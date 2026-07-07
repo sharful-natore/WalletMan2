@@ -18,18 +18,22 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # গ্রেডল সেটআপ করা (ভার্সন ৯.৩.১)
+      # ৪. গ্রেডল সেটআপ করা (ভার্সন ৯.৩.১)
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
           validate-wrappers: false
 
-      # গিটহাব সিক্রেট থেকে Base64 ডাটা নিয়ে কি-স্টোর ফাইল তৈরি করা
-      - name: Decode Keystore
+      # সমাধান: রানারের পিসিতে একটি স্ট্যান্ডার্ড ডিবাগ কি-স্টোর জেনারেট করা
+      # যার পাসওয়ার্ড: android এবং অ্যালাইয়াস: androiddebugkey
+      # এটি প্রজেক্টের রুট এবং app ফোল্ডার—উভয় জায়গাতেই কপি করে দেওয়া হচ্ছে যাতে গ্রেডল যেকোনো এক জায়গা থেকে পেলেই বিল্ড করে নেয়।
+      - name: Generate Default Debug Keystore
         run: |
-          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > debug.keystore
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cp ~/.android/debug.keystore ./debug.keystore
+          cp ~/.android/debug.keystore ./app/debug.keystore
 
-      # গ্রেডল বিল্ড রান করা
       - name: Build with Gradle
         run: gradle assembleDebug
