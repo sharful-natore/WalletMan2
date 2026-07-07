@@ -18,18 +18,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # ৪. গ্রেডল সেটআপ করা (যাতে লোকাল র্যাপার বা উইন্ডোজ CRLF লাইনের কোনো সমস্যা ছাড়াই ৯.৩.১ ভার্সনে বিল্ড হতে পারে এবং র্যাপার ভ্যালিডেশন বন্ধ রাখা হয়েছে)
+      # গ্রেডল সেটআপ করা (ভার্সন ৯.৩.১)
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
           validate-wrappers: false
 
+      # গিটহাব সিক্রেট থেকে Base64 ডাটা নিয়ে কি-স্টোর ফাইল তৈরি করা
       - name: Decode Keystore
         run: |
-          if [ -f "debug.keystore.base64" ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-          fi
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > debug.keystore
 
+      # গ্রেডল বিল্ড রান করা
       - name: Build with Gradle
         run: gradle assembleDebug
