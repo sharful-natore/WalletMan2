@@ -1,0 +1,35 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ৪. গ্রেডল সেটআপ করা (যাতে লোকাল র্যাপার বা উইন্ডোজ CRLF লাইনের কোনো সমস্যা ছাড়াই ৯.৩.১ ভার্সনে বিল্ড হতে পারে এবং র্যাপার ভ্যালিডেশন বন্ধ রাখা হয়েছে)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+          validate-wrappers: false
+
+      - name: Decode Keystore
+        run: |
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
+      - name: Build with Gradle
+        run: gradle assembleDebug

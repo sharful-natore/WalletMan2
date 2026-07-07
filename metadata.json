@@ -1,0 +1,6 @@
+{
+  "name": "Sanchay",
+  "description": "A premium fintech-styled personal finance manager with Bengali/English support, transaction tracking, debt management, and savings targets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
