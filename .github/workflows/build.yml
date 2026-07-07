@@ -18,16 +18,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # ৪. গ্রেডল সেটআপ করা (ভার্সন ৯.৩.১)
+      # ৪. গ্রেডল সেটআপ করা
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
           validate-wrappers: false
 
-      # সমাধান: রানারের পিসিতে একটি স্ট্যান্ডার্ড ডিবাগ কি-স্টোর জেনারেট করা
-      # যার পাসওয়ার্ড: android এবং অ্যালাইয়াস: androiddebugkey
-      # এটি প্রজেক্টের রুট এবং app ফোল্ডার—উভয় জায়গাতেই কপি করে দেওয়া হচ্ছে যাতে গ্রেডল যেকোনো এক জায়গা থেকে পেলেই বিল্ড করে নেয়।
+      # রানারের পিসিতে ডিবাগ কি-স্টোর জেনারেট করা
       - name: Generate Default Debug Keystore
         run: |
           mkdir -p ~/.android
@@ -37,3 +35,10 @@ jobs:
 
       - name: Build with Gradle
         run: gradle assembleDebug
+
+      # নতুন স্টেপ: বিল্ড হওয়া APK ফাইলটি ডাউনলোডের জন্য আপলোড করা
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-wallet-app-debug # এখানে আপনার ইচ্ছামতো নাম দিতে পারেন
+          path: app/build/outputs/apk/debug/*.apk
