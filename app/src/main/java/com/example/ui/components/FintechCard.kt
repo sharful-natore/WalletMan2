@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +24,7 @@ fun FintechGradientCard(
     gradientColors: List<Color>,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 20.dp,
-    padding: Dp = 14.dp,
+    padding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -63,7 +64,7 @@ fun FrostedGlassCard(
     modifier: Modifier = Modifier,
     isDark: Boolean = true,
     cornerRadius: Dp = 24.dp,
-    padding: Dp = 14.dp,
+    padding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {

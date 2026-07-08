@@ -700,7 +700,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                         .fillMaxWidth()
                         .background(FintechBlue)
                         .navigationBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -761,8 +761,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                         // Center: Central FAB!
                         Box(
                             modifier = Modifier
-                                .offset(y = (-34).dp)
-                                .size(96.dp)
+                                .offset(y = (-24).dp)
+                                .size(80.dp)
                                 .background(if (isDarkTheme) Color.Black else Color.White, CircleShape)
                                 .clickable(
                                     indication = null,
@@ -773,7 +773,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(76.dp)
+                                    .size(64.dp)
                                     .shadow(
                                         elevation = 8.dp,
                                         shape = CircleShape
@@ -791,7 +791,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = "Add Transaction",
                                     tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
                         }
@@ -1272,6 +1272,7 @@ fun DashboardScreen(
             FintechGradientCard(
                 gradientColors = GradientsList[0], // Sleek Indigo-Violet-Fuchsia Gradient
                 cornerRadius = 32.dp,
+                padding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
                 modifier = Modifier.testTag("dashboard_balance_card")
             ) {
                 // Total Balance Header Row
@@ -1292,7 +1293,7 @@ fun DashboardScreen(
                             color = Color.White,
                             fontSize = 34.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                            modifier = Modifier.padding(vertical = 2.dp)
                         )
                     }
 
@@ -1315,7 +1316,7 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Row 1: Income and Expense Sub-Cards
                 Row(
@@ -1330,7 +1331,7 @@ fun DashboardScreen(
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                             .clickable { onNavigate("transactions", "INCOME") }
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -1365,7 +1366,7 @@ fun DashboardScreen(
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                             .clickable { onNavigate("transactions", "EXPENSE") }
-                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -1573,7 +1574,7 @@ fun TransactionRowItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 22.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -1740,7 +1741,7 @@ fun TransactionsScreen(
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    padding = 10.dp,
+                    padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 2.dp)) {
@@ -1752,7 +1753,7 @@ fun TransactionsScreen(
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    padding = 10.dp,
+                    padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 2.dp)) {
@@ -1911,7 +1912,7 @@ fun DebtsScreen(
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    padding = 10.dp,
+                    padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 2.dp)) {
@@ -1923,7 +1924,7 @@ fun DebtsScreen(
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    padding = 10.dp,
+                    padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 2.dp)) {
@@ -2224,7 +2225,7 @@ fun PersonDebtRowItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 22.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -2407,7 +2408,7 @@ fun SavingsGoalCardItem(
         gradientColors = gradient,
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(160.dp)
             .combinedClickable(
                 onClick = { onGoalClick(goal) },
                 onLongClick = { onEditGoal(goal) }
@@ -2472,7 +2473,7 @@ fun SavingsGoalCardItem(
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(top = 20.dp)
+                    .padding(top = 16.dp, start = 8.dp)
             ) {
                 Text(
                     text = formattedCategory,
@@ -3794,7 +3795,7 @@ fun PersonDetailOverlay(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Net Balance Summary Box inside Card
                 val (statusText, statusColor, absoluteAmount) = when {
@@ -3806,9 +3807,10 @@ fun PersonDetailOverlay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(if (isDark) Color(0xFF141724) else Color(0xFFF3F4F6))
-                        .padding(14.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -3836,7 +3838,7 @@ fun PersonDetailOverlay(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Action Buttons Grid (Lend / Borrow / Repay)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -5132,7 +5134,7 @@ fun ChartsScreen(
         FintechGradientCard(
             gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
             cornerRadius = 24.dp,
-            padding = 24.dp,
+            padding = PaddingValues(24.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -5190,7 +5192,7 @@ fun ChartsScreen(
         FintechGradientCard(
             gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
             cornerRadius = 24.dp,
-            padding = 16.dp,
+            padding = PaddingValues(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -5231,23 +5233,13 @@ fun SplashScreen(isDark: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(140.dp)
-                    .shadow(elevation = 20.dp, shape = RoundedCornerShape(36.dp))
-                    .clip(RoundedCornerShape(36.dp))
-                    .background(Color.White)
-                    .padding(2.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_app_logo),
-                    contentDescription = "Finance Note Logo",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            Spacer(modifier = Modifier.height(32.dp))
+            Image(
+                painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_app_logo),
+                contentDescription = "Finance Note Logo",
+                modifier = Modifier.size(120.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Finance Note",
                 color = Color.White,
