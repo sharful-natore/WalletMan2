@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
+import java.io.InputStream
 
 data class PersonDebt(
     val person: Person,
@@ -75,7 +79,6 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     val savingsGoals: StateFlow<List<SavingsGoal>> = repository.allSavingsGoals
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Combined Streams for Debts & Credits
     val personDebts: StateFlow<List<PersonDebt>> = combine(persons, transactions) { personList, txList ->
         personList.map { person ->
             val personTx = txList.filter { it.personId == person.id }
@@ -249,6 +252,26 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         }
     }
 
+    private fun saveImageToInternalStorage(context: Context, uriString: String): String? {
+        return try {
+            if (!uriString.startsWith("content://")) return uriString
+            val uri = Uri.parse(uriString)
+            val inputStream = context.contentResolver.openInputStream(uri)
+            val fileName = "profile_photo_${System.currentTimeMillis()}.jpg"
+            val file = File(context.filesDir, fileName)
+            val outputStream = FileOutputStream(file)
+            inputStream?.use { input ->
+                outputStream.use { output ->
+                    input.copyTo(output)
+                }
+            }
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     // Profile Settings Helpers
     fun loadProfile(context: Context) {
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -266,24 +289,55 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     }
 
     fun saveProfile(context: Context, name: String, email: String, photoUri: String? = null, phone: String = "", social: String = "", address: String = "") {
+        val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it) } ?: photoUri
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putString("user_name", name)
             .putString("user_email", email)
-            .putString("user_photo", photoUri)
+            .putString("user_photo", finalPhotoUri)
             .putString("user_phone", phone)
             .putString("user_social", social)
             .putString("user_address", address)
             .apply()
         _profileName.value = name
         _profileEmail.value = email
-        _profilePhotoUri.value = photoUri
+        _profilePhotoUri.value = finalPhotoUri
         _profilePhone.value = phone
         _profileSocial.value = social
         _profileAddress.value = address
     }
 
     // Backup & Restore operations
+    fun exportBackupToUri(context: Context, outputStream: java.io.OutputStream, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val backupData = repository.getBackupData()
+                val json = backupAdapter.indent("  ").toJson(backupData)
+                outputStream.use { it.write(json.toByteArray()) }
+                onSuccess()
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    fun importBackupFromUri(context: Context, inputStream: java.io.InputStream, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val jsonContent = inputStream.use { it.bufferedReader().readText() }
+                val backupData = backupAdapter.fromJson(jsonContent)
+                if (backupData != null) {
+                    repository.restoreBackupData(backupData)
+                    onSuccess()
+                } else {
+                    throw Exception("Invalid backup data format")
+                }
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
     fun exportBackup(context: Context, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {

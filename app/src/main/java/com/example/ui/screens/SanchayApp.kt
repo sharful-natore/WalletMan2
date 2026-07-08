@@ -582,14 +582,34 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
 
+    var showExitConfirm by remember { mutableStateOf(false) }
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            title = { Text(if (language == AppLanguage.BN) "অ্যাপ থেকে বের হবেন?" else "Exit App?") },
+            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে অ্যাপ থেকে বের হতে চান?" else "Are you sure you want to exit the app?") },
+            confirmButton = {
+                Button(onClick = { (context as? android.app.Activity)?.finish() }) {
+                    Text(if (language == AppLanguage.BN) "হ্যাঁ" else "Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) {
+                    Text(if (language == AppLanguage.BN) "না" else "No")
+                }
+            }
+        )
+    }
+
     // Back handling for overlays and settings
     androidx.activity.compose.BackHandler(
-        enabled = selectedPersonDetail != null || selectedSavingsGoalDetail != null || activeTab == "settings"
+        enabled = selectedPersonDetail != null || selectedSavingsGoalDetail != null || activeTab == "settings" || activeTab == "dashboard"
     ) {
         when {
             selectedPersonDetail != null -> selectedPersonDetail = null
             selectedSavingsGoalDetail != null -> selectedSavingsGoalDetail = null
             activeTab == "settings" -> activeTab = "dashboard"
+            activeTab == "dashboard" -> showExitConfirm = true
         }
     }
 
@@ -700,7 +720,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                         .fillMaxWidth()
                         .background(FintechBlue)
                         .navigationBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .padding(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -761,8 +781,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                         // Center: Central FAB!
                         Box(
                             modifier = Modifier
-                                .offset(y = (-24).dp)
-                                .size(80.dp)
+                                .offset(y = (-20).dp)
+                                .size(72.dp)
                                 .background(if (isDarkTheme) Color.Black else Color.White, CircleShape)
                                 .clickable(
                                     indication = null,
@@ -773,11 +793,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(64.dp)
-                                    .shadow(
-                                        elevation = 8.dp,
-                                        shape = CircleShape
-                                    )
+                                    .size(58.dp)
                                     .clip(CircleShape)
                                     .background(
                                         Brush.linearGradient(
@@ -791,7 +807,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = "Add Transaction",
                                     tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(26.dp)
                                 )
                             }
                         }
@@ -879,7 +895,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                                     language = language,
                                     isDark = isDarkTheme,
                                     transactions = transactions,
-                                    persons = persons
+                                    persons = persons,
+                                    onBack = { activeTab = "dashboard" }
                                 )
                             } else {
                                 val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
@@ -895,23 +912,23 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                                         else -> null
                                     }
                                     if (page != null && pagerState.currentPage != page) {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(page)
-                                        }
+                                        pagerState.animateScrollToPage(page)
                                     }
                                 }
 
-                                // Sync Pager swipe to activeTab
-                                LaunchedEffect(pagerState.currentPage) {
-                                    val tab = when (pagerState.currentPage) {
-                                        0 -> "dashboard"
-                                        1 -> "transactions"
-                                        2 -> "debts"
-                                        3 -> "savings"
-                                        else -> "dashboard"
-                                    }
-                                    if (activeTab != tab) {
-                                        activeTab = tab
+                                // Sync Pager settled page to activeTab
+                                LaunchedEffect(pagerState.settledPage) {
+                                    if (!pagerState.isScrollInProgress) {
+                                        val tab = when (pagerState.settledPage) {
+                                            0 -> "dashboard"
+                                            1 -> "transactions"
+                                            2 -> "debts"
+                                            3 -> "savings"
+                                            else -> "dashboard"
+                                        }
+                                        if (activeTab != tab && (activeTab == "dashboard" || activeTab == "transactions" || activeTab == "debts" || activeTab == "savings")) {
+                                            activeTab = tab
+                                        }
                                     }
                                 }
 
@@ -2408,7 +2425,7 @@ fun SavingsGoalCardItem(
         gradientColors = gradient,
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .height(170.dp)
             .combinedClickable(
                 onClick = { onGoalClick(goal) },
                 onLongClick = { onEditGoal(goal) }
@@ -2469,21 +2486,20 @@ fun SavingsGoalCardItem(
                 modifier = Modifier.align(Alignment.TopEnd)
             )
 
-            // Goal Category and Balance in the middle-bottom
+            // Goal Category and Balance in the bottom-left
             Column(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(top = 16.dp, start = 8.dp)
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 Text(
                     text = formattedCategory,
                     color = Color.White,
-                    fontSize = 20.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp
                 )
-                
-                Spacer(modifier = Modifier.height(4.dp))
                 
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -2497,35 +2513,29 @@ fun SavingsGoalCardItem(
                             text = " / " + formatCurrency(goal.targetAmount, language),
                             color = Color.White.copy(alpha = 0.6f),
                             fontSize = 14.sp,
-                            modifier = Modifier.padding(bottom = 4.dp, start = 4.dp)
+                            modifier = Modifier.padding(bottom = 2.dp, start = 2.dp)
                         )
                     }
                 }
+                
+                Text(
+                    text = goal.cardholderName.ifBlank { profileName }.uppercase(),
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.sp
+                )
             }
 
-            // Bottom row: "Holder" (Title again or generic) and Mastercard-like logo
+            // Bottom row: Mastercard-like logo
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(end = 8.dp, bottom = 8.dp)
+                    .align(Alignment.BottomEnd),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.Bottom
             ) {
-                Column {
-                    Text(
-                        text = if (language == AppLanguage.BN) "কার্ডধারী" else "CARDHOLDER",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = goal.cardholderName.ifBlank { profileName }.uppercase(),
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.sp
-                    )
-                }
 
                 // Mastercard Circles Logo Simulation
                 Box(contentAlignment = Alignment.Center) {
@@ -3545,19 +3555,12 @@ fun SavingsGoalDetailOverlay(
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.CenterStart)
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = if (isDark) Color.White else Color.Black)
-                }
-                
                 Text(
                     text = if (language == AppLanguage.BN) "সঞ্চয় কার্ডের বিস্তারিত" else "Savings Card Details",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FintechBlue,
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.align(Alignment.CenterStart)
                 )
 
                 Row(
@@ -3568,6 +3571,9 @@ fun SavingsGoalDetailOverlay(
                     }
                     IconButton(onClick = { showDeleteConfirm = true }) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Close", tint = if (isDark) Color.White else Color.Black)
                     }
                 }
             }
@@ -4534,6 +4540,30 @@ fun SettingsScreen(
         }
 
         // --- 4. DATA BACKUP & RESTORE CARD ---
+        val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            uri?.let {
+                context.contentResolver.openOutputStream(it)?.let { outputStream ->
+                    viewModel.exportBackupToUri(context, outputStream, {
+                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
+                    }, { error ->
+                        Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                    })
+                }
+            }
+        }
+
+        val openDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let {
+                context.contentResolver.openInputStream(it)?.let { inputStream ->
+                    viewModel.importBackupFromUri(context, inputStream, {
+                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
+                    }, { error ->
+                        Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                    })
+                }
+            }
+        }
+
         SettingCategory(
             title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
             isDark = isDark,
@@ -4563,20 +4593,30 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        var showBackupConfirm by remember { mutableStateOf(false) }
+                        if (showBackupConfirm) {
+                            AlertDialog(
+                                onDismissRequest = { showBackupConfirm = false },
+                                title = { Text(if (language == AppLanguage.BN) "ব্যাকআপ তৈরি করবেন?" else "Create Backup?") },
+                                text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে ডাটার ব্যাকআপ তৈরি করতে চান?" else "Are you sure you want to create a backup of your data?") },
+                                confirmButton = {
+                                    Button(onClick = {
+                                        showBackupConfirm = false
+                                        createDocumentLauncher.launch("financenote_backup_${System.currentTimeMillis()}.json")
+                                    }) {
+                                        Text(if (language == AppLanguage.BN) "হ্যাঁ" else "Yes")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showBackupConfirm = false }) {
+                                        Text(if (language == AppLanguage.BN) "না" else "No")
+                                    }
+                                }
+                            )
+                        }
                         Button(
                             onClick = {
-                                viewModel.exportBackup(
-                                    context = context,
-                                    onSuccess = { json ->
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        val clip = android.content.ClipData.newPlainText("Finance Note Backup", json)
-                                        clipboard.setPrimaryClip(clip)
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ মেমোরিতে সেভ হয়েছে এবং ক্লিপবোর্ডে কপি হয়েছে!" else "Backup saved to memory and copied to clipboard!", Toast.LENGTH_LONG).show()
-                                    },
-                                    onError = { error ->
-                                        Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
-                                    }
-                                )
+                                showBackupConfirm = true
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
@@ -4588,7 +4628,9 @@ fun SettingsScreen(
                         }
 
                         Button(
-                            onClick = { showPasteArea = !showPasteArea },
+                            onClick = {
+                                openDocumentLauncher.launch(arrayOf("application/json", "application/octet-stream"))
+                            },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0)),
@@ -5102,7 +5144,8 @@ fun ChartsScreen(
     language: AppLanguage,
     isDark: Boolean,
     transactions: List<Transaction>,
-    persons: List<Person>
+    persons: List<Person>,
+    onBack: () -> Unit
 ) {
     val totalIncome = transactions.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
     val totalExpense = transactions.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }.sumOf { it.amount }
@@ -5131,6 +5174,7 @@ fun ChartsScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
+        androidx.activity.compose.BackHandler(onBack = onBack)
         FintechGradientCard(
             gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
             cornerRadius = 24.dp,
@@ -5163,8 +5207,7 @@ fun ChartsScreen(
                                         color = colors[index],
                                         startAngle = startAngle,
                                         sweepAngle = sweepAngle,
-                                        useCenter = false,
-                                        style = Stroke(width = 50f, cap = StrokeCap.Round)
+                                        useCenter = true
                                     )
                                     startAngle += sweepAngle
                                 }
