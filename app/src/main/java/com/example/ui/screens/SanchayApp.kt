@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.R
 import android.content.Context
 import android.net.Uri
 import com.example.ui.components.*
@@ -495,13 +496,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
     }
 
     if (showSplash) {
-        MaterialTheme(colorScheme = MaterialTheme.colorScheme) {
-            SplashScreen(isDark = isDarkTheme)
-        }
-        return
-    }
-
-    val persons by viewModel.persons.collectAsState()
+        SplashScreen(isDark = isDarkTheme)
+    } else {
+        val persons by viewModel.persons.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
     val savingsGoals by viewModel.savingsGoals.collectAsState()
     val personDebts by viewModel.personDebts.collectAsState()
@@ -1134,6 +1131,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
             }
         }
     }
+}
 }
 
 // ---------------- DASHBOARD TAB ----------------
@@ -5242,7 +5240,7 @@ fun SplashScreen(isDark: Boolean) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.finance_note_bank_logo),
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.app_logo_main),
                     contentDescription = "Finance Note Logo",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

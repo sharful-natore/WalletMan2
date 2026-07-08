@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/finance_note_bank_logo"
+        android:drawable="@drawable/app_logo_main"
         android:gravity="center" />
 </layer-list>
