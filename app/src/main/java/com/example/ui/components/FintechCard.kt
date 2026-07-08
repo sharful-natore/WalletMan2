@@ -23,6 +23,7 @@ fun FintechGradientCard(
     gradientColors: List<Color>,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 20.dp,
+    padding: Dp = 14.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -49,7 +50,7 @@ fun FintechGradientCard(
                 shape = shape
             )
             .then(clickModifier)
-            .padding(20.dp)
+            .padding(padding)
     ) {
         Column {
             content()
@@ -62,6 +63,7 @@ fun FrostedGlassCard(
     modifier: Modifier = Modifier,
     isDark: Boolean = true,
     cornerRadius: Dp = 24.dp,
+    padding: Dp = 14.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -102,7 +104,7 @@ fun FrostedGlassCard(
                 shape = shape
             )
             .then(clickModifier)
-            .padding(18.dp)
+            .padding(padding)
     ) {
         Column {
             content()

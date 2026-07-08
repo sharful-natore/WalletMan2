@@ -4,7 +4,7 @@ enum class AppLanguage { BN, EN }
 
 object Translation {
     private val bnMap = mapOf(
-        "app_title" to "সঞ্চয়",
+        "app_title" to "Finance Note",
         "dashboard" to "ড্যাশবোর্ড",
         "transactions" to "লেনদেন",
         "debts" to "দেনাপাওনা",
@@ -123,7 +123,7 @@ object Translation {
     )
 
     private val enMap = mapOf(
-        "app_title" to "Sanchay",
+        "app_title" to "Finance Note",
         "dashboard" to "Dashboard",
         "transactions" to "Transactions",
         "debts" to "Debts & Credits",

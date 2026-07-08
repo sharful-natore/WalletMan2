@@ -12,7 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.view.WindowCompat
 import com.example.data.AppDatabase
 import com.example.data.FinanceRepository
-import com.example.ui.screens.SanchayApp
+import com.example.ui.screens.FinanceNoteApp
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.ui.viewmodel.FinanceViewModelFactory
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
             }
             
             MyApplicationTheme(darkTheme = isDarkTheme) {
-                SanchayApp(viewModel = viewModel)
+                FinanceNoteApp(viewModel = viewModel)
             }
         }
     }

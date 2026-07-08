@@ -1,156 +1,404 @@
 package com.example.ui.screens
 
 import android.content.Context
+import android.net.Uri
+import com.example.ui.components.*
+import com.example.ui.theme.*
+import androidx.compose.ui.graphics.vector.ImageVector
+import java.text.DecimalFormat
+import androidx.compose.ui.window.Dialog
 import android.widget.Toast
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.pager.*
+import androidx.compose.foundation.shape.*
+import androidx.compose.foundation.text.*
+import androidx.compose.material.icons.*
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.geometry.*
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.*
+import androidx.compose.ui.layout.*
+import androidx.compose.ui.platform.*
+import androidx.compose.ui.text.*
+import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.*
+import androidx.compose.ui.unit.*
 import coil.compose.AsyncImage
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.CompareArrows
-import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
-import androidx.compose.material.icons.automirrored.rounded.TrendingDown
-import androidx.compose.material.icons.automirrored.rounded.TrendingUp
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ArrowDownward
-import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.DirectionsRun
-import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.NightsStay
-import androidx.compose.material.icons.rounded.Payments
-import androidx.compose.material.icons.rounded.People
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Phone
-import androidx.compose.material.icons.rounded.AccountBalance
-import androidx.compose.material.icons.rounded.Savings
-import androidx.compose.material.icons.rounded.TrendingDown
-import androidx.compose.material.icons.rounded.TrendingUp
-import androidx.compose.material.icons.rounded.Wallet
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.SpaceDashboard
-import androidx.compose.material.icons.rounded.ListAlt
-import androidx.compose.material.icons.rounded.Group
-import androidx.compose.material.icons.rounded.Handshake
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Backup
-import androidx.compose.material.icons.rounded.Restore
-import androidx.compose.material.icons.rounded.Email
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import com.example.data.Person
-import com.example.data.SavingsGoal
-import com.example.data.SavingsTransaction
-import com.example.data.Transaction
-import com.example.ui.AppLanguage
-import com.example.ui.Translation
-import com.example.ui.components.FintechGradientCard
-import com.example.ui.components.FrostedGlassCard
-import com.example.ui.theme.FintechGreen
-import com.example.ui.theme.FintechRed
-import com.example.ui.theme.FintechBlue
-import com.example.ui.theme.GradientsList
-import com.example.ui.viewmodel.FinanceViewModel
-import com.example.ui.viewmodel.PersonDebt
-import java.text.DecimalFormat
+import com.example.data.*
+import com.example.ui.*
+import com.example.ui.viewmodel.*
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+
+
+fun formatNumber(number: Int, lang: AppLanguage): String {
+    val str = number.toString()
+    if (lang == AppLanguage.EN) return str
+    return str
+        .replace("0", "০")
+        .replace("1", "১")
+        .replace("2", "২")
+        .replace("3", "৩")
+        .replace("4", "৪")
+        .replace("5", "৫")
+        .replace("6", "৬")
+        .replace("7", "৭")
+        .replace("8", "৮")
+        .replace("9", "৯")
+}
+
+fun getCustomTimeFilterLabel(timeFilter: String, lang: AppLanguage): String {
+    val monthsBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+    val monthsEn = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    
+    if (timeFilter.startsWith("CUSTOM_MONTH:")) {
+        val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+        if (parts.size == 2) {
+            val year = parts[0].toIntOrNull() ?: 2026
+            val month = parts[1].toIntOrNull() ?: 1
+            val monthStr = if (lang == AppLanguage.BN) monthsBn[month - 1] else monthsEn[month - 1]
+            return "$monthStr, ${formatNumber(year, lang)}"
+        }
+    } else if (timeFilter.startsWith("CUSTOM_DATE:")) {
+        val parts = timeFilter.substringAfter("CUSTOM_DATE:").split("-")
+        if (parts.size == 3) {
+            val year = parts[0].toIntOrNull() ?: 2026
+            val month = parts[1].toIntOrNull() ?: 1
+            val day = parts[2].toIntOrNull() ?: 1
+            val monthStr = if (lang == AppLanguage.BN) monthsBn[month - 1] else monthsEn[month - 1]
+            return "${formatNumber(day, lang)} $monthStr, ${formatNumber(year, lang)}"
+        }
+    }
+    return timeFilter
+}
+
+fun formatNumberString(str: String, lang: AppLanguage): String {
+    if (lang == AppLanguage.EN) return str
+    return str
+        .replace("0", "০")
+        .replace("1", "১")
+        .replace("2", "২")
+        .replace("3", "৩")
+        .replace("4", "৪")
+        .replace("5", "৫")
+        .replace("6", "৬")
+        .replace("7", "৭")
+        .replace("8", "৮")
+        .replace("9", "৯")
+}
+
+fun getFormattedDateLabel(timeFilter: String, lang: AppLanguage): String {
+    if (timeFilter.startsWith("CUSTOM_DATE:")) {
+        val parts = timeFilter.substringAfter("CUSTOM_DATE:").split("-")
+        if (parts.size == 3) {
+            val year = parts[0].toIntOrNull() ?: 2026
+            val month = parts[1].toIntOrNull() ?: 1
+            val day = parts[2].toIntOrNull() ?: 1
+            val shortYear = year % 100
+            val dayStr = if (day < 10) "0$day" else "$day"
+            val monthStr = if (month < 10) "0$month" else "$month"
+            val yearStr = if (shortYear < 10) "0$shortYear" else "$shortYear"
+            val rawDate = "$dayStr/$monthStr/$yearStr"
+            return if (lang == AppLanguage.BN) "${formatNumberString(rawDate, lang)} তারিখের" else "$rawDate"
+        }
+    }
+    return if (lang == AppLanguage.BN) "তারিখ অনুযায়ী" else "By Date"
+}
+
+@Composable
+fun MonthYearPickerDialog(
+    initialYear: Int,
+    initialMonth: Int,
+    language: AppLanguage,
+    onDismiss: () -> Unit,
+    onConfirm: (year: Int, month: Int) -> Unit
+) {
+    var selectedYear by remember { mutableStateOf(initialYear) }
+    var selectedMonth by remember { mutableStateOf(initialMonth) }
+    
+    val monthsBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+    val monthsEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    val months = if (language == AppLanguage.BN) monthsBn else monthsEn
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (language == AppLanguage.BN) "মাস নির্বাচন করুন" else "Select Month & Year") },
+        text = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(modifier = Modifier.weight(1.2f)) {
+                    Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(12) { index ->
+                            val m = index + 1
+                            val isSelected = selectedMonth == m
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedMonth = m }
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(months[index], fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                    val years = (currentYear - 3..currentYear + 2).toList()
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(years.size) { index ->
+                            val y = years[index]
+                            val isSelected = selectedYear == y
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedYear = y }
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(formatNumber(y, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedYear, selectedMonth) }) {
+                Text(Translation.get("confirm", language))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(Translation.get("cancel", language))
+            }
+        }
+    )
+}
+
+@Composable
+fun SpecificDatePickerDialog(
+    initialYear: Int,
+    initialMonth: Int,
+    initialDay: Int,
+    language: AppLanguage,
+    onDismiss: () -> Unit,
+    onConfirm: (year: Int, month: Int, day: Int) -> Unit
+) {
+    var selectedYear by remember { mutableStateOf(initialYear) }
+    var selectedMonth by remember { mutableStateOf(initialMonth) }
+    var selectedDay by remember { mutableStateOf(initialDay) }
+    
+    val monthsBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+    val monthsEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    val months = if (language == AppLanguage.BN) monthsBn else monthsEn
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (language == AppLanguage.BN) "তারিখ নির্বাচন করুন" else "Select Date") },
+        text = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(if (language == AppLanguage.BN) "দিন" else "Day", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(31) { index ->
+                            val d = index + 1
+                            val isSelected = selectedDay == d
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedDay = d }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(formatNumber(d, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1.2f)) {
+                    Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(12) { index ->
+                            val m = index + 1
+                            val isSelected = selectedMonth == m
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedMonth = m }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(months[index], fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                    val years = (currentYear - 3..currentYear + 2).toList()
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(years.size) { index ->
+                            val y = years[index]
+                            val isSelected = selectedYear == y
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedYear = y }
+                                    .padding(6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(formatNumber(y, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay) }) {
+                Text(Translation.get("confirm", language))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(Translation.get("cancel", language))
+            }
+        }
+    )
+}
+
+@Composable
+fun DeleteVerificationDialog(
+    language: AppLanguage,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val verificationCode = remember { (1000..9999).random().toString() }
+    var userInput by remember { mutableStateOf("") }
+    val isMatched = userInput.trim() == verificationCode
+    
+    val title = if (language == AppLanguage.BN) "মুছে ফেলার নিশ্চিতকরণ" else "Confirm Deletion"
+    val msg = if (language == AppLanguage.BN) {
+        "এটি মুছে ফেলতে নিচে দেখানো কোডটি টাইপ করুন:"
+    } else {
+        "To delete, please type the verification code below:"
+    }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Rounded.Delete, contentDescription = null, tint = FintechRed)
+                Text(title, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(msg, style = MaterialTheme.typography.bodyMedium)
+                
+                // Big beautiful matched/unmatched verification code display
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f))
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = formatNumber(verificationCode.toInt(), language),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.error,
+                        letterSpacing = 4.sp
+                    )
+                }
+                
+                OutlinedTextField(
+                    value = userInput,
+                    onValueChange = { userInput = it },
+                    placeholder = {
+                        Text(
+                            if (language == AppLanguage.BN) "কোডটি এখানে লিখুন" else "Enter code here",
+                            fontSize = 14.sp
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag("delete_verification_input"),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = isMatched,
+                colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.testTag("delete_verification_confirm_btn")
+            ) {
+                Text(Translation.get("delete", language), color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(Translation.get("cancel", language))
+            }
+        }
+    )
+}
 
 // Helper to format currency
 fun formatCurrency(amount: Double, lang: AppLanguage): String {
@@ -231,7 +479,7 @@ fun formatDateHeader(dateStr: String, lang: AppLanguage): String {
 }
 
 @Composable
-fun SanchayApp(viewModel: FinanceViewModel) {
+fun FinanceNoteApp(viewModel: FinanceViewModel) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val profileName by viewModel.profileName.collectAsState()
@@ -239,8 +487,18 @@ fun SanchayApp(viewModel: FinanceViewModel) {
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
 
     val context = LocalContext.current
+    var showSplash by remember { mutableStateOf(true) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadProfile(context)
+        kotlinx.coroutines.delay(2000)
+        showSplash = false
+    }
+
+    if (showSplash) {
+        MaterialTheme(colorScheme = MaterialTheme.colorScheme) {
+            SplashScreen(isDark = isDarkTheme)
+        }
+        return
     }
 
     val persons by viewModel.persons.collectAsState()
@@ -254,7 +512,17 @@ fun SanchayApp(viewModel: FinanceViewModel) {
     val totalOwedToMe by viewModel.totalOwedToMe.collectAsState()
     val totalIOwe by viewModel.totalIOwe.collectAsState()
 
-    var timeFilter by remember { mutableStateOf("ALL") } // "ALL", "TODAY", "MONTH"
+    var timeFilter by remember { mutableStateOf("MONTH") } // Default to "MONTH" as requested by user
+    var showMonthPickerState by remember { mutableStateOf(false) }
+    var showDatePickerState by remember { mutableStateOf(false) }
+
+    val handleTimeFilterChange: (String) -> Unit = { filterVal ->
+        when (filterVal) {
+            "TRIGGER_MONTH_PICKER" -> showMonthPickerState = true
+            "TRIGGER_DATE_PICKER" -> showDatePickerState = true
+            else -> timeFilter = filterVal
+        }
+    }
 
     // Filtered Transactions and metrics for the current time period
     val filteredTransactionsForMetrics = remember(transactions, timeFilter) {
@@ -330,6 +598,7 @@ fun SanchayApp(viewModel: FinanceViewModel) {
         colorScheme = MaterialTheme.colorScheme
     ) {
         Scaffold(
+            containerColor = if (isDarkTheme) Color.Black else Color.White,
             topBar = {
                 Surface(
                     color = FintechBlue,
@@ -339,12 +608,12 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .statusBarsPadding()
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (activeTab == "settings") {
+                            if (activeTab == "settings" || activeTab == "charts") {
                                 IconButton(
                                     onClick = { activeTab = "dashboard" },
                                     modifier = Modifier.padding(end = 8.dp).size(24.dp)
@@ -357,12 +626,15 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                                 }
                             }
                             
-                            val screenTitle = when (activeTab) {
-                                "dashboard" -> Translation.get("dashboard", language)
-                                "transactions" -> Translation.get("transactions", language)
-                                "debts" -> Translation.get("debts", language)
-                                "savings" -> Translation.get("savings", language)
-                                "settings" -> Translation.get("settings", language)
+                            val screenTitle = when {
+                                selectedSavingsGoalDetail != null -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
+                                selectedPersonDetail != null -> Translation.get("details", language)
+                                activeTab == "dashboard" -> "Finance Note"
+                                activeTab == "transactions" -> Translation.get("transactions", language)
+                                activeTab == "debts" -> Translation.get("debts", language)
+                                activeTab == "savings" -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
+                                activeTab == "settings" -> Translation.get("settings", language)
+                                activeTab == "charts" -> if (language == AppLanguage.BN) "চার্টস" else "Charts"
                                 else -> Translation.get("dashboard", language)
                             }
                             
@@ -378,33 +650,37 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            IconButton(
+                                onClick = { viewModel.toggleLanguage(context) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Language,
+                                    contentDescription = "Toggle Language",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.toggleTheme(context) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.NightsStay,
+                                    contentDescription = "Theme Toggle",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
                             if (activeTab != "settings") {
                                 IconButton(
-                                    onClick = { viewModel.toggleLanguage() },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Language,
-                                        contentDescription = "Toggle Language",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { viewModel.toggleTheme() },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.NightsStay,
-                                        contentDescription = "Theme Toggle",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { activeTab = "settings" },
+                                    onClick = {
+                                        activeTab = "settings"
+                                        selectedPersonDetail = null
+                                        selectedSavingsGoalDetail = null
+                                    },
                                     modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
@@ -425,7 +701,7 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                         .fillMaxWidth()
                         .background(FintechBlue)
                         .navigationBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -457,8 +733,8 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                                ) {
+                                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                                 ) {
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
@@ -486,36 +762,37 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                         // Center: Central FAB!
                         Box(
                             modifier = Modifier
-                                .offset(y = (-30).dp)
-                                .size(88.dp)
+                                .offset(y = (-34).dp)
+                                .size(96.dp)
+                                .background(if (isDarkTheme) Color.Black else Color.White, CircleShape)
                                 .clickable(
                                     indication = null,
                                     interactionSource = remember { MutableInteractionSource() }
                                 ) { showAddTransactionDialog = true }
-                                .testTag("fab_add_transaction"),
+                                .testTag("fab_add_transaction_outer"),
                             contentAlignment = Alignment.Center
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(78.dp)
+                                    .size(76.dp)
+                                    .shadow(
+                                        elevation = 8.dp,
+                                        shape = CircleShape
+                                    )
                                     .clip(CircleShape)
                                     .background(
                                         Brush.linearGradient(
                                             colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
                                         )
                                     )
-                                    .border(
-                                        width = 5.dp,
-                                        color = if (isDarkTheme) Color(0xFF141724) else Color.White,
-                                        shape = CircleShape
-                                    ),
+                                    .testTag("fab_add_transaction"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = "Add Transaction",
                                     tint = Color.White,
-                                    modifier = Modifier.size(26.dp)
+                                    modifier = Modifier.size(32.dp)
                                 )
                             }
                         }
@@ -573,89 +850,141 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp)
                 ) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(0.dp))
 
                     // Active Tab Render
                     Box(modifier = Modifier.weight(1f)) {
+                        val mainOrSettingsOrCharts = when (activeTab) {
+                            "settings" -> "settings"
+                            "charts" -> "charts"
+                            else -> "main"
+                        }
                         AnimatedContent(
-                            targetState = activeTab,
+                            targetState = mainOrSettingsOrCharts,
                             transitionSpec = {
-                                (fadeIn(animationSpec = tween(220, delayMillis = 90)) + 
-                                 scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)))
-                                .togetherWith(fadeOut(animationSpec = tween(90)))
+                                (slideInHorizontally(initialOffsetX = { it }) + fadeIn())
+                                    .togetherWith(slideOutHorizontally(targetOffsetX = { -it }) + fadeOut())
                             },
-                            label = "TabTransition"
-                        ) { targetTab ->
-                            when (targetTab) {
-                                "dashboard" -> DashboardScreen(
-                                    language = language,
-                                    isDark = isDarkTheme,
-                                    profileName = profileName,
-                                    profileEmail = profileEmail,
-                                    profilePhotoUri = profilePhotoUri,
-                                    balance = totalBalance,
-                                    income = currentTotalIncome,
-                                    expense = currentTotalExpense,
-                                    owedToMe = currentTotalOwedToMe,
-                                    iOwe = currentTotalIOwe,
-                                    recentTransactions = transactions.take(10),
-                                    persons = persons,
-                                    onAddTransactionClick = { showAddTransactionDialog = true },
-                                    onAddPersonClick = { showAddPersonDialog = true },
-                                    onAddSavingClick = { showAddSavingsGoalDialog = true },
-                                    onDeleteTransaction = { viewModel.deleteTransaction(it) },
-                                    onNavigate = { tab, filter ->
-                                        activeTab = tab
-                                        if (tab == "transactions") transactionFilter = filter
-                                        if (tab == "debts") debtFilter = filter
-                                    },
-                                    timeFilter = timeFilter,
-                                    onTimeFilterChange = { timeFilter = it }
-                                )
-                                "transactions" -> TransactionsScreen(
-                                    language = language,
-                                    isDark = isDarkTheme,
-                                    transactions = transactions,
-                                    persons = persons,
-                                    onAddTransactionClick = { showAddTransactionDialog = true },
-                                    onDeleteTransaction = { viewModel.deleteTransaction(it) },
-                                    filter = transactionFilter,
-                                    onFilterChange = { transactionFilter = it },
-                                    timeFilter = timeFilter,
-                                    onTimeFilterChange = { timeFilter = it }
-                                )
-                                "debts" -> DebtsScreen(
-                                    language = language,
-                                    isDark = isDarkTheme,
-                                    personDebts = filteredPersonDebts,
-                                    onAddPersonClick = { showAddPersonDialog = true },
-                                    onPersonClick = { selectedPersonDetail = it },
-                                    onDeletePerson = { viewModel.deletePerson(it) },
-                                    filter = debtFilter,
-                                    onFilterChange = { debtFilter = it },
-                                    timeFilter = timeFilter,
-                                    onTimeFilterChange = { timeFilter = it }
-                                )
-                                "savings" -> SavingsScreen(
-                                    language = language,
-                                    isDark = isDarkTheme,
-                                    savingsGoals = savingsGoals,
-                                    onAddSavingsGoalClick = { showAddSavingsGoalDialog = true },
-                                    onGoalClick = { selectedSavingsGoalDetail = it },
-                                    onContributeClick = { goal, isWithdraw -> 
-                                        showSavingsContributionDialog = goal
-                                        isWithdrawMode = isWithdraw
-                                    },
-                                    onEditGoal = { goalToEdit = it }
-                                )
-                                "settings" -> SettingsScreen(
+                            label = "MainContentTransition"
+                        ) { tabState ->
+                            if (tabState == "settings") {
+                                SettingsScreen(
                                     viewModel = viewModel,
                                     language = language,
                                     isDark = isDarkTheme,
                                     onBack = { activeTab = "dashboard" }
                                 )
+                            } else if (tabState == "charts") {
+                                ChartsScreen(
+                                    language = language,
+                                    isDark = isDarkTheme,
+                                    transactions = transactions,
+                                    persons = persons
+                                )
+                            } else {
+                                val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
+                                val coroutineScope = rememberCoroutineScope()
+
+                                // Sync activeTab click to Pager
+                                LaunchedEffect(activeTab) {
+                                    val page = when (activeTab) {
+                                        "dashboard" -> 0
+                                        "transactions" -> 1
+                                        "debts" -> 2
+                                        "savings" -> 3
+                                        else -> null
+                                    }
+                                    if (page != null && pagerState.currentPage != page) {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(page)
+                                        }
+                                    }
+                                }
+
+                                // Sync Pager swipe to activeTab
+                                LaunchedEffect(pagerState.currentPage) {
+                                    val tab = when (pagerState.currentPage) {
+                                        0 -> "dashboard"
+                                        1 -> "transactions"
+                                        2 -> "debts"
+                                        3 -> "savings"
+                                        else -> "dashboard"
+                                    }
+                                    if (activeTab != tab) {
+                                        activeTab = tab
+                                    }
+                                }
+
+                                HorizontalPager(
+                                    state = pagerState,
+                                    modifier = Modifier.fillMaxSize()
+                                ) { page ->
+                                    when (page) {
+                                        0 -> DashboardScreen(
+                                            language = language,
+                                            isDark = isDarkTheme,
+                                            profileName = profileName,
+                                            profileEmail = profileEmail,
+                                            profilePhotoUri = profilePhotoUri,
+                                            balance = totalBalance,
+                                            income = currentTotalIncome,
+                                            expense = currentTotalExpense,
+                                            owedToMe = currentTotalOwedToMe,
+                                            iOwe = currentTotalIOwe,
+                                            recentTransactions = transactions.take(10),
+                                            persons = persons,
+                                            onAddTransactionClick = { showAddTransactionDialog = true },
+                                            onAddPersonClick = { showAddPersonDialog = true },
+                                            onAddSavingClick = { showAddSavingsGoalDialog = true },
+                                            onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                            onNavigate = { tab, filter ->
+                                                activeTab = tab
+                                                if (tab == "transactions") transactionFilter = filter
+                                                if (tab == "debts") debtFilter = filter
+                                            },
+                                            timeFilter = timeFilter,
+                                            onTimeFilterChange = handleTimeFilterChange
+                                        )
+                                        1 -> TransactionsScreen(
+                                            language = language,
+                                            isDark = isDarkTheme,
+                                            transactions = transactions,
+                                            persons = persons,
+                                            onAddTransactionClick = { showAddTransactionDialog = true },
+                                            onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                            filter = transactionFilter,
+                                            onFilterChange = { transactionFilter = it },
+                                            timeFilter = timeFilter,
+                                            onTimeFilterChange = handleTimeFilterChange
+                                        )
+                                        2 -> DebtsScreen(
+                                            language = language,
+                                            isDark = isDarkTheme,
+                                            personDebts = filteredPersonDebts,
+                                            onAddPersonClick = { showAddPersonDialog = true },
+                                            onPersonClick = { selectedPersonDetail = it },
+                                            onDeletePerson = { viewModel.deletePerson(it) },
+                                            filter = debtFilter,
+                                            onFilterChange = { debtFilter = it },
+                                            timeFilter = timeFilter,
+                                            onTimeFilterChange = handleTimeFilterChange
+                                        )
+                                        3 -> SavingsScreen(
+                                            language = language,
+                                            isDark = isDarkTheme,
+                                            profileName = profileName,
+                                            savingsGoals = savingsGoals,
+                                            onAddSavingsGoalClick = { showAddSavingsGoalDialog = true },
+                                            onGoalClick = { selectedSavingsGoalDetail = it },
+                                            onContributeClick = { goal, isWithdraw -> 
+                                                showSavingsContributionDialog = goal
+                                                isWithdrawMode = isWithdraw
+                                            },
+                                            onEditGoal = { goalToEdit = it }
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -668,8 +997,8 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                         persons = persons,
                         isDark = isDarkTheme,
                         onDismiss = { showAddTransactionDialog = false },
-                        onConfirm = { amount, type, category, note, personId ->
-                            viewModel.addTransaction(amount, type, category, note, personId)
+                        onConfirm = { amount, type, category, note, personId, timestamp ->
+                            viewModel.addTransaction(amount, type, category, note, personId, timestamp)
                             showAddTransactionDialog = false
                         }
                     )
@@ -696,16 +1025,17 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                             showAddSavingsGoalDialog = false
                             goalToEdit = null
                         },
-                        onConfirm = { title, target, sector, colorIdx ->
+                        onConfirm = { title, target, sector, colorIdx, cardholder ->
                             if (goalToEdit != null) {
                                 viewModel.updateSavingsGoal(goalToEdit!!.copy(
                                     title = title,
                                     targetAmount = target,
                                     category = sector,
-                                    colorIndex = colorIdx
+                                    colorIndex = colorIdx,
+                                    cardholderName = cardholder
                                 ))
                             } else {
-                                viewModel.addSavingsGoal(title, target, sector, colorIdx)
+                                viewModel.addSavingsGoal(title, target, sector, colorIdx, cardholder)
                             }
                             showAddSavingsGoalDialog = false
                             goalToEdit = null
@@ -721,45 +1051,82 @@ fun SanchayApp(viewModel: FinanceViewModel) {
                         isDark = isDarkTheme,
                         initialIsWithdraw = isWithdrawMode,
                         onDismiss = { showSavingsContributionDialog = null },
-                        onConfirm = { amount, isWithdraw ->
+                        onConfirm = { amount, isWithdraw, note ->
                             val finalAmount = if (isWithdraw) -amount else amount
-                            viewModel.addSavingsContribution(goal.id, finalAmount)
+                            viewModel.addSavingsContribution(goal.id, finalAmount, note)
                             showSavingsContributionDialog = null
                         }
                     )
                 }
 
+                if (showMonthPickerState) {
+                    val calendar = java.util.Calendar.getInstance()
+                    MonthYearPickerDialog(
+                        initialYear = calendar.get(java.util.Calendar.YEAR),
+                        initialMonth = calendar.get(java.util.Calendar.MONTH) + 1,
+                        language = language,
+                        onDismiss = { showMonthPickerState = false },
+                        onConfirm = { year, month ->
+                            timeFilter = "CUSTOM_MONTH:$year-$month"
+                            showMonthPickerState = false
+                        }
+                    )
+                }
+
+                if (showDatePickerState) {
+                    val calendar = java.util.Calendar.getInstance()
+                    SpecificDatePickerDialog(
+                        initialYear = calendar.get(java.util.Calendar.YEAR),
+                        initialMonth = calendar.get(java.util.Calendar.MONTH) + 1,
+                        initialDay = calendar.get(java.util.Calendar.DAY_OF_MONTH),
+                        language = language,
+                        onDismiss = { showDatePickerState = false },
+                        onConfirm = { year, month, day ->
+                            timeFilter = "CUSTOM_DATE:$year-$month-$day"
+                            showDatePickerState = false
+                        }
+                    )
+                }
+
                 // Detailed view for savings transactions
-                selectedSavingsGoalDetail?.let { goal ->
+                selectedSavingsGoalDetail?.let { goalSnapshot ->
+                    val goal = savingsGoals.find { it.id == goalSnapshot.id } ?: goalSnapshot
                     SavingsGoalDetailOverlay(
                         language = language,
                         isDark = isDarkTheme,
+                        profileName = profileName,
                         goal = goal,
                         transactionsFlow = viewModel.getSavingsTransactions(goal.id),
                         onDismiss = { selectedSavingsGoalDetail = null },
-                        onDeleteGoal = { viewModel.deleteSavingsGoal(it) }
+                        onDeleteGoal = { viewModel.deleteSavingsGoal(it) },
+                        onEditGoal = { goalToEdit = it },
+                        onContributeClick = { goalObj, isWithdraw ->
+                            showSavingsContributionDialog = goalObj
+                            isWithdrawMode = isWithdraw
+                        }
                     )
                 }
 
                 // Detailed view for transactions with a specific person
-                selectedPersonDetail?.let { debtInfo ->
+                selectedPersonDetail?.let { debtInfoSnapshot ->
+                    val debtInfo = filteredPersonDebts.find { it.person.id == debtInfoSnapshot.person.id } ?: debtInfoSnapshot
                     PersonDetailOverlay(
                         language = language,
                         isDark = isDarkTheme,
                         personDebt = debtInfo,
                         transactionsFlow = viewModel.getTransactionsByPerson(debtInfo.person.id),
                         onDismiss = { selectedPersonDetail = null },
-                        onLendClick = {
-                            viewModel.addTransaction(it, "LEND", "Lending", "Lent money to ${debtInfo.person.name}", debtInfo.person.id)
+                        onLendClick = { amt, note ->
+                            viewModel.addTransaction(amt, "LEND", "Lending", note.ifBlank { "Lent money to ${debtInfo.person.name}" }, debtInfo.person.id)
                         },
-                        onBorrowClick = {
-                            viewModel.addTransaction(it, "BORROW", "Borrowing", "Borrowed money from ${debtInfo.person.name}", debtInfo.person.id)
+                        onBorrowClick = { amt, note ->
+                            viewModel.addTransaction(amt, "BORROW", "Borrowing", note.ifBlank { "Borrowed money from ${debtInfo.person.name}" }, debtInfo.person.id)
                         },
-                        onRepayPaidClick = {
-                            viewModel.addTransaction(it, "REPAY_PAID", "Repay Paid", "Paid back borrowed loan", debtInfo.person.id)
+                        onRepayPaidClick = { amt, note ->
+                            viewModel.addTransaction(amt, "REPAY_PAID", "Repay Paid", note.ifBlank { "Paid back borrowed loan" }, debtInfo.person.id)
                         },
-                        onRepayReceivedClick = {
-                            viewModel.addTransaction(it, "REPAY_RECEIVED", "Repay Received", "Received back lent loan", debtInfo.person.id)
+                        onRepayReceivedClick = { amt, note ->
+                            viewModel.addTransaction(amt, "REPAY_RECEIVED", "Repay Received", note.ifBlank { "Received back lent loan" }, debtInfo.person.id)
                         },
                         onDeleteTx = { viewModel.deleteTransaction(it) }
                     )
@@ -793,7 +1160,9 @@ fun DashboardScreen(
     onTimeFilterChange: (String) -> Unit = {}
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
@@ -934,12 +1303,13 @@ fun DashboardScreen(
                             .size(46.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(Color.White.copy(alpha = 0.15f))
-                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(14.dp)),
+                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                            .clickable { onNavigate("charts", "") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Wallet,
-                            contentDescription = null,
+                            imageVector = Icons.Rounded.PieChart,
+                            contentDescription = "Charts",
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
@@ -961,20 +1331,27 @@ fun DashboardScreen(
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                             .clickable { onNavigate("transactions", "INCOME") }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "আয়" else "Income",
                             color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = formatCurrency(income, language),
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -989,20 +1366,27 @@ fun DashboardScreen(
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                             .clickable { onNavigate("transactions", "EXPENSE") }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
                             color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = formatCurrency(expense, language),
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1014,44 +1398,41 @@ fun DashboardScreen(
 
         // Time Filter Row
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TimeFilterChip(selected = timeFilter == "ALL", onClick = { onTimeFilterChange("ALL") }, label = Translation.get("all_time", language))
-                TimeFilterChip(selected = timeFilter == "TODAY", onClick = { onTimeFilterChange("TODAY") }, label = Translation.get("today", language))
-                TimeFilterChip(selected = timeFilter == "MONTH", onClick = { onTimeFilterChange("MONTH") }, label = Translation.get("this_month", language))
-            }
+            TimeFilterRow(
+                timeFilter = timeFilter,
+                language = language,
+                onTimeFilterChange = onTimeFilterChange,
+                modifier = Modifier.padding(vertical = 6.dp)
+            )
         }
 
-        // New Item: Separate Debt and Owed Cards
+        // I Owe & Owed to Me Cards (দেনা ও পাওনা)
         item {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 0.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                    // I Owe Card (দেনা)
+                // I Owe Card (দেনা)
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
                     modifier = Modifier
                         .weight(1f)
-                        .height(110.dp)
+                        .height(95.dp)
                         .clickable { onNavigate("debts", "DENA") }
                         .testTag("dashboard_i_owe_card")
                 ) {
                     Text(
                         text = Translation.get("i_owe", language),
                         color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = formatCurrency(iOwe, language),
                         color = Color.White,
-                        fontSize = 24.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -1063,20 +1444,20 @@ fun DashboardScreen(
                     cornerRadius = 24.dp,
                     modifier = Modifier
                         .weight(1f)
-                        .height(110.dp)
+                        .height(95.dp)
                         .clickable { onNavigate("debts", "PAWN") }
                         .testTag("dashboard_owed_to_me_card")
                 ) {
                     Text(
                         text = Translation.get("owed_to_me", language),
                         color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = formatCurrency(owedToMe, language),
                         color = Color.White,
-                        fontSize = 24.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -1169,40 +1550,14 @@ fun TransactionRowItem(
     val linkedPerson = persons.find { it.id == tx.personId }
 
     if (showDeleteConfirm) {
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1E2D) else Color.White),
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        Translation.get("delete_confirm", language),
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color.DarkGray,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextButton(onClick = { showDeleteConfirm = false }) {
-                            Text(Translation.get("cancel", language), color = Color.Gray)
-                        }
-                        Button(
-                            onClick = {
-                                onDelete(tx.id)
-                                showDeleteConfirm = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
-                        ) {
-                            Text(Translation.get("delete", language), color = Color.White)
-                        }
-                    }
-                }
-            }
-        }
+        DeleteVerificationDialog(
+            language = language,
+            onConfirm = {
+                onDelete(tx.id)
+                showDeleteConfirm = false
+            },
+            onDismiss = { showDeleteConfirm = false }
+        )
     }
 
     Card(
@@ -1268,8 +1623,22 @@ fun TransactionRowItem(
                         tx.category
                     }
 
+                    val isDebtType = tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED")
+                    val titleText = if (isDebtType && linkedPerson != null) {
+                        val typeSuffix = when (tx.type) {
+                            "LEND" -> if (language == AppLanguage.BN) "ধার প্রদান" else "Lending"
+                            "BORROW" -> if (language == AppLanguage.BN) "ধার গ্রহন" else "Borrowing"
+                            "REPAY_PAID" -> if (language == AppLanguage.BN) "পরিশোধ" else "Repaid"
+                            "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "প্রাপ্তি" else "Received"
+                            else -> ""
+                        }
+                        "${linkedPerson.name} - ($typeSuffix)"
+                    } else {
+                        if (linkedPerson != null) "$formattedCategory (${linkedPerson.name})" else formattedCategory
+                    }
+
                     Text(
-                        text = if (linkedPerson != null) "$formattedCategory (${linkedPerson.name})" else formattedCategory,
+                        text = titleText,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color(0xFF1E222F),
@@ -1346,11 +1715,13 @@ fun TransactionsScreen(
     }
 
     val filteredTransactions = remember(timeFilteredTransactions, filter) {
-        var list = timeFilteredTransactions
+        val list = timeFilteredTransactions
         // Type filter
         when (filter) {
-            "INCOME" -> list.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }
-            "EXPENSE" -> list.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }
+            "INCOME" -> list.filter { it.type == "INCOME" }
+            "EXPENSE" -> list.filter { it.type == "EXPENSE" }
+            "DENA" -> list.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
+            "PAWN" -> list.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
             else -> list
         }
     }
@@ -1359,73 +1730,75 @@ fun TransactionsScreen(
     val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }.sumOf { it.amount }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-            // Summary Card
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Summary Cards (arranged horizontally in a Row)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    modifier = Modifier.weight(1f).height(100.dp)
+                    padding = 10.dp,
+                    modifier = Modifier.weight(1f).height(80.dp)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                        Text(Translation.get("total_income", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Column(modifier = Modifier.padding(horizontal = 2.dp)) {
+                        Text(Translation.get("total_income", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(formatCurrency(totalIncome, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        Text(formatCurrency(totalIncome, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                     }
                 }
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    modifier = Modifier.weight(1f).height(100.dp)
+                    padding = 10.dp,
+                    modifier = Modifier.weight(1f).height(80.dp)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                        Text(Translation.get("total_expense", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Column(modifier = Modifier.padding(horizontal = 2.dp)) {
+                        Text(Translation.get("total_expense", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(formatCurrency(totalExpense, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        Text(formatCurrency(totalExpense, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                     }
                 }
             }
 
             // Time Filter Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TimeFilterChip(selected = timeFilter == "ALL", onClick = { onTimeFilterChange("ALL") }, label = Translation.get("all_time", language))
-                TimeFilterChip(selected = timeFilter == "TODAY", onClick = { onTimeFilterChange("TODAY") }, label = Translation.get("today", language))
-                TimeFilterChip(selected = timeFilter == "MONTH", onClick = { onTimeFilterChange("MONTH") }, label = Translation.get("this_month", language))
-            }
+            TimeFilterRow(
+                timeFilter = timeFilter,
+                language = language,
+                onTimeFilterChange = onTimeFilterChange,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
 
             // Type Filters chip row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val filters = listOf(
                     Pair("ALL", "all"),
                     Pair("INCOME", "income"),
-                    Pair("EXPENSE", "expense")
+                    Pair("EXPENSE", "expense"),
+                    Pair("DENA", "dena"),
+                    Pair("PAWN", "pawn")
                 )
 
                 filters.forEach { (type, labelKey) ->
                     val isSelected = filter == type
                     Box(
                         modifier = Modifier
-                            .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
                             .background(
                                 if (isSelected) MaterialTheme.colorScheme.primary
                                 else if (isDark) Color(0xFF1E222F) else Color.White
                             )
                             .clickable { onFilterChange(type) }
-                            .padding(vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -1443,6 +1816,7 @@ fun TransactionsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
                         .weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -1470,11 +1844,13 @@ fun TransactionsScreen(
                                 color = Color.Gray,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
                             )
                         }
                         items(txs) { tx ->
-                            TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction)
+                            Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction)
+                            }
                         }
                     }
                     item {
@@ -1526,52 +1902,81 @@ fun DebtsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Summary Card
+            // Summary Cards (arranged horizontally in a Row)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    modifier = Modifier.weight(1f).height(100.dp)
+                    padding = 10.dp,
+                    modifier = Modifier.weight(1f).height(80.dp)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                        Text(Translation.get("total_dena", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Column(modifier = Modifier.padding(horizontal = 2.dp)) {
+                        Text(Translation.get("total_dena", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(formatCurrency(totalDena, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        Text(formatCurrency(totalDena, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                     }
                 }
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
-                    modifier = Modifier.weight(1f).height(100.dp)
+                    padding = 10.dp,
+                    modifier = Modifier.weight(1f).height(80.dp)
                 ) {
-                    Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
-                        Text(Translation.get("total_pawn", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Column(modifier = Modifier.padding(horizontal = 2.dp)) {
+                        Text(Translation.get("total_pawn", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(formatCurrency(totalPawn, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        Text(formatCurrency(totalPawn, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                     }
                 }
             }
 
             // Time Filter Row
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TimeFilterChip(selected = timeFilter == "ALL", onClick = { onTimeFilterChange("ALL") }, label = Translation.get("all_time", language))
-                TimeFilterChip(selected = timeFilter == "TODAY", onClick = { onTimeFilterChange("TODAY") }, label = Translation.get("today", language))
-                TimeFilterChip(selected = timeFilter == "MONTH", onClick = { onTimeFilterChange("MONTH") }, label = Translation.get("this_month", language))
-            }
+            TimeFilterRow(
+                timeFilter = timeFilter,
+                language = language,
+                onTimeFilterChange = onTimeFilterChange,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
 
             // Filter Tabs
-            Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { onFilterChange("ALL") }) { Text(Translation.get("all", language), color = if (filter == "ALL") MaterialTheme.colorScheme.primary else Color.Gray) }
-                TextButton(onClick = { onFilterChange("DENA") }) { Text(Translation.get("dena", language), color = if (filter == "DENA") MaterialTheme.colorScheme.primary else Color.Gray) }
-                TextButton(onClick = { onFilterChange("PAWN") }) { Text(Translation.get("pawn", language), color = if (filter == "PAWN") MaterialTheme.colorScheme.primary else Color.Gray) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val filters = listOf(
+                    Pair("ALL", "all"),
+                    Pair("DENA", "dena"),
+                    Pair("PAWN", "pawn")
+                )
+
+                filters.forEach { (type, labelKey) ->
+                    val isSelected = filter == type
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else if (isDark) Color(0xFF1E222F) else Color.White
+                            )
+                            .clickable { onFilterChange(type) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = Translation.get(labelKey, language),
+                            color = if (isSelected) Color.White else Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
             if (filteredDebts.isEmpty()) {
@@ -1598,7 +2003,9 @@ fun DebtsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(filteredDebts) { item ->
-                        PersonDebtRowItem(item, language, isDark, onPersonClick, onDeletePerson)
+                        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                            PersonDebtRowItem(item, language, isDark, onPersonClick, onDeletePerson)
+                        }
                     }
                     item {
                         Spacer(modifier = Modifier.height(80.dp))
@@ -1622,24 +2029,96 @@ fun DebtsScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TimeFilterChip(selected: Boolean, onClick: () -> Unit, label: String) {
+fun TimeFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    icon: ImageVector
+) {
     Surface(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 4.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent,
-        border = if (selected) null else BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+            .clickable { onClick() },
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Text(
-            text = label,
+        Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            color = if (selected) MaterialTheme.colorScheme.primary else Color.Gray,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else Color.Gray,
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = label,
+                color = if (selected) MaterialTheme.colorScheme.primary else Color.Gray,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+fun TimeFilterRow(
+    timeFilter: String,
+    language: AppLanguage,
+    onTimeFilterChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val isMonthActive = timeFilter == "MONTH" || timeFilter.startsWith("CUSTOM_MONTH:")
+        val isDateActive = timeFilter.startsWith("CUSTOM_DATE:")
+        
+        // 1. All Time Chip
+        TimeFilterChip(
+            selected = timeFilter == "ALL",
+            onClick = { onTimeFilterChange("ALL") },
+            label = if (language == AppLanguage.BN) "সব সময়ের" else "All Time",
+            icon = Icons.Rounded.DateRange
+        )
+        
+        // 2. Month Chip
+        val calendar = java.util.Calendar.getInstance()
+        val curYear = calendar.get(java.util.Calendar.YEAR)
+        val curMonth = calendar.get(java.util.Calendar.MONTH) + 1
+        val monthLabel = if (timeFilter.startsWith("CUSTOM_MONTH:")) {
+            getCustomTimeFilterLabel(timeFilter, language) + (if (language == AppLanguage.BN) " মাসের" else " Month")
+        } else {
+            getCustomTimeFilterLabel("CUSTOM_MONTH:$curYear-$curMonth", language) + (if (language == AppLanguage.BN) " মাসের" else " Month")
+        }
+        
+        TimeFilterChip(
+            selected = isMonthActive,
+            onClick = { onTimeFilterChange("TRIGGER_MONTH_PICKER") },
+            label = monthLabel,
+            icon = Icons.Rounded.DateRange
+        )
+        
+        // 3. Specific Date Chip
+        val dateLabel = if (timeFilter.startsWith("CUSTOM_DATE:")) {
+            getFormattedDateLabel(timeFilter, language)
+        } else {
+            if (language == AppLanguage.BN) "তারিখ অনুযায়ী" else "Select Date"
+        }
+        
+        TimeFilterChip(
+            selected = isDateActive,
+            onClick = { onTimeFilterChange("TRIGGER_DATE_PICKER") },
+            label = dateLabel,
+            icon = Icons.Rounded.DateRange
         )
     }
 }
@@ -1647,8 +2126,8 @@ fun TimeFilterChip(selected: Boolean, onClick: () -> Unit, label: String) {
 fun filterTransactionsByTime(transactions: List<Transaction>, timeFilter: String): List<Transaction> {
     val now = System.currentTimeMillis()
     val calendar = java.util.Calendar.getInstance()
-    return when (timeFilter) {
-        "TODAY" -> {
+    return when {
+        timeFilter == "TODAY" -> {
             calendar.timeInMillis = now
             calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
             calendar.set(java.util.Calendar.MINUTE, 0)
@@ -1657,7 +2136,7 @@ fun filterTransactionsByTime(transactions: List<Transaction>, timeFilter: String
             val startOfDay = calendar.timeInMillis
             transactions.filter { it.timestamp >= startOfDay }
         }
-        "MONTH" -> {
+        timeFilter == "MONTH" -> {
             calendar.timeInMillis = now
             calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
             calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
@@ -1666,6 +2145,45 @@ fun filterTransactionsByTime(transactions: List<Transaction>, timeFilter: String
             calendar.set(java.util.Calendar.MILLISECOND, 0)
             val startOfMonth = calendar.timeInMillis
             transactions.filter { it.timestamp >= startOfMonth }
+        }
+        timeFilter.startsWith("CUSTOM_MONTH:") -> {
+            val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+            if (parts.size == 2) {
+                val year = parts[0].toIntOrNull() ?: 2026
+                val month = parts[1].toIntOrNull() ?: 1
+                calendar.clear()
+                calendar.set(java.util.Calendar.YEAR, year)
+                calendar.set(java.util.Calendar.MONTH, month - 1)
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                calendar.add(java.util.Calendar.MONTH, 1)
+                val end = calendar.timeInMillis
+                transactions.filter { it.timestamp in start until end }
+            } else transactions
+        }
+        timeFilter.startsWith("CUSTOM_DATE:") -> {
+            val parts = timeFilter.substringAfter("CUSTOM_DATE:").split("-")
+            if (parts.size == 3) {
+                val year = parts[0].toIntOrNull() ?: 2026
+                val month = parts[1].toIntOrNull() ?: 1
+                val day = parts[2].toIntOrNull() ?: 1
+                calendar.clear()
+                calendar.set(java.util.Calendar.YEAR, year)
+                calendar.set(java.util.Calendar.MONTH, month - 1)
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, day)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                val end = calendar.timeInMillis
+                transactions.filter { it.timestamp in start until end }
+            } else transactions
         }
         else -> transactions
     }
@@ -1683,40 +2201,14 @@ fun PersonDebtRowItem(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1E2D) else Color.White),
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        Translation.get("delete_confirm", language),
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color.DarkGray,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextButton(onClick = { showDeleteConfirm = false }) {
-                            Text(Translation.get("cancel", language), color = Color.Gray)
-                        }
-                        Button(
-                            onClick = {
-                                onDelete(item.person.id)
-                                showDeleteConfirm = false
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
-                        ) {
-                            Text(Translation.get("delete", language), color = Color.White)
-                        }
-                    }
-                }
-            }
-        }
+        DeleteVerificationDialog(
+            language = language,
+            onConfirm = {
+                onDelete(item.person.id)
+                showDeleteConfirm = false
+            },
+            onDismiss = { showDeleteConfirm = false }
+        )
     }
 
     Card(
@@ -1812,6 +2304,7 @@ fun PersonDebtRowItem(
 fun SavingsScreen(
     language: AppLanguage,
     isDark: Boolean,
+    profileName: String,
     savingsGoals: List<SavingsGoal>,
     onAddSavingsGoalClick: () -> Unit,
     onGoalClick: (SavingsGoal) -> Unit,
@@ -1820,6 +2313,35 @@ fun SavingsScreen(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "আপনার সঞ্চয় কার্ডসমূহ" else "Your Savings Cards",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechBlue
+                )
+                
+                IconButton(
+                    onClick = onAddSavingsGoalClick,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(FintechBlue.copy(alpha = 0.1f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Add",
+                        tint = FintechBlue
+                    )
+                }
+            }
+
             if (savingsGoals.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -1829,7 +2351,7 @@ fun SavingsScreen(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ReceiptLong,
+                            imageVector = Icons.Rounded.AccountBalance,
                             contentDescription = null,
                             tint = Color.Gray.copy(alpha = 0.5f),
                             modifier = Modifier.size(64.dp)
@@ -1840,11 +2362,12 @@ fun SavingsScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f)
+                        .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(savingsGoals) { goal ->
-                        SavingsGoalCardItem(goal, language, isDark, onGoalClick, onContributeClick, onEditGoal)
+                        SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal)
                     }
                     item {
                         Spacer(modifier = Modifier.height(80.dp))
@@ -1874,183 +2397,152 @@ fun SavingsGoalCardItem(
     goal: SavingsGoal,
     language: AppLanguage,
     isDark: Boolean,
+    profileName: String,
     onGoalClick: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onEditGoal: (SavingsGoal) -> Unit
 ) {
     val gradient = GradientsList[goal.colorIndex % GradientsList.size]
 
-    val progress = if (goal.targetAmount > 0) {
-        (goal.savedAmount / goal.targetAmount).coerceIn(0.0, 1.0).toFloat()
-    } else {
-        0f
-    }
-    val percentage = (progress * 100).toInt()
-
     FintechGradientCard(
         gradientColors = gradient,
         modifier = Modifier
             .fillMaxWidth()
+            .height(180.dp)
             .combinedClickable(
                 onClick = { onGoalClick(goal) },
                 onLongClick = { onEditGoal(goal) }
             )
             .testTag("savings_item_${goal.id}")
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                val formattedCategory = if (language == AppLanguage.BN) {
-                    when (goal.category) {
-                        "Emergency" -> "জরুরি ফান্ড"
-                        "Laptop" -> "ল্যাপটপ"
-                        "Travel" -> "ভ্রমণ"
-                        "Marriage" -> "বিয়ে"
-                        "Investment" -> "বিনিয়োগ"
-                        else -> goal.category
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Mastercard Chip and Contactless Icon
+            Column(modifier = Modifier.align(Alignment.TopStart)) {
+                // Chip Icon Simulation
+                Box(
+                    modifier = Modifier
+                        .size(38.dp, 28.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        repeat(3) {
+                            Divider(color = Color.White.copy(alpha = 0.1f), thickness = 0.5.dp)
+                        }
                     }
-                } else {
-                    goal.category
                 }
-
-                Text(
-                    text = formattedCategory.uppercase(),
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Icon(
+                    imageVector = Icons.Rounded.Wifi,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp).rotate(90f)
                 )
+            }
+
+            // Category Label at Top Right
+            val formattedCategory = if (language == AppLanguage.BN) {
+                when (goal.category) {
+                    "Emergency" -> "জরুরি ফান্ড"
+                    "Laptop" -> "ল্যাপটপ"
+                    "Travel" -> "ভ্রমণ"
+                    "Marriage" -> "বিয়ে"
+                    "Investment" -> "বিনিয়োগ"
+                    else -> goal.category
+                }
+            } else {
+                goal.category
+            }
+
+            // Card Title at Top Right
+            Text(
+                text = goal.title.uppercase(),
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
+
+            // Goal Category and Balance in the middle-bottom
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(top = 20.dp)
+            ) {
                 Text(
-                    text = goal.title,
+                    text = formattedCategory,
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(vertical = 2.dp)
+                    letterSpacing = 1.sp
                 )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = formatCurrency(goal.savedAmount, language),
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (goal.targetAmount > 0) {
+                        Text(
+                            text = " / " + formatCurrency(goal.targetAmount, language),
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(bottom = 4.dp, start = 4.dp)
+                        )
+                    }
+                }
             }
 
-            // Edit Button inside gradient card
-            IconButton(
-                onClick = { onEditGoal(goal) },
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = "Edit",
-                    tint = Color.White.copy(alpha = 0.8f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Targets and saved amounts
-        if (goal.targetAmount > 0) {
+            // Bottom row: "Holder" (Title again or generic) and Mastercard-like logo
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(Translation.get("saved", language), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
-                    Text(formatCurrency(goal.savedAmount, language), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(Translation.get("target", language), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
-                    Text(formatCurrency(goal.targetAmount, language), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Progress bar
-            LinearProgressIndicator(
-                progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
-                color = Color.White,
-                trackColor = Color.White.copy(alpha = 0.25f)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-        } else {
-            // Only Saved Amount
-            Column {
-                Text(Translation.get("saved", language), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
-                Text(formatCurrency(goal.savedAmount, language), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                if (goal.targetAmount > 0) {
-                    val percentageText = if (language == AppLanguage.BN) {
-                        "$percentage% অর্জিত"
-                            .replace("0", "০")
-                            .replace("1", "১")
-                            .replace("2", "২")
-                            .replace("3", "৩")
-                            .replace("4", "৪")
-                            .replace("5", "৫")
-                            .replace("6", "৬")
-                            .replace("7", "৭")
-                            .replace("8", "৮")
-                            .replace("9", "৯")
-                    } else {
-                        "$percentage% Completed"
-                    }
-
-                    Text(
-                        text = percentageText,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            // Actions: Deposit & Withdraw (Fixed width ratio for consistency)
-            Row(
-                modifier = Modifier.fillMaxWidth(0.65f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .align(Alignment.BottomCenter),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
             ) {
-                Button(
-                    onClick = { onContributeClick(goal, false) },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    modifier = Modifier.height(30.dp).weight(1f),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
+                Column {
                     Text(
-                        text = Translation.get("deposit", language),
-                        color = gradient[0],
+                        text = if (language == AppLanguage.BN) "কার্ডধারী" else "CARDHOLDER",
+                        color = Color.White.copy(alpha = 0.6f),
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = goal.cardholderName.ifBlank { profileName }.uppercase(),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.sp
                     )
                 }
 
-                Button(
-                    onClick = { onContributeClick(goal, true) }, 
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f)),
-                    modifier = Modifier.height(30.dp).weight(1f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    Text(
-                        text = Translation.get("withdraw", language),
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                // Mastercard Circles Logo Simulation
+                Box(contentAlignment = Alignment.Center) {
+                    Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEB001B).copy(alpha = 0.8f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF79E1B).copy(alpha = 0.8f))
+                        )
+                    }
                 }
             }
         }
@@ -2066,10 +2558,11 @@ fun AddTransactionDialog(
     persons: List<Person>,
     isDark: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (Double, String, String, String, Int?) -> Unit
+    onConfirm: (Double, String, String, String, Int?, Long) -> Unit
 ) {
     val amountStr by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var customTimestamp by remember { mutableStateOf<Long?>(null) }
 
     // Dropdowns / Option selectors
     var type by remember { mutableStateOf("EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
@@ -2349,6 +2842,66 @@ fun AddTransactionDialog(
                     )
                 }
 
+                // Manual Date/Time Selection
+                item {
+                    Text(
+                        if (language == AppLanguage.BN) "তারিখ ও সময় (ঐচ্ছিক)" else "Date & Time (Optional)",
+                        color = labelColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    var showManualDatePicker by remember { mutableStateOf(false) }
+                    
+                    val dateLabel = if (customTimestamp != null) {
+                        formatDate(customTimestamp!!, language)
+                    } else {
+                        if (language == AppLanguage.BN) "বর্তমান সময় (স্বয়ংক্রিয়)" else "Current Time (Automatic)"
+                    }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(chipBg)
+                            .clickable { showManualDatePicker = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Rounded.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Text(dateLabel, color = textColor, fontSize = 14.sp)
+                        }
+                        if (customTimestamp != null) {
+                            IconButton(onClick = { customTimestamp = null }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Clear", tint = FintechRed, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                    
+                    if (showManualDatePicker) {
+                        val calendar = java.util.Calendar.getInstance()
+                        val curYear = calendar.get(java.util.Calendar.YEAR)
+                        val curMonth = calendar.get(java.util.Calendar.MONTH) + 1
+                        val curDay = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+                        SpecificDatePickerDialog(
+                            initialYear = curYear,
+                            initialMonth = curMonth,
+                            initialDay = curDay,
+                            language = language,
+                            onDismiss = { showManualDatePicker = false },
+                            onConfirm = { year, month, day ->
+                                calendar.clear()
+                                calendar.set(year, month - 1, day)
+                                customTimestamp = calendar.timeInMillis
+                                showManualDatePicker = false
+                            }
+                        )
+                    }
+                }
+
                 // Confirm and Cancel buttons
                 item {
                     Row(
@@ -2372,7 +2925,7 @@ fun AddTransactionDialog(
                                 } else if (isPersonRequired && selectedPersonId == null) {
                                     Toast.makeText(context, Translation.get("error_empty_person", language), Toast.LENGTH_SHORT).show()
                                 } else {
-                                    onConfirm(amount, type, category, note, selectedPersonId)
+                                    onConfirm(amount, type, category, note, selectedPersonId, customTimestamp ?: System.currentTimeMillis())
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -2538,10 +3091,13 @@ fun AddPersonDialog(
 
                     Button(
                         onClick = {
-                            if (name.trim().isNotEmpty()) {
-                                onConfirm(name.trim(), phone.trim(), address.trim(), photoUri.trim())
-                            } else {
+                            val trimmedPhone = phone.trim()
+                            if (name.trim().isEmpty()) {
                                 Toast.makeText(context, Translation.get("enter_name", language), Toast.LENGTH_SHORT).show()
+                            } else if (trimmedPhone.isNotEmpty() && (!trimmedPhone.all { it.isDigit() } || trimmedPhone.length != 11)) {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "সঠিক ১১ ডিজিটের ফোন নম্বর লিখুন" else "Enter a valid 11-digit phone number", Toast.LENGTH_SHORT).show()
+                            } else {
+                                onConfirm(name.trim(), trimmedPhone, address.trim(), photoUri.trim())
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -2564,15 +3120,17 @@ fun AddSavingsGoalDialog(
     isDark: Boolean,
     initialGoal: SavingsGoal? = null,
     onDismiss: () -> Unit,
-    onConfirm: (String, Double, String, Int) -> Unit
+    onConfirm: (String, Double, String, Int, String) -> Unit
 ) {
     var title by remember { mutableStateOf(initialGoal?.title ?: "") }
+    var cardholderName by remember { mutableStateOf(initialGoal?.cardholderName ?: "") }
     var targetStr by remember { mutableStateOf(if (initialGoal != null) initialGoal.targetAmount.toString() else "") }
     var sector by remember { mutableStateOf(initialGoal?.category ?: "Emergency") }
     var colorIndex by remember { mutableStateOf(initialGoal?.colorIndex ?: 0) }
 
-    val sectors = listOf("Emergency", "Laptop", "Travel", "Marriage", "Investment")
+    val sectors = listOf("Emergency", "Laptop", "Travel", "Marriage", "Investment", "Other")
     var sectorDropdownExpanded by remember { mutableStateOf(false) }
+    var customSectorName by remember { mutableStateOf("") }
     val context = LocalContext.current
 
     val dialogBg = if (isDark) Color(0xFF141724) else Color.White
@@ -2593,7 +3151,7 @@ fun AddSavingsGoalDialog(
             ) {
                 item {
                     Text(
-                        Translation.get("add_saving", language),
+                        if (language == AppLanguage.BN) "নতুন সঞ্চয় কার্ড" else "New Savings Card",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = textColor
@@ -2604,7 +3162,7 @@ fun AddSavingsGoalDialog(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text(Translation.get("name", language)) },
+                        label = { Text(if (language == AppLanguage.BN) "কার্ডের নাম" else "Card Name") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = labelColor,
@@ -2616,6 +3174,25 @@ fun AddSavingsGoalDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("input_saving_title")
+                    )
+                }
+                
+                item {
+                    OutlinedTextField(
+                        value = cardholderName,
+                        onValueChange = { cardholderName = it },
+                        label = { Text(if (language == AppLanguage.BN) "কার্ডধারীর নাম" else "Cardholder Name") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = labelColor,
+                            focusedTextColor = textColor,
+                            unfocusedTextColor = textColor,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            unfocusedLabelColor = labelColor
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_saving_cardholder")
                     )
                 }
 
@@ -2653,6 +3230,7 @@ fun AddSavingsGoalDialog(
                                     "Travel" -> "ভ্রমণ"
                                     "Marriage" -> "বিয়ে"
                                     "Investment" -> "বিনিয়োগ"
+                                    "Other" -> "অন্যান্য"
                                     else -> sector
                                 }
                             } else {
@@ -2684,6 +3262,7 @@ fun AddSavingsGoalDialog(
                                             "Travel" -> "ভ্রমণ"
                                             "Marriage" -> "বিয়ে"
                                             "Investment" -> "বিনিয়োগ"
+                                            "Other" -> "অন্যান্য"
                                             else -> sec
                                         }
                                     } else sec
@@ -2698,6 +3277,27 @@ fun AddSavingsGoalDialog(
                                 }
                             }
                         }
+                    }
+                }
+
+                if (sector == "Other") {
+                    item {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = customSectorName,
+                            onValueChange = { customSectorName = it },
+                            label = { Text(if (language == AppLanguage.BN) "খাতের নাম লিখুন" else "Enter Sector Name") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = labelColor,
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedLabelColor = labelColor
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
 
@@ -2743,8 +3343,9 @@ fun AddSavingsGoalDialog(
                         Button(
                             onClick = {
                                 val target = targetStr.toDoubleOrNull() ?: 0.0
+                                val finalSector = if (sector == "Other" && customSectorName.isNotBlank()) customSectorName else sector
                                 if (title.trim().isNotEmpty()) {
-                                    onConfirm(title.trim(), target, sector, colorIndex)
+                                    onConfirm(title.trim(), target, finalSector, colorIndex, cardholderName.trim())
                                 } else {
                                     Toast.makeText(context, Translation.get("error_empty_title", language), Toast.LENGTH_SHORT).show()
                                 }
@@ -2770,9 +3371,10 @@ fun SavingsContributionDialog(
     isDark: Boolean,
     initialIsWithdraw: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirm: (Double, Boolean) -> Unit
+    onConfirm: (Double, Boolean, String) -> Unit
 ) {
     var amountStr by remember { mutableStateOf("") }
+    var noteStr by remember { mutableStateOf("") }
     var isWithdraw by remember { mutableStateOf(initialIsWithdraw) }
     val context = LocalContext.current
 
@@ -2848,6 +3450,22 @@ fun SavingsContributionDialog(
                         .testTag("input_contribution_amount")
                 )
 
+                OutlinedTextField(
+                    value = noteStr,
+                    onValueChange = { noteStr = it },
+                    label = { Text(if (language == AppLanguage.BN) "মন্তব্য যোগ করুন" else "Add Comment") },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = labelColor,
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        unfocusedLabelColor = labelColor
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                )
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2865,7 +3483,7 @@ fun SavingsContributionDialog(
                                 if (isWithdraw && amount > savingsGoal.savedAmount) {
                                     Toast.makeText(context, if (language == AppLanguage.BN) "পর্যাপ্ত ব্যালেন্স নেই!" else "Insufficient balance!", Toast.LENGTH_SHORT).show()
                                 } else {
-                                    onConfirm(amount, isWithdraw)
+                                    onConfirm(amount, isWithdraw, noteStr)
                                 }
                             } else {
                                 Toast.makeText(context, Translation.get("error_empty_amount", language), Toast.LENGTH_SHORT).show()
@@ -2889,50 +3507,27 @@ fun SavingsContributionDialog(
 fun SavingsGoalDetailOverlay(
     language: AppLanguage,
     isDark: Boolean,
+    profileName: String,
     goal: SavingsGoal,
     transactionsFlow: kotlinx.coroutines.flow.Flow<List<SavingsTransaction>>,
     onDismiss: () -> Unit,
-    onDeleteGoal: (Int) -> Unit
+    onDeleteGoal: (Int) -> Unit,
+    onEditGoal: (SavingsGoal) -> Unit,
+    onContributeClick: (SavingsGoal, Boolean) -> Unit
 ) {
     val txList by transactionsFlow.collectAsState(initial = emptyList())
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1E2D) else Color.White),
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        Translation.get("delete_confirm", language),
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color.DarkGray,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextButton(onClick = { showDeleteConfirm = false }) {
-                            Text(Translation.get("cancel", language), color = Color.Gray)
-                        }
-                        Button(
-                            onClick = {
-                                onDeleteGoal(goal.id)
-                                showDeleteConfirm = false
-                                onDismiss()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
-                        ) {
-                            Text(Translation.get("delete", language), color = Color.White)
-                        }
-                    }
-                }
-            }
-        }
+        DeleteVerificationDialog(
+            language = language,
+            onConfirm = {
+                onDeleteGoal(goal.id)
+                showDeleteConfirm = false
+                onDismiss()
+            },
+            onDismiss = { showDeleteConfirm = false }
+        )
     }
 
     Surface(
@@ -2944,28 +3539,79 @@ fun SavingsGoalDetailOverlay(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(16.dp)
         ) {
             // Header
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = if (isDark) Color.White else Color.Black)
+                }
+                
+                Text(
+                    text = if (language == AppLanguage.BN) "সঞ্চয় কার্ডের বিস্তারিত" else "Savings Card Details",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechBlue,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+
+                Row(
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                    IconButton(onClick = { onEditGoal(goal) }) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
+                    }
+                    IconButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Show Card at top
+            SavingsGoalCardItem(
+                goal = goal,
+                language = language,
+                isDark = isDark,
+                profileName = profileName,
+                onGoalClick = {}, // No click action here
+                onContributeClick = { _, _ -> },
+                onEditGoal = {}
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Deposit/Withdraw Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close", tint = if (isDark) Color.White else Color.DarkGray)
+                Button(
+                    onClick = { onContributeClick(goal, false) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechGreen)
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (language == AppLanguage.BN) "জমা করুন" else "Deposit", color = Color.White, fontWeight = FontWeight.Bold)
                 }
 
-                Text(
-                    text = "${goal.title} ${Translation.get("history", language)}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = if (isDark) Color.White else Color.DarkGray
-                )
-                
-                IconButton(onClick = { showDeleteConfirm = true }) {
-                    Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
+                Button(
+                    onClick = { onContributeClick(goal, true) },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
+                ) {
+                    Icon(Icons.Rounded.Remove, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (language == AppLanguage.BN) "উত্তোলন" else "Withdraw", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -2974,10 +3620,10 @@ fun SavingsGoalDetailOverlay(
             // History Label
             Text(
                 text = Translation.get("history", language),
-                fontSize = 15.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isDark) Color.White else Color.DarkGray,
-                modifier = Modifier.padding(bottom = 8.dp)
+                color = if (isDark) Color.White else Color(0xFF0F1724),
+                modifier = Modifier.padding(bottom = 12.dp)
             )
 
             // Transactions List
@@ -2991,7 +3637,7 @@ fun SavingsGoalDetailOverlay(
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("No transactions yet", color = Color.Gray)
+                        Text(if (language == AppLanguage.BN) "কোনো লেনদেন নেই" else "No transactions yet", color = Color.Gray)
                     }
                 }
             } else {
@@ -3017,23 +3663,49 @@ fun SavingsGoalDetailOverlay(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
-                                        modifier = Modifier.size(40.dp).clip(CircleShape).background(amountColor.copy(alpha = 0.15f)),
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(amountColor.copy(alpha = 0.1f)),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Icon(txIcon, contentDescription = null, tint = amountColor, modifier = Modifier.size(20.dp))
+                                        Icon(
+                                            imageVector = txIcon,
+                                            contentDescription = null,
+                                            tint = amountColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text(txLabel, fontWeight = FontWeight.Bold, color = if (isDark) Color.White else Color(0xFF0F1724))
+                                        Text(
+                                            text = txLabel,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color(0xFF0F1724),
+                                            fontSize = 14.sp
+                                        )
                                         val d = java.util.Date(tx.timestamp)
-                                        val f = java.text.SimpleDateFormat("dd MMM, hh:mm a", java.util.Locale.getDefault())
-                                        Text(f.format(d), color = Color.Gray, fontSize = 12.sp)
+                                        val f = java.text.SimpleDateFormat("dd MMM, yyyy", java.util.Locale.getDefault())
+                                        Text(
+                                            text = f.format(d),
+                                            color = Color.Gray,
+                                            fontSize = 12.sp
+                                        )
+                                        if (tx.note.isNotEmpty()) {
+                                            Text(
+                                                text = tx.note,
+                                                color = Color.Gray,
+                                                fontSize = 12.sp,
+                                                fontStyle = FontStyle.Italic
+                                            )
+                                        }
                                     }
                                 }
                                 Text(
-                                    text = "${if (isDeposit) "+" else "-"}${formatCurrency(tx.amount, language)}",
+                                    text = (if (isDeposit) "+" else "-") + formatCurrency(tx.amount, language),
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = amountColor,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontSize = 15.sp
                                 )
                             }
                         }
@@ -3052,15 +3724,16 @@ fun PersonDetailOverlay(
     personDebt: PersonDebt,
     transactionsFlow: kotlinx.coroutines.flow.Flow<List<Transaction>>,
     onDismiss: () -> Unit,
-    onLendClick: (Double) -> Unit,
-    onBorrowClick: (Double) -> Unit,
-    onRepayPaidClick: (Double) -> Unit,
-    onRepayReceivedClick: (Double) -> Unit,
+    onLendClick: (Double, String) -> Unit,
+    onBorrowClick: (Double, String) -> Unit,
+    onRepayPaidClick: (Double, String) -> Unit,
+    onRepayReceivedClick: (Double, String) -> Unit,
     onDeleteTx: (Int) -> Unit
 ) {
     val txList by transactionsFlow.collectAsState(initial = emptyList())
     var showActionSheet by remember { mutableStateOf<String?>(null) } // "LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED"
     var actionAmountStr by remember { mutableStateOf("") }
+    var actionNoteStr by remember { mutableStateOf("") }
 
     Surface(
         modifier = Modifier
@@ -3071,30 +3744,10 @@ fun PersonDetailOverlay(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .padding(16.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close", tint = if (isDark) Color.White else Color.DarkGray)
-                }
-
-                Text(
-                    text = Translation.get("details", language),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = if (isDark) Color.White else Color.DarkGray
-                )
-
-                Spacer(modifier = Modifier.width(48.dp)) // symmetry spacer
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            // Header - Simplified (removed Close button to reduce empty space as requested by user)
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Person Bio Card (Frosted Card)
             FrostedGlassCard(isDark = isDark) {
@@ -3292,11 +3945,29 @@ fun PersonDetailOverlay(
                                 modifier = Modifier.fillMaxWidth()
                             )
 
+                            OutlinedTextField(
+                                value = actionNoteStr,
+                                onValueChange = { actionNoteStr = it },
+                                label = { Text(if (language == AppLanguage.BN) "মন্তব্য যোগ করুন" else "Add Comment") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = Color.Gray,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedLabelColor = Color.Gray
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                TextButton(onClick = { showActionSheet = null }, modifier = Modifier.weight(1f)) {
+                                TextButton(onClick = { 
+                                    showActionSheet = null
+                                    actionNoteStr = ""
+                                }, modifier = Modifier.weight(1f)) {
                                     Text(Translation.get("cancel", language), color = Color.Gray)
                                 }
                                 Button(
@@ -3304,12 +3975,13 @@ fun PersonDetailOverlay(
                                         val amt = actionAmountStr.toDoubleOrNull() ?: 0.0
                                         if (amt > 0) {
                                             when (actType) {
-                                                "LEND" -> onLendClick(amt)
-                                                "BORROW" -> onBorrowClick(amt)
-                                                "REPAY_PAID" -> onRepayPaidClick(amt)
-                                                "REPAY_RECEIVED" -> onRepayReceivedClick(amt)
+                                                "LEND" -> onLendClick(amt, actionNoteStr)
+                                                "BORROW" -> onBorrowClick(amt, actionNoteStr)
+                                                "REPAY_PAID" -> onRepayPaidClick(amt, actionNoteStr)
+                                                "REPAY_RECEIVED" -> onRepayReceivedClick(amt, actionNoteStr)
                                             }
                                             actionAmountStr = ""
+                                            actionNoteStr = ""
                                             showActionSheet = null
                                         }
                                     },
@@ -3473,19 +4145,33 @@ fun SettingItem(
 fun SettingCategory(
     title: String,
     isDark: Boolean,
+    icon: ImageVector? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = title,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            color = FintechBlue,
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) Color.White else Color(0xFF1E293B)
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3496,7 +4182,7 @@ fun SettingCategory(
                     color = if (isDark) Color(0xFF1F2937) else Color(0xFFE2E8F0),
                     shape = RoundedCornerShape(20.dp)
                 )
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Column {
                 content()
@@ -3516,10 +4202,16 @@ fun SettingsScreen(
     val profileName by viewModel.profileName.collectAsState()
     val profileEmail by viewModel.profileEmail.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val profilePhone by viewModel.profilePhone.collectAsState()
+    val profileSocial by viewModel.profileSocial.collectAsState()
+    val profileAddress by viewModel.profileAddress.collectAsState()
 
     var nameInput by remember(profileName) { mutableStateOf(profileName) }
     var emailInput by remember(profileEmail) { mutableStateOf(profileEmail) }
     var photoUriInput by remember(profilePhotoUri) { mutableStateOf(profilePhotoUri) }
+    var phoneInput by remember(profilePhone) { mutableStateOf(profilePhone) }
+    var socialInput by remember(profileSocial) { mutableStateOf(profileSocial) }
+    var addressInput by remember(profileAddress) { mutableStateOf(profileAddress) }
 
     val photoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -3537,287 +4229,604 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color(0xFF0F111A) else Color(0xFFF8FAFC))
+            .background(if (isDark) Color(0xFF0F111A) else Color(0xFFF1F5F9))
             .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Top Row with Back Button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        // --- 1. USER PROFILE EDIT CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
+            isDark = isDark,
+            icon = Icons.Rounded.Person
         ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(if (isDark) Color(0xFF1F2937) else Color.White, CircleShape)
-                    .border(
-                        1.dp,
-                        if (isDark) Color(0xFF374151) else Color(0xFFE2E8F0),
-                        CircleShape
-                    )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back",
-                    tint = if (isDark) Color.White else Color(0xFF1E293B)
-                )
-            }
-            Text(
-                text = Translation.get("settings", language),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = if (isDark) Color.White else Color(0xFF1E293B)
-            )
-        }
-
-        // Account Section
-        SettingCategory(title = Translation.get("account", language), isDark = isDark) {
-            // Profile Info Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+                // Circular Avatar
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9))
-                        .clickable { photoLauncher.launch("image/*") },
-                    contentAlignment = Alignment.Center
+                        .size(105.dp)
+                        .clickable { photoLauncher.launch("image/*") }
+                        .testTag("settings_avatar_box")
                 ) {
-                    if (photoUriInput != null) {
-                        AsyncImage(
-                            model = photoUriInput,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = FintechBlue,
-                            modifier = Modifier.size(32.dp)
-                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0), CircleShape)
+                            .border(2.dp, FintechBlue, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!photoUriInput.isNullOrBlank()) {
+                            AsyncImage(
+                                model = photoUriInput,
+                                contentDescription = "Profile Photo",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Person,
+                                contentDescription = "Profile Icon",
+                                tint = FintechBlue,
+                                modifier = Modifier.size(50.dp)
+                            )
+                        }
                     }
+                    // Small camera badge
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .size(20.dp)
+                            .size(32.dp)
                             .background(FintechBlue, CircleShape)
                             .border(2.dp, if (isDark) Color(0xFF141724) else Color.White, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Edit,
-                            contentDescription = null,
+                            imageVector = Icons.Rounded.PhotoCamera,
+                            contentDescription = "Edit photo",
                             tint = Color.White,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = profileName.ifBlank { Translation.get("name", language) },
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color(0xFF1E293B)
+
+                // Input fields
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Your Name *
+                    val nameLabel = if (language == AppLanguage.BN) "আপনার নাম *" else "Your Name *"
+                    OutlinedTextField(
+                        value = nameInput,
+                        onValueChange = { nameInput = it },
+                        label = { Text(nameLabel) },
+                        leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
                     )
-                    Text(
-                        text = profileEmail.ifBlank { Translation.get("enter_email", language) },
-                        fontSize = 14.sp,
-                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+
+                    // Phone Number
+                    val phoneLabel = if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number"
+                    OutlinedTextField(
+                        value = phoneInput,
+                        onValueChange = { phoneInput = it },
+                        label = { Text(phoneLabel) },
+                        leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                    )
+
+                    // Email or Social Profile
+                    val socialLabel = if (language == AppLanguage.BN) "ইমেইল বা সোশ্যাল প্রোফাইল" else "Email or Social Profile"
+                    OutlinedTextField(
+                        value = socialInput,
+                        onValueChange = { socialInput = it },
+                        label = { Text(socialLabel) },
+                        leadingIcon = { Icon(Icons.Rounded.AlternateEmail, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                    )
+
+                    // Address
+                    val addressLabel = if (language == AppLanguage.BN) "ঠিকানা" else "Address"
+                    OutlinedTextField(
+                        value = addressInput,
+                        onValueChange = { addressInput = it },
+                        label = { Text(addressLabel) },
+                        leadingIcon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
                     )
                 }
-            }
 
-            HorizontalDivider(
-                color = if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9),
-                thickness = 1.dp
-            )
-
-            // Edit Profile Fields
-            Column(
-                modifier = Modifier.padding(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = nameInput,
-                    onValueChange = { nameInput = it },
-                    label = { Text(Translation.get("name", language)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = FintechBlue,
-                        unfocusedBorderColor = if (isDark) Color(0xFF374151) else Color(0xFFCBD5E1),
-                        focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                        unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                    )
-                )
-                OutlinedTextField(
-                    value = emailInput,
-                    onValueChange = { emailInput = it },
-                    label = { Text(Translation.get("enter_email", language)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = FintechBlue,
-                        unfocusedBorderColor = if (isDark) Color(0xFF374151) else Color(0xFFCBD5E1),
-                        focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                        unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                    )
-                )
+                // Save Information Button
                 Button(
                     onClick = {
                         if (nameInput.isNotBlank()) {
-                            viewModel.saveProfile(context, nameInput, emailInput, photoUriInput)
-                            android.widget.Toast.makeText(
+                            viewModel.saveProfile(
                                 context,
-                                Translation.get("profile_saved", language),
-                                android.widget.Toast.LENGTH_SHORT
+                                nameInput,
+                                emailInput,
+                                photoUriInput,
+                                phoneInput,
+                                socialInput,
+                                addressInput
+                            )
+                            Toast.makeText(
+                                context,
+                                if (language == AppLanguage.BN) "তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!" else "Information saved successfully!",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                if (language == AppLanguage.BN) "দয়া করে নাম লিখুন" else "Please enter your name",
+                                Toast.LENGTH_SHORT
                             ).show()
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    contentPadding = PaddingValues(14.dp)
                 ) {
-                    Text(Translation.get("confirm", language), fontWeight = FontWeight.Bold)
+                    Icon(imageVector = Icons.Rounded.Save, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "তথ্য সংরক্ষণ করুন" else "Save Information",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color.White
+                    )
                 }
             }
         }
 
-        // Appearance Section
-        SettingCategory(title = Translation.get("appearance", language), isDark = isDark) {
-            SettingItem(
-                icon = if (isDark) Icons.Rounded.NightsStay else Icons.Rounded.LightMode,
-                iconColor = FintechBlue,
-                title = if (isDark) Translation.get("dark_mode", language) else Translation.get("light_mode", language),
-                isDark = isDark,
-                trailing = {
-                    Switch(
-                        checked = isDark,
-                        onCheckedChange = { viewModel.toggleTheme() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = FintechBlue)
+        // --- 2. DARK MODE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
+            isDark = isDark,
+            icon = Icons.Rounded.NightsStay
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(Color(0xFFEAB308).copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.WbSunny,
+                        contentDescription = null,
+                        tint = Color(0xFFEAB308),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
-            )
-            HorizontalDivider(color = if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9))
-            SettingItem(
-                icon = Icons.Rounded.Language,
-                iconColor = Color(0xFF10B981),
-                title = Translation.get("language", language),
-                subtitle = if (language == AppLanguage.BN) "বাংলা" else "English",
-                isDark = isDark,
-                onClick = { viewModel.toggleLanguage() }
-            )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "চোখের সুরক্ষায় ডার্ক থিম সক্রিয় করুন" else "Activate dark theme for eye protection",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                }
+                Switch(
+                    checked = isDark,
+                    onCheckedChange = { viewModel.toggleTheme(context) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = FintechBlue,
+                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                    )
+                )
+            }
         }
 
-        // Data Management Section
-        SettingCategory(title = Translation.get("data_management", language), isDark = isDark) {
-            SettingItem(
-                icon = Icons.Rounded.Backup,
-                iconColor = Color(0xFF8B5CF6),
-                title = Translation.get("create_backup", language),
-                subtitle = Translation.get("backup_instructions", language),
-                isDark = isDark,
-                onClick = {
-                    viewModel.exportBackup(
-                        context = context,
-                        onSuccess = { json ->
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("Sanchay Backup", json)
-                            clipboard.setPrimaryClip(clip)
-                            android.widget.Toast.makeText(context, Translation.get("backup_success", language), android.widget.Toast.LENGTH_SHORT).show()
-                        },
-                        onError = { error ->
-                            android.widget.Toast.makeText(context, "Error: $error", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                }
-            )
-            HorizontalDivider(color = if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9))
-            SettingItem(
-                icon = Icons.Rounded.Restore,
-                iconColor = Color(0xFFF59E0B),
-                title = Translation.get("restore_backup", language),
-                subtitle = Translation.get("restore_clipboard", language),
-                isDark = isDark,
-                onClick = { showPasteArea = !showPasteArea }
-            )
+        // --- 3. APP LANGUAGE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অ্যাপের ভাষা / App Language" else "App Language",
+            isDark = isDark,
+            icon = Icons.Rounded.Language
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "আপনার পছন্দের ভাষা নির্বাচন করুন" else "Choose your preferred language",
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
+                )
 
-            AnimatedVisibility(visible = showPasteArea) {
-                Column(
-                    modifier = Modifier.padding(bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    OutlinedTextField(
-                        value = pasteJsonInput,
-                        onValueChange = { pasteJsonInput = it },
-                        label = { Text(Translation.get("paste_backup_code", language)) },
-                        modifier = Modifier.fillMaxWidth().height(100.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = FintechBlue,
-                            unfocusedBorderColor = if (isDark) Color(0xFF374151) else Color(0xFFCBD5E1),
-                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                        )
-                    )
+                    // Bangla Button
+                    val isBn = language == AppLanguage.BN
                     Button(
-                        onClick = {
-                            if (pasteJsonInput.isNotBlank()) {
-                                viewModel.importBackup(
-                                    context = context,
-                                    json = pasteJsonInput,
-                                    fromLocalFile = false,
-                                    onSuccess = {
-                                        pasteJsonInput = ""
-                                        showPasteArea = false
-                                        android.widget.Toast.makeText(context, Translation.get("restore_success", language), android.widget.Toast.LENGTH_SHORT).show()
-                                    },
-                                    onError = { error ->
-                                        android.widget.Toast.makeText(context, "Error: $error", android.widget.Toast.LENGTH_SHORT).show()
-                                    }
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { if (!isBn) viewModel.toggleLanguage(context) },
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isBn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isBn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
+                        ),
+                        contentPadding = PaddingValues(12.dp)
                     ) {
-                        Text(Translation.get("confirm", language), fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "বাংলা (Bangla)",
+                            color = if (isBn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    // English Button
+                    val isEn = language == AppLanguage.EN
+                    Button(
+                        onClick = { if (!isEn) viewModel.toggleLanguage(context) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isEn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isEn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
+                        ),
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Text(
+                            text = "English",
+                            color = if (isEn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }
         }
 
-        // About Developer Card
+        // --- 4. DATA BACKUP & RESTORE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
+            isDark = isDark,
+            icon = Icons.Rounded.Backup
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Local Backup & Restore Sub-header
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "লোকাল ব্যাকআপ ও রিস্টোর" else "Local Backup & Restore",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "আপনার সমস্ত ডাটা ফোনের মেমোরিতে ফাইল আকারে ব্যাকআপ রাখুন এবং যেকোনো সময় রিস্টোর করুন।" 
+                            else "Keep a backup of all your data as a file in phone memory and restore anytime.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.exportBackup(
+                                    context = context,
+                                    onSuccess = { json ->
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Finance Note Backup", json)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ মেমোরিতে সেভ হয়েছে এবং ক্লিপবোর্ডে কপি হয়েছে!" else "Backup saved to memory and copied to clipboard!", Toast.LENGTH_LONG).show()
+                                    },
+                                    onError = { error ->
+                                        Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        ) {
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (language == AppLanguage.BN) "ব্যাকআপ তৈরি" else "Create Backup", fontSize = 12.sp, color = Color.White)
+                        }
+
+                        Button(
+                            onClick = { showPasteArea = !showPasteArea },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0)),
+                            border = BorderStroke(1.dp, if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
+                        ) {
+                            Icon(Icons.Rounded.Restore, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (language == AppLanguage.BN) "রিস্টোর করুন" else "Restore", fontSize = 12.sp, color = FintechBlue)
+                        }
+                    }
+                }
+
+                // Expandable paste backup area
+                AnimatedVisibility(visible = showPasteArea) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Option 1: Quick Restore from File
+                        Button(
+                            onClick = {
+                                viewModel.importBackup(
+                                    context = context,
+                                    json = null,
+                                    fromLocalFile = true,
+                                    onSuccess = {
+                                        showPasteArea = false
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { error ->
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "কোনো সেভ করা ব্যাকআপ পাওয়া যায়নি!" else "No saved backup found!", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                        ) {
+                            Icon(Icons.Rounded.RestorePage, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (language == AppLanguage.BN) "মেমোরি থেকে রিস্টোর" else "Restore from Memory", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+
+                        // Option 2: Paste Code
+                        OutlinedTextField(
+                            value = pasteJsonInput,
+                            onValueChange = { pasteJsonInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "ব্যাকআপ কোড পেস্ট করুন" else "Paste Backup Code") },
+                            modifier = Modifier.fillMaxWidth().height(100.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FintechBlue,
+                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                        )
+                        Button(
+                            onClick = {
+                                if (pasteJsonInput.isNotBlank()) {
+                                    viewModel.importBackup(
+                                        context = context,
+                                        json = pasteJsonInput,
+                                        fromLocalFile = false,
+                                        onSuccess = {
+                                            pasteJsonInput = ""
+                                            showPasteArea = false
+                                            Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
+                                        },
+                                        onError = { error ->
+                                            Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        ) {
+                            Text(if (language == AppLanguage.BN) "নিশ্চিত করুন" else "Confirm", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0))
+
+                // Online Backup (Google Drive) Sub-header
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "অনলাইন ব্যাকআপ (গুগল ড্রাইভ)" else "Online Backup (Google Drive)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                                        // User status row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(FintechBlue.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Rounded.AccountCircle, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = profileName.ifBlank { "Shariful Islam" },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                            Text(
+                                text = profileEmail.ifBlank { "connect.shariful@gmail.com" },
+                                fontSize = 11.sp,
+                                color = if (isDark) Color.Gray else Color(0xFF64748B)
+                            )
+                        }
+                        Text(
+                            text = if (language == AppLanguage.BN) "লগআউট" else "Logout",
+                            color = FintechRed,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable {
+                                    Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে সফলভাবে লগআউট করা হয়েছে!" else "Successfully logged out of Google Drive!", Toast.LENGTH_SHORT).show()
+                                }
+                                .padding(4.dp)
+                        )
+                    }
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "আপনার সমস্ত বেচাকেনা ও ক্রেতার তথ্য সম্পূর্ণ নিরাপদ রাখতে সরাসরি গুগল ড্রাইভে ব্যাকআপ রাখুন।" 
+                            else "To keep all your transaction and customer data safe, backup directly to Google Drive.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                                        Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড ব্যাকআপ বর্তমানে উন্নয়নাধীন!" else "Cloud Backup is currently under development!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        ) {
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (language == AppLanguage.BN) "ক্লাউড ব্যাকআপ" else "Cloud Backup", fontSize = 11.sp, color = Color.White)
+                        }
+                        Button(
+                            onClick = {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড রিস্টোর বর্তমানে উন্নয়নাধীন!" else "Cloud Restore is currently under development!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0)),
+                            border = BorderStroke(1.dp, if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
+                        ) {
+                            Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (language == AppLanguage.BN) "ক্লাউড রিস্টোর" else "Cloud Restore", fontSize = 11.sp, color = FintechBlue)
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 5. APP ERROR LOG (SUPPORT) CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অ্যাপ এর লগ (সাপোর্ট)" else "App Error Log (Support)",
+            isDark = isDark,
+            icon = Icons.Rounded.BugReport
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) 
+                        "অ্যাপ ব্যবহারে কোনো কারিগরি সমস্যা হলে নিচের বাটনে ক্লিক করে এরর লগগুলো আমাদের ইমেইল বা হোয়াটসঅ্যাপে পাঠাতে পারেন। এটি আমাদের সমস্যা সমাধানে সাহায্য করবে।" 
+                        else "If you encounter any technical issues while using the app, you can check the error logs and send them to our email or WhatsApp. This helps us solve the problem.",
+                    fontSize = 12.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B),
+                    lineHeight = 18.sp
+                )
+
+                Button(
+                    onClick = {
+                        Toast.makeText(context, if (language == AppLanguage.BN) "কোনো এরর লগ পাওয়া যায়নি!" else "No error logs found!", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
+                ) {
+                    Icon(Icons.Rounded.Restore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "এরর রিপোর্ট চেক করুন" else "Check Error Report",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        // --- 6. ABOUT DEVELOPER CARD ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(Color(0xFF4F46E5), Color(0xFF7C3AED))
+                        colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
                     )
                 )
-                .padding(24.dp)
+                .padding(20.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // Row 1: Profile Avatar and Title/Subtitle
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(54.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
@@ -3826,92 +4835,434 @@ fun SettingsScreen(
                             imageVector = Icons.Rounded.Person,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                     Column {
                         Text(
-                            text = Translation.get("dev_name", language),
+                            text = "Shariful Islam",
                             color = Color.White,
-                            fontSize = 20.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = Translation.get("dev_role", language),
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 14.sp
+                            text = if (language == AppLanguage.BN) "ইউজার এক্সপেরিয়েন্স ও অ্যাপ ডেভেলপার" else "User Experience & App Developer",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 12.sp
                         )
                     }
                 }
-                Text(
-                    text = Translation.get("dev_bio", language),
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-                
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+
+                // Row 2: List Items with chevrons
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    listOf("Kotlin", "Compose", "Android").forEach { skill ->
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(text = skill, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        }
+                    // Item 1: Facebook
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://facebook.com/shariful.uxd"))
+                                context.startActivity(intent)
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Link, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("facebook.com/shariful.uxd", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+
+                    // Item 2: Mobile / WhatsApp
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:01768899599"))
+                                context.startActivity(intent)
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("01768899599", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+
+                    // Item 3: Email
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                                    data = android.net.Uri.parse("mailto:connect.shariful@gmail.com")
+                                }
+                                context.startActivity(intent)
+                            }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Email, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("connect.shariful@gmail.com", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
 
+                // Row 3: Contact/Mega button
                 Button(
                     onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
-                            data = android.net.Uri.parse("mailto:shorifbd24@gmail.com")
-                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Sanchay App Feedback")
-                        }
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599"))
                         context.startActivity(intent)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
                     contentPadding = PaddingValues(12.dp)
                 ) {
-                    Icon(Icons.Rounded.Email, contentDescription = null, tint = Color(0xFF4F46E5))
-                    Spacer(Modifier.width(8.dp))
-                    Text(Translation.get("contact_dev", language), color = Color(0xFF4F46E5), fontWeight = FontWeight.Bold)
+                    Icon(Icons.Rounded.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "নতুন আপডেট পেতে সরাসরি আমাদের সাথে হোয়াটসঅ্যাপে যোগাযোগ করতে এখানে চাপুন" 
+                            else "Tap here to contact us directly on WhatsApp to get new updates",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 15.sp,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
 
-        // App Info Section
-        SettingCategory(title = Translation.get("app_info", language), isDark = isDark) {
-            SettingItem(
-                icon = Icons.Rounded.Info,
-                iconColor = Color(0xFF3B82F6),
-                title = Translation.get("version", language),
-                subtitle = "1.0.4 Professional",
-                isDark = isDark
+        // --- 7. APP INFO CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অ্যাপ ইনফো" else "App Info",
+            isDark = isDark,
+            icon = Icons.Rounded.Info
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "অ্যাপের নাম" else "App Name",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "ফাইন্যান্স নোট (Finance Note)" else "Finance Note",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                }
+                
+                HorizontalDivider(color = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "সংস্করণ" else "Version",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                    Text(
+                        text = "1.3.0",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                }
+            }
+        }
+
+        // --- 8. PRIVACY & TERMS CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "প্রাইভেসি ও শর্তাবলী" else "Privacy & Terms",
+            isDark = isDark,
+            icon = Icons.Rounded.Security
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Item 1: Privacy Policy
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://google.com"))
+                            context.startActivity(intent)
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Info, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "প্রাইভেসি পলিসি" else "Privacy Policy",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0))
+
+                // Item 2: Terms of Use
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://google.com"))
+                            context.startActivity(intent)
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Security, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "ব্যবহারের শর্তাবলী" else "Terms of Use",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // --- 9. BOTTOM SPONSORED AD CARD ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (isDark) Color(0xFF141724) else Color.White)
+                .border(1.dp, if (isDark) Color(0xFF1F2937) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (language == AppLanguage.BN) "📢 স্পন্সরড বিজ্ঞাপন" else "📢 Sponsored Ad",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) Color.Gray else Color(0xFF64748B)
             )
-            HorizontalDivider(color = if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9))
-            SettingItem(
-                icon = Icons.Rounded.Security,
-                iconColor = Color(0xFFEF4444),
-                title = Translation.get("privacy_policy", language),
-                isDark = isDark,
-                onClick = { /* Open Privacy Link */ }
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(FintechBlue.copy(alpha = 0.15f))
+                    .clickable {
+                        Toast.makeText(context, if (language == AppLanguage.BN) "বিজ্ঞাপন মুক্ত করুন!" else "Free Ads!", Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "মুক্ত বিজ্ঞাপন" else "Free Ad",
+                    color = FintechBlue,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+
+
+@Composable
+fun ChartsScreen(
+    language: AppLanguage,
+    isDark: Boolean,
+    transactions: List<Transaction>,
+    persons: List<Person>
+) {
+    val totalIncome = transactions.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+    val totalExpense = transactions.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }.sumOf { it.amount }
+    val totalDena = transactions.filter { it.type == "BORROW" }.sumOf { it.amount } - transactions.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+    val totalPawn = transactions.filter { it.type == "LEND" }.sumOf { it.amount } - transactions.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+
+    val values = listOf(
+        maxOf(0.0, totalIncome).toFloat(),
+        maxOf(0.0, totalExpense).toFloat(),
+        maxOf(0.0, totalDena).toFloat(),
+        maxOf(0.0, totalPawn).toFloat()
+    )
+    val colors = listOf(Color(0xFF4CAF50), Color(0xFFF44336), Color(0xFFFF9800), Color(0xFF2196F3))
+    val labels = listOf(
+        if (language == AppLanguage.BN) "আয়" else "Income",
+        if (language == AppLanguage.BN) "ব্যয়" else "Expense",
+        if (language == AppLanguage.BN) "দেনা" else "Debt",
+        if (language == AppLanguage.BN) "পাওনা" else "Credit"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        FintechGradientCard(
+            gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
+            cornerRadius = 24.dp,
+            padding = 24.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (language == AppLanguage.BN) "আর্থিক সারাংশ" else "Financial Summary",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+
+                val total = values.sum()
+                if (total == 0f) {
+                    Text(
+                        text = Translation.get("no_tx", language),
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                } else {
+                    Box(modifier = Modifier.size(220.dp), contentAlignment = Alignment.Center) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            var startAngle = -90f
+                            values.forEachIndexed { index, value ->
+                                if (value > 0) {
+                                    val sweepAngle = (value / total) * 360f
+                                    drawArc(
+                                        color = colors[index],
+                                        startAngle = startAngle,
+                                        sweepAngle = sweepAngle,
+                                        useCenter = false,
+                                        style = Stroke(width = 50f, cap = StrokeCap.Round)
+                                    )
+                                    startAngle += sweepAngle
+                                }
+                            }
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "মোট" else "Total",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = formatCurrency(total.toDouble(), language),
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+
+        FintechGradientCard(
+            gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
+            cornerRadius = 24.dp,
+            padding = 16.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                values.forEachIndexed { index, value ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(colors[index]))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = labels[index], color = Color.White, fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                        }
+                        Text(text = formatCurrency(value.toDouble(), language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SplashScreen(isDark: Boolean) {
+    val gradientBrush = if (isDark) {
+        Brush.verticalGradient(colors = listOf(Color(0xFF0F121F), Color(0xFF141724)))
+    } else {
+        Brush.verticalGradient(colors = listOf(Color(0xFF3F8CFF), Color(0xFF2563EB)))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradientBrush),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .shadow(elevation = 20.dp, shape = RoundedCornerShape(36.dp))
+                    .clip(RoundedCornerShape(36.dp))
+                    .background(Color.White)
+                    .padding(2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.finance_note_bank_logo),
+                    contentDescription = "Finance Note Logo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = "Finance Note",
+                color = Color.White,
+                fontSize = 42.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp
             )
-            HorizontalDivider(color = if (isDark) Color(0xFF1F2937) else Color(0xFFF1F5F9))
-            SettingItem(
-                icon = Icons.Rounded.Star,
-                iconColor = Color(0xFFEAB308),
-                title = Translation.get("rate_app", language),
-                isDark = isDark,
-                onClick = { /* Open Play Store */ }
+            Text(
+                text = "Your Personal Money Manager",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }

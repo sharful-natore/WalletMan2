@@ -18,27 +18,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # ৪. গ্রেডল সেটআপ করা
+      # ৪. গ্রেডল সেটআপ করা (যাতে লোকাল র্যাপার বা উইন্ডোজ CRLF লাইনের কোনো সমস্যা ছাড়াই ৯.৩.১ ভার্সনে বিল্ড হতে পারে এবং র্যাপার ভ্যালিডেশন বন্ধ রাখা হয়েছে)
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
           validate-wrappers: false
 
-      # রানারের পিসিতে ডিবাগ কি-স্টোর জেনারেট করা
-      - name: Generate Default Debug Keystore
+      - name: Decode Keystore
         run: |
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          cp ~/.android/debug.keystore ./debug.keystore
-          cp ~/.android/debug.keystore ./app/debug.keystore
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
 
       - name: Build with Gradle
         run: gradle assembleDebug
-
-      # নতুন স্টেপ: বিল্ড হওয়া APK ফাইলটি ডাউনলোডের জন্য আপলোড করা
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: my-wallet-app-debug # এখানে আপনার ইচ্ছামতো নাম দিতে পারেন
-          path: app/build/outputs/apk/debug/*.apk

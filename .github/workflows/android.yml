@@ -1,0 +1,44 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ৪. গ্রেডল সেটআপ করা
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+          validate-wrappers: false
+
+      # রানারের পিসিতে ডিবাগ কি-স্টোর জেনারেট করা
+      - name: Generate Default Debug Keystore
+        run: |
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          cp ~/.android/debug.keystore ./debug.keystore
+          cp ~/.android/debug.keystore ./app/debug.keystore
+
+      - name: Build with Gradle
+        run: gradle assembleDebug
+
+      # নতুন স্টেপ: বিল্ড হওয়া APK ফাইলটি ডাউনলোডের জন্য আপলোড করা
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-wallet-app-debug # এখানে আপনার ইচ্ছামতো নাম দিতে পারেন
+          path: app/build/outputs/apk/debug/*.apk

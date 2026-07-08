@@ -37,18 +37,27 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
-    private val _isDarkTheme = MutableStateFlow(true) // Default to dark theme for premium fintech feel
+    private val _isDarkTheme = MutableStateFlow(false) // Default to light theme as requested
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
     // Profile Settings States
-    private val _profileName = MutableStateFlow("Rahad Ahmed")
+    private val _profileName = MutableStateFlow("Shariful Islam")
     val profileName: StateFlow<String> = _profileName.asStateFlow()
 
-    private val _profileEmail = MutableStateFlow("shorifbd24@gmail.com")
+    private val _profileEmail = MutableStateFlow("connect.shariful@gmail.com")
     val profileEmail: StateFlow<String> = _profileEmail.asStateFlow()
 
     private val _profilePhotoUri = MutableStateFlow<String?>(null)
     val profilePhotoUri: StateFlow<String?> = _profilePhotoUri.asStateFlow()
+
+    private val _profilePhone = MutableStateFlow("01768899599")
+    val profilePhone: StateFlow<String> = _profilePhone.asStateFlow()
+
+    private val _profileSocial = MutableStateFlow("connect.shariful@gmail.com")
+    val profileSocial: StateFlow<String> = _profileSocial.asStateFlow()
+
+    private val _profileAddress = MutableStateFlow("Parkol, Baraigram, Natore")
+    val profileAddress: StateFlow<String> = _profileAddress.asStateFlow()
 
     // Moshi JSON adapter configuration
     private val moshi = Moshi.Builder()
@@ -123,12 +132,22 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     // User Actions / Intents
-    fun toggleLanguage() {
-        _language.value = if (_language.value == AppLanguage.BN) AppLanguage.EN else AppLanguage.BN
+    fun toggleLanguage(context: Context) {
+        val newLang = if (_language.value == AppLanguage.BN) AppLanguage.EN else AppLanguage.BN
+        _language.value = newLang
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("app_language", newLang.name)
+            .apply()
     }
 
-    fun toggleTheme() {
-        _isDarkTheme.value = !_isDarkTheme.value
+    fun toggleTheme(context: Context) {
+        val newTheme = !_isDarkTheme.value
+        _isDarkTheme.value = newTheme
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("is_dark_theme", newTheme)
+            .apply()
     }
 
     fun addPerson(name: String, phone: String, address: String, photoUri: String) {
@@ -148,7 +167,8 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         type: String,
         category: String,
         note: String,
-        personId: Int?
+        personId: Int?,
+        timestamp: Long = System.currentTimeMillis()
     ) {
         viewModelScope.launch {
             repository.insertTransaction(
@@ -158,7 +178,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                     category = category,
                     note = note,
                     personId = personId,
-                    timestamp = System.currentTimeMillis()
+                    timestamp = timestamp
                 )
             )
         }
@@ -174,7 +194,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         return repository.getTransactionsByPerson(personId)
     }
 
-    fun addSavingsGoal(title: String, targetAmount: Double, category: String, colorIndex: Int) {
+    fun addSavingsGoal(title: String, targetAmount: Double, category: String, colorIndex: Int, cardholderName: String = "") {
         viewModelScope.launch {
             repository.insertSavingsGoal(
                 SavingsGoal(
@@ -182,7 +202,8 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                     targetAmount = targetAmount,
                     savedAmount = 0.0,
                     category = category,
-                    colorIndex = colorIndex
+                    colorIndex = colorIndex,
+                    cardholderName = cardholderName
                 )
             )
         }
@@ -192,7 +213,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         return repository.getSavingsTransactionsByGoal(goalId)
     }
 
-    fun addSavingsContribution(id: Int, contribution: Double) {
+    fun addSavingsContribution(id: Int, contribution: Double, note: String = "") {
         viewModelScope.launch {
             // Find current savings goal and update it
             val currentList = savingsGoals.value
@@ -208,7 +229,8 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                     SavingsTransaction(
                         goalId = id,
                         amount = absoluteAmount,
-                        isDeposit = isDeposit
+                        isDeposit = isDeposit,
+                        note = note
                     )
                 )
             }
@@ -229,22 +251,36 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
 
     // Profile Settings Helpers
     fun loadProfile(context: Context) {
-        val prefs = context.getSharedPreferences("sanchay_prefs", Context.MODE_PRIVATE)
-        _profileName.value = prefs.getString("user_name", "Rahad Ahmed") ?: "Rahad Ahmed"
-        _profileEmail.value = prefs.getString("user_email", "shorifbd24@gmail.com") ?: "shorifbd24@gmail.com"
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        _profileName.value = prefs.getString("user_name", "Shariful Islam") ?: "Shariful Islam"
+        _profileEmail.value = prefs.getString("user_email", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
         _profilePhotoUri.value = prefs.getString("user_photo", null)
+        _profilePhone.value = prefs.getString("user_phone", "01768899599") ?: "01768899599"
+        _profileSocial.value = prefs.getString("user_social", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
+        _profileAddress.value = prefs.getString("user_address", "Parkol, Baraigram, Natore") ?: "Parkol, Baraigram, Natore"
+        
+        // Load language and theme, defaulting language to BN and theme to false (Light)
+        val savedLangStr = prefs.getString("app_language", AppLanguage.BN.name) ?: AppLanguage.BN.name
+        _language.value = try { AppLanguage.valueOf(savedLangStr) } catch (e: Exception) { AppLanguage.BN }
+        _isDarkTheme.value = prefs.getBoolean("is_dark_theme", false)
     }
 
-    fun saveProfile(context: Context, name: String, email: String, photoUri: String? = null) {
-        val prefs = context.getSharedPreferences("sanchay_prefs", Context.MODE_PRIVATE)
+    fun saveProfile(context: Context, name: String, email: String, photoUri: String? = null, phone: String = "", social: String = "", address: String = "") {
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putString("user_name", name)
             .putString("user_email", email)
             .putString("user_photo", photoUri)
+            .putString("user_phone", phone)
+            .putString("user_social", social)
+            .putString("user_address", address)
             .apply()
         _profileName.value = name
         _profileEmail.value = email
         _profilePhotoUri.value = photoUri
+        _profilePhone.value = phone
+        _profileSocial.value = social
+        _profileAddress.value = address
     }
 
     // Backup & Restore operations
@@ -254,8 +290,8 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                 val backupData = repository.getBackupData()
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 
-                // Write to local private file sanchay_backup.json
-                val backupFile = File(context.filesDir, "sanchay_backup.json")
+                // Write to local private file financenote_backup.json
+                val backupFile = File(context.filesDir, "financenote_backup.json")
                 backupFile.writeText(json)
                 
                 onSuccess(json)
@@ -269,7 +305,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         viewModelScope.launch {
             try {
                 val jsonContent = if (fromLocalFile) {
-                    val backupFile = File(context.filesDir, "sanchay_backup.json")
+                    val backupFile = File(context.filesDir, "financenote_backup.json")
                     if (backupFile.exists()) {
                         backupFile.readText()
                     } else {

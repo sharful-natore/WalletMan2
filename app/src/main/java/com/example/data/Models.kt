@@ -36,6 +36,7 @@ data class SavingsGoal(
     val savedAmount: Double = 0.0,
     val category: String = "General",
     val colorIndex: Int = 0, // Index for choosing distinct fintech gradient card themes
+    val cardholderName: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -46,7 +47,8 @@ data class SavingsTransaction(
     val goalId: Int,
     val amount: Double,
     val isDeposit: Boolean,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val note: String = ""
 )
 
 @JsonClass(generateAdapter = true)

@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [Person::class, Transaction::class, SavingsGoal::class, SavingsTransaction::class],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,7 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "sanchay_finance_db"
+                    "financenote_finance_db"
                 ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
