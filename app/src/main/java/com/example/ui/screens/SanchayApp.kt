@@ -497,8 +497,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
 
     if (showSplash) {
         SplashScreen(isDark = isDarkTheme)
-    } else {
-        val persons by viewModel.persons.collectAsState()
+        return
+    }
+
+    val persons by viewModel.persons.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
     val savingsGoals by viewModel.savingsGoals.collectAsState()
     val personDebts by viewModel.personDebts.collectAsState()
@@ -1131,7 +1133,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
             }
         }
     }
-}
 }
 
 // ---------------- DASHBOARD TAB ----------------
@@ -5240,7 +5241,7 @@ fun SplashScreen(isDark: Boolean) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.app_logo_main),
+                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_app_logo),
                     contentDescription = "Finance Note Logo",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
