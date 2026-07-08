@@ -583,6 +583,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
 
     var showExitConfirm by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     if (showExitConfirm) {
         AlertDialog(
             onDismissRequest = { showExitConfirm = false },
@@ -601,15 +602,19 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
         )
     }
 
+    if (showSearch) {
+        SearchDialog(onDismissRequest = { showSearch = false }, language = language)
+    }
+
     // Back handling for overlays and settings
     androidx.activity.compose.BackHandler(
-        enabled = selectedPersonDetail != null || selectedSavingsGoalDetail != null || activeTab == "settings" || activeTab == "dashboard"
+        enabled = true
     ) {
         when {
             selectedPersonDetail != null -> selectedPersonDetail = null
             selectedSavingsGoalDetail != null -> selectedSavingsGoalDetail = null
-            activeTab == "settings" -> activeTab = "dashboard"
-            activeTab == "dashboard" -> showExitConfirm = true
+            activeTab != "dashboard" -> activeTab = "dashboard"
+            else -> showExitConfirm = true
         }
     }
 
@@ -669,6 +674,18 @@ fun FinanceNoteApp(viewModel: FinanceViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            IconButton(
+                                onClick = { showSearch = true },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Search,
+                                    contentDescription = "Search",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
                             IconButton(
                                 onClick = { viewModel.toggleLanguage(context) },
                                 modifier = Modifier.size(36.dp)
@@ -1178,7 +1195,7 @@ fun DashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
@@ -1186,7 +1203,7 @@ fun DashboardScreen(
             FintechGradientCard(
                 gradientColors = GradientsList[0],
                 cornerRadius = 24.dp,
-                modifier = Modifier.testTag("dashboard_profile_card")
+                modifier = Modifier.testTag("dashboard_profile_card").padding(top = 8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2434,7 +2451,7 @@ fun SavingsGoalCardItem(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Mastercard Chip and Contactless Icon
-            Column(modifier = Modifier.align(Alignment.TopStart)) {
+            Column(modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp)) {
                 // Chip Icon Simulation
                 Box(
                     modifier = Modifier
@@ -2453,7 +2470,7 @@ fun SavingsGoalCardItem(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 Icon(
                     imageVector = Icons.Rounded.Wifi,
@@ -2463,7 +2480,7 @@ fun SavingsGoalCardItem(
                 )
             }
 
-            // Category Label at Top Right
+
             val formattedCategory = if (language == AppLanguage.BN) {
                 when (goal.category) {
                     "Emergency" -> "জরুরি ফান্ড"
@@ -2474,27 +2491,26 @@ fun SavingsGoalCardItem(
                     else -> goal.category
                 }
             } else {
-                goal.category
+                goal.category.uppercase()
             }
 
-            // Card Title at Top Right
             Text(
-                text = goal.title.uppercase(),
+                text = formattedCategory,
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.TopEnd)
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
             )
 
-            // Goal Category and Balance in the bottom-left
+            // Goal Title and Balance in the bottom-left
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 8.dp),
+                    .padding(start = 12.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 Text(
-                    text = formattedCategory,
+                    text = goal.title.uppercase(),
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -2703,7 +2719,7 @@ fun AddTransactionDialog(
 
                 // Link with Person (Needed for Lending, Borrowing, Repayments)
                 val isPersonRequired = type != "INCOME" && type != "EXPENSE"
-                if (isPersonRequired || persons.isNotEmpty()) {
+                if (isPersonRequired) {
                     item {
                         Text(
                             Translation.get("person", language) + (if (isPersonRequired) " *" else " (${Translation.get("phone", language).split(" ").last()})"),
@@ -3041,6 +3057,7 @@ fun AddPersonDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text(Translation.get("name", language)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = labelColor,
@@ -3107,7 +3124,7 @@ fun AddPersonDialog(
                             } else if (trimmedPhone.isNotEmpty() && (!trimmedPhone.all { it.isDigit() } || trimmedPhone.length != 11)) {
                                 Toast.makeText(context, if (language == AppLanguage.BN) "সঠিক ১১ ডিজিটের ফোন নম্বর লিখুন" else "Enter a valid 11-digit phone number", Toast.LENGTH_SHORT).show()
                             } else {
-                                onConfirm(name.trim(), trimmedPhone, address.trim(), photoUri.trim())
+                                onConfirm(name.trim().uppercase(), trimmedPhone, address.trim(), photoUri.trim())
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -3173,6 +3190,7 @@ fun AddSavingsGoalDialog(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text(if (language == AppLanguage.BN) "কার্ডের নাম" else "Card Name") },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = labelColor,
@@ -3192,6 +3210,7 @@ fun AddSavingsGoalDialog(
                         value = cardholderName,
                         onValueChange = { cardholderName = it },
                         label = { Text(if (language == AppLanguage.BN) "কার্ডধারীর নাম" else "Cardholder Name") },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = labelColor,
@@ -3355,7 +3374,7 @@ fun AddSavingsGoalDialog(
                                 val target = targetStr.toDoubleOrNull() ?: 0.0
                                 val finalSector = if (sector == "Other" && customSectorName.isNotBlank()) customSectorName else sector
                                 if (title.trim().isNotEmpty()) {
-                                    onConfirm(title.trim(), target, finalSector, colorIndex, cardholderName.trim())
+                                    onConfirm(title.trim().uppercase(), target, finalSector, colorIndex, cardholderName.trim().uppercase())
                                 } else {
                                     Toast.makeText(context, Translation.get("error_empty_title", language), Toast.LENGTH_SHORT).show()
                                 }
@@ -3745,7 +3764,7 @@ fun PersonDetailOverlay(
         modifier = Modifier
             .fillMaxSize()
             .testTag("person_detail_overlay"),
-        color = if (isDark) Color(0xFF0B0D14) else Color(0xFFF3F4F6)
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -3923,7 +3942,7 @@ fun PersonDetailOverlay(
                 Dialog(onDismissRequest = { showActionSheet = null }) {
                     Card(
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF141724)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Column(
@@ -4312,6 +4331,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = nameInput,
                         onValueChange = { nameInput = it },
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                         label = { Text(nameLabel) },
                         leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = FintechBlue) },
                         modifier = Modifier.fillMaxWidth(),
