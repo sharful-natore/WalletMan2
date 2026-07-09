@@ -51,9 +51,10 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
+import com.google.android.gms.common.api.ApiException
 
 
 fun formatNumber(number: Int, lang: AppLanguage): String {
@@ -1285,26 +1286,26 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     }
                 }
 
-      // Google Sign In - Official Native Flow (WebView এরর মুক্ত সমাধান)
+                // Google Sign In - Official Native Flow (WebView এরর মুক্ত সমাধান)
                 if (showSignInWebView) {
                     val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "1066328409774-9gg0t4s4v6k4pdmhnvh5sj04tjlknhpt.apps.googleusercontent.com"
                     
-                    val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                         .requestServerAuthCode(finalClientId)
                         .requestEmail()
-                        .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
+                        .requestScopes(Scope("https://www.googleapis.com/auth/drive.file"))
                         .build()
 
-                    val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
                     val signInIntent = googleSignInClient.signInIntent
 
                     // সিস্টেমের অফিশিয়াল গুগল পপ-আপ হ্যান্ডেল করার জন্য লাঞ্চার
                     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
                         contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
                     ) { result ->
-                        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
                         try {
-                            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+                            val account = task.getResult(ApiException::class.java)
                             val code = account?.serverAuthCode
                             if (code != null) {
                                 viewModel.exchangeCodeForTokens(
@@ -1329,7 +1330,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         launcher.launch(signInIntent)
                         showSignInWebView = false // পপ-আপ লঞ্চ হওয়ার পর স্ট্যাটাস রিসেট
                     }
-                }          
+                }
 
                 if (showBackupConfirm) {
                     AlertDialog(
