@@ -1285,7 +1285,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
                 // Google Sign In, Backup & Restore Overlays
                 if (showSignInWebView) {
-                    val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else BuildConfig.DRIVE_API
+                    val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com"
                     GoogleSignInWebViewDialog(
                         clientId = finalClientId,
                         onDismiss = { showSignInWebView = false },
@@ -1295,10 +1295,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 authCode = code,
                                 clientId = finalClientId,
                                 onSuccess = {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
                                 },
                                 onError = { err ->
-                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
                                 }
                             )
                         }
