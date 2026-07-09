@@ -1312,14 +1312,20 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     authCode = code,
                                     clientId = finalClientId,
                                     onSuccess = {
+                                        showSignInWebView = false // সফল হলে ডায়ালগ বন্ধ হবে
                                         Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
                                     },
                                     onError = { err ->
+                                        showSignInWebView = false // এরর হলেও ডায়ালg বন্ধ হবে
                                         Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
                                     }
                                 )
+                            } else {
+                                showSignInWebView = false
+                                Toast.makeText(context, "Auth code is null", Toast.LENGTH_SHORT).show()
                             }
                         } catch (e: Exception) {
+                            showSignInWebView = false
                             Toast.makeText(context, "Sign in failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                         }
                     }
@@ -1327,9 +1333,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     // বাটন ট্রিগার হওয়ার সাথে সাথে অফিশিয়াল পপ-আপটি ওপেন হবে
                     androidx.compose.runtime.LaunchedEffect(Unit) {
                         launcher.launch(signInIntent)
-                        showSignInWebView = false // পপ-আপ লঞ্চ হওয়ার পর স্ট্যাটাস রিসেট
+                        // এখান থেকে showSignInWebView = false লাইনটি সরিয়ে দেওয়া হয়েছে
                     }
-                }
 
                 if (showBackupConfirm) {
                     AlertDialog(
