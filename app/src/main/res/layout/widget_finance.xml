@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Income" android:textColor="#B0BEC5" android:textSize="12sp" />
+            <TextView android:id="@+id/tv_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#10B981" android:textStyle="bold" android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Expense" android:textColor="#B0BEC5" android:textSize="12sp" />
+            <TextView android:id="@+id/tv_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#EF4444" android:textStyle="bold" android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Debt" android:textColor="#B0BEC5" android:textSize="12sp" />
+            <TextView android:id="@+id/tv_debt" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#F59E0B" android:textStyle="bold" android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Credit" android:textColor="#B0BEC5" android:textSize="12sp" />
+            <TextView android:id="@+id/tv_credit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#3B82F6" android:textStyle="bold" android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:weightSum="3">
+        <Button android:id="@+id/btn_add_tx" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+Tx" android:textSize="10sp" android:backgroundTint="#3B82F6" android:layout_marginEnd="4dp" />
+        <Button android:id="@+id/btn_add_person" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+Person" android:textSize="10sp" android:backgroundTint="#3B82F6" android:layout_marginEnd="4dp" />
+        <Button android:id="@+id/btn_add_saving" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+Saving" android:textSize="10sp" android:backgroundTint="#3B82F6" />
+    </LinearLayout>
+
+</LinearLayout>

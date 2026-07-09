@@ -21,8 +21,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Register global exception handler for logging crashes
+        com.example.data.ErrorLogger.registerUncaughtExceptionHandler(this)
+        
         // Initialize database & repository
         val database = AppDatabase.getDatabase(this)
+        val notifIntent = android.content.Intent(this, com.example.widget.FinanceNotificationService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(notifIntent)
+        } else {
+            startService(notifIntent)
+        }
+
         val repository = FinanceRepository(database.financeDao())
         
         // ViewModel creation
@@ -46,7 +56,8 @@ class MainActivity : ComponentActivity() {
             }
             
             MyApplicationTheme(darkTheme = isDarkTheme) {
-                FinanceNoteApp(viewModel = viewModel)
+                val action = intent?.action
+                FinanceNoteApp(viewModel = viewModel, initialAction = action)
             }
         }
     }

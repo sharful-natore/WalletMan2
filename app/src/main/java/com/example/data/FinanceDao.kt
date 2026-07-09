@@ -2,6 +2,7 @@ package com.example.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.Update
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,9 @@ interface FinanceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: Person): Long
+    @Update
+    suspend fun updatePerson(person: Person)
+
 
     @Query("DELETE FROM persons WHERE id = :id")
     suspend fun deletePersonById(id: Int)

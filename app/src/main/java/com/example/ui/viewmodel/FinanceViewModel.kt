@@ -11,6 +11,16 @@ import com.example.data.SavingsGoal
 import com.example.data.SavingsTransaction
 import com.example.data.FinanceRepository
 import com.example.data.FinanceBackup
+import com.example.data.AppDatabase
+import com.example.data.GoogleTokenResponse
+import com.example.data.GoogleUserInfoResponse
+import com.example.data.GoogleDriveFile
+import com.example.data.GoogleDriveFilesResponse
+import okhttp3.FormBody
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import com.example.ui.AppLanguage
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -156,6 +166,12 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     fun addPerson(name: String, phone: String, address: String, photoUri: String) {
         viewModelScope.launch {
             repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri))
+        }
+    }
+
+    fun updatePerson(person: Person) {
+        viewModelScope.launch {
+            repository.updatePerson(person)
         }
     }
 
@@ -380,6 +396,456 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                 onError(e.localizedMessage ?: "Unknown error")
             }
         }
+    }
+
+    // Google Sign-In & Drive Backup properties
+    private val _googleName = MutableStateFlow<String?>(null)
+    val googleName: StateFlow<String?> = _googleName.asStateFlow()
+
+    private val _googleEmail = MutableStateFlow<String?>(null)
+    val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
+
+    private val _googlePhotoUrl = MutableStateFlow<String?>(null)
+    val googlePhotoUrl: StateFlow<String?> = _googlePhotoUrl.asStateFlow()
+
+    private val _isGoogleSignedIn = MutableStateFlow(false)
+    val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
+
+    private val _driveStatusMessage = MutableStateFlow<String?>(null)
+    val driveStatusMessage: StateFlow<String?> = _driveStatusMessage.asStateFlow()
+
+    private val _googleDriveFiles = MutableStateFlow<List<GoogleDriveFile>>(emptyList())
+    val googleDriveFiles: StateFlow<List<GoogleDriveFile>> = _googleDriveFiles.asStateFlow()
+
+    private val _isFetchingFiles = MutableStateFlow(false)
+    val isFetchingFiles: StateFlow<Boolean> = _isFetchingFiles.asStateFlow()
+
+    private val client = OkHttpClient()
+
+    // Initialize Google State from Shared Prefs
+    fun initGoogleDrive(context: Context) {
+        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        val refreshToken = prefs.getString("google_refresh_token", null)
+        val email = prefs.getString("google_email", null)
+        val name = prefs.getString("google_name", null)
+        val photoUrl = prefs.getString("google_photo_url", null)
+
+        if (!refreshToken.isNullOrEmpty()) {
+            _googleEmail.value = email
+            _googleName.value = name
+            _googlePhotoUrl.value = photoUrl
+            _isGoogleSignedIn.value = true
+        } else {
+            _googleEmail.value = null
+            _googleName.value = null
+            _googlePhotoUrl.value = null
+            _isGoogleSignedIn.value = false
+        }
+    }
+
+    fun exchangeCodeForTokens(
+        context: Context,
+        authCode: String,
+        clientId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                _driveStatusMessage.value = "Authenticating with Google..."
+                val formBody = FormBody.Builder()
+                    .add("code", authCode)
+                    .add("client_id", clientId)
+                    .add("redirect_uri", "http://localhost")
+                    .add("grant_type", "authorization_code")
+                    .build()
+
+                val request = Request.Builder()
+                    .url("https://oauth2.googleapis.com/token")
+                    .post(formBody)
+                    .build()
+
+                val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(request).execute()
+                    }
+                }
+
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: ""
+                    val tokenResponse = moshi.adapter(GoogleTokenResponse::class.java).fromJson(responseBody)
+                    if (tokenResponse != null) {
+                        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                        val edit = prefs.edit()
+                            .putString("google_access_token", tokenResponse.access_token)
+                            .putLong("google_access_token_expires_at", System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000)
+                        
+                        if (tokenResponse.refresh_token != null) {
+                            edit.putString("google_refresh_token", tokenResponse.refresh_token)
+                        }
+                        edit.apply()
+
+                        // Fetch user info with the new access token
+                        fetchGoogleUserInfo(context, tokenResponse.access_token, { name, email ->
+                            _isGoogleSignedIn.value = true
+                            _driveStatusMessage.value = "Successfully Signed In!"
+                            onSuccess()
+                        }, { err ->
+                            _isGoogleSignedIn.value = true
+                            _driveStatusMessage.value = "Signed In (Unable to fetch user info)"
+                            onSuccess()
+                        })
+                    } else {
+                        throw Exception("Failed to parse token response")
+                    }
+                } else {
+                    val errBody = response.body?.string() ?: ""
+                    throw Exception("Google server returned error: $errBody")
+                }
+            } catch (e: Exception) {
+                _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
+                onError(e.localizedMessage ?: "Unknown authentication error")
+            }
+        }
+    }
+
+    private fun fetchGoogleUserInfo(
+        context: Context,
+        accessToken: String,
+        onSuccess: (String, String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val request = Request.Builder()
+                    .url("https://www.googleapis.com/oauth2/v3/userinfo")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+
+                val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(request).execute()
+                    }
+                }
+
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: ""
+                    val userInfo = moshi.adapter(GoogleUserInfoResponse::class.java).fromJson(responseBody)
+                    if (userInfo != null) {
+                        val name = userInfo.name ?: "Google User"
+                        val email = userInfo.email ?: "drive.user@gmail.com"
+                        val picture = userInfo.picture
+
+                        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                        val editor = prefs.edit()
+                            .putString("google_name", name)
+                            .putString("google_email", email)
+                        if (!picture.isNullOrEmpty()) {
+                            editor.putString("google_photo_url", picture)
+                        } else {
+                            editor.remove("google_photo_url")
+                        }
+                        editor.apply()
+
+                        _googleName.value = name
+                        _googleEmail.value = email
+                        _googlePhotoUrl.value = picture
+                        onSuccess(name, email)
+                    } else {
+                        throw Exception("Failed to parse user info")
+                    }
+                } else {
+                    throw Exception("Failed to fetch user info")
+                }
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    private suspend fun getValidAccessToken(context: Context): String? {
+        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        val accessToken = prefs.getString("google_access_token", null)
+        val expiresAt = prefs.getLong("google_access_token_expires_at", 0)
+        val refreshToken = prefs.getString("google_refresh_token", null)
+
+        if (refreshToken.isNullOrEmpty()) {
+            return null
+        }
+
+        // If access token exists and is valid for at least another 5 minutes, use it
+        if (!accessToken.isNullOrEmpty() && expiresAt > System.currentTimeMillis() + 300 * 1000) {
+            return accessToken
+        }
+
+        // Otherwise, refresh the access token!
+        return try {
+            val formBody = FormBody.Builder()
+                .add("client_id", "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com")
+                .add("refresh_token", refreshToken)
+                .add("grant_type", "refresh_token")
+                .build()
+
+            val request = Request.Builder()
+                .url("https://oauth2.googleapis.com/token")
+                .post(formBody)
+                .build()
+
+            val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                kotlinx.coroutines.withContext(d) {
+                    client.newCall(request).execute()
+                }
+            }
+
+            if (response.isSuccessful) {
+                val responseBody = response.body?.string() ?: ""
+                val tokenResponse = moshi.adapter(GoogleTokenResponse::class.java).fromJson(responseBody)
+                if (tokenResponse != null) {
+                    prefs.edit()
+                        .putString("google_access_token", tokenResponse.access_token)
+                        .putLong("google_access_token_expires_at", System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000)
+                        .apply()
+                    tokenResponse.access_token
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun backupToGoogleDrive(context: Context, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                _driveStatusMessage.value = "Starting cloud backup..."
+                val accessToken = getValidAccessToken(context)
+                if (accessToken == null) {
+                    _isGoogleSignedIn.value = false
+                    throw Exception("Not signed in to Google or session expired")
+                }
+
+                // 1. Get database data JSON string
+                val backupData = repository.getBackupData()
+                val json = backupAdapter.indent("  ").toJson(backupData)
+
+                // 2. Create timestamp and fileName
+                val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                val fileName = "finance_note_backup_$timestamp.json"
+
+                _driveStatusMessage.value = "Creating cloud backup file..."
+                val boundary = "BackupBoundary"
+                val multipartBody = buildString {
+                    append("--$boundary\r\n")
+                    append("Content-Type: application/json; charset=UTF-8\r\n\r\n")
+                    append("{\"name\": \"$fileName\", \"mimeType\": \"application/json\"}\r\n")
+                    append("--$boundary\r\n")
+                    append("Content-Type: application/json\r\n\r\n")
+                    append(json)
+                    append("\r\n--$boundary--\r\n")
+                }
+
+                val requestBody = multipartBody.toRequestBody("multipart/related; boundary=$boundary".toMediaType())
+                val createRequest = Request.Builder()
+                    .url("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
+                    .header("Authorization", "Bearer $accessToken")
+                    .post(requestBody)
+                    .build()
+
+                val createResponse = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(createRequest).execute()
+                    }
+                }
+
+                if (createResponse.isSuccessful) {
+                    _driveStatusMessage.value = "Backup successfully created: $fileName"
+                    onSuccess()
+                } else {
+                    val errBody = createResponse.body?.string() ?: ""
+                    throw Exception("Failed to create backup on Google Drive: $errBody")
+                }
+            } catch (e: Exception) {
+                _driveStatusMessage.value = "Backup Failed: ${e.localizedMessage}"
+                onError(e.localizedMessage ?: "Unknown backup error")
+            }
+        }
+    }
+
+    fun listGoogleDriveFiles(context: Context, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch {
+            _isFetchingFiles.value = true
+            try {
+                val accessToken = getValidAccessToken(context)
+                if (accessToken == null) {
+                    _isGoogleSignedIn.value = false
+                    throw Exception("Not signed in to Google or session expired")
+                }
+
+                val request = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files?q=name%20contains%20'finance_note_backup'%20and%20trashed=false&fields=files(id,name,mimeType,createdTime,size)&orderBy=createdTime%20desc")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+
+                val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(request).execute()
+                    }
+                }
+
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    val filesResponse = moshi.adapter(GoogleDriveFilesResponse::class.java).fromJson(body)
+                    _googleDriveFiles.value = filesResponse?.files ?: emptyList()
+                    onSuccess()
+                } else {
+                    val errBody = response.body?.string() ?: ""
+                    throw Exception("Failed to list files: $errBody")
+                }
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Unknown error")
+            } finally {
+                _isFetchingFiles.value = false
+            }
+        }
+    }
+
+    fun deleteGoogleDriveFile(context: Context, fileId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val accessToken = getValidAccessToken(context)
+                if (accessToken == null) {
+                    _isGoogleSignedIn.value = false
+                    throw Exception("Not signed in to Google or session expired")
+                }
+
+                val request = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files/$fileId")
+                    .delete()
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+
+                val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(request).execute()
+                    }
+                }
+
+                if (response.isSuccessful) {
+                    listGoogleDriveFiles(context)
+                    onSuccess()
+                } else {
+                    val errBody = response.body?.string() ?: ""
+                    throw Exception("Failed to delete file: $errBody")
+                }
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    fun restoreFromGoogleDriveFile(context: Context, fileId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                _driveStatusMessage.value = "Downloading selected backup file..."
+                val accessToken = getValidAccessToken(context)
+                if (accessToken == null) {
+                    _isGoogleSignedIn.value = false
+                    throw Exception("Not signed in to Google or session expired")
+                }
+
+                val downloadRequest = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+
+                val downloadResponse = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(downloadRequest).execute()
+                    }
+                }
+
+                if (downloadResponse.isSuccessful) {
+                    val jsonContent = downloadResponse.body?.string() ?: ""
+                    _driveStatusMessage.value = "Restoring database content..."
+                    val backupData = backupAdapter.fromJson(jsonContent)
+                    if (backupData != null) {
+                       repository.restoreBackupData(backupData)
+                       _driveStatusMessage.value = "Restore successfully completed!"
+                       onSuccess()
+                    } else {
+                       throw Exception("Downloaded backup file format is invalid")
+                    }
+                } else {
+                    val errBody = downloadResponse.body?.string() ?: ""
+                    throw Exception("Failed to download file from Google Drive: $errBody")
+                }
+            } catch (e: Exception) {
+                _driveStatusMessage.value = "Restore Failed: ${e.localizedMessage}"
+                onError(e.localizedMessage ?: "Unknown restore error")
+            }
+        }
+    }
+
+    fun restoreFromGoogleDrive(context: Context, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                _driveStatusMessage.value = "Searching for backup on cloud..."
+                val accessToken = getValidAccessToken(context)
+                if (accessToken == null) {
+                    _isGoogleSignedIn.value = false
+                    throw Exception("Not signed in to Google or session expired")
+                }
+
+                val searchRequest = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files?q=name%20contains%20'finance_note_backup'%20and%20trashed=false&fields=files(id,name)&orderBy=createdTime%20desc")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+
+                val searchResponse = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(searchRequest).execute()
+                    }
+                }
+
+                var existingFileId: String? = null
+                if (searchResponse.isSuccessful) {
+                    val searchBody = searchResponse.body?.string() ?: ""
+                    val listType = com.squareup.moshi.Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+                    val mapAdapter = moshi.adapter<Map<String, Any>>(listType)
+                    val parsed = mapAdapter.fromJson(searchBody)
+                    val filesList = parsed?.get("files") as? List<*>
+                    if (!filesList.isNullOrEmpty()) {
+                        val firstFile = filesList[0] as? Map<*, *>
+                        existingFileId = firstFile?.get("id") as? String
+                    }
+                }
+
+                if (existingFileId == null) {
+                    throw Exception("No backup file found on Google Drive!")
+                }
+
+                restoreFromGoogleDriveFile(context, existingFileId, onSuccess, onError)
+            } catch (e: Exception) {
+                _driveStatusMessage.value = "Restore Failed: ${e.localizedMessage}"
+                onError(e.localizedMessage ?: "Unknown restore error")
+            }
+        }
+    }
+
+    fun signOutFromGoogle(context: Context, onSuccess: () -> Unit) {
+        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+        
+        _googleEmail.value = null
+        _googleName.value = null
+        _googlePhotoUrl.value = null
+        _isGoogleSignedIn.value = false
+        _driveStatusMessage.value = "Signed Out"
+        onSuccess()
     }
 }
 

@@ -58,3 +58,32 @@ data class FinanceBackup(
     val savingsGoals: List<SavingsGoal>,
     val savingsTransactions: List<SavingsTransaction> = emptyList()
 )
+
+@JsonClass(generateAdapter = true)
+data class GoogleTokenResponse(
+    val access_token: String,
+    val refresh_token: String? = null,
+    val expires_in: Long? = null,
+    val token_type: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GoogleUserInfoResponse(
+    val name: String? = null,
+    val email: String? = null,
+    val picture: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GoogleDriveFile(
+    val id: String,
+    val name: String,
+    val mimeType: String? = null,
+    val createdTime: String? = null,
+    val size: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GoogleDriveFilesResponse(
+    val files: List<GoogleDriveFile>
+)

@@ -18,6 +18,10 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun insertPerson(person: Person): Long {
         return financeDao.insertPerson(person)
     }
+    suspend fun updatePerson(person: Person) {
+        financeDao.updatePerson(person)
+    }
+
 
     suspend fun deletePerson(id: Int) {
         // First delete their related transactions to avoid orphaned entries
