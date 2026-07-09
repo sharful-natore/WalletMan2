@@ -4,68 +4,236 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_bg"
-    android:padding="16dp">
+    android:padding="4dp">
 
+    <!-- Row 1: Summary Cards (Square-ish) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:weightSum="2">
+        android:baselineAligned="false">
 
-        <LinearLayout
+        <!-- Income/Balance Card -->
+        <RelativeLayout
+            android:id="@+id/card_income"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="55dp"
             android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Income" android:textColor="#B0BEC5" android:textSize="12sp" />
-            <TextView android:id="@+id/tv_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#10B981" android:textStyle="bold" android:textSize="16sp" />
-        </LinearLayout>
+            android:layout_margin="2dp"
+            android:background="@drawable/glass_card_bg"
+            android:padding="8dp"
+            android:clickable="true">
+            <TextView
+                android:id="@+id/lbl_income"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ব্যালেন্স"
+                android:textColor="#CCFFFFFF"
+                android:textSize="8sp" />
+            <TextView
+                android:id="@+id/tv_income"
+                android:layout_below="@id/lbl_income"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="৳ 0"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:maxLines="1" />
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentRight="true"
+                android:src="@drawable/ic_trending_up"
+                android:alpha="0.6" />
+        </RelativeLayout>
 
-        <LinearLayout
+        <!-- Expense Card -->
+        <RelativeLayout
+            android:id="@+id/card_expense"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="55dp"
             android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Expense" android:textColor="#B0BEC5" android:textSize="12sp" />
-            <TextView android:id="@+id/tv_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#EF4444" android:textStyle="bold" android:textSize="16sp" />
-        </LinearLayout>
+            android:layout_margin="2dp"
+            android:background="@drawable/glass_card_bg"
+            android:padding="8dp"
+            android:clickable="true">
+            <TextView
+                android:id="@+id/lbl_expense"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ব্যয়"
+                android:textColor="#CCFFFFFF"
+                android:textSize="8sp" />
+            <TextView
+                android:id="@+id/tv_expense"
+                android:layout_below="@id/lbl_expense"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="৳ 0"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:maxLines="1" />
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentRight="true"
+                android:src="@drawable/ic_trending_down"
+                android:alpha="0.6" />
+        </RelativeLayout>
+
+        <!-- Debt Card -->
+        <RelativeLayout
+            android:id="@+id/card_debt"
+            android:layout_width="0dp"
+            android:layout_height="55dp"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:background="@drawable/glass_card_bg"
+            android:padding="8dp"
+            android:clickable="true">
+            <TextView
+                android:id="@+id/lbl_debt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="দেনা"
+                android:textColor="#CCFFFFFF"
+                android:textSize="8sp" />
+            <TextView
+                android:id="@+id/tv_debt"
+                android:layout_below="@id/lbl_debt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="৳ 0"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:maxLines="1" />
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentRight="true"
+                android:src="@drawable/ic_arrow_up"
+                android:alpha="0.6" />
+        </RelativeLayout>
+
+        <!-- Credit Card -->
+        <RelativeLayout
+            android:id="@+id/card_credit"
+            android:layout_width="0dp"
+            android:layout_height="55dp"
+            android:layout_weight="1"
+            android:layout_margin="2dp"
+            android:background="@drawable/glass_card_bg"
+            android:padding="8dp"
+            android:clickable="true">
+            <TextView
+                android:id="@+id/lbl_credit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="পাওনা"
+                android:textColor="#CCFFFFFF"
+                android:textSize="8sp" />
+            <TextView
+                android:id="@+id/tv_credit"
+                android:layout_below="@id/lbl_credit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="৳ 0"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9sp"
+                android:maxLines="1" />
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentRight="true"
+                android:src="@drawable/ic_arrow_down"
+                android:alpha="0.6" />
+        </RelativeLayout>
     </LinearLayout>
 
+    <!-- Row 2: Action Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:orientation="horizontal"
-        android:weightSum="2">
+        android:gravity="center"
+        android:baselineAligned="false">
 
+        <!-- Add Transaction Button -->
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Debt" android:textColor="#B0BEC5" android:textSize="12sp" />
-            <TextView android:id="@+id/tv_debt" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#F59E0B" android:textStyle="bold" android:textSize="16sp" />
+            android:id="@+id/btn_add_tx"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginHorizontal="6dp"
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_add"
+                android:tint="#FFFFFF" />
         </LinearLayout>
 
+        <!-- Add Debt/Credit Button -->
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Credit" android:textColor="#B0BEC5" android:textSize="12sp" />
-            <TextView android:id="@+id/tv_credit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="৳ 0" android:textColor="#3B82F6" android:textStyle="bold" android:textSize="16sp" />
+            android:id="@+id/btn_add_person"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginHorizontal="6dp"
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_person_add"
+                android:tint="#FFFFFF" />
         </LinearLayout>
-    </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:orientation="horizontal"
-        android:weightSum="3">
-        <Button android:id="@+id/btn_add_tx" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+Tx" android:textSize="10sp" android:backgroundTint="#3B82F6" android:layout_marginEnd="4dp" />
-        <Button android:id="@+id/btn_add_person" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+Person" android:textSize="10sp" android:backgroundTint="#3B82F6" android:layout_marginEnd="4dp" />
-        <Button android:id="@+id/btn_add_saving" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+Saving" android:textSize="10sp" android:backgroundTint="#3B82F6" />
+        <!-- Add Saving Button -->
+        <LinearLayout
+            android:id="@+id/btn_add_saving"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginHorizontal="6dp"
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_card"
+                android:tint="#FFFFFF" />
+        </LinearLayout>
+
+        <!-- Cloud Backup Button -->
+        <LinearLayout
+            android:id="@+id/btn_backup"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginHorizontal="6dp"
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_cloud_backup"
+                android:tint="#FFFFFF" />
+        </LinearLayout>
     </LinearLayout>
 
 </LinearLayout>

@@ -1,46 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/notif_main_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#1E2235"
+    android:background="@android:color/transparent"
     android:padding="8dp">
 
+    <!-- Action Buttons Grid -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:weightSum="4">
-        
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Inc" android:textColor="#B0BEC5" android:textSize="10sp" />
-            <TextView android:id="@+id/tv_notif_income" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#10B981" android:textStyle="bold" android:textSize="12sp" />
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <!-- Row 1 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+            
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_dashboard" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_dashboard" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_tx" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_add" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_debt" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_person_add" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_savings" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_card" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
 
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Exp" android:textColor="#B0BEC5" android:textSize="10sp" />
-            <TextView android:id="@+id/tv_notif_expense" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#EF4444" android:textStyle="bold" android:textSize="12sp" />
-        </LinearLayout>
-        
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Debt" android:textColor="#B0BEC5" android:textSize="10sp" />
-            <TextView android:id="@+id/tv_notif_debt" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#F59E0B" android:textStyle="bold" android:textSize="12sp" />
-        </LinearLayout>
-        
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Credit" android:textColor="#B0BEC5" android:textSize="10sp" />
-            <TextView android:id="@+id/tv_notif_credit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#3B82F6" android:textStyle="bold" android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
+        <!-- Row 2 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:orientation="horizontal"
+            android:weightSum="4"
+            android:baselineAligned="false">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal"
-        android:weightSum="3">
-        <Button android:id="@+id/btn_notif_tx" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" android:text="+Tx" android:textSize="10sp" android:backgroundTint="#3B82F6" android:layout_marginEnd="4dp" />
-        <Button android:id="@+id/btn_notif_person" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" android:text="+Person" android:textSize="10sp" android:backgroundTint="#3B82F6" android:layout_marginEnd="4dp" />
-        <Button android:id="@+id/btn_notif_saving" android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1" android:text="+Saving" android:textSize="10sp" android:backgroundTint="#3B82F6" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_charts" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_pie_chart" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_backup" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_cloud_backup" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center">
+                <LinearLayout android:id="@+id/btn_notif_settings" android:layout_width="40dp" android:layout_height="40dp" android:background="@drawable/gradient_notif_button" android:gravity="center" android:clickable="true">
+                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_settings" android:tint="#FFFFFF" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

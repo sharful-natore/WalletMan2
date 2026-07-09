@@ -25,26 +25,25 @@ jobs:
           gradle-version: '9.3.1'
           validate-wrappers: false
 
-      - name: Decode Keystore and Build Release Signed APK
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+      - name: Build APK
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEYSTORE_PATH: "my-upload-key.jks"
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > app/my-upload-key.jks
-          gradle assembleRelease
-
-      - name: Build Debug APK (Fallback if Secrets are missing)
-        if: ${{ secrets.KEYSTORE_BASE64 == '' }}
-        run: |
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          cp ~/.android/debug.keystore ./debug.keystore
-          cp ~/.android/debug.keystore ./app/debug.keystore
-          gradle assembleDebug
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Secrets found. Building Release APK..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/my-upload-key.jks
+            gradle assembleRelease
+          else
+            echo "Secrets missing. Building Debug APK..."
+            mkdir -p ~/.android
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            cp ~/.android/debug.keystore ./debug.keystore
+            cp ~/.android/debug.keystore ./app/debug.keystore
+            gradle assembleDebug
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

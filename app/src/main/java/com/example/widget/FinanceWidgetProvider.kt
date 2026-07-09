@@ -29,17 +29,44 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val personIntent = Intent(context, MainActivity::class.java).apply {
-        action = "ACTION_ADD_PERSON"
+        action = "ACTION_DEBT_CREDIT"
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val savingIntent = Intent(context, MainActivity::class.java).apply {
-        action = "ACTION_ADD_SAVING"
+        action = "ACTION_SAVINGS"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+    val backupIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_BACKUP"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+
+    val incomeViewIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_VIEW_INCOME"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+    val expenseViewIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_VIEW_EXPENSE"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+    val debtViewIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_VIEW_DEBT"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+    val creditViewIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_VIEW_CREDIT"
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     views.setOnClickPendingIntent(R.id.btn_add_tx, PendingIntent.getActivity(context, 1, txIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_person, PendingIntent.getActivity(context, 2, personIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_saving, PendingIntent.getActivity(context, 3, savingIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.btn_backup, PendingIntent.getActivity(context, 4, backupIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+
+    views.setOnClickPendingIntent(R.id.card_income, PendingIntent.getActivity(context, 10, incomeViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.card_expense, PendingIntent.getActivity(context, 11, expenseViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.card_debt, PendingIntent.getActivity(context, 12, debtViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.card_credit, PendingIntent.getActivity(context, 13, creditViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
     // Background logic to load data
     CoroutineScope(Dispatchers.IO).launch {
@@ -48,6 +75,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val allTxs = dao.getAllTransactionsList()
             val income = allTxs.filter { it.type == "INCOME" || it.type == "REPAY_RECEIVED" || it.type == "BORROW" }.sumOf { it.amount }
             val expense = allTxs.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }.sumOf { it.amount }
+            val balance = income - expense
 
             val persons = dao.getAllPersonsList()
             var totalDena = 0.0
@@ -63,10 +91,11 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 if (net < 0) totalDena += -net
             }
 
-            views.setTextViewText(R.id.tv_income, "৳ $income")
-            views.setTextViewText(R.id.tv_expense, "৳ $expense")
-            views.setTextViewText(R.id.tv_debt, "৳ $totalDena")
-            views.setTextViewText(R.id.tv_credit, "৳ $totalPaona")
+            val df = java.text.DecimalFormat("#,##,##0")
+            views.setTextViewText(R.id.tv_income, "৳ ${df.format(balance)}")
+            views.setTextViewText(R.id.tv_expense, "৳ ${df.format(expense)}")
+            views.setTextViewText(R.id.tv_debt, "৳ ${df.format(totalDena)}")
+            views.setTextViewText(R.id.tv_credit, "৳ ${df.format(totalPaona)}")
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         } catch (e: Exception) {

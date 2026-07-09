@@ -1,7 +1,11 @@
 package com.example.ui.viewmodel
 
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.core.content.ContextCompat
+import android.Manifest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -53,6 +57,9 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
 
     private val _isDarkTheme = MutableStateFlow(false) // Default to light theme as requested
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
+
+    private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
+    val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
 
     // Profile Settings States
     private val _profileName = MutableStateFlow("Shariful Islam")
@@ -162,6 +169,46 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
             .putBoolean("is_dark_theme", newTheme)
             .apply()
     }
+
+    fun toggleNotification(context: Context) {
+        val currentState = _isNotificationEnabled.value
+        val newState = !currentState
+        
+        if (newState) {
+            // Check permission if turning ON
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    // Cannot enable without permission
+                    _isNotificationEnabled.value = false
+                    context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("notification_enabled", false)
+                        .apply()
+                    return
+                }
+            }
+        }
+        
+        _isNotificationEnabled.value = newState
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("notification_enabled", newState)
+            .apply()
+
+        val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)
+        if (newState) {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) { e.printStackTrace() }
+        } else {
+            context.stopService(intent)
+        }
+    }
+
 
     fun addPerson(name: String, phone: String, address: String, photoUri: String) {
         viewModelScope.launch {
@@ -302,6 +349,29 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         val savedLangStr = prefs.getString("app_language", AppLanguage.BN.name) ?: AppLanguage.BN.name
         _language.value = try { AppLanguage.valueOf(savedLangStr) } catch (e: Exception) { AppLanguage.BN }
         _isDarkTheme.value = prefs.getBoolean("is_dark_theme", false)
+
+        // Load notification setting
+        var notifEnabled = prefs.getBoolean("notification_enabled", true)
+        
+        // Ensure it's disabled if permission is missing (Android 13+)
+        if (notifEnabled && android.os.Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notifEnabled = false
+            }
+        }
+        
+        _isNotificationEnabled.value = notifEnabled
+
+        if (notifEnabled) {
+            val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) { e.printStackTrace() }
+        }
     }
 
     fun saveProfile(context: Context, name: String, email: String, photoUri: String? = null, phone: String = "", social: String = "", address: String = "") {

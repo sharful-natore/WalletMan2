@@ -1,4 +1,5 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="100dp"
     android:viewportWidth="100"
@@ -6,10 +7,11 @@
     <path
         android:fillColor="#3F8CFF"
         android:pathData="M50,50m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0" />
+    <!-- Receipt Long style white icon -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M30,20h40v60l-5,-5l-5,5l-5,-5l-5,5l-5,-5l-5,5l-5,-5z" />
+        android:pathData="M32,25h36v50l-6,-4l-6,4l-6,-4l-6,4l-6,-4l-6,4z" />
     <path
         android:fillColor="#3F8CFF"
-        android:pathData="M38,35h24v4h-24zM38,45h24v4h-24zM38,55h16v4h-16z" />
+        android:pathData="M38,34h24v3h-24zM38,42h24v3h-24zM38,50h16v3h-16zM38,58h24v3h-24z" />
 </vector>

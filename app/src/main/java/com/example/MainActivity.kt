@@ -18,6 +18,11 @@ import com.example.ui.viewmodel.FinanceViewModel
 import com.example.ui.viewmodel.FinanceViewModelFactory
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -26,19 +31,15 @@ class MainActivity : ComponentActivity() {
         
         // Initialize database & repository
         val database = AppDatabase.getDatabase(this)
-        val notifIntent = android.content.Intent(this, com.example.widget.FinanceNotificationService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            startForegroundService(notifIntent)
-        } else {
-            startService(notifIntent)
-        }
-
         val repository = FinanceRepository(database.financeDao())
         
         // ViewModel creation
         val factory = FinanceViewModelFactory(repository)
         val viewModel: FinanceViewModel by viewModels { factory }
         
+        // Load persistent settings
+        viewModel.loadProfile(this)
+
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
             
@@ -56,6 +57,7 @@ class MainActivity : ComponentActivity() {
             }
             
             MyApplicationTheme(darkTheme = isDarkTheme) {
+                // Get action from intent, but also listen for changes via setIntent(intent) in onNewIntent
                 val action = intent?.action
                 FinanceNoteApp(viewModel = viewModel, initialAction = action)
             }

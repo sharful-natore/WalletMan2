@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add_tx"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_add"
+        android:shortcutShortLabel="@string/shortcut_add_tx">
+        <intent
+            android:action="ACTION_ADD_TRANSACTION"
+            android:targetPackage="com.vibestudio.financenote"
+            android:targetClass="com.example.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="debt_credit"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_debt"
+        android:shortcutShortLabel="@string/shortcut_debt_credit">
+        <intent
+            android:action="ACTION_DEBT_CREDIT"
+            android:targetPackage="com.vibestudio.financenote"
+            android:targetClass="com.example.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="savings"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_savings"
+        android:shortcutShortLabel="@string/shortcut_savings">
+        <intent
+            android:action="ACTION_SAVINGS"
+            android:targetPackage="com.vibestudio.financenote"
+            android:targetClass="com.example.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="backup"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_backup"
+        android:shortcutShortLabel="@string/shortcut_backup">
+        <intent
+            android:action="ACTION_BACKUP"
+            android:targetPackage="com.vibestudio.financenote"
+            android:targetClass="com.example.MainActivity" />
+    </shortcut>
+</shortcuts>

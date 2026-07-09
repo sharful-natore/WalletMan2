@@ -3,6 +3,7 @@ package com.example.ui.screens
 import com.example.R
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import com.example.ui.components.*
 import com.example.ui.theme.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.layout.*
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.*
@@ -581,15 +583,41 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         filteredPersonDebts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
     }
 
-    var activeTab by remember { mutableStateOf("dashboard") }
-    var transactionFilter by remember { mutableStateOf("ALL") }
-    var debtFilter by remember { mutableStateOf("ALL") }
+    var activeTab by remember(initialAction) {
+        mutableStateOf(
+            when (initialAction) {
+                "ACTION_DEBT_CREDIT", "ACTION_VIEW_DEBT", "ACTION_VIEW_CREDIT" -> "debts"
+                "ACTION_SAVINGS" -> "savings"
+                "ACTION_SETTINGS" -> "settings"
+                "ACTION_CHARTS" -> "charts"
+                else -> "dashboard"
+            }
+        )
+    }
+    var transactionFilter by remember(initialAction) { 
+        mutableStateOf(
+            when(initialAction) {
+                "ACTION_VIEW_INCOME" -> "INCOME"
+                "ACTION_VIEW_EXPENSE" -> "EXPENSE"
+                else -> "ALL"
+            }
+        )
+    }
+    var debtFilter by remember(initialAction) { 
+        mutableStateOf(
+            when(initialAction) {
+                "ACTION_VIEW_DEBT" -> "DEBT"
+                "ACTION_VIEW_CREDIT" -> "CREDIT"
+                else -> "ALL"
+            }
+        )
+    }
 
     // Dialog & overlay states
-    var showAddTransactionDialog by remember { mutableStateOf(initialAction == "ACTION_ADD_TRANSACTION") }
+    var showAddTransactionDialog by remember(initialAction) { mutableStateOf(initialAction == "ACTION_ADD_TRANSACTION") }
     var editingPerson by remember { mutableStateOf<Person?>(null) }
-    var showAddPersonDialog by remember { mutableStateOf(initialAction == "ACTION_ADD_PERSON") }
-    var showAddSavingsGoalDialog by remember { mutableStateOf(initialAction == "ACTION_ADD_SAVING") }
+    var showAddPersonDialog by remember { mutableStateOf(false) }
+    var showAddSavingsGoalDialog by remember { mutableStateOf(false) }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
@@ -608,7 +636,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isFetchingFiles by viewModel.isFetchingFiles.collectAsState()
 
     var showSignInWebView by remember { mutableStateOf(false) }
-    var showBackupConfirm by remember { mutableStateOf(false) }
+    var showBackupConfirm by remember(initialAction) { mutableStateOf(initialAction == "ACTION_BACKUP") }
     var showRestoreListDialog by remember { mutableStateOf(false) }
     if (showExitConfirm) {
         AlertDialog(
@@ -706,7 +734,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 activeTab == "debts" -> Translation.get("debts", language)
                                 activeTab == "savings" -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
                                 activeTab == "settings" -> Translation.get("settings", language)
-                                activeTab == "charts" -> if (language == AppLanguage.BN) "চার্টস" else "Charts"
+                                activeTab == "charts" -> if (language == AppLanguage.BN) "রিপোর্ট চার্ট" else "Report Chart"
                                 else -> Translation.get("dashboard", language)
                             }
                             
@@ -1034,7 +1062,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             onTimeFilterChange = handleTimeFilterChange,
                                             isGoogleSignedIn = isGoogleSignedIn,
                                             onSignInClick = { showSignInWebView = true },
-                                            onBackupClick = { showBackupConfirm = true }
+                                            onBackupClick = { showBackupConfirm = true },
+                                            viewModel = viewModel
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -1372,8 +1401,40 @@ fun DashboardScreen(
     onTimeFilterChange: (String) -> Unit = {},
     isGoogleSignedIn: Boolean = false,
     onSignInClick: () -> Unit = {},
-    onBackupClick: () -> Unit = {}
+    onBackupClick: () -> Unit = {},
+    viewModel: FinanceViewModel? = null
 ) {
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) {
+            viewModel?.let { vm ->
+                if (!vm.isNotificationEnabled.value) {
+                    vm.toggleNotification(context)
+                }
+            }
+        } else {
+            // Permission denied, ensure notification is disabled if it was first launch attempt
+            viewModel?.let { vm ->
+                if (vm.isNotificationEnabled.value) {
+                    vm.toggleNotification(context)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val hasAskedNotif = prefs.getBoolean("has_asked_notification_permission", false)
+        
+        if (!hasAskedNotif && Build.VERSION.SDK_INT >= 33) {
+            prefs.edit().putBoolean("has_asked_notification_permission", true).apply()
+            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else if (!hasAskedNotif) {
+            // Below Android 13, permission is granted by default, but we should still track that we "asked" or initialized
+            prefs.edit().putBoolean("has_asked_notification_permission", true).apply()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1588,7 +1649,7 @@ fun DashboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.PieChart,
+                            painter = painterResource(id = R.drawable.ic_pie_chart),
                             contentDescription = "Charts",
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
@@ -1615,7 +1676,7 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                            painter = painterResource(id = R.drawable.ic_pie_chart),
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(16.dp)
@@ -5017,7 +5078,73 @@ fun SettingsScreen(
             }
         }
 
-        // --- 3. APP LANGUAGE CARD ---
+        // --- 3. NOTIFICATION WIDGET CARD ---
+        val notificationEnabled by viewModel.isNotificationEnabled.collectAsState()
+        val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                viewModel.toggleNotification(context)
+            } else {
+                Toast.makeText(context, if (language == AppLanguage.BN) "নটিফিকেশন পারমিশন প্রয়োজন" else "Notification permission required", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "কুইক একশন উইজেট" else "Quick Action Widget",
+            isDark = isDark,
+            icon = Icons.Rounded.NotificationsActive,
+            initiallyExpanded = true
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SmartButton,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "নটিফিকেশন বার উইজেট" else "Notification Bar Widget",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "দ্রুত একশন বাটনগুলো নটিফিকেশন বারে দেখান" else "Show quick action buttons in notification bar",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                }
+                Switch(
+                    checked = notificationEnabled,
+                    onCheckedChange = { 
+                        if (!notificationEnabled && android.os.Build.VERSION.SDK_INT >= 33) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            viewModel.toggleNotification(context)
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = FintechBlue,
+                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                    )
+                )
+            }
+        }
+
+        // --- 4. APP LANGUAGE CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "অ্যাপের ভাষা / App Language" else "App Language",
             isDark = isDark,
@@ -5087,7 +5214,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- 4. DATA BACKUP & RESTORE CARD ---
+        // --- 5. DATA BACKUP & RESTORE CARD ---
         val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
             uri?.let {
                 context.contentResolver.openOutputStream(it)?.let { outputStream ->
@@ -5379,7 +5506,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- 5. APP ERROR LOG (SUPPORT) CARD ---
+        // --- 6. APP ERROR LOG (SUPPORT) CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "অ্যাপ এর লগ (সাপোর্ট)" else "App Error Log (Support)",
             isDark = isDark,
@@ -5418,7 +5545,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- 6. ABOUT DEVELOPER CARD ---
+        // --- 7. ABOUT DEVELOPER CARD ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5558,7 +5685,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- 7. APP INFO CARD ---
+        // --- 8. APP INFO CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "অ্যাপ ইনফো" else "App Info",
             isDark = isDark,
@@ -5609,7 +5736,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- 8. PRIVACY & TERMS CARD ---
+        // --- 9. PRIVACY & TERMS CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "প্রাইভেসি ও শর্তাবলী" else "Privacy & Terms",
             isDark = isDark,
@@ -5666,7 +5793,7 @@ fun SettingsScreen(
             }
         }
 
-        // --- 9. BOTTOM SPONSORED AD CARD ---
+        // --- 10. BOTTOM SPONSORED AD CARD ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5995,33 +6122,16 @@ fun ChartsScreen(
     persons: List<Person>,
     onBack: () -> Unit
 ) {
-    val totalIncome = transactions.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+    val incomeTransactions = transactions.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }
     val expenseTransactions = transactions.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }
     
+    val incomesByCategory = incomeTransactions.groupBy { it.category }.mapValues { it.value.sumOf { tx -> tx.amount } }
     val expensesByCategory = expenseTransactions.groupBy { it.category }.mapValues { it.value.sumOf { tx -> tx.amount } }
+    
+    val totalIncome = incomeTransactions.sumOf { it.amount }
     val totalExpense = expenseTransactions.sumOf { it.amount }
-    
-    val categoryNames = expensesByCategory.keys.toList()
-    val categoryValues = categoryNames.map { expensesByCategory[it]!!.toFloat() }
-    
-    val showRemaining = totalIncome > totalExpense
-    val remainingValue = if (showRemaining) (totalIncome - totalExpense).toFloat() else 0f
-    
-    val chartLabels = categoryNames.toMutableList()
-    val chartValues = categoryValues.toMutableList()
-    
-    if (showRemaining && remainingValue > 0) {
-        chartLabels.add(if (language == AppLanguage.BN) "অবশিষ্ট আয়" else "Remaining Income")
-        chartValues.add(remainingValue)
-    }
 
-    val palette = listOf(Color(0xFFEF4444), Color(0xFF3B82F6), Color(0xFFF59E0B), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF06B6D4), Color(0xFF10B981))
-    val colors = chartValues.indices.map { 
-        if (showRemaining && it == chartValues.lastIndex) Color(0xFF10B981) 
-        else palette[it % palette.size] 
-    }
-
-    val baseTotal = if (totalIncome > 0) totalIncome.toFloat() else totalExpense.toFloat()
+    val palette = listOf(Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF06B6D4))
 
     Column(
         modifier = Modifier
@@ -6032,36 +6142,85 @@ fun ChartsScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         androidx.activity.compose.BackHandler(onBack = onBack)
-        FintechGradientCard(
-            gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
-            cornerRadius = 24.dp,
-            padding = PaddingValues(24.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = if (language == AppLanguage.BN) "রিপোর্ট চার্ট" else "Report Chart",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-                Spacer(modifier = Modifier.height(32.dp))
+        
+        Text(
+            text = if (language == AppLanguage.BN) "আয় ব্যয়ের চার্ট" else "Income & Expense Chart",
+            color = if (isDark) Color.White else Color(0xFF1E293B),
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
 
-                val total = chartValues.sum()
-                if (total == 0f) {
+        // --- INCOME CHART ---
+        ChartSection(
+            title = if (language == AppLanguage.BN) "খাত অনুযায়ী আয়" else "Income by Category",
+            data = incomesByCategory,
+            total = totalIncome,
+            palette = palette,
+            language = language
+        )
+
+        // --- EXPENSE CHART ---
+        ChartSection(
+            title = if (language == AppLanguage.BN) "খাত অনুযায়ী ব্যয়" else "Expense by Category",
+            data = expensesByCategory,
+            total = totalExpense,
+            palette = palette.reversed(), // slightly different colors
+            language = language
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+fun ChartSection(
+    title: String,
+    data: Map<String, Double>,
+    total: Double,
+    palette: List<Color>,
+    language: AppLanguage
+) {
+    FintechGradientCard(
+        gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
+        cornerRadius = 24.dp,
+        padding = PaddingValues(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (total == 0.0) {
+                Box(modifier = Modifier.height(150.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        text = Translation.get("no_tx", language),
+                        text = if (language == AppLanguage.BN) "কোন তথ্য নেই" else "No Data Available",
                         color = Color.White.copy(alpha = 0.5f)
                     )
-                } else {
-                    Box(modifier = Modifier.size(220.dp), contentAlignment = Alignment.Center) {
+                }
+            } else {
+                val values = data.values.map { it.toFloat() }
+                val labels = data.keys.toList()
+                val totalFloat = total.toFloat()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             var startAngle = -90f
-                            chartValues.forEachIndexed { index, value ->
+                            values.forEachIndexed { index, value ->
                                 if (value > 0) {
-                                    val sweepAngle = (value / total) * 360f
+                                    val sweepAngle = (value / totalFloat) * 360f
                                     drawArc(
-                                        color = colors[index],
+                                        color = palette[index % palette.size],
                                         startAngle = startAngle,
                                         sweepAngle = sweepAngle,
                                         useCenter = true
@@ -6072,46 +6231,48 @@ fun ChartsScreen(
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = if (language == AppLanguage.BN) "ব্যায়ের চার্ট" else "Expense Chart",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 14.sp
+                                text = "Total",
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 10.sp
                             )
                             Text(
-                                text = formatCurrency(totalExpense, language),
+                                text = formatCurrency(total, language),
                                 color = Color.White,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 18.sp
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
                             )
                         }
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
 
-        if (chartValues.isNotEmpty()) {
-            FintechGradientCard(
-                gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
-                cornerRadius = 24.dp,
-                padding = PaddingValues(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    chartValues.forEachIndexed { index, value ->
-                        val percent = if (baseTotal > 0) ((value / baseTotal) * 100).toInt() else 0
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        labels.forEachIndexed { index, label ->
+                            val value = data[label] ?: 0.0
+                            val percent = ((value / total) * 100).toInt()
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(colors[index]))
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(text = chartLabels[index], color = Color.White, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(text = formatCurrency(value.toDouble(), language), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text(text = "$percent%", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(palette[index % palette.size])
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = label,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${formatCurrency(value, language)} ($percent%)",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 10.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -6203,7 +6364,7 @@ fun SplashScreen(isDark: Boolean) {
 
         // Bottom Footer: From VibeStudio
         Text(
-            text = "From VibeStudio",
+            text = "Developed by VibeStudio",
             color = footerColor,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
