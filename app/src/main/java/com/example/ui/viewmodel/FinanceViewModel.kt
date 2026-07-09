@@ -651,7 +651,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
 
        // Otherwise, refresh the access token!
         return try {
-            val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com"
+            val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "1066328409774-9gg0t4s4v6k4pdmhnvh5sj04tjlknhpt.apps.googleusercontent.com"
             val formBody = FormBody.Builder()
                 .add("client_id", finalClientId)
                 .add("refresh_token", refreshToken)
