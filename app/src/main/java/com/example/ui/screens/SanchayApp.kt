@@ -1285,7 +1285,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     }
                 }
 
-                // Google Sign In - Official Native Flow (WebView এরর মুক্ত সমাধান)
+      // Google Sign In - Official Native Flow (WebView এরর মুক্ত সমাধান)
                 if (showSignInWebView) {
                     val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "1066328409774-9gg0t4s4v6k4pdmhnvh5sj04tjlknhpt.apps.googleusercontent.com"
                     
@@ -1329,7 +1329,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         launcher.launch(signInIntent)
                         showSignInWebView = false // পপ-আপ লঞ্চ হওয়ার পর স্ট্যাটাস রিসেট
                     }
-                }
+                }          
+
                 if (showBackupConfirm) {
                     AlertDialog(
                         onDismissRequest = { showBackupConfirm = false },
