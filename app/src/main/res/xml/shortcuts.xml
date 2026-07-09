@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
+        android:shortcutId="dashboard"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_dashboard"
+        android:shortcutShortLabel="@string/shortcut_dashboard">
+        <intent
+            android:action="ACTION_DASHBOARD"
+            android:targetPackage="com.vibestudio.financenote"
+            android:targetClass="com.example.MainActivity" />
+    </shortcut>
+    <shortcut
         android:shortcutId="add_tx"
         android:enabled="true"
         android:icon="@drawable/ic_shortcut_add"
@@ -37,6 +47,16 @@
         android:shortcutShortLabel="@string/shortcut_backup">
         <intent
             android:action="ACTION_BACKUP"
+            android:targetPackage="com.vibestudio.financenote"
+            android:targetClass="com.example.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="settings"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_settings"
+        android:shortcutShortLabel="@string/shortcut_settings">
+        <intent
+            android:action="ACTION_SETTINGS"
             android:targetPackage="com.vibestudio.financenote"
             android:targetClass="com.example.MainActivity" />
     </shortcut>

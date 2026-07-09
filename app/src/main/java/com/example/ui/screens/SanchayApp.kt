@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.BuildConfig
 import com.example.R
 import android.content.Context
 import android.content.Intent
@@ -588,7 +589,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             when (initialAction) {
                 "ACTION_DEBT_CREDIT", "ACTION_VIEW_DEBT", "ACTION_VIEW_CREDIT" -> "debts"
                 "ACTION_SAVINGS" -> "savings"
-                "ACTION_SETTINGS" -> "settings"
+                "ACTION_SETTINGS", "ACTION_BACKUP" -> "settings"
                 "ACTION_CHARTS" -> "charts"
                 else -> "dashboard"
             }
@@ -1284,14 +1285,15 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
                 // Google Sign In, Backup & Restore Overlays
                 if (showSignInWebView) {
+                    val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else BuildConfig.DRIVE_API
                     GoogleSignInWebViewDialog(
-                        clientId = "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com",
+                        clientId = finalClientId,
                         onDismiss = { showSignInWebView = false },
                         onCodeReceived = { code ->
                             viewModel.exchangeCodeForTokens(
                                 context = context,
                                 authCode = code,
-                                clientId = "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com",
+                                clientId = finalClientId,
                                 onSuccess = {
                                     Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
                                 },
@@ -1446,7 +1448,16 @@ fun DashboardScreen(
             FintechGradientCard(
                 gradientColors = GradientsList[0],
                 cornerRadius = 24.dp,
-                modifier = Modifier.testTag("dashboard_profile_card").padding(top = 8.dp)
+                modifier = Modifier
+                    .testTag("dashboard_profile_card")
+                    .padding(top = 8.dp)
+                    .clickable { 
+                        if (isGoogleSignedIn) {
+                            onNavigate("settings", "")
+                        } else {
+                            onSignInClick()
+                        }
+                    }
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1504,7 +1515,7 @@ fun DashboardScreen(
                     }
 
                     // Profile text details
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (language == AppLanguage.BN) "স্বাগতম," else "Welcome,",
                             color = Color.White.copy(alpha = 0.75f),
@@ -1546,7 +1557,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Settings & Google Sign-In/Sync Actions
+                    // Action Buttons
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1564,23 +1575,6 @@ fun DashboardScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.CloudUpload,
                                     contentDescription = if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক" else "Cloud Sync",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            // Edit Button - navigate to profile edit in Settings screen
-                            IconButton(
-                                onClick = { onNavigate("settings", "") },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.15f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
-                                    .size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Edit,
-                                    contentDescription = if (language == AppLanguage.BN) "প্রোফাইল এডিট" else "Edit Profile",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -1676,7 +1670,7 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_pie_chart),
+                            painter = painterResource(id = R.drawable.ic_trending_up),
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(16.dp)
@@ -2262,7 +2256,7 @@ fun TransactionsScreen(
                             Text(formatCurrency(totalIncome, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                         }
                         Icon(
-                            imageVector = Icons.Rounded.PieChart,
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
@@ -5546,144 +5540,152 @@ fun SettingsScreen(
         }
 
         // --- 7. ABOUT DEVELOPER CARD ---
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
-                    )
-                )
-                .padding(20.dp)
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ডেভেলপার প্রোফাইল" else "Developer Profile",
+            isDark = isDark,
+            icon = Icons.Rounded.Code,
+            initiallyExpanded = false
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Row 1: Profile Avatar and Title/Subtitle
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Person,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
                         )
-                    }
-                    Column {
-                        Text(
-                            text = "Shariful Islam",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (language == AppLanguage.BN) "ইউজার এক্সপেরিয়েন্স ও অ্যাপ ডেভেলপার" else "User Experience & App Developer",
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-
-                // Row 2: List Items with chevrons
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Item 1: Facebook
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .clickable {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://facebook.com/shariful.uxd"))
-                                context.startActivity(intent)
-                            }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.Link, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("facebook.com/shariful.uxd", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    // Item 2: Mobile / WhatsApp
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .clickable {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:01768899599"))
-                                context.startActivity(intent)
-                            }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("01768899599", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-
-                    // Item 3: Email
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .clickable {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
-                                    data = android.net.Uri.parse("mailto:connect.shariful@gmail.com")
-                                }
-                                context.startActivity(intent)
-                            }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.Email, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("connect.shariful@gmail.com", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    }
-                }
-
-                // Row 3: Contact/Mega button
-                Button(
-                    onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599"))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
-                    contentPadding = PaddingValues(12.dp)
-                ) {
-                    Icon(Icons.Rounded.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (language == AppLanguage.BN) 
-                            "নতুন আপডেট পেতে সরাসরি আমাদের সাথে হোয়াটসঅ্যাপে যোগাযোগ করতে এখানে চাপুন" 
-                            else "Tap here to contact us directly on WhatsApp to get new updates",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 15.sp,
-                        modifier = Modifier.weight(1f)
                     )
+                    .padding(20.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // Row 1: Profile Avatar and Title/Subtitle
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Person,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Shariful Islam",
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (language == AppLanguage.BN) "ইউজার এক্সপেরিয়েন্স ও অ্যাপ ডেভেলপার" else "User Experience & App Developer",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    // Row 2: List Items with chevrons
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Item 1: Facebook
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .clickable {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://facebook.com/shariful.uxd"))
+                                    context.startActivity(intent)
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.Link, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("facebook.com/shariful.uxd", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+
+                        // Item 2: Mobile / WhatsApp
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .clickable {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:01768899599"))
+                                    context.startActivity(intent)
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("01768899599", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+
+                        // Item 3: Email
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .clickable {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                                        data = android.net.Uri.parse("mailto:connect.shariful@gmail.com")
+                                    }
+                                    context.startActivity(intent)
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Rounded.Email, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("connect.shariful@gmail.com", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    // Row 3: Contact/Mega button
+                    Button(
+                        onClick = {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Icon(Icons.Rounded.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) 
+                                "নতুন আপডেট পেতে সরাসরি আমাদের সাথে হোয়াটসঅ্যাপে যোগাযোগ করতে এখানে চাপুন" 
+                                else "Tap here to contact us directly on WhatsApp to get new updates",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
+
 
         // --- 8. APP INFO CARD ---
         SettingCategory(

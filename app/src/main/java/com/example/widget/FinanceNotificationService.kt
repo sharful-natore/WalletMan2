@@ -73,10 +73,6 @@ class FinanceNotificationService : Service() {
             action = "ACTION_DASHBOARD"
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        val chartsIntent = Intent(this, MainActivity::class.java).apply {
-            action = "ACTION_CHARTS"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
         val settingsIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_SETTINGS"
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -87,7 +83,6 @@ class FinanceNotificationService : Service() {
         views.setOnClickPendingIntent(R.id.btn_notif_savings, PendingIntent.getActivity(this, 3, savingsIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         views.setOnClickPendingIntent(R.id.btn_notif_backup, PendingIntent.getActivity(this, 4, backupIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         views.setOnClickPendingIntent(R.id.btn_notif_dashboard, PendingIntent.getActivity(this, 5, dashboardIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-        views.setOnClickPendingIntent(R.id.btn_notif_charts, PendingIntent.getActivity(this, 6, chartsIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         views.setOnClickPendingIntent(R.id.btn_notif_settings, PendingIntent.getActivity(this, 7, settingsIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
         val prefs = getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
