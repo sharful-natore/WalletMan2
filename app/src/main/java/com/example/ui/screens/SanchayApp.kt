@@ -56,7 +56,6 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import com.google.android.gms.common.api.ApiException
 
-
 fun formatNumber(number: Int, lang: AppLanguage): String {
     val str = number.toString()
     if (lang == AppLanguage.EN) return str
