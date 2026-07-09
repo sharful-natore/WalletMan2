@@ -132,4 +132,5 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+  implementation("com.google.android.gms:play-services-auth:21.2.0")
 }
