@@ -1284,27 +1284,51 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
 
                 // Google Sign In, Backup & Restore Overlays
+                // Google Sign In - Official Native Flow (WebView এরর মুক্ত সমাধান)
                 if (showSignInWebView) {
                     val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "1066328409774-9gg0t4s4v6k4pdmhnvh5sj04tjlknhpt.apps.googleusercontent.com"
-                    GoogleSignInWebViewDialog(
-                        clientId = finalClientId,
-                        onDismiss = { showSignInWebView = false },
-                        onCodeReceived = { code ->
-                            viewModel.exchangeCodeForTokens(
-                                context = context,
-                                authCode = code,
-                                clientId = finalClientId,
-                                onSuccess = {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
-                                },
-                                onError = { err ->
-                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
-                                }
-                            )
-                        }
-                    )
-                }
+                    
+                    val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN)
+                        .requestServerAuthCode(finalClientId)
+                        .requestEmail()
+                        .requestScopes(com.google.android.gms.common.api.Scope(com.google.api.services.drive.DriveScopes.DRIVE_FILE))
+                        .build()
 
+                    val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+                    val signInIntent = googleSignInClient.signInIntent
+
+                    // সিস্টেমের অফিশিয়াল গুগল পপ-আপ হ্যান্ডেল করার জন্য লাঞ্চার
+                    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+                    ) { result ->
+                        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                        try {
+                            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+                            val code = account?.serverAuthCode
+                            if (code != null) {
+                                viewModel.exchangeCodeForTokens(
+                                    context = context,
+                                    authCode = code,
+                                    clientId = finalClientId,
+                                    onSuccess = {
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { err ->
+                                        Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Sign in failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+
+                    // বাটন ট্রিগার হওয়ার সাথে সাথে অফিশিয়াল পপ-আপটি ওপেন হবে
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        launcher.launch(signInIntent)
+                        showSignInWebView = false // পপ-আপ লঞ্চ হওয়ার পর স্ট্যাটাস রিসেট
+                    }
+                }
                 if (showBackupConfirm) {
                     AlertDialog(
                         onDismissRequest = { showBackupConfirm = false },
