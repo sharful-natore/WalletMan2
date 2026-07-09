@@ -649,15 +649,14 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
             return accessToken
         }
 
-        // Otherwise, refresh the access token!
+       // Otherwise, refresh the access token!
         return try {
-            val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else BuildConfig.DRIVE_API
+            val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com"
             val formBody = FormBody.Builder()
                 .add("client_id", finalClientId)
                 .add("refresh_token", refreshToken)
                 .add("grant_type", "refresh_token")
                 .build()
-
             val request = Request.Builder()
                 .url("https://oauth2.googleapis.com/token")
                 .post(formBody)
