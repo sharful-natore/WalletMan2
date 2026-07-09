@@ -1285,7 +1285,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     }
                 }
 
-                // Google Sign In - Official Native Flow (WebView এরর মুক্ত সমাধান)
+                // Google Sign In - Official Native Flow (WebView ও ব্র্যাকেট এরর মুক্ত চূড়ান্ত সমাধান)
                 if (showSignInWebView) {
                     val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "1066328409774-9gg0t4s4v6k4pdmhnvh5sj04tjlknhpt.apps.googleusercontent.com"
                     
@@ -1298,7 +1298,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     val googleSignInClient = GoogleSignIn.getClient(context, gso)
                     val signInIntent = googleSignInClient.signInIntent
 
-                    // সিস্টেমের অফিশিয়াল গুগল পপ-আপ হ্যান্ডেল করার জন্য লাঞ্চার
                     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
                         contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
                     ) { result ->
@@ -1312,11 +1311,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     authCode = code,
                                     clientId = finalClientId,
                                     onSuccess = {
-                                        showSignInWebView = false // সফল হলে ডায়ালগ বন্ধ হবে
+                                        showSignInWebView = false
                                         Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
                                     },
                                     onError = { err ->
-                                        showSignInWebView = false // এরর হলেও ডায়ালg বন্ধ হবে
+                                        showSignInWebView = false
                                         Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
                                     }
                                 )
@@ -1330,11 +1329,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
-                    // বাটন ট্রিগার হওয়ার সাথে সাথে অফিশিয়াল পপ-আপটি ওপেন হবে
                     androidx.compose.runtime.LaunchedEffect(Unit) {
                         launcher.launch(signInIntent)
-                        // এখান থেকে showSignInWebView = false লাইনটি সরিয়ে দেওয়া হয়েছে
                     }
+                }
 
                 if (showBackupConfirm) {
                     AlertDialog(
