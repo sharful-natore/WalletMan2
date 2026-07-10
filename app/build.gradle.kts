@@ -21,7 +21,26 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${System.getenv("GOOGLE_CLIENT_ID") ?: ""}\"")
+    
+    val configFile = file("${rootDir}/firebase-applet-config.json")
+    var oauthClientId = ""
+    var projectId = ""
+    if (configFile.exists()) {
+        val contents = configFile.readText()
+        val matchResult = Regex("\"oAuthClientId\"\\s*:\\s*\"([^\"]+)\"").find(contents)
+        if (matchResult != null) {
+            oauthClientId = matchResult.groupValues[1]
+        }
+        val projectMatchResult = Regex("\"projectId\"\\s*:\\s*\"([^\"]+)\"").find(contents)
+        if (projectMatchResult != null) {
+            projectId = projectMatchResult.groupValues[1]
+        }
+    }
+    if (oauthClientId.isEmpty()) {
+        oauthClientId = System.getenv("GOOGLE_CLIENT_ID") ?: ""
+    }
+    buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$oauthClientId\"")
+    buildConfigField("String", "PROJECT_ID", "\"$projectId\"")
   }
 
   signingConfigs {
@@ -112,6 +131,7 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
+  implementation(libs.play.services.auth)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
@@ -132,5 +152,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
-  implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

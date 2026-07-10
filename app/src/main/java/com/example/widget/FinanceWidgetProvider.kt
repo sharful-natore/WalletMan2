@@ -92,7 +92,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             }
 
             val df = java.text.DecimalFormat("#,##,##0")
-            views.setTextViewText(R.id.tv_income, "৳ ${df.format(balance)}")
+            views.setTextViewText(R.id.tv_income, "৳ ${df.format(income)}")
             views.setTextViewText(R.id.tv_expense, "৳ ${df.format(expense)}")
             views.setTextViewText(R.id.tv_debt, "৳ ${df.format(totalDena)}")
             views.setTextViewText(R.id.tv_credit, "৳ ${df.format(totalPaona)}")
@@ -104,4 +104,22 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     }
 
     appWidgetManager.updateAppWidget(appWidgetId, views)
+}
+
+fun updateAllWidgets(context: Context) {
+    try {
+        val intent = Intent(context, FinanceWidgetProvider::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+        }
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val ids = appWidgetManager.getAppWidgetIds(
+            android.content.ComponentName(context, FinanceWidgetProvider::class.java)
+        )
+        if (ids.isNotEmpty()) {
+            intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+            context.sendBroadcast(intent)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }

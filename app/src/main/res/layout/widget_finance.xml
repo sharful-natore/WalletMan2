@@ -27,7 +27,7 @@
                 android:id="@+id/lbl_income"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ব্যালেন্স"
+                android:text="আয়"
                 android:textColor="#CCFFFFFF"
                 android:textSize="8sp" />
             <TextView

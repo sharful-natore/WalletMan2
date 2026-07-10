@@ -34,7 +34,7 @@ class MainActivity : ComponentActivity() {
         val repository = FinanceRepository(database.financeDao())
         
         // ViewModel creation
-        val factory = FinanceViewModelFactory(repository)
+        val factory = FinanceViewModelFactory(repository, application)
         val viewModel: FinanceViewModel by viewModels { factory }
         
         // Load persistent settings

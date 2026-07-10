@@ -85,6 +85,14 @@ class FinanceNotificationService : Service() {
         views.setOnClickPendingIntent(R.id.btn_notif_dashboard, PendingIntent.getActivity(this, 5, dashboardIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         views.setOnClickPendingIntent(R.id.btn_notif_settings, PendingIntent.getActivity(this, 7, settingsIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
+        try {
+            val timeFormat = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+            val currentTime = timeFormat.format(java.util.Date())
+            views.setTextViewText(R.id.tv_notif_time, currentTime)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         val prefs = getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
         val isDark = prefs.getBoolean("is_dark_theme", false)
         

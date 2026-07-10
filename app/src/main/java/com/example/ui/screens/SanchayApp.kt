@@ -51,10 +51,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.Scope
-import com.google.android.gms.common.api.ApiException
+
+
 
 fun formatNumber(number: Int, lang: AppLanguage): String {
     val str = number.toString()
@@ -464,7 +462,7 @@ fun formatDateToDay(timestamp: Long): String {
 fun formatDateHeader(dateStr: String, lang: AppLanguage): String {
     try {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH)
-        val date = sdf.parse(dateStr)
+        val date = sdf.parse(dateStr) ?: return dateStr
         val format = java.text.SimpleDateFormat("dd MMMM, yyyy", java.util.Locale.ENGLISH)
         val enDate = format.format(date)
         if (lang == AppLanguage.EN) return enDate
@@ -506,6 +504,63 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val profilePhotoUri = if (isGoogleSignedIn) (googlePhotoUrl ?: rawProfilePhotoUri) else rawProfilePhotoUri
 
     val context = LocalContext.current
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
+            BuildConfig.GOOGLE_CLIENT_ID
+        } else {
+            BuildConfig.DRIVE_API
+        }
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            val authCode = account?.serverAuthCode
+            if (authCode != null) {
+                viewModel.exchangeCodeForTokens(
+                    context = context,
+                    authCode = authCode,
+                    clientId = finalClientId,
+                    onSuccess = {
+                        Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                    }
+                )
+            } else {
+                Toast.makeText(context, if (language == AppLanguage.BN) "সাইন ইন কোড পাওয়া যায়নি।" else "Sign-in code not received.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            val errMsg = e.localizedMessage ?: "Unknown error"
+            Toast.makeText(context, "${if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে: " else "Sign-in failed: "}$errMsg", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val triggerGoogleSignIn = {
+        val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
+            BuildConfig.GOOGLE_CLIENT_ID
+        } else {
+            BuildConfig.DRIVE_API
+        }
+        val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+            com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
+        )
+            .requestEmail()
+            .requestProfile()
+            .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
+            .requestServerAuthCode(finalClientId)
+            .build()
+
+        val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
+        
+        googleSignInClient.signOut().addOnCompleteListener {
+            val signInIntent = googleSignInClient.signInIntent
+            googleSignInLauncher.launch(signInIntent)
+        }
+    }
+
     var showSplash by remember { mutableStateOf(true) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadProfile(context)
@@ -617,6 +672,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     }
 
     // Dialog & overlay states
+    val composeCoroutineScope = rememberCoroutineScope()
     var showAddTransactionDialog by remember(initialAction) { mutableStateOf(initialAction == "ACTION_ADD_TRANSACTION") }
     var editingPerson by remember { mutableStateOf<Person?>(null) }
     var showAddPersonDialog by remember { mutableStateOf(false) }
@@ -638,8 +694,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val googleDriveFiles by viewModel.googleDriveFiles.collectAsState()
     val isFetchingFiles by viewModel.isFetchingFiles.collectAsState()
 
-    var showSignInWebView by remember { mutableStateOf(false) }
+
     var showBackupConfirm by remember(initialAction) { mutableStateOf(initialAction == "ACTION_BACKUP") }
+    var cloudBackupStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
     var showRestoreListDialog by remember { mutableStateOf(false) }
     if (showExitConfirm) {
         AlertDialog(
@@ -732,7 +789,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             val screenTitle = when {
                                 selectedSavingsGoalDetail != null -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
                                 selectedPersonDetail != null -> Translation.get("details", language)
-                                activeTab == "dashboard" -> "Finance Note"
+                                activeTab == "dashboard" -> Translation.get("dashboard", language)
                                 activeTab == "transactions" -> Translation.get("transactions", language)
                                 activeTab == "debts" -> Translation.get("debts", language)
                                 activeTab == "savings" -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
@@ -741,12 +798,17 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 else -> Translation.get("dashboard", language)
                             }
                             
-                            Text(
-                                text = screenTitle,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Crossfade(
+                                targetState = screenTitle,
+                                label = "TitleCrossfade"
+                            ) { title ->
+                                Text(
+                                    text = title,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
 
                         Row(
@@ -985,8 +1047,15 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     language = language,
                                     isDark = isDarkTheme,
                                     onBack = { activeTab = "dashboard" },
-                                    onSignInClick = { showSignInWebView = true },
-                                    onBackupClick = { showBackupConfirm = true },
+                                    onSignInClick = { triggerGoogleSignIn() },
+                                    onBackupClick = {
+                                        composeCoroutineScope.launch {
+                                            val backupData = viewModel.getCurrentDatabaseBackup()
+                                            val stats = viewModel.calculateBackupStats(backupData)
+                                            cloudBackupStats = stats
+                                            showBackupConfirm = true
+                                        }
+                                    },
                                     onRestoreClick = {
                                         showRestoreListDialog = true
                                         viewModel.listGoogleDriveFiles(context)
@@ -1064,8 +1133,15 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             timeFilter = timeFilter,
                                             onTimeFilterChange = handleTimeFilterChange,
                                             isGoogleSignedIn = isGoogleSignedIn,
-                                            onSignInClick = { showSignInWebView = true },
-                                            onBackupClick = { showBackupConfirm = true },
+                                            onSignInClick = { triggerGoogleSignIn() },
+                                            onBackupClick = {
+                                                composeCoroutineScope.launch {
+                                                    val backupData = viewModel.getCurrentDatabaseBackup()
+                                                    val stats = viewModel.calculateBackupStats(backupData)
+                                                    cloudBackupStats = stats
+                                                    showBackupConfirm = true
+                                                }
+                                            },
                                             viewModel = viewModel
                                         )
                                         1 -> TransactionsScreen(
@@ -1285,85 +1361,35 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     }
                 }
 
-                
-                // Google Sign In - Official Native Flow (WebView ও ব্র্যাকেট এরর মুক্ত চূড়ান্ত সমাধান)
-                if (showSignInWebView) {
-                    val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com"
-                    
-                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                        .requestServerAuthCode(finalClientId)
-                        .requestEmail()
-                        .requestScopes(Scope("https://www.googleapis.com/auth/drive.file"))
-                        .build()
 
-                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
-                    val signInIntent = googleSignInClient.signInIntent
 
-                    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
-                        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-                    ) { result ->
-                        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-                        try {
-                            val account = task.getResult(ApiException::class.java)
-                            val code = account?.serverAuthCode
-                            if (code != null) {
-                                viewModel.exchangeCodeForTokens(
-                                    context = context,
-                                    authCode = code,
-                                    clientId = finalClientId,
-                                    onSuccess = {
-                                        showSignInWebView = false
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    onError = { err ->
-                                        showSignInWebView = false
-                                        Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
-                                    }
-                                )
-                            } else {
-                                showSignInWebView = false
-                                Toast.makeText(context, "Auth code is null", Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (e: Exception) {
-                            showSignInWebView = false
-                            Toast.makeText(context, "Sign in failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                        }
-                    }
+                if (showBackupConfirm && cloudBackupStats != null) {
+                    val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                    val defaultName = "finance_note_backup_$timestamp.json"
 
-                    androidx.compose.runtime.LaunchedEffect(Unit) {
-                        launcher.launch(signInIntent)
-                    }
-                }
-
-                if (showBackupConfirm) {
-                    AlertDialog(
-                        onDismissRequest = { showBackupConfirm = false },
-                        title = { Text(if (language == AppLanguage.BN) "গুগল ড্রাইভ ব্যাকআপ" else "Google Drive Backup") },
-                        text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনার সমস্ত ডাটা গুগল ড্রাইভে ব্যাকআপ রাখতে চান?" else "Are you sure you want to backup all your data to Google Drive?") },
-                        confirmButton = {
-                            Button(
-                                colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
-                                onClick = {
-                                    showBackupConfirm = false
-                                    viewModel.backupToGoogleDrive(
-                                        context = context,
-                                        onSuccess = {
-                                            Toast.makeText(context, if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = { err ->
-                                            Toast.makeText(context, "${if (language == AppLanguage.BN) "ব্যাকআপ ব্যর্থ হয়েছে: " else "Backup failed: "}$err", Toast.LENGTH_LONG).show()
-                                        }
-                                    )
+                    BackupStatsDialog(
+                        title = if (language == AppLanguage.BN) "ক্লাউড ব্যাকআপ সামারি" else "Cloud Backup Summary",
+                        stats = cloudBackupStats!!,
+                        language = language,
+                        isDark = isDarkTheme,
+                        isRestoreMode = false,
+                        initialFileName = defaultName,
+                        onConfirm = { finalFileName, comment ->
+                            showBackupConfirm = false
+                            viewModel.backupToGoogleDrive(
+                                context = context,
+                                customFileName = finalFileName,
+                                comment = comment,
+                                onSuccess = {
+                                    Toast.makeText(context, if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", Toast.LENGTH_SHORT).show()
+                                    viewModel.listGoogleDriveFiles(context)
+                                },
+                                onError = { err ->
+                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "ব্যাকআপ ব্যর্থ হয়েছে: " else "Backup failed: "}$err", Toast.LENGTH_LONG).show()
                                 }
-                            ) {
-                                Text(if (language == AppLanguage.BN) "ব্যাকআপ করুন" else "Backup", color = Color.White)
-                            }
+                            )
                         },
-                        dismissButton = {
-                            TextButton(onClick = { showBackupConfirm = false }) {
-                                Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
-                            }
-                        }
+                        onDismiss = { showBackupConfirm = false }
                     )
                 }
 
@@ -1373,19 +1399,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         isDark = isDarkTheme,
                         isFetching = isFetchingFiles,
                         files = googleDriveFiles,
+                        viewModel = viewModel,
                         onDismiss = { showRestoreListDialog = false },
-                        onRestore = { fileId ->
-                            viewModel.restoreFromGoogleDriveFile(
-                                context = context,
-                                fileId = fileId,
-                                onSuccess = {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "ড্রাইভ থেকে রিস্টোর সফল হয়েছে!" else "Drive Restore successful!", Toast.LENGTH_SHORT).show()
-                                    showRestoreListDialog = false
-                                },
-                                onError = { err ->
-                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "রিস্টোর ব্যর্থ হয়েছে: " else "Restore failed: "}$err", Toast.LENGTH_LONG).show()
-                                }
-                            )
+                        onRestoreSuccess = {
+                            Toast.makeText(context, if (language == AppLanguage.BN) "ড্রাইভ থেকে রিস্টোর সফল হয়েছে!" else "Drive Restore successful!", Toast.LENGTH_SHORT).show()
+                            showRestoreListDialog = false
                         },
                         onDelete = { fileId ->
                             viewModel.deleteGoogleDriveFile(
@@ -4819,6 +4837,7 @@ fun SettingsScreen(
     onRestoreClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val localCoroutineScope = rememberCoroutineScope()
     val profileName by viewModel.profileName.collectAsState()
     val profileEmail by viewModel.profileEmail.collectAsState()
     val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
@@ -5239,11 +5258,45 @@ fun SettingsScreen(
         }
 
         // --- 5. DATA BACKUP & RESTORE CARD ---
+        var pendingLocalBackupComment by remember { mutableStateOf("") }
+        var pendingLocalRestoreData by remember { mutableStateOf<com.example.data.FinanceBackup?>(null) }
+        var pendingLocalRestoreStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
+        var pendingLocalRestoreFileName by remember { mutableStateOf("") }
+        var pendingLocalRestoreJson by remember { mutableStateOf("") }
+        var showLocalBackupStatsDialog by remember { mutableStateOf(false) }
+        var currentDbStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
+
+        fun getFileNameFromUri(context: android.content.Context, uri: android.net.Uri): String? {
+            var result: String? = null
+            if (uri.scheme == "content") {
+                val cursor = context.contentResolver.query(uri, null, null, null, null)
+                try {
+                    if (cursor != null && cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (index != -1) {
+                            result = cursor.getString(index)
+                        }
+                    }
+                } finally {
+                    cursor?.close()
+                }
+            }
+            if (result == null) {
+                result = uri.path
+                val cut = result?.lastIndexOf('/')
+                if (cut != null && cut != -1) {
+                    result = result.substring(cut + 1)
+                }
+            }
+            return result
+        }
+
         val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
             uri?.let {
                 context.contentResolver.openOutputStream(it)?.let { outputStream ->
-                    viewModel.exportBackupToUri(context, outputStream, {
+                    viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, {
                         Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
+                        pendingLocalBackupComment = ""
                     }, { error ->
                         Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
                     })
@@ -5254,13 +5307,75 @@ fun SettingsScreen(
         val openDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             uri?.let {
                 context.contentResolver.openInputStream(it)?.let { inputStream ->
-                    viewModel.importBackupFromUri(context, inputStream, {
-                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
-                    }, { error ->
-                        Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
-                    })
+                    try {
+                        val jsonContent = inputStream.use { it.bufferedReader().readText() }
+                        val parsed = viewModel.parseBackupJson(jsonContent)
+                        if (parsed != null) {
+                            pendingLocalRestoreData = parsed
+                            pendingLocalRestoreStats = viewModel.calculateBackupStats(parsed)
+                            pendingLocalRestoreFileName = getFileNameFromUri(context, uri) ?: "Local Backup"
+                            pendingLocalRestoreJson = jsonContent
+                        } else {
+                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
+        }
+
+        // Render Local Backup/Restore summary dialogs if active
+        if (showLocalBackupStatsDialog && currentDbStats != null) {
+            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+            val defaultName = "financenote_backup_$timestamp.json"
+
+            BackupStatsDialog(
+                title = if (language == AppLanguage.BN) "লোকাল ব্যাকআপ সামারি" else "Local Backup Summary",
+                stats = currentDbStats!!,
+                language = language,
+                isDark = isDark,
+                isRestoreMode = false,
+                initialFileName = defaultName,
+                onConfirm = { finalFileName, comment ->
+                    showLocalBackupStatsDialog = false
+                    pendingLocalBackupComment = comment
+                    createDocumentLauncher.launch(finalFileName)
+                },
+                onDismiss = { showLocalBackupStatsDialog = false }
+            )
+        }
+
+        if (pendingLocalRestoreStats != null && pendingLocalRestoreData != null) {
+            BackupStatsDialog(
+                title = if (language == AppLanguage.BN) "লোকাল রিস্টোর সামারি" else "Local Restore Summary",
+                stats = pendingLocalRestoreStats!!,
+                language = language,
+                isDark = isDark,
+                isRestoreMode = true,
+                initialFileName = pendingLocalRestoreFileName,
+                onConfirm = { _, _ ->
+                    viewModel.importBackup(
+                        context = context,
+                        json = pendingLocalRestoreJson,
+                        fromLocalFile = false,
+                        onSuccess = {
+                            pendingLocalRestoreStats = null
+                            pendingLocalRestoreData = null
+                            pendingLocalRestoreJson = ""
+                            Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { error ->
+                            Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                },
+                onDismiss = {
+                    pendingLocalRestoreStats = null
+                    pendingLocalRestoreData = null
+                    pendingLocalRestoreJson = ""
+                }
+            )
         }
 
         SettingCategory(
@@ -5292,30 +5407,14 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        var showBackupConfirm by remember { mutableStateOf(false) }
-                        if (showBackupConfirm) {
-                            AlertDialog(
-                                onDismissRequest = { showBackupConfirm = false },
-                                title = { Text(if (language == AppLanguage.BN) "ব্যাকআপ তৈরি করবেন?" else "Create Backup?") },
-                                text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে ডাটার ব্যাকআপ তৈরি করতে চান?" else "Are you sure you want to create a backup of your data?") },
-                                confirmButton = {
-                                    Button(onClick = {
-                                        showBackupConfirm = false
-                                        createDocumentLauncher.launch("financenote_backup_${System.currentTimeMillis()}.json")
-                                    }) {
-                                        Text(if (language == AppLanguage.BN) "হ্যাঁ" else "Yes")
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showBackupConfirm = false }) {
-                                        Text(if (language == AppLanguage.BN) "না" else "No")
-                                    }
-                                }
-                            )
-                        }
                         Button(
                             onClick = {
-                                showBackupConfirm = true
+                                localCoroutineScope.launch {
+                                    val backupData = viewModel.getCurrentDatabaseBackup()
+                                    val stats = viewModel.calculateBackupStats(backupData)
+                                    currentDbStats = stats
+                                    showLocalBackupStatsDialog = true
+                                }
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
@@ -5351,18 +5450,26 @@ fun SettingsScreen(
                         // Option 1: Quick Restore from File
                         Button(
                             onClick = {
-                                viewModel.importBackup(
-                                    context = context,
-                                    json = null,
-                                    fromLocalFile = true,
-                                    onSuccess = {
-                                        showPasteArea = false
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    onError = { error ->
+                                try {
+                                    val backupFile = java.io.File(context.filesDir, "financenote_backup.json")
+                                    if (backupFile.exists()) {
+                                        val jsonContent = backupFile.readText()
+                                        val parsed = viewModel.parseBackupJson(jsonContent)
+                                        if (parsed != null) {
+                                            pendingLocalRestoreData = parsed
+                                            pendingLocalRestoreStats = viewModel.calculateBackupStats(parsed)
+                                            pendingLocalRestoreFileName = "financenote_backup.json"
+                                            pendingLocalRestoreJson = jsonContent
+                                            showPasteArea = false
+                                        } else {
+                                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
                                         Toast.makeText(context, if (language == AppLanguage.BN) "কোনো সেভ করা ব্যাকআপ পাওয়া যায়নি!" else "No saved backup found!", Toast.LENGTH_SHORT).show()
                                     }
-                                )
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -5390,19 +5497,21 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (pasteJsonInput.isNotBlank()) {
-                                    viewModel.importBackup(
-                                        context = context,
-                                        json = pasteJsonInput,
-                                        fromLocalFile = false,
-                                        onSuccess = {
+                                    try {
+                                        val parsed = viewModel.parseBackupJson(pasteJsonInput)
+                                        if (parsed != null) {
+                                            pendingLocalRestoreData = parsed
+                                            pendingLocalRestoreStats = viewModel.calculateBackupStats(parsed)
+                                            pendingLocalRestoreFileName = if (language == AppLanguage.BN) "পেস্ট করা ব্যাকআপ কোড" else "Pasted Backup Code"
+                                            pendingLocalRestoreJson = pasteJsonInput
                                             pasteJsonInput = ""
                                             showPasteArea = false
-                                            Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = { error ->
-                                            Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
                                         }
-                                    )
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -6407,84 +6516,7 @@ fun SplashScreen(isDark: Boolean) {
     }
 }
 
-@Composable
-fun GoogleSignInWebViewDialog(
-    clientId: String,
-    onDismiss: () -> Unit,
-    onCodeReceived: (String) -> Unit
-) {
-    val redirectUri = "http://localhost"
-    val authUrl = android.net.Uri.parse("https://accounts.google.com/o/oauth2/v2/auth").buildUpon()
-        .appendQueryParameter("client_id", clientId)
-        .appendQueryParameter("redirect_uri", redirectUri)
-        .appendQueryParameter("response_type", "code")
-        .appendQueryParameter("scope", "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email")
-        .appendQueryParameter("access_type", "offline")
-        .appendQueryParameter("prompt", "consent")
-        .build().toString()
 
-    Dialog(
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-        onDismissRequest = onDismiss
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Top header bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Close")
-                    }
-                    Text(
-                        text = "Sign In with Google",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(48.dp)) // balance spacing
-                }
-
-                // Android WebView
-                AndroidView(
-                    factory = { ctx ->
-                        android.webkit.WebView(ctx).apply {
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-                            
-                            webViewClient = object : android.webkit.WebViewClient() {
-                                override fun onPageStarted(view: android.webkit.WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                                    super.onPageStarted(view, url, favicon)
-                                    url?.let {
-                                        if (it.startsWith(redirectUri)) {
-                                            val uri = android.net.Uri.parse(it)
-                                            val code = uri.getQueryParameter("code")
-                                            if (code != null) {
-                                                onCodeReceived(code)
-                                                onDismiss()
-                                            } else if (uri.getQueryParameter("error") != null) {
-                                                onDismiss()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            loadUrl(authUrl)
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun GoogleDriveRestoreListDialog(
@@ -6492,13 +6524,20 @@ fun GoogleDriveRestoreListDialog(
     isDark: Boolean,
     isFetching: Boolean,
     files: List<com.example.data.GoogleDriveFile>,
+    viewModel: com.example.ui.viewmodel.FinanceViewModel,
     onDismiss: () -> Unit,
-    onRestore: (String) -> Unit,
+    onRestoreSuccess: () -> Unit,
     onDelete: (String) -> Unit,
     onRefresh: () -> Unit
 ) {
-    var fileToRestore by remember { mutableStateOf<com.example.data.GoogleDriveFile?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var fileToDelete by remember { mutableStateOf<com.example.data.GoogleDriveFile?>(null) }
+
+    var pendingCloudRestoreData by remember { mutableStateOf<com.example.data.FinanceBackup?>(null) }
+    var pendingCloudRestoreStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
+    var pendingCloudRestoreFileName by remember { mutableStateOf("") }
+    var pendingCloudRestoreJson by remember { mutableStateOf("") }
+    var isDownloadingByFileId by remember { mutableStateOf<String?>(null) }
 
     Dialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -6589,7 +6628,7 @@ fun GoogleDriveRestoreListDialog(
                                         modifier = Modifier.size(28.dp)
                                     )
 
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         // Nicely formatted name
                                         val displayName = if (file.name.startsWith("finance_note_backup_")) {
                                             val parts = file.name.removePrefix("finance_note_backup_").removeSuffix(".json")
@@ -6637,14 +6676,41 @@ fun GoogleDriveRestoreListDialog(
                                     // Action buttons
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         IconButton(
-                                            onClick = { fileToRestore = file }
+                                            onClick = {
+                                                isDownloadingByFileId = file.id
+                                                viewModel.downloadGoogleDriveFile(
+                                                    context = context,
+                                                    fileId = file.id,
+                                                    onSuccess = { jsonContent ->
+                                                        isDownloadingByFileId = null
+                                                        val parsed = viewModel.parseBackupJson(jsonContent)
+                                                        if (parsed != null) {
+                                                            pendingCloudRestoreData = parsed
+                                                            pendingCloudRestoreStats = viewModel.calculateBackupStats(parsed)
+                                                            pendingCloudRestoreFileName = file.name
+                                                            pendingCloudRestoreJson = jsonContent
+                                                        } else {
+                                                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    },
+                                                    onError = { err ->
+                                                        isDownloadingByFileId = null
+                                                        Toast.makeText(context, "Download failed: $err", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                )
+                                            },
+                                            enabled = isDownloadingByFileId == null
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Restore,
-                                                contentDescription = "Restore",
-                                                tint = FintechBlue,
-                                                modifier = Modifier.size(20.dp)
-                                            )
+                                            if (isDownloadingByFileId == file.id) {
+                                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = FintechBlue)
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Restore,
+                                                    contentDescription = "Restore",
+                                                    tint = FintechBlue,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                         IconButton(
                                             onClick = { fileToDelete = file }
@@ -6666,72 +6732,50 @@ fun GoogleDriveRestoreListDialog(
         }
     }
 
-    // Confirmation dialogs
-    fileToRestore?.let { file ->
-        AlertDialog(
-            onDismissRequest = { fileToRestore = null },
-            title = {
-                Text(
-                    text = if (language == AppLanguage.BN) "রিস্টোর নিশ্চিত করুন" else "Confirm Restore"
-                )
-            },
-            text = {
-                Text(
-                    text = if (language == AppLanguage.BN)
-                        "আপনি কি নিশ্চিত যে এই ব্যাকআপ ফাইলটি থেকে ডেটা রিস্টোর করতে চান? এটি আপনার বর্তমান সমস্ত ডেটা মুছে নতুন করে ব্যাকআপের ডেটা লোড করবে।"
-                    else "Are you sure you want to restore from this backup file? This will overwrite your current local data."
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onRestore(file.id)
-                        fileToRestore = null
+    // Backup stats dialog for cloud restore
+    if (pendingCloudRestoreStats != null && pendingCloudRestoreData != null) {
+        BackupStatsDialog(
+            title = if (language == AppLanguage.BN) "ক্লাউড রিস্টোর সামারি" else "Cloud Restore Summary",
+            stats = pendingCloudRestoreStats!!,
+            language = language,
+            isDark = isDark,
+            isRestoreMode = true,
+            initialFileName = pendingCloudRestoreFileName,
+            onConfirm = { _, _ ->
+                viewModel.importBackup(
+                    context = context,
+                    json = pendingCloudRestoreJson,
+                    fromLocalFile = false,
+                    onSuccess = {
+                        pendingCloudRestoreStats = null
+                        pendingCloudRestoreData = null
+                        pendingCloudRestoreJson = ""
+                        onRestoreSuccess()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
-                ) {
-                    Text(text = if (language == AppLanguage.BN) "রিস্টোর করুন" else "Restore")
-                }
+                    onError = { err ->
+                        Toast.makeText(context, "Error: $err", Toast.LENGTH_SHORT).show()
+                    }
+                )
             },
-            dismissButton = {
-                TextButton(onClick = { fileToRestore = null }) {
-                    Text(text = if (language == AppLanguage.BN) "বাতিল" else "Cancel")
-                }
+            onDismiss = {
+                pendingCloudRestoreStats = null
+                pendingCloudRestoreData = null
+                pendingCloudRestoreJson = ""
             }
         )
     }
 
+    // Captcha delete confirmation dialog
     fileToDelete?.let { file ->
-        AlertDialog(
-            onDismissRequest = { fileToDelete = null },
-            title = {
-                Text(
-                    text = if (language == AppLanguage.BN) "ব্যাকআপ ডিলিট নিশ্চিত করুন" else "Confirm Delete"
-                )
+        CaptchaDeleteDialog(
+            fileName = file.name,
+            language = language,
+            isDark = isDark,
+            onConfirm = {
+                onDelete(file.id)
+                fileToDelete = null
             },
-            text = {
-                Text(
-                    text = if (language == AppLanguage.BN)
-                        "আপনি কি নিশ্চিত যে এই ব্যাকআপ ফাইলটি গুগল ড্রাইভ থেকে ডিলিট করতে চান?"
-                    else "Are you sure you want to delete this backup file from Google Drive?"
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onDelete(file.id)
-                        fileToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
-                ) {
-                    Text(text = if (language == AppLanguage.BN) "ডিলিট করুন" else "Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { fileToDelete = null }) {
-                    Text(text = if (language == AppLanguage.BN) "বাতিল" else "Cancel")
-                }
-            }
+            onDismiss = { fileToDelete = null }
         )
     }
 }

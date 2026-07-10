@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.core.content.ContextCompat
 import android.Manifest
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -50,7 +52,18 @@ data class PersonDebt(
     val totalRepaidReceived: Double
 )
 
-class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() {
+data class BackupStats(
+    val totalIncome: Double,
+    val totalExpense: Double,
+    val totalOwedToMe: Double,
+    val totalIOwe: Double,
+    val totalPersons: Int,
+    val totalCards: Int,
+    val comment: String = "",
+    val createdAt: Long? = null
+)
+
+class FinanceViewModel(private val repository: FinanceRepository, application: Application) : AndroidViewModel(application) {
 
     // Preferences & UI State
     private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
@@ -214,18 +227,21 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     fun addPerson(name: String, phone: String, address: String, photoUri: String) {
         viewModelScope.launch {
             repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri))
+            com.example.widget.updateAllWidgets(getApplication())
         }
     }
 
     fun updatePerson(person: Person) {
         viewModelScope.launch {
             repository.updatePerson(person)
+            com.example.widget.updateAllWidgets(getApplication())
         }
     }
 
     fun deletePerson(id: Int) {
         viewModelScope.launch {
             repository.deletePerson(id)
+            com.example.widget.updateAllWidgets(getApplication())
         }
     }
 
@@ -248,12 +264,14 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                     timestamp = timestamp
                 )
             )
+            com.example.widget.updateAllWidgets(getApplication())
         }
     }
 
     fun deleteTransaction(id: Int) {
         viewModelScope.launch {
             repository.deleteTransaction(id)
+            com.example.widget.updateAllWidgets(getApplication())
         }
     }
 
@@ -395,10 +413,56 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     }
 
     // Backup & Restore operations
-    fun exportBackupToUri(context: Context, outputStream: java.io.OutputStream, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun parseBackupJson(json: String): FinanceBackup? {
+        return try {
+            backupAdapter.fromJson(json)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun getCurrentDatabaseBackup(): FinanceBackup {
+        return repository.getBackupData()
+    }
+
+    fun calculateBackupStats(backup: FinanceBackup): BackupStats {
+        val personsList = backup.persons
+        val txList = backup.transactions
+        val savingsGoals = backup.savingsGoals
+
+        val income = txList.filter { it.type == "INCOME" }.sumOf { it.amount }
+        val expense = txList.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+
+        // Person debts calculation
+        val debts = personsList.map { person ->
+            val personTx = txList.filter { it.personId == person.id }
+            val lent = personTx.filter { it.type == "LEND" }.sumOf { it.amount }
+            val borrowed = personTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+            val repaidPaid = personTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+            val repaidReceived = personTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+            val net = (lent + repaidPaid) - (borrowed + repaidReceived)
+            net
+        }
+
+        val totalOwedToMe = debts.filter { it > 0 }.sum()
+        val totalIOwe = debts.filter { it < 0 }.sumOf { -it }
+
+        return BackupStats(
+            totalIncome = income,
+            totalExpense = expense,
+            totalOwedToMe = totalOwedToMe,
+            totalIOwe = totalIOwe,
+            totalPersons = personsList.size,
+            totalCards = savingsGoals.size,
+            comment = backup.comment ?: "",
+            createdAt = backup.createdAt
+        )
+    }
+
+    fun exportBackupToUri(context: Context, outputStream: java.io.OutputStream, comment: String = "", onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val backupData = repository.getBackupData()
+                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 outputStream.use { it.write(json.toByteArray()) }
                 onSuccess()
@@ -415,6 +479,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                 val backupData = backupAdapter.fromJson(jsonContent)
                 if (backupData != null) {
                     repository.restoreBackupData(backupData)
+                    com.example.widget.updateAllWidgets(getApplication())
                     onSuccess()
                 } else {
                     throw Exception("Invalid backup data format")
@@ -425,10 +490,10 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         }
     }
 
-    fun exportBackup(context: Context, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
+    fun exportBackup(context: Context, comment: String = "", onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val backupData = repository.getBackupData()
+                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 
                 // Write to local private file financenote_backup.json
@@ -459,6 +524,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                 val backupData = backupAdapter.fromJson(jsonContent)
                 if (backupData != null) {
                     repository.restoreBackupData(backupData)
+                    com.example.widget.updateAllWidgets(getApplication())
                     onSuccess()
                 } else {
                     throw Exception("Invalid backup data format")
@@ -524,10 +590,12 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         viewModelScope.launch {
             try {
                 _driveStatusMessage.value = "Authenticating with Google..."
+                // Native sign-in codes require an empty redirect_uri for token exchange
+                val redirectUri = ""
                 val formBody = FormBody.Builder()
                     .add("code", authCode)
                     .add("client_id", clientId)
-                    .add("redirect_uri", "http://localhost")
+                    .add("redirect_uri", redirectUri)
                     .add("grant_type", "authorization_code")
                     .build()
 
@@ -649,14 +717,15 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
             return accessToken
         }
 
-       // Otherwise, refresh the access token!
+        // Otherwise, refresh the access token!
         return try {
-            val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "767284176898-t1aj175l4h6gg73514kjsq9v28bg8hgg.apps.googleusercontent.com"
+            val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else BuildConfig.DRIVE_API
             val formBody = FormBody.Builder()
                 .add("client_id", finalClientId)
                 .add("refresh_token", refreshToken)
                 .add("grant_type", "refresh_token")
                 .build()
+
             val request = Request.Builder()
                 .url("https://oauth2.googleapis.com/token")
                 .post(formBody)
@@ -689,7 +758,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         }
     }
 
-    fun backupToGoogleDrive(context: Context, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun backupToGoogleDrive(context: Context, customFileName: String? = null, comment: String = "", onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
                 _driveStatusMessage.value = "Starting cloud backup..."
@@ -699,13 +768,13 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                     throw Exception("Not signed in to Google or session expired")
                 }
 
-                // 1. Get database data JSON string
-                val backupData = repository.getBackupData()
+                // 1. Get database data JSON string with comment and createdAt metadata
+                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
                 val json = backupAdapter.indent("  ").toJson(backupData)
 
                 // 2. Create timestamp and fileName
                 val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
-                val fileName = "finance_note_backup_$timestamp.json"
+                val fileName = customFileName ?: "finance_note_backup_$timestamp.json"
 
                 _driveStatusMessage.value = "Creating cloud backup file..."
                 val boundary = "BackupBoundary"
@@ -818,6 +887,41 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
         }
     }
 
+    fun downloadGoogleDriveFile(context: Context, fileId: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                _driveStatusMessage.value = "Downloading selected backup file..."
+                val accessToken = getValidAccessToken(context)
+                if (accessToken == null) {
+                    _isGoogleSignedIn.value = false
+                    throw Exception("Not signed in to Google or session expired")
+                }
+
+                val downloadRequest = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+
+                val downloadResponse = kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        client.newCall(downloadRequest).execute()
+                    }
+                }
+
+                if (downloadResponse.isSuccessful) {
+                    val jsonContent = downloadResponse.body?.string() ?: ""
+                    onSuccess(jsonContent)
+                } else {
+                    val errBody = downloadResponse.body?.string() ?: ""
+                    throw Exception("Failed to download file from Google Drive: $errBody")
+                }
+            } catch (e: Exception) {
+                _driveStatusMessage.value = "Download Failed: ${e.localizedMessage}"
+                onError(e.localizedMessage ?: "Unknown restore error")
+            }
+        }
+    }
+
     fun restoreFromGoogleDriveFile(context: Context, fileId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -845,6 +949,7 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
                     val backupData = backupAdapter.fromJson(jsonContent)
                     if (backupData != null) {
                        repository.restoreBackupData(backupData)
+                       com.example.widget.updateAllWidgets(getApplication())
                        _driveStatusMessage.value = "Restore successfully completed!"
                        onSuccess()
                     } else {
@@ -920,11 +1025,11 @@ class FinanceViewModel(private val repository: FinanceRepository) : ViewModel() 
     }
 }
 
-class FinanceViewModelFactory(private val repository: FinanceRepository) : ViewModelProvider.Factory {
+class FinanceViewModelFactory(private val repository: FinanceRepository, private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FinanceViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return FinanceViewModel(repository) as T
+            return FinanceViewModel(repository, application) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
