@@ -58,6 +58,11 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
+    val profileIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_SETTINGS"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+
     views.setOnClickPendingIntent(R.id.btn_add_tx, PendingIntent.getActivity(context, 1, txIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_person, PendingIntent.getActivity(context, 2, personIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_saving, PendingIntent.getActivity(context, 3, savingIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -67,6 +72,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     views.setOnClickPendingIntent(R.id.card_expense, PendingIntent.getActivity(context, 11, expenseViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_debt, PendingIntent.getActivity(context, 12, debtViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_credit, PendingIntent.getActivity(context, 13, creditViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
     // Background logic to load data
     CoroutineScope(Dispatchers.IO).launch {
@@ -90,6 +96,71 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 if (net > 0) totalPaona += net
                 if (net < 0) totalDena += -net
             }
+
+            // Load user settings and profile details
+            val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            val langStr = prefs.getString("app_language", "BN") ?: "BN"
+            val isBn = langStr == "BN"
+
+            val rawName = prefs.getString("user_name", "Shariful Islam") ?: "Shariful Islam"
+            val rawEmail = prefs.getString("user_email", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
+
+            val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+            val refreshToken = gPrefs.getString("google_refresh_token", null)
+            val isGoogleSignedIn = !refreshToken.isNullOrEmpty()
+
+            val googleName = gPrefs.getString("google_name", null)
+            val googleEmail = gPrefs.getString("google_email", null)
+
+            val profileName = if (isGoogleSignedIn) (googleName ?: rawName) else rawName
+            val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawEmail) else rawEmail
+
+            // Determine initials
+            val initials = if (profileName.isNotBlank()) {
+                profileName.split(" ")
+                    .filter { it.isNotBlank() }
+                    .take(2)
+                    .mapNotNull { it.firstOrNull()?.toString() }
+                    .joinToString("")
+                    .uppercase()
+            } else ""
+
+            if (initials.isNotEmpty()) {
+                views.setViewVisibility(R.id.iv_avatar, android.view.View.GONE)
+                views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.VISIBLE)
+                views.setTextViewText(R.id.tv_avatar_initials, initials)
+            } else {
+                views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
+                views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
+            }
+
+            val welcomeText = if (isBn) "স্বাগতম," else "Welcome,"
+            views.setTextViewText(R.id.tv_welcome_label, welcomeText)
+
+            val displayName = if (isGoogleSignedIn) {
+                if (profileName.isNotBlank()) profileName else (if (isBn) "ব্যবহারকারী" else "User")
+            } else {
+                if (isBn) "সাইন-ইন করুন" else "Sign In"
+            }
+            views.setTextViewText(R.id.tv_profile_name, displayName)
+
+            val displayEmail = if (isGoogleSignedIn) {
+                profileEmail
+            } else {
+                if (isBn) "গুগল সাইন-ইন করুন" else "Sign in with Google"
+            }
+            views.setTextViewText(R.id.tv_profile_email, displayEmail)
+
+            // Dynamic card headers based on language
+            val labelIncome = if (isBn) "আয়" else "Income"
+            val labelExpense = if (isBn) "ব্যয়" else "Expense"
+            val labelDebt = if (isBn) "দেনা" else "Debt"
+            val labelCredit = if (isBn) "পাওনা" else "Credit"
+
+            views.setTextViewText(R.id.lbl_income, labelIncome)
+            views.setTextViewText(R.id.lbl_expense, labelExpense)
+            views.setTextViewText(R.id.lbl_debt, labelDebt)
+            views.setTextViewText(R.id.lbl_credit, labelCredit)
 
             val df = java.text.DecimalFormat("#,##,##0")
             views.setTextViewText(R.id.tv_income, "৳ ${df.format(income)}")

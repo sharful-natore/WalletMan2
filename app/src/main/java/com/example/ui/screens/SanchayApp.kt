@@ -798,9 +798,13 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 else -> Translation.get("dashboard", language)
                             }
                             
-                            Crossfade(
+                            AnimatedContent(
                                 targetState = screenTitle,
-                                label = "TitleCrossfade"
+                                transitionSpec = {
+                                    (slideInVertically { height -> height } + fadeIn())
+                                        .togetherWith(slideOutVertically { height -> -height } + fadeOut())
+                                },
+                                label = "TitleSlideTransition"
                             ) { title ->
                                 Text(
                                     text = title,

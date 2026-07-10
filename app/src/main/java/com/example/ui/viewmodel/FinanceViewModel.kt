@@ -173,6 +173,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             .edit()
             .putString("app_language", newLang.name)
             .apply()
+        com.example.widget.updateAllWidgets(context)
     }
 
     fun toggleTheme(context: Context) {
@@ -410,6 +411,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _profilePhone.value = phone
         _profileSocial.value = social
         _profileAddress.value = address
+        com.example.widget.updateAllWidgets(context)
     }
 
     // Backup & Restore operations
@@ -628,10 +630,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         fetchGoogleUserInfo(context, tokenResponse.access_token, { name, email ->
                             _isGoogleSignedIn.value = true
                             _driveStatusMessage.value = "Successfully Signed In!"
+                            com.example.widget.updateAllWidgets(context)
                             onSuccess()
                         }, { err ->
                             _isGoogleSignedIn.value = true
                             _driveStatusMessage.value = "Signed In (Unable to fetch user info)"
+                            com.example.widget.updateAllWidgets(context)
                             onSuccess()
                         })
                     } else {
@@ -1021,6 +1025,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _googlePhotoUrl.value = null
         _isGoogleSignedIn.value = false
         _driveStatusMessage.value = "Signed Out"
+        com.example.widget.updateAllWidgets(context)
         onSuccess()
     }
 }
