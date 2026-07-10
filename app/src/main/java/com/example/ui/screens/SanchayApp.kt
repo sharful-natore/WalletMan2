@@ -1285,6 +1285,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     }
                 }
 
+                
                 // Google Sign In - Official Native Flow (WebView ও ব্র্যাকেট এরর মুক্ত চূড়ান্ত সমাধান)
                 if (showSignInWebView) {
                     val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) BuildConfig.GOOGLE_CLIENT_ID else "1066328409774-9gg0t4s4v6k4pdmhnvh5sj04tjlknhpt.apps.googleusercontent.com"
