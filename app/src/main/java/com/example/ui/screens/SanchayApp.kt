@@ -1537,6 +1537,7 @@ fun DashboardScreen(
             FintechGradientCard(
                 gradientColors = GradientsList[0],
                 cornerRadius = 24.dp,
+                padding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
                 modifier = Modifier
                     .testTag("dashboard_profile_card")
                     .padding(top = 8.dp)
@@ -1755,7 +1756,7 @@ fun DashboardScreen(
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                             .clickable { onNavigate("transactions", "INCOME") }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -1790,7 +1791,7 @@ fun DashboardScreen(
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
                             .clickable { onNavigate("transactions", "EXPENSE") }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -1843,7 +1844,7 @@ fun DashboardScreen(
                     cornerRadius = 24.dp,
                     modifier = Modifier
                         .weight(1f)
-                        .height(95.dp)
+                        .height(80.dp)
                         .clickable { onNavigate("debts", "DENA") }
                         .testTag("dashboard_i_owe_card")
                 ) {
@@ -1882,7 +1883,7 @@ fun DashboardScreen(
                     cornerRadius = 24.dp,
                     modifier = Modifier
                         .weight(1f)
-                        .height(95.dp)
+                        .height(80.dp)
                         .clickable { onNavigate("debts", "PAWN") }
                         .testTag("dashboard_owed_to_me_card")
                 ) {
@@ -5599,10 +5600,24 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(FintechBlue.copy(alpha = 0.15f)),
+                                .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Rounded.AccountCircle, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(24.dp))
+                            if (isGoogleSignedIn && !profilePhotoUri.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = profilePhotoUri,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.AccountCircle, 
+                                    contentDescription = null, 
+                                    tint = FintechBlue, 
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
@@ -6505,7 +6520,7 @@ fun SplashScreen(isDark: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.splash_pie_chart),
+                painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.glossy_3d_pie_chart_logo_1783711271663),
                 contentDescription = "App Logo",
                 modifier = Modifier
                     .size(140.dp)

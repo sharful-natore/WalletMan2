@@ -402,6 +402,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
         
         _isNotificationEnabled.value = notifEnabled
+        
+        // Also initialize Google Drive state to ensure persistence
+        initGoogleDrive(context)
 
         if (notifEnabled) {
             val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)

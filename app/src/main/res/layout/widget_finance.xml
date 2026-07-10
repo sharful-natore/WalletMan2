@@ -10,11 +10,11 @@
     <RelativeLayout
         android:id="@+id/card_profile"
         android:layout_width="match_parent"
-        android:layout_height="62dp"
+        android:layout_height="64dp"
         android:layout_margin="2dp"
         android:layout_marginBottom="4dp"
         android:background="@drawable/glass_card_bg"
-        android:padding="6dp"
+        android:padding="10dp"
         android:clickable="true"
         android:focusable="true">
 
@@ -85,15 +85,24 @@
                 android:ellipsize="end" />
         </LinearLayout>
         
-        <!-- Small settings icon on the right end -->
-        <ImageView
-            android:layout_width="16dp"
-            android:layout_height="16dp"
+        <!-- Action Button (Sync or Login) -->
+        <RelativeLayout
+            android:id="@+id/btn_profile_action"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:layout_alignParentRight="true"
             android:layout_centerVertical="true"
-            android:src="@drawable/ic_settings"
-            android:tint="#CCFFFFFF"
-            android:alpha="0.8" />
+            android:background="@drawable/widget_button_bg"
+            android:gravity="center"
+            android:clickable="true">
+            
+            <ImageView
+                android:id="@+id/iv_profile_action"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_settings"
+                android:tint="#FFFFFF" />
+        </RelativeLayout>
 
     </RelativeLayout>
 
@@ -108,11 +117,11 @@
         <RelativeLayout
             android:id="@+id/card_income"
             android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="2dp"
             android:background="@drawable/glass_card_bg"
-            android:padding="8dp"
+            android:padding="6dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_income"
@@ -144,11 +153,11 @@
         <RelativeLayout
             android:id="@+id/card_expense"
             android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="2dp"
             android:background="@drawable/glass_card_bg"
-            android:padding="8dp"
+            android:padding="6dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_expense"
@@ -180,11 +189,11 @@
         <RelativeLayout
             android:id="@+id/card_debt"
             android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="2dp"
             android:background="@drawable/glass_card_bg"
-            android:padding="8dp"
+            android:padding="6dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_debt"
@@ -216,11 +225,11 @@
         <RelativeLayout
             android:id="@+id/card_credit"
             android:layout_width="0dp"
-            android:layout_height="56dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="2dp"
             android:background="@drawable/glass_card_bg"
-            android:padding="8dp"
+            android:padding="6dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_credit"

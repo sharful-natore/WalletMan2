@@ -67,7 +67,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     views.setOnClickPendingIntent(R.id.btn_add_person, PendingIntent.getActivity(context, 2, personIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_saving, PendingIntent.getActivity(context, 3, savingIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_backup, PendingIntent.getActivity(context, 4, backupIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-
+    
     views.setOnClickPendingIntent(R.id.card_income, PendingIntent.getActivity(context, 10, incomeViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_expense, PendingIntent.getActivity(context, 11, expenseViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_debt, PendingIntent.getActivity(context, 12, debtViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -111,6 +111,12 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
 
             val googleName = gPrefs.getString("google_name", null)
             val googleEmail = gPrefs.getString("google_email", null)
+
+            val profileActionIntent = Intent(context, MainActivity::class.java).apply {
+                action = if (isGoogleSignedIn) "ACTION_BACKUP" else "ACTION_GOOGLE_SIGN_IN"
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            views.setOnClickPendingIntent(R.id.btn_profile_action, PendingIntent.getActivity(context, 15, profileActionIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
             val profileName = if (isGoogleSignedIn) (googleName ?: rawName) else rawName
             val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawEmail) else rawEmail
@@ -166,6 +172,10 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 if (isBn) "গুগল সাইন-ইন করুন" else "Sign in with Google"
             }
             views.setTextViewText(R.id.tv_profile_email, displayEmail)
+
+            // Update profile action icon
+            val actionIcon = if (isGoogleSignedIn) R.drawable.ic_shortcut_backup else R.drawable.ic_settings
+            views.setImageViewResource(R.id.iv_profile_action, actionIcon)
 
             // Dynamic card headers based on language
             val labelIncome = if (isBn) "আয়" else "Income"
