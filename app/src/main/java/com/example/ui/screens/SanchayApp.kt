@@ -522,12 +522,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-            val authCode = account?.serverAuthCode
-            if (authCode != null) {
-                viewModel.exchangeCodeForTokens(
+            if (account != null) {
+                viewModel.handleGoogleSignInSuccess(
                     context = context,
-                    authCode = authCode,
-                    clientId = finalClientId,
+                    account = account,
                     onSuccess = {
                         Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
                     },
@@ -536,7 +534,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     }
                 )
             } else {
-                Toast.makeText(context, if (language == AppLanguage.BN) "সাইন ইন কোড পাওয়া যায়নি।" else "Sign-in code not received.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে।" else "Sign-in failed.", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             val errMsg = e.localizedMessage ?: "Unknown error"
@@ -562,7 +560,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             .requestEmail()
             .requestProfile()
             .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
-            .requestServerAuthCode(finalClientId)
             .build()
 
         val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)

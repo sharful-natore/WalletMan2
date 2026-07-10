@@ -582,193 +582,53 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    fun exchangeCodeForTokens(
+    fun handleGoogleSignInSuccess(
         context: Context,
-        authCode: String,
-        clientId: String,
+        account: com.google.android.gms.auth.api.signin.GoogleSignInAccount,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
             try {
-                _driveStatusMessage.value = "Authenticating with Google..."
-                // Native sign-in codes require an empty redirect_uri for token exchange
-                val redirectUri = ""
-                val formBody = FormBody.Builder()
-                    .add("code", authCode)
-                    .add("client_id", clientId)
-                    .add("redirect_uri", redirectUri)
-                    .add("grant_type", "authorization_code")
-                    .build()
-
-                val request = Request.Builder()
-                    .url("https://oauth2.googleapis.com/token")
-                    .post(formBody)
-                    .build()
-
-                val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
-                    kotlinx.coroutines.withContext(d) {
-                        client.newCall(request).execute()
-                    }
+                val email = account.email
+                if (email == null) {
+                    throw Exception("Google account email not found")
                 }
-
-                if (response.isSuccessful) {
-                    val responseBody = response.body?.string() ?: ""
-                    val tokenResponse = moshi.adapter(GoogleTokenResponse::class.java).fromJson(responseBody)
-                    if (tokenResponse != null) {
-                        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                        val edit = prefs.edit()
-                            .putString("google_access_token", tokenResponse.access_token)
-                            .putLong("google_access_token_expires_at", System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000)
-                        
-                        if (tokenResponse.refresh_token != null) {
-                            edit.putString("google_refresh_token", tokenResponse.refresh_token)
-                        }
-                        edit.apply()
-
-                        // Fetch user info with the new access token
-                        fetchGoogleUserInfo(context, tokenResponse.access_token, { name, email ->
-                            _isGoogleSignedIn.value = true
-                            _driveStatusMessage.value = "Successfully Signed In!"
-                            com.example.widget.updateAllWidgets(context)
-                            onSuccess()
-                        }, { err ->
-                            _isGoogleSignedIn.value = true
-                            _driveStatusMessage.value = "Signed In (Unable to fetch user info)"
-                            com.example.widget.updateAllWidgets(context)
-                            onSuccess()
-                        })
-                    } else {
-                        throw Exception("Failed to parse token response")
-                    }
-                } else {
-                    val errBody = response.body?.string() ?: ""
-                    throw Exception("Google server returned error: $errBody")
-                }
+                val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("google_email", email)
+                    .putString("google_name", account.displayName ?: "Google User")
+                    .putString("google_photo_url", account.photoUrl?.toString())
+                    .apply()
+                
+                _googleEmail.value = email
+                _googleName.value = account.displayName ?: "Google User"
+                _googlePhotoUrl.value = account.photoUrl?.toString()
+                _isGoogleSignedIn.value = true
+                _driveStatusMessage.value = "Successfully Signed In!"
+                com.example.widget.updateAllWidgets(context)
+                onSuccess()
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
-                onError(e.localizedMessage ?: "Unknown authentication error")
-            }
-        }
-    }
-
-    private fun fetchGoogleUserInfo(
-        context: Context,
-        accessToken: String,
-        onSuccess: (String, String) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        viewModelScope.launch {
-            try {
-                val request = Request.Builder()
-                    .url("https://www.googleapis.com/oauth2/v3/userinfo")
-                    .header("Authorization", "Bearer $accessToken")
-                    .build()
-
-                val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
-                    kotlinx.coroutines.withContext(d) {
-                        client.newCall(request).execute()
-                    }
-                }
-
-                if (response.isSuccessful) {
-                    val responseBody = response.body?.string() ?: ""
-                    val userInfo = moshi.adapter(GoogleUserInfoResponse::class.java).fromJson(responseBody)
-                    if (userInfo != null) {
-                        val name = userInfo.name ?: "Google User"
-                        val email = userInfo.email ?: "drive.user@gmail.com"
-                        val picture = userInfo.picture
-
-                        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                        val editor = prefs.edit()
-                            .putString("google_name", name)
-                            .putString("google_email", email)
-                        if (!picture.isNullOrEmpty()) {
-                            editor.putString("google_photo_url", picture)
-                        } else {
-                            editor.remove("google_photo_url")
-                        }
-                        editor.apply()
-
-                        _googleName.value = name
-                        _googleEmail.value = email
-                        _googlePhotoUrl.value = picture
-                        onSuccess(name, email)
-                    } else {
-                        throw Exception("Failed to parse user info")
-                    }
-                } else {
-                    throw Exception("Failed to fetch user info")
-                }
-            } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
             }
         }
     }
 
     private suspend fun getValidAccessToken(context: Context): String? {
-        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-        val accessToken = prefs.getString("google_access_token", null)
-        val expiresAt = prefs.getLong("google_access_token_expires_at", 0)
-        val refreshToken = prefs.getString("google_refresh_token", null)
-
-        if (refreshToken.isNullOrEmpty()) {
-            return null
-        }
-
-        // If access token exists and is valid for at least another 5 minutes, use it
-        if (!accessToken.isNullOrEmpty() && expiresAt > System.currentTimeMillis() + 300 * 1000) {
-            return accessToken
-        }
-
-        // Otherwise, refresh the access token!
-        return try {
-            val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
-                BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
-                BuildConfig.DRIVE_API != "..." &&
-                BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
-            ) {
-                BuildConfig.DRIVE_API
-            } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
-                BuildConfig.GOOGLE_CLIENT_ID
-            } else {
-                BuildConfig.DRIVE_API
-            }
-            val formBody = FormBody.Builder()
-                .add("client_id", finalClientId)
-                .add("refresh_token", refreshToken)
-                .add("grant_type", "refresh_token")
-                .build()
-
-            val request = Request.Builder()
-                .url("https://oauth2.googleapis.com/token")
-                .post(formBody)
-                .build()
-
-            val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
-                kotlinx.coroutines.withContext(d) {
-                    client.newCall(request).execute()
-                }
-            }
-
-            if (response.isSuccessful) {
-                val responseBody = response.body?.string() ?: ""
-                val tokenResponse = moshi.adapter(GoogleTokenResponse::class.java).fromJson(responseBody)
-                if (tokenResponse != null) {
-                    prefs.edit()
-                        .putString("google_access_token", tokenResponse.access_token)
-                        .putLong("google_access_token_expires_at", System.currentTimeMillis() + (tokenResponse.expires_in ?: 3600) * 1000)
-                        .apply()
-                    tokenResponse.access_token
-                } else {
+        return kotlinx.coroutines.Dispatchers.IO.let { d ->
+            kotlinx.coroutines.withContext(d) {
+                try {
+                    val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    val email = prefs.getString("google_email", null) ?: return@withContext null
+                    val account = android.accounts.Account(email, "com.google")
+                    val scope = "oauth2:https://www.googleapis.com/auth/drive.file"
+                    com.google.android.gms.auth.GoogleAuthUtil.getToken(context, account, scope)
+                } catch (e: Exception) {
+                    e.printStackTrace()
                     null
                 }
-            } else {
-                null
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
         }
     }
 
