@@ -508,7 +508,13 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
+        val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
+            BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
+            BuildConfig.DRIVE_API != "..." &&
+            BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
+        ) {
+            BuildConfig.DRIVE_API
+        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
             BuildConfig.GOOGLE_CLIENT_ID
         } else {
             BuildConfig.DRIVE_API
@@ -539,7 +545,13 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     }
 
     val triggerGoogleSignIn = {
-        val finalClientId = if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
+        val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
+            BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
+            BuildConfig.DRIVE_API != "..." &&
+            BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
+        ) {
+            BuildConfig.DRIVE_API
+        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
             BuildConfig.GOOGLE_CLIENT_ID
         } else {
             BuildConfig.DRIVE_API
