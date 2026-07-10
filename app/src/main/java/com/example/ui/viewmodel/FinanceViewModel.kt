@@ -355,6 +355,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun verifyNotificationState(context: Context) {
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val notifEnabledInPrefs = prefs.getBoolean("notification_enabled", true)
+        
+        var isActuallyEnabled = notifEnabledInPrefs
+
+        // Check if system notifications are enabled
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                isActuallyEnabled = false
+            }
+        }
+
+        // Check if service is actually running
+        if (!com.example.widget.FinanceNotificationService.isRunning) {
+            isActuallyEnabled = false
+        }
+
+        _isNotificationEnabled.value = isActuallyEnabled
+    }
+
     // Profile Settings Helpers
     fun loadProfile(context: Context) {
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -511,6 +532,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun importBackup(context: Context, json: String?, fromLocalFile: Boolean, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
+            _isSyncing.value = true
             try {
                 val jsonContent = if (fromLocalFile) {
                     val backupFile = File(context.filesDir, "financenote_backup.json")
@@ -533,6 +555,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
@@ -558,18 +582,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private val _isFetchingFiles = MutableStateFlow(false)
     val isFetchingFiles: StateFlow<Boolean> = _isFetchingFiles.asStateFlow()
+    
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     private val client = OkHttpClient()
 
     // Initialize Google State from Shared Prefs
     fun initGoogleDrive(context: Context) {
         val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-        val refreshToken = prefs.getString("google_refresh_token", null)
         val email = prefs.getString("google_email", null)
         val name = prefs.getString("google_name", null)
         val photoUrl = prefs.getString("google_photo_url", null)
 
-        if (!refreshToken.isNullOrEmpty()) {
+        if (!email.isNullOrEmpty()) {
             _googleEmail.value = email
             _googleName.value = name
             _googlePhotoUrl.value = photoUrl
@@ -634,6 +660,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun backupToGoogleDrive(context: Context, customFileName: String? = null, comment: String = "", onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
+            _isSyncing.value = true
             try {
                 _driveStatusMessage.value = "Starting cloud backup..."
                 val accessToken = getValidAccessToken(context)
@@ -685,6 +712,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Backup Failed: ${e.localizedMessage}"
                 onError(e.localizedMessage ?: "Unknown backup error")
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
@@ -763,6 +792,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun downloadGoogleDriveFile(context: Context, fileId: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
+            _isSyncing.value = true
             try {
                 _driveStatusMessage.value = "Downloading selected backup file..."
                 val accessToken = getValidAccessToken(context)

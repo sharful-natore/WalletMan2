@@ -134,7 +134,23 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
             }
 
-            val welcomeText = if (isBn) "স্বাগতম," else "Welcome,"
+            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+            val welcomeText = if (isBn) {
+                when (hour) {
+                    in 5..11 -> "শুভ সকাল,"
+                    in 12..15 -> "শুভ দুপুর,"
+                    in 16..17 -> "শুভ বিকাল,"
+                    in 18..19 -> "শুভ সন্ধ্যা,"
+                    else -> "শুভ রাত্রি,"
+                }
+            } else {
+                when (hour) {
+                    in 5..11 -> "Good morning,"
+                    in 12..16 -> "Good afternoon,"
+                    in 17..20 -> "Good evening,"
+                    else -> "Good night,"
+                }
+            }
             views.setTextViewText(R.id.tv_welcome_label, welcomeText)
 
             val displayName = if (isGoogleSignedIn) {

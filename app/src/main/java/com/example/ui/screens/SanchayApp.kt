@@ -661,6 +661,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             }
         )
     }
+    var settingsFilter by remember { mutableStateOf("") }
     var transactionFilter by remember(initialAction) { 
         mutableStateOf(
             when(initialAction) {
@@ -702,6 +703,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val driveStatusMessage by viewModel.driveStatusMessage.collectAsState()
     val googleDriveFiles by viewModel.googleDriveFiles.collectAsState()
     val isFetchingFiles by viewModel.isFetchingFiles.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
 
 
     var showBackupConfirm by remember(initialAction) { mutableStateOf(initialAction == "ACTION_BACKUP") }
@@ -1059,6 +1061,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     viewModel = viewModel,
                                     language = language,
                                     isDark = isDarkTheme,
+                                    filter = settingsFilter,
                                     onBack = { activeTab = "dashboard" },
                                     onSignInClick = { triggerGoogleSignIn() },
                                     onBackupClick = {
@@ -1142,6 +1145,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                 activeTab = tab
                                                 if (tab == "transactions") transactionFilter = filter
                                                 if (tab == "debts") debtFilter = filter
+                                                if (tab == "settings") settingsFilter = filter
                                             },
                                             timeFilter = timeFilter,
                                             onTimeFilterChange = handleTimeFilterChange,
@@ -1437,10 +1441,34 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
             }
         }
+        
+        if (isSyncing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable(enabled = false) {}, // Intercept clicks
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .background(if (isDarkTheme) Color(0xFF1E2235) else Color.White, RoundedCornerShape(16.dp))
+                        .padding(32.dp)
+                ) {
+                    CircularProgressIndicator(color = FintechBlue)
+                    Text(
+                        text = if (language == AppLanguage.BN) "দয়া করে অপেক্ষা করুন..." else "Please wait...",
+                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
 
-// ---------------- DASHBOARD TAB ----------------
 @Composable
 fun DashboardScreen(
     language: AppLanguage,
@@ -1514,7 +1542,7 @@ fun DashboardScreen(
                     .padding(top = 8.dp)
                     .clickable { 
                         if (isGoogleSignedIn) {
-                            onNavigate("settings", "")
+                            onNavigate("settings", "expand_profile")
                         } else {
                             onSignInClick()
                         }
@@ -2161,8 +2189,8 @@ fun TransactionRowItem(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 // ---------------- TRANSACTION DETAILS DIALOG ----------------
 @Composable
@@ -2909,8 +2937,8 @@ fun PersonDebtRowItem(
                 )
             }
         }
-    }
-}
+            }
+        }
 
 // ---------------- SAVINGS TAB ----------------
 @Composable
@@ -3061,13 +3089,13 @@ fun SavingsGoalCardItem(
 
 
             val formattedCategory = if (language == AppLanguage.BN) {
-                when (goal.category) {
-                    "Emergency" -> "জরুরি ফান্ড"
-                    "Laptop" -> "ল্যাপটপ"
-                    "Travel" -> "ভ্রমণ"
-                    "Marriage" -> "বিয়ে"
-                    "Investment" -> "বিনিয়োগ"
-                    else -> goal.category
+                when (goal.category.lowercase()) {
+                    "emergency", "জরুরি ফান্ড" -> "জরুরি ফান্ড"
+                    "laptop", "ল্যাপটপ" -> "ল্যাপটপ"
+                    "travel", "ভ্রমণ" -> "ভ্রমণ"
+                    "marriage", "বিয়ে" -> "বিয়ে"
+                    "investment", "বিনিয়োগ" -> "বিনিয়োগ"
+                    else -> goal.category.uppercase()
                 }
             } else {
                 goal.category.uppercase()
@@ -3151,8 +3179,8 @@ fun SavingsGoalCardItem(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 // ---------------- DIALOGS ----------------
 
@@ -3544,8 +3572,8 @@ fun AddTransactionDialog(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 @Composable
 fun AddPersonDialog(
@@ -3717,8 +3745,8 @@ fun AddPersonDialog(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -3970,8 +3998,8 @@ fun AddSavingsGoalDialog(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 @Composable
 fun SavingsContributionDialog(
@@ -4108,8 +4136,8 @@ fun SavingsContributionDialog(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 // ---------------- SAVINGS GOAL DETAIL OVERLAY ----------------
 @Composable
@@ -4319,8 +4347,8 @@ fun SavingsGoalDetailOverlay(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 // ---------------- PERSON DETAIL FULL OVERLAY ----------------
 @Composable
@@ -4661,8 +4689,8 @@ fun PersonDetailOverlay(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 @Composable
 fun QuickActionCard(
@@ -4711,8 +4739,8 @@ fun QuickActionCard(
                 )
             }
         }
-    }
-}
+            }
+        }
 
 @Composable
 fun SettingItem(
@@ -4836,14 +4864,15 @@ fun SettingCategory(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 @Composable
 fun SettingsScreen(
     viewModel: FinanceViewModel,
     language: AppLanguage,
     isDark: Boolean,
+    filter: String = "",
     onBack: () -> Unit,
     onSignInClick: () -> Unit,
     onBackupClick: () -> Unit,
@@ -4851,9 +4880,14 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val localCoroutineScope = rememberCoroutineScope()
-    val profileName by viewModel.profileName.collectAsState()
-    val profileEmail by viewModel.profileEmail.collectAsState()
-    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    
+    LaunchedEffect(Unit) {
+        viewModel.verifyNotificationState(context)
+    }
+
+    val rawProfileName by viewModel.profileName.collectAsState()
+    val rawProfileEmail by viewModel.profileEmail.collectAsState()
+    val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsState()
     val profilePhone by viewModel.profilePhone.collectAsState()
     val profileSocial by viewModel.profileSocial.collectAsState()
     val profileAddress by viewModel.profileAddress.collectAsState()
@@ -4861,7 +4895,12 @@ fun SettingsScreen(
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
     val googleName by viewModel.googleName.collectAsState()
     val googleEmail by viewModel.googleEmail.collectAsState()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val driveStatusMessage by viewModel.driveStatusMessage.collectAsState()
+
+    val profileName = if (isGoogleSignedIn) (googleName ?: rawProfileName) else rawProfileName
+    val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawProfileEmail) else rawProfileEmail
+    val profilePhotoUri = if (isGoogleSignedIn) (googlePhotoUrl ?: rawProfilePhotoUri) else rawProfilePhotoUri
 
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
@@ -4906,7 +4945,8 @@ fun SettingsScreen(
             SettingCategory(
                 title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
                 isDark = isDark,
-                icon = Icons.Rounded.Person
+                icon = Icons.Rounded.Person,
+                initiallyExpanded = (filter == "expand_profile")
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -6433,98 +6473,58 @@ fun ChartSection(
                 }
             }
         }
-    }
-}
+            }
+        }
 
 @Composable
 fun SplashScreen(isDark: Boolean) {
     val bgColor = if (isDark) Color(0xFF0F121F) else Color.White
-    val titleColor = if (isDark) Color.White else Color(0xFF1D4ED8)
-    val subtitleColor = if (isDark) Color.White.copy(alpha = 0.7f) else Color(0xFF2563EB)
-    val footerColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF2563EB)
-
-    // Animated loading progress
-    var progress by remember { mutableStateOf(0f) }
-    LaunchedEffect(Unit) {
-        while (progress < 1f) {
-            progress += 0.02f
-            kotlinx.coroutines.delay(35)
-        }
-    }
+    
+    // Pulse animation for the logo
+    val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "LogoScale"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(bgColor)
-            .padding(24.dp)
     ) {
-        // Center Content
+        // App Logo with pulsing animation, positioned slightly above center
         Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset(y = (-40).dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Splash Logo
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.splash_pie_chart),
                 contentDescription = "App Logo",
                 modifier = Modifier
-                    .size(120.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .size(140.dp)
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale
+                    )
             )
-            
-            Spacer(modifier = Modifier.height(40.dp))
-            
-            // Title: Finance Note
-            Text(
-                text = "Finance Note",
-                color = titleColor,
-                fontSize = 36.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.sp,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Subtitle
-            Text(
-                text = "Your digital finance tracker. Keep tracking\nand manage your assets always.",
-                color = subtitleColor,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                lineHeight = 22.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Loading Bar
-            Box(
-                modifier = Modifier
-                    .width(200.dp)
-                    .height(6.dp)
-                    .background(if (isDark) Color.White.copy(alpha = 0.15f) else Color(0xFFE2E8F0), CircleShape)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .background(Color(0xFF2563EB), CircleShape)
-                )
-            }
         }
 
-        // Bottom Footer: From VibeStudio
-        Text(
-            text = "Developed by VibeStudio",
-            color = footerColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
+        // Modern loading circle at the bottom
+        CircularProgressIndicator(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
+                .padding(bottom = 80.dp)
+                .size(44.dp),
+            color = FintechBlue,
+            strokeWidth = 4.dp,
+            trackColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
         )
     }
 }

@@ -23,11 +23,21 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class FinanceNotificationService : Service() {
+    companion object {
+        var isRunning = false
+    }
+
     private val scope = CoroutineScope(Dispatchers.IO + Job())
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         createNotificationChannel()
+    }
+    
+    override fun onDestroy() {
+        isRunning = false
+        super.onDestroy()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
