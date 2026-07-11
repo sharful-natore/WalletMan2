@@ -149,18 +149,20 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                     }
 
                     if (bitmap != null) {
-                        views.setImageViewBitmap(R.id.iv_avatar, bitmap)
+                        val circularBitmap = getCircularBitmapWithBorders(bitmap)
+                        views.setViewPadding(R.id.iv_avatar, 0, 0, 0, 0)
+                        views.setImageViewBitmap(R.id.iv_avatar, circularBitmap)
                         views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
                         views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
                         views.setInt(R.id.iv_avatar, "setColorFilter", 0)
                     } else {
-                        showInitials(views, profileName)
+                        showInitials(context, views, profileName)
                     }
                 } catch (e: Exception) {
-                    showInitials(views, profileName)
+                    showInitials(context, views, profileName)
                 }
             } else {
-                showInitials(views, profileName)
+                showInitials(context, views, profileName)
             }
 
             val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -226,7 +228,45 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     appWidgetManager.updateAppWidget(appWidgetId, views)
 }
 
-private fun showInitials(views: RemoteViews, profileName: String) {
+fun getCircularBitmapWithBorders(src: android.graphics.Bitmap): android.graphics.Bitmap {
+    val size = Math.min(src.width, src.height)
+    val output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(output)
+    
+    val radius = size / 2f
+    
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    val strokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.STROKE
+    }
+    
+    val borderWidth = size * 0.05f // White border (approx 5% of size)
+    val innerRadius = radius - borderWidth
+    
+    // Draw transparent background and circular mask
+    canvas.drawARGB(0, 0, 0, 0)
+    canvas.drawCircle(radius, radius, innerRadius, paint)
+    
+    // Draw cropped bitmap inside mask using SRC_IN
+    paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+    val left = (src.width - size) / 2
+    val top = (src.height - size) / 2
+    val srcRect = android.graphics.Rect(left, top, left + size, top + size)
+    val destRect = android.graphics.Rect(0, 0, size, size)
+    canvas.drawBitmap(src, srcRect, destRect, paint)
+    
+    // Reset paint and draw borders
+    paint.xfermode = null
+    
+    // Draw single white border
+    strokePaint.color = android.graphics.Color.WHITE
+    strokePaint.strokeWidth = borderWidth
+    canvas.drawCircle(radius, radius, radius - borderWidth / 2f, strokePaint)
+    
+    return output
+}
+
+private fun showInitials(context: Context, views: RemoteViews, profileName: String) {
     val initials = if (profileName.isNotBlank()) {
         profileName.split(" ")
             .filter { it.isNotBlank() }
@@ -235,6 +275,9 @@ private fun showInitials(views: RemoteViews, profileName: String) {
             .joinToString("")
             .uppercase()
     } else ""
+
+    val paddingPx = (8 * context.resources.displayMetrics.density).toInt()
+    views.setViewPadding(R.id.iv_avatar, paddingPx, paddingPx, paddingPx, paddingPx)
 
     if (initials.isNotEmpty()) {
         views.setViewVisibility(R.id.iv_avatar, android.view.View.GONE)

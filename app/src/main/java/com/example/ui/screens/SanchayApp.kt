@@ -1700,10 +1700,11 @@ fun DashboardScreen(
                     // Profile Avatar Circle with initials or photo
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(56.dp)
+                            .border(2.dp, Color.White, CircleShape)
+                            .padding(2.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape),
+                            .background(Color.White.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (profilePhotoUri != null) {
@@ -5184,15 +5185,17 @@ fun SettingsScreen(
                     // Circular Avatar
                     Box(
                         modifier = Modifier
-                            .size(105.dp)
+                            .size(110.dp)
                             .clickable { photoLauncher.launch("image/*") }
                             .testTag("settings_avatar_box")
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0), CircleShape)
-                                .border(2.dp, FintechBlue, CircleShape),
+                                .border(3.dp, Color.White, CircleShape)
+                                .padding(3.dp)
+                                .clip(CircleShape)
+                                .background(if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0)),
                             contentAlignment = Alignment.Center
                         ) {
                             if (!photoUriInput.isNullOrBlank()) {
@@ -5200,8 +5203,7 @@ fun SettingsScreen(
                                     model = photoUriInput,
                                     contentDescription = "Profile Photo",
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape),
+                                        .fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
@@ -7978,5 +7980,49 @@ fun GoogleDriveRestoreListDialog(
             },
             onDismiss = { fileToDelete = null }
         )
+    }
+}
+
+class NotchedBottomBarShape(
+    val notchRadius: Dp = 38.dp,
+    val controlOffset: Dp = 14.dp
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val path = Path().apply {
+            val r = with(density) { notchRadius.toPx() }
+            val c = with(density) { controlOffset.toPx() }
+            val cx = size.width / 2f
+            
+            moveTo(0f, 0f)
+            lineTo(cx - r - c, 0f)
+            
+            cubicTo(
+                x1 = cx - r - c / 2f,
+                y1 = 0f,
+                x2 = cx - r,
+                y2 = r,
+                x3 = cx,
+                y3 = r
+            )
+            
+            cubicTo(
+                x1 = cx + r,
+                y1 = r,
+                x2 = cx + r + c / 2f,
+                y2 = 0f,
+                x3 = cx + r + c,
+                y3 = 0f
+            )
+            
+            lineTo(size.width, 0f)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
     }
 }

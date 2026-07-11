@@ -1,30 +1,25 @@
 package com.example.ui.theme
 
+import android.content.res.AssetManager
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.AppLanguage
 
-val provider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
-)
-
-val InterFont = GoogleFont("Inter")
-val HindSiliguriFont = GoogleFont("Hind Siliguri")
-
 val InterFontFamily = FontFamily(
-    Font(googleFont = InterFont, fontProvider = provider)
+    Font(resId = R.font.inter_regular, weight = FontWeight.Normal),
+    Font(resId = R.font.inter_medium, weight = FontWeight.Medium),
+    Font(resId = R.font.inter_bold, weight = FontWeight.Bold)
 )
 
 val HindSiliguriFontFamily = FontFamily(
-    Font(googleFont = HindSiliguriFont, fontProvider = provider)
+    Font(resId = R.font.hind_siliguri_regular, weight = FontWeight.Normal),
+    Font(resId = R.font.hind_siliguri_medium, weight = FontWeight.Medium),
+    Font(resId = R.font.hind_siliguri_bold, weight = FontWeight.Bold)
 )
 
 fun createTypography(fontFamily: FontFamily): Typography {
@@ -140,8 +135,35 @@ fun createTypography(fontFamily: FontFamily): Typography {
 val InterTypography = createTypography(InterFontFamily)
 val HindSiliguriTypography = createTypography(HindSiliguriFontFamily)
 
-fun getTypographyForLanguage(language: AppLanguage): Typography {
-    return if (language == AppLanguage.BN) HindSiliguriTypography else InterTypography
+private var cachedInterTypography: Typography? = null
+private var cachedHindSiliguriTypography: Typography? = null
+
+fun getTypographyForLanguage(language: AppLanguage, assets: AssetManager): Typography {
+    return try {
+        if (language == AppLanguage.BN) {
+            if (cachedHindSiliguriTypography == null) {
+                val fontFamily = FontFamily(
+                    Font(path = "font/hind_siliguri_regular.ttf", assetManager = assets, weight = FontWeight.Normal),
+                    Font(path = "font/hind_siliguri_medium.ttf", assetManager = assets, weight = FontWeight.Medium),
+                    Font(path = "font/hind_siliguri_bold.ttf", assetManager = assets, weight = FontWeight.Bold)
+                )
+                cachedHindSiliguriTypography = createTypography(fontFamily)
+            }
+            cachedHindSiliguriTypography!!
+        } else {
+            if (cachedInterTypography == null) {
+                val fontFamily = FontFamily(
+                    Font(path = "font/inter_regular.ttf", assetManager = assets, weight = FontWeight.Normal),
+                    Font(path = "font/inter_medium.ttf", assetManager = assets, weight = FontWeight.Medium),
+                    Font(path = "font/inter_bold.ttf", assetManager = assets, weight = FontWeight.Bold)
+                )
+                cachedInterTypography = createTypography(fontFamily)
+            }
+            cachedInterTypography!!
+        }
+    } catch (e: Exception) {
+        if (language == AppLanguage.BN) HindSiliguriTypography else InterTypography
+    }
 }
 
 val Typography = HindSiliguriTypography
