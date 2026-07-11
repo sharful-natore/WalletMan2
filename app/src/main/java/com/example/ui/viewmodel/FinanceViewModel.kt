@@ -269,6 +269,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun updateTransaction(transaction: Transaction) {
+        viewModelScope.launch {
+            repository.updateTransaction(transaction)
+            com.example.widget.updateAllWidgets(getApplication())
+        }
+    }
+
     fun deleteTransaction(id: Int) {
         viewModelScope.launch {
             repository.deleteTransaction(id)

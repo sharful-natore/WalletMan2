@@ -13,8 +13,8 @@
         android:layout_height="64dp"
         android:layout_margin="2dp"
         android:layout_marginBottom="4dp"
-        android:background="@drawable/glass_card_bg"
-        android:padding="10dp"
+        android:background="@drawable/widget_gradient_card_bg"
+        android:padding="8dp"
         android:clickable="true"
         android:focusable="true">
 
@@ -119,8 +119,8 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:layout_margin="2dp"
-            android:background="@drawable/glass_card_bg"
+            android:layout_margin="4dp"
+            android:background="@drawable/widget_gradient_card_bg"
             android:padding="6dp"
             android:clickable="true">
             <TextView
@@ -155,8 +155,8 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:layout_margin="2dp"
-            android:background="@drawable/glass_card_bg"
+            android:layout_margin="4dp"
+            android:background="@drawable/widget_gradient_card_bg"
             android:padding="6dp"
             android:clickable="true">
             <TextView
@@ -191,8 +191,8 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:layout_margin="2dp"
-            android:background="@drawable/glass_card_bg"
+            android:layout_margin="4dp"
+            android:background="@drawable/widget_gradient_card_bg"
             android:padding="6dp"
             android:clickable="true">
             <TextView
@@ -227,8 +227,8 @@
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
-            android:layout_margin="2dp"
-            android:background="@drawable/glass_card_bg"
+            android:layout_margin="4dp"
+            android:background="@drawable/widget_gradient_card_bg"
             android:padding="6dp"
             android:clickable="true">
             <TextView

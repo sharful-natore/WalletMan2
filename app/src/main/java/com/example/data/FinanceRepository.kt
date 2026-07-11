@@ -33,6 +33,10 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         return financeDao.insertTransaction(transaction)
     }
 
+    suspend fun updateTransaction(transaction: Transaction) {
+        financeDao.updateTransaction(transaction)
+    }
+
     suspend fun deleteTransaction(id: Int) {
         financeDao.deleteTransactionById(id)
     }

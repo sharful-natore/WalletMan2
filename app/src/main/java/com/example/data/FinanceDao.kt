@@ -41,6 +41,9 @@ interface FinanceDao {
     @Query("DELETE FROM transactions WHERE personId = :personId")
     suspend fun deleteTransactionsByPersonId(personId: Int)
 
+    @Update
+    suspend fun updateTransaction(transaction: Transaction)
+
     // Savings Goals
     @Query("SELECT * FROM savings_goals ORDER BY createdAt DESC")
     fun getAllSavingsGoals(): Flow<List<SavingsGoal>>

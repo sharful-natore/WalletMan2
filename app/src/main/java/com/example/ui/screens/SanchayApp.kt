@@ -655,6 +655,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             when (initialAction) {
                 "ACTION_DEBT_CREDIT", "ACTION_VIEW_DEBT", "ACTION_VIEW_CREDIT" -> "debts"
                 "ACTION_SAVINGS" -> "savings"
+                "ACTION_VIEW_INCOME", "ACTION_VIEW_EXPENSE" -> "transactions"
                 "ACTION_SETTINGS", "ACTION_BACKUP", "ACTION_SETTINGS_PROFILE", "ACTION_GOOGLE_SIGN_IN" -> "settings"
                 "ACTION_CHARTS" -> "charts"
                 else -> "dashboard"
@@ -696,6 +697,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     var showAddPersonDialog by remember { mutableStateOf(initialAction == "ACTION_DEBT_CREDIT") }
     var showAddSavingsGoalDialog by remember { mutableStateOf(initialAction == "ACTION_SAVINGS") }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
+    var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
@@ -714,14 +716,24 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isSyncing by viewModel.isSyncing.collectAsState()
 
 
-    var showBackupConfirm by remember(initialAction) { mutableStateOf(false) }
+    var showBackupConfirm by remember(initialAction) { mutableStateOf(initialAction == "ACTION_BACKUP") }
     var cloudBackupStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
     var showRestoreListDialog by remember { mutableStateOf(false) }
 
-    // Logic for triggering sign-in automatically if action is GOOGLE_SIGN_IN
-    LaunchedEffect(initialAction) {
+    // Logic for triggering sign-in or backup automatically from intents
+    LaunchedEffect(initialAction, isGoogleSignedIn) {
         if (initialAction == "ACTION_GOOGLE_SIGN_IN" && !isGoogleSignedIn) {
             triggerGoogleSignIn()
+        }
+        if (initialAction == "ACTION_BACKUP") {
+            if (!isGoogleSignedIn) {
+                triggerGoogleSignIn()
+            } else {
+                val backupData = viewModel.getCurrentDatabaseBackup()
+                val stats = viewModel.calculateBackupStats(backupData)
+                cloudBackupStats = stats
+                showBackupConfirm = true
+            }
         }
     }
     if (showExitConfirm) {
@@ -1163,6 +1175,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             onAddPersonClick = { showAddPersonDialog = true },
                                             onAddSavingClick = { showAddSavingsGoalDialog = true },
                                             onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                            onEditTransaction = { transactionToEdit = it },
                                             onNavigate = { tab, filter ->
                                                 activeTab = tab
                                                 if (tab == "transactions") transactionFilter = filter
@@ -1190,6 +1203,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             persons = persons,
                                             onAddTransactionClick = { showAddTransactionDialog = true },
                                             onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                            onEditTransaction = { transactionToEdit = it },
                                             filter = transactionFilter,
                                             onFilterChange = { transactionFilter = it },
                                             timeFilter = timeFilter,
@@ -1228,15 +1242,34 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
 
                 // Dynamic Overlays & Dialogs
-                if (showAddTransactionDialog) {
+                if (showAddTransactionDialog || transactionToEdit != null) {
                     AddTransactionDialog(
                         language = language,
                         persons = persons,
                         isDark = isDarkTheme,
-                        onDismiss = { showAddTransactionDialog = false },
+                        editTransaction = transactionToEdit,
+                        onDismiss = { 
+                            showAddTransactionDialog = false 
+                            transactionToEdit = null
+                        },
                         onConfirm = { amount, type, category, note, personId, timestamp ->
-                            viewModel.addTransaction(amount, type, category, note, personId, timestamp)
+                            if (transactionToEdit != null) {
+                                viewModel.updateTransaction(transactionToEdit!!.copy(
+                                    amount = amount,
+                                    type = type,
+                                    category = category,
+                                    note = note,
+                                    personId = personId,
+                                    timestamp = timestamp
+                                ))
+                            } else {
+                                viewModel.addTransaction(amount, type, category, note, personId, timestamp)
+                            }
                             showAddTransactionDialog = false
+                            transactionToEdit = null
+                        },
+                        onAddPersonClick = {
+                            showAddPersonDialog = true
                         }
                     )
                 }
@@ -1388,6 +1421,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 viewModel.addTransaction(amt, "REPAY_RECEIVED", "Repay Received", note.ifBlank { "Received back lent loan" }, debtInfo.person.id)
                             },
                             onDeleteTx = { viewModel.deleteTransaction(it) },
+                            onEditTx = { transactionToEdit = it },
                             onEditPerson = {
                                 editingPerson = it
                                 showAddPersonDialog = true
@@ -1531,6 +1565,7 @@ fun DashboardScreen(
     onAddPersonClick: () -> Unit,
     onAddSavingClick: () -> Unit,
     onDeleteTransaction: (Int) -> Unit,
+    onEditTransaction: (Transaction) -> Unit,
     onNavigate: (String, String) -> Unit,
     timeFilter: String = "ALL",
     onTimeFilterChange: (String) -> Unit = {},
@@ -1581,7 +1616,7 @@ fun DashboardScreen(
             FintechGradientCard(
                 gradientColors = GradientsList[0],
                 cornerRadius = 24.dp,
-                padding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                padding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
                 modifier = Modifier
                     .testTag("dashboard_profile_card")
                     .padding(top = 8.dp)
@@ -1677,7 +1712,7 @@ fun DashboardScreen(
                             }
                         } else {
                             Text(
-                                text = if (language == AppLanguage.BN) "ব্যাকআপ ও এডিটের জন্য গুগল সাইন-ইন করুন" else "Sign in with Google to backup & edit profile",
+                                text = if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর করার জন্য সাইন-ইন করুন" else "Sign in to backup & restore",
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,
@@ -2019,7 +2054,7 @@ fun DashboardScreen(
                     )
                 }
                 items(txs) { tx ->
-                    TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction)
+                    TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction, onEditTransaction)
                 }
             }
         }
@@ -2040,6 +2075,7 @@ fun TransactionRowItem(
     isDark: Boolean,
     persons: List<Person>,
     onDelete: (Int) -> Unit,
+    onEdit: (Transaction) -> Unit,
     isHighlighted: Boolean = false
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -2068,6 +2104,10 @@ fun TransactionRowItem(
             onDelete = {
                 showDetails = false
                 showDeleteConfirm = true
+            },
+            onEdit = {
+                showDetails = false
+                onEdit(tx)
             },
             onShare = {
                 val shareText = buildString {
@@ -2242,6 +2282,7 @@ fun TransactionDetailsDialog(
     linkedPerson: Person?,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
     onShare: () -> Unit
 ) {
     val bgColor = if (isDark) Color(0xFF1E2235) else Color.White
@@ -2311,6 +2352,9 @@ fun TransactionDetailsDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = FintechBlue)
+                    }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
                     }
@@ -2336,6 +2380,7 @@ fun TransactionsScreen(
     persons: List<Person>,
     onAddTransactionClick: () -> Unit,
     onDeleteTransaction: (Int) -> Unit,
+    onEditTransaction: (Transaction) -> Unit,
     filter: String = "ALL",
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
@@ -2357,8 +2402,8 @@ fun TransactionsScreen(
         }
     }
 
-    val totalIncome = timeFilteredTransactions.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
-    val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }.sumOf { it.amount }
+    val totalIncome = timeFilteredTransactions.filter { it.type == "INCOME" }.sumOf { it.amount }
+    val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -2504,7 +2549,7 @@ fun TransactionsScreen(
                         }
                         items(txs) { tx ->
                             Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                                TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction)
+                                TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction, onEditTransaction)
                             }
                         }
                     }
@@ -3231,17 +3276,18 @@ fun AddTransactionDialog(
     language: AppLanguage,
     persons: List<Person>,
     isDark: Boolean,
+    editTransaction: Transaction? = null,
     onDismiss: () -> Unit,
-    onConfirm: (Double, String, String, String, Int?, Long) -> Unit
+    onConfirm: (Double, String, String, String, Int?, Long) -> Unit,
+    onAddPersonClick: () -> Unit = {}
 ) {
-    val amountStr by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var customTimestamp by remember { mutableStateOf<Long?>(null) }
+    var note by remember { mutableStateOf(editTransaction?.note ?: "") }
+    var customTimestamp by remember { mutableStateOf<Long?>(editTransaction?.timestamp) }
 
     // Dropdowns / Option selectors
-    var type by remember { mutableStateOf("EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
-    var selectedPersonId by remember { mutableStateOf<Int?>(null) }
-    var category by remember { mutableStateOf("Food") }
+    var type by remember { mutableStateOf(editTransaction?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
+    var selectedPersonId by remember { mutableStateOf<Int?>(editTransaction?.personId) }
+    var category by remember { mutableStateOf(editTransaction?.category ?: "Food") }
 
     val categoriesIncome = listOf("Salary", "Business", "Freelancing", "Investment", "Others")
     val categoriesExpense = listOf("Food", "Rent", "Shopping", "Bills", "Medical", "Entertainment", "Others")
@@ -3263,7 +3309,7 @@ fun AddTransactionDialog(
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
     val chipBg = if (isDark) Color(0xFF1F2336) else Color(0xFFF1F5F9)
 
-    var amountInputState by remember { mutableStateOf("") }
+    var amountInputState by remember { mutableStateOf(editTransaction?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
     val context = LocalContext.current
 
     Dialog(onDismissRequest = onDismiss) {
@@ -3369,52 +3415,62 @@ fun AddTransactionDialog(
                 val isPersonRequired = type != "INCOME" && type != "EXPENSE"
                 if (isPersonRequired) {
                     item {
-                        Text(
-                            Translation.get("person", language) + (if (isPersonRequired) " *" else " (${Translation.get("phone", language).split(" ").last()})"),
-                            color = labelColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Box(modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                            ExposedDropdownMenuBox(
-                                expanded = personDropdownExpanded,
-                                onExpandedChange = { personDropdownExpanded = !personDropdownExpanded }
-                            ) {
-                                val selectedPersonName = persons.find { it.id == selectedPersonId }?.name ?: Translation.get("select_person", language)
-                                OutlinedTextField(
-                                    readOnly = true,
-                                    value = selectedPersonName,
-                                    onValueChange = {},
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = personDropdownExpanded) },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = textColor,
-                                        unfocusedTextColor = textColor,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = labelColor
-                                    ),
-                                    modifier = Modifier.fillMaxWidth().menuAnchor()
-                                )
-                                ExposedDropdownMenu(
+                        Text(Translation.get("person", language) + (if (isPersonRequired) " *" else ""), color = labelColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ExposedDropdownMenuBox(
                                     expanded = personDropdownExpanded,
-                                    onDismissRequest = { personDropdownExpanded = false }
+                                    onExpandedChange = { personDropdownExpanded = !personDropdownExpanded }
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text(Translation.get("select_person", language)) },
-                                        onClick = {
-                                            selectedPersonId = null
-                                            personDropdownExpanded = false
-                                        }
+                                    val selectedPersonName = persons.find { it.id == selectedPersonId }?.name ?: Translation.get("select_person", language)
+                                    OutlinedTextField(
+                                        readOnly = true,
+                                        value = selectedPersonName,
+                                        onValueChange = {},
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = personDropdownExpanded) },
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = textColor,
+                                            unfocusedTextColor = textColor,
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = labelColor
+                                        ),
+                                        modifier = Modifier.fillMaxWidth().menuAnchor()
                                     )
-                                    persons.forEach { person ->
+                                    ExposedDropdownMenu(
+                                        expanded = personDropdownExpanded,
+                                        onDismissRequest = { personDropdownExpanded = false }
+                                    ) {
                                         DropdownMenuItem(
-                                            text = { Text(person.name) },
+                                            text = { Text(Translation.get("select_person", language)) },
                                             onClick = {
-                                                selectedPersonId = person.id
+                                                selectedPersonId = null
                                                 personDropdownExpanded = false
                                             }
                                         )
+                                        persons.forEach { person ->
+                                            DropdownMenuItem(
+                                                text = { Text(person.name) },
+                                                onClick = {
+                                                    selectedPersonId = person.id
+                                                    personDropdownExpanded = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
+                            }
+                            IconButton(
+                                onClick = onAddPersonClick,
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                            ) {
+                                Icon(Icons.Rounded.PersonAdd, contentDescription = "Add Person", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -4404,6 +4460,7 @@ fun PersonDetailOverlay(
     onRepayPaidClick: (Double, String) -> Unit,
     onRepayReceivedClick: (Double, String) -> Unit,
     onDeleteTx: (Int) -> Unit,
+    onEditTx: (Transaction) -> Unit,
     onEditPerson: (Person) -> Unit,
     onDeletePerson: () -> Unit
 ) {
@@ -4467,6 +4524,13 @@ fun PersonDetailOverlay(
                                 text = personDebt.person.phone,
                                 fontSize = 13.sp,
                                 color = Color.Gray
+                            )
+                        }
+                        if (personDebt.person.address.isNotEmpty()) {
+                            Text(
+                                text = personDebt.person.address,
+                                fontSize = 12.sp,
+                                color = Color.Gray.copy(alpha = 0.8f)
                             )
                         }
                     }
@@ -4724,7 +4788,7 @@ fun PersonDetailOverlay(
                             )
                         }
                         items(txs) { tx ->
-                            TransactionRowItem(tx, language, isDark, listOf(personDebt.person), onDeleteTx)
+                            TransactionRowItem(tx, language, isDark, listOf(personDebt.person), onDeleteTx, onEditTx)
                         }
                     }
                 }
@@ -6384,10 +6448,10 @@ fun ChartsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .padding(top = 4.dp, bottom = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         androidx.activity.compose.BackHandler(onBack = onBack)
         
@@ -6395,8 +6459,7 @@ fun ChartsScreen(
             text = if (language == AppLanguage.BN) "আয় ব্যয়ের চার্ট" else "Income & Expense Chart",
             color = if (isDark) Color.White else Color(0xFF1E293B),
             fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
-            modifier = Modifier.padding(vertical = 8.dp)
+            fontSize = 20.sp
         )
 
         // --- INCOME CHART ---
@@ -6405,7 +6468,8 @@ fun ChartsScreen(
             data = incomesByCategory,
             total = totalIncome,
             palette = palette,
-            language = language
+            language = language,
+            isDark = isDark
         )
 
         // --- EXPENSE CHART ---
@@ -6414,7 +6478,8 @@ fun ChartsScreen(
             data = expensesByCategory,
             total = totalExpense,
             palette = palette.reversed(), // slightly different colors
-            language = language
+            language = language,
+            isDark = isDark
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -6427,18 +6492,23 @@ fun ChartSection(
     data: Map<String, Double>,
     total: Double,
     palette: List<Color>,
-    language: AppLanguage
+    language: AppLanguage,
+    isDark: Boolean = true
 ) {
+    val bgColor = if (isDark) listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
+    val textColor = if (isDark) Color.White else Color(0xFF1E293B)
+    
     FintechGradientCard(
-        gradientColors = listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)),
+        gradientColors = bgColor,
         cornerRadius = 24.dp,
         padding = PaddingValues(20.dp),
         modifier = Modifier.fillMaxWidth()
+            .padding(horizontal = 16.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = title,
-                color = Color.White,
+                color = textColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -6480,12 +6550,12 @@ fun ChartSection(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Total",
-                                color = Color.White.copy(alpha = 0.6f),
+                                color = textColor.copy(alpha = 0.6f),
                                 fontSize = 10.sp
                             )
                             Text(
                                 text = formatCurrency(total, language),
-                                color = Color.White,
+                                color = textColor,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
@@ -6547,11 +6617,12 @@ fun SplashScreen(isDark: Boolean) {
         label = "LogoScale"
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(bgColor)
     ) {
+        val screenWidth = maxWidth
         // App Logo with pulsing animation, positioned slightly above center
         Column(
             modifier = Modifier
@@ -6560,10 +6631,10 @@ fun SplashScreen(isDark: Boolean) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.glossy_3d_pie_chart_logo_1783711271663),
+                painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.app_logo_new),
                 contentDescription = "App Logo",
                 modifier = Modifier
-                    .size(300.dp) // Increased size to 300.dp for more prominence
+                    .size(screenWidth * 0.4f) // 40% of screen width as requested
                     .graphicsLayer(
                         scaleX = scale,
                         scaleY = scale
