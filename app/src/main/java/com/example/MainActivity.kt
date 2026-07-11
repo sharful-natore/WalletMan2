@@ -26,6 +26,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+        
         // Register global exception handler for logging crashes
         com.example.data.ErrorLogger.registerUncaughtExceptionHandler(this)
         
@@ -39,23 +48,10 @@ class MainActivity : ComponentActivity() {
         
         // Load persistent settings
         viewModel.loadProfile(this)
-
+        
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
             val language by viewModel.language.collectAsState()
-            
-            LaunchedEffect(isDarkTheme) {
-                enableEdgeToEdge(
-                    statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-                    navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-                )
-                
-                // Explicitly configure status bar and navigation bar icon visibility using WindowCompat
-                WindowCompat.getInsetsController(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = false
-                    isAppearanceLightNavigationBars = false
-                }
-            }
             
             MyApplicationTheme(darkTheme = isDarkTheme, language = language) {
                 // Get action from intent, but also listen for changes via setIntent(intent) in onNewIntent

@@ -17,7 +17,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentStart="true"
-            android:text="Sanchay (সঞ্চয়) - Finance Note"
+            android:text="Finance Note"
             android:textColor="#3F8CFF"
             android:textStyle="bold"
             android:textSize="12sp" />
@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:layout_alignParentEnd="true"
             android:text="Active"
-            android:textColor="#B0FFFFFF"
+            android:textColor="#3F8CFF"
             android:textSize="11sp" />
     </RelativeLayout>
 

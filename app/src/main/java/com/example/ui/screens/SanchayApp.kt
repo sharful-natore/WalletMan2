@@ -1700,11 +1700,10 @@ fun DashboardScreen(
                     // Profile Avatar Circle with initials or photo
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
-                            .border(2.dp, Color.White, CircleShape)
-                            .padding(2.dp)
+                            .size(52.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f)),
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (profilePhotoUri != null) {
@@ -5185,17 +5184,15 @@ fun SettingsScreen(
                     // Circular Avatar
                     Box(
                         modifier = Modifier
-                            .size(110.dp)
+                            .size(105.dp)
                             .clickable { photoLauncher.launch("image/*") }
                             .testTag("settings_avatar_box")
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .border(3.dp, Color.White, CircleShape)
-                                .padding(3.dp)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0)),
+                                .background(if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0), CircleShape)
+                                .border(2.dp, FintechBlue, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             if (!photoUriInput.isNullOrBlank()) {
@@ -5203,7 +5200,8 @@ fun SettingsScreen(
                                     model = photoUriInput,
                                     contentDescription = "Profile Photo",
                                     modifier = Modifier
-                                        .fillMaxSize(),
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
@@ -6839,13 +6837,21 @@ fun TimelineSplineChart(
 }
 
 enum class ChartFilterMode {
-    MONTH, YEAR, MONTH_TO_MONTH, YEAR_TO_YEAR
+    MONTH, YEAR, MONTH_TO_MONTH, YEAR_TO_YEAR, DAY
 }
 
 fun isTxInMonth(txTimestamp: Long, year: Int, month: Int): Boolean {
     val cal = java.util.Calendar.getInstance()
     cal.timeInMillis = txTimestamp
     return cal.get(java.util.Calendar.YEAR) == year && cal.get(java.util.Calendar.MONTH) == month
+}
+
+fun isTxInDay(txTimestamp: Long, year: Int, month: Int, day: Int): Boolean {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = txTimestamp
+    return cal.get(java.util.Calendar.YEAR) == year &&
+            cal.get(java.util.Calendar.MONTH) == month &&
+            cal.get(java.util.Calendar.DAY_OF_MONTH) == day
 }
 
 fun isTxInYear(txTimestamp: Long, year: Int): Boolean {
@@ -6901,7 +6907,7 @@ fun calculateSplineChartData(
     val monthsLabels = if (language == AppLanguage.BN) banglaMonths else englishMonths
 
     when (filterMode) {
-        ChartFilterMode.MONTH, ChartFilterMode.YEAR -> {
+        ChartFilterMode.YEAR -> {
             val yearToUse = selectedYear
             val incomes = DoubleArray(12) { 0.0 }
             val expenses = DoubleArray(12) { 0.0 }
@@ -6924,6 +6930,44 @@ fun calculateSplineChartData(
             }
             return SplineChartData(
                 labels = monthsLabels,
+                incomeSums = incomes.toList(),
+                expenseSums = expenses.toList(),
+                lendSums = lends.toList(),
+                borrowSums = borrows.toList()
+            )
+        }
+        ChartFilterMode.MONTH -> {
+            val yearToUse = selectedYear
+            val monthToUse = selectedMonth
+            
+            cal.set(java.util.Calendar.YEAR, yearToUse)
+            cal.set(java.util.Calendar.MONTH, monthToUse)
+            val daysInMonth = cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+            
+            val incomes = DoubleArray(daysInMonth) { 0.0 }
+            val expenses = DoubleArray(daysInMonth) { 0.0 }
+            val lends = DoubleArray(daysInMonth) { 0.0 }
+            val borrows = DoubleArray(daysInMonth) { 0.0 }
+            
+            for (tx in transactions) {
+                cal.timeInMillis = tx.timestamp
+                if (cal.get(java.util.Calendar.YEAR) == yearToUse && cal.get(java.util.Calendar.MONTH) == monthToUse) {
+                    val day = cal.get(java.util.Calendar.DAY_OF_MONTH) - 1 // 0-indexed
+                    if (day in 0 until daysInMonth) {
+                        when (tx.type) {
+                            "INCOME" -> incomes[day] += tx.amount
+                            "EXPENSE" -> expenses[day] += tx.amount
+                            "LEND" -> lends[day] += tx.amount
+                            "BORROW" -> borrows[day] += tx.amount
+                        }
+                    }
+                }
+            }
+            
+            val labels = (1..daysInMonth).map { it.toString() }
+            
+            return SplineChartData(
+                labels = labels,
                 incomeSums = incomes.toList(),
                 expenseSums = expenses.toList(),
                 lendSums = lends.toList(),
@@ -7060,6 +7104,40 @@ fun calculateSplineChartData(
                 borrowSums = if (borrowsList.isEmpty()) listOf(0.0) else borrowsList
             )
         }
+        ChartFilterMode.DAY -> {
+            val daysInMonth = java.util.Calendar.getInstance().apply {
+                set(java.util.Calendar.YEAR, selectedYear)
+                set(java.util.Calendar.MONTH, selectedMonth)
+            }.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+            
+            val labelsList = (1..daysInMonth).map { formatNumber(it, language) }
+            val incomesList = DoubleArray(daysInMonth) { 0.0 }
+            val expensesList = DoubleArray(daysInMonth) { 0.0 }
+            val lendsList = DoubleArray(daysInMonth) { 0.0 }
+            val borrowsList = DoubleArray(daysInMonth) { 0.0 }
+            
+            for (tx in transactions) {
+                cal.timeInMillis = tx.timestamp
+                if (cal.get(java.util.Calendar.YEAR) == selectedYear && cal.get(java.util.Calendar.MONTH) == selectedMonth) {
+                    val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+                    if (day in 1..daysInMonth) {
+                        when (tx.type) {
+                            "INCOME" -> incomesList[day - 1] += tx.amount
+                            "EXPENSE" -> expensesList[day - 1] += tx.amount
+                            "LEND" -> lendsList[day - 1] += tx.amount
+                            "BORROW" -> borrowsList[day - 1] += tx.amount
+                        }
+                    }
+                }
+            }
+            return SplineChartData(
+                labels = labelsList,
+                incomeSums = incomesList.toList(),
+                expenseSums = expensesList.toList(),
+                lendSums = lendsList.toList(),
+                borrowSums = borrowsList.toList()
+            )
+        }
     }
 }
 
@@ -7172,17 +7250,23 @@ fun ChartsScreen(
     persons: List<Person>,
     onBack: () -> Unit
 ) {
-    var filterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
+    var pieChartFilterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
+    var timelineChartFilterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
 
     // Calendar & Defaults
     val currentCal = java.util.Calendar.getInstance()
     val currentYear = currentCal.get(java.util.Calendar.YEAR)
     val currentMonth = currentCal.get(java.util.Calendar.MONTH) // 0-indexed
 
-    // Mode-specific states:
-    // 1. MONTH mode (default: current month/year)
-    var selectedMonth by remember { mutableStateOf(currentMonth) }
-    var selectedYear by remember { mutableStateOf(currentYear) }
+    // Pie Chart Specific States:
+    var pieSelectedMonth by remember { mutableStateOf(currentMonth) }
+    var pieSelectedYear by remember { mutableStateOf(currentYear) }
+    var pieSelectedDay by remember { mutableStateOf(currentCal.get(java.util.Calendar.DAY_OF_MONTH)) }
+
+    // Timeline Chart Specific States:
+    var timelineSelectedMonth by remember { mutableStateOf(currentMonth) }
+    var timelineSelectedYear by remember { mutableStateOf(currentYear) }
+    var timelineSelectedDay by remember { mutableStateOf(currentCal.get(java.util.Calendar.DAY_OF_MONTH)) }
 
     // 2. MONTH_TO_MONTH mode (default: Jan of current year to current month)
     var startMonth by remember { mutableStateOf(0) } // Jan
@@ -7209,20 +7293,23 @@ fun ChartsScreen(
     }
 
     // Filter transactions for Pie Charts based on selection
-    val filteredTxsForPie = remember(transactions, filterMode, selectedYear, selectedMonth, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y) {
+    val filteredTxsForPie = remember(transactions, pieChartFilterMode, pieSelectedYear, pieSelectedMonth, pieSelectedDay, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y) {
         transactions.filter { tx ->
-            when (filterMode) {
+            when (pieChartFilterMode) {
                 ChartFilterMode.MONTH -> {
-                    isTxInMonth(tx.timestamp, selectedYear, selectedMonth)
+                    isTxInMonth(tx.timestamp, pieSelectedYear, pieSelectedMonth)
                 }
                 ChartFilterMode.YEAR -> {
-                    isTxInYear(tx.timestamp, selectedYear)
+                    isTxInYear(tx.timestamp, pieSelectedYear)
                 }
                 ChartFilterMode.MONTH_TO_MONTH -> {
                     isTxInMonthRange(tx.timestamp, startYear, startMonth, endYear, endMonth)
                 }
                 ChartFilterMode.YEAR_TO_YEAR -> {
                     isTxInYearRange(tx.timestamp, startYearY2Y, endYearY2Y)
+                }
+                ChartFilterMode.DAY -> {
+                    isTxInDay(tx.timestamp, pieSelectedYear, pieSelectedMonth, pieSelectedDay)
                 }
             }
         }
@@ -7240,12 +7327,12 @@ fun ChartsScreen(
     val palette = listOf(Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF06B6D4))
 
     // Calculate Spline Chart Data dynamically based on filter selection
-    val splineChartData = remember(transactions, filterMode, selectedYear, selectedMonth, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y, language) {
+    val splineChartData = remember(transactions, timelineChartFilterMode, timelineSelectedYear, timelineSelectedMonth, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y, language) {
         calculateSplineChartData(
             transactions = transactions,
-            filterMode = filterMode,
-            selectedYear = selectedYear,
-            selectedMonth = selectedMonth,
+            filterMode = timelineChartFilterMode,
+            selectedYear = timelineSelectedYear,
+            selectedMonth = timelineSelectedMonth,
             startYear = startYear,
             startMonth = startMonth,
             endYear = endYear,
@@ -7329,7 +7416,7 @@ fun ChartsScreen(
                     )
                 }
                 
-                // Chips for filterMode
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -7337,55 +7424,61 @@ fun ChartsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CustomChartFilterChip(
-                        selected = filterMode == ChartFilterMode.MONTH,
+                        selected = pieChartFilterMode == ChartFilterMode.MONTH,
                         label = if (language == AppLanguage.BN) "মাস" else "Month",
-                        onClick = { filterMode = ChartFilterMode.MONTH },
+                        onClick = { pieChartFilterMode = ChartFilterMode.MONTH },
                         isDark = isDark
                     )
                     CustomChartFilterChip(
-                        selected = filterMode == ChartFilterMode.YEAR,
+                        selected = pieChartFilterMode == ChartFilterMode.YEAR,
                         label = if (language == AppLanguage.BN) "বছর" else "Year",
-                        onClick = { filterMode = ChartFilterMode.YEAR },
+                        onClick = { pieChartFilterMode = ChartFilterMode.YEAR },
                         isDark = isDark
                     )
                     CustomChartFilterChip(
-                        selected = filterMode == ChartFilterMode.MONTH_TO_MONTH,
+                        selected = pieChartFilterMode == ChartFilterMode.MONTH_TO_MONTH,
                         label = if (language == AppLanguage.BN) "মাস টু মাস" else "Month-to-Month",
-                        onClick = { filterMode = ChartFilterMode.MONTH_TO_MONTH },
+                        onClick = { pieChartFilterMode = ChartFilterMode.MONTH_TO_MONTH },
                         isDark = isDark
                     )
                     CustomChartFilterChip(
-                        selected = filterMode == ChartFilterMode.YEAR_TO_YEAR,
+                        selected = pieChartFilterMode == ChartFilterMode.YEAR_TO_YEAR,
                         label = if (language == AppLanguage.BN) "বছর টু বছর" else "Year-to-Year",
-                        onClick = { filterMode = ChartFilterMode.YEAR_TO_YEAR },
+                        onClick = { pieChartFilterMode = ChartFilterMode.YEAR_TO_YEAR },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = pieChartFilterMode == ChartFilterMode.DAY,
+                        label = if (language == AppLanguage.BN) "দিন" else "Day",
+                        onClick = { pieChartFilterMode = ChartFilterMode.DAY },
                         isDark = isDark
                     )
                 }
-                
-                // Selectors Area
-                when (filterMode) {
+
+
+                when (pieChartFilterMode) {
                     ChartFilterMode.MONTH -> {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.Center
                         ) {
                             SegmentedFilterPicker(
                                 label = if (language == AppLanguage.BN) "নির্বাচিত মাস:" else "Selected Month:",
-                                valueDisplay = formatMonthYearDisplay(selectedMonth, selectedYear, language),
+                                valueDisplay = formatMonthYearDisplay(pieSelectedMonth, pieSelectedYear, language),
                                 onPrevious = {
-                                    if (selectedMonth == 0) {
-                                        selectedMonth = 11
-                                        selectedYear--
+                                    if (pieSelectedMonth == 0) {
+                                        pieSelectedMonth = 11
+                                        pieSelectedYear--
                                     } else {
-                                        selectedMonth--
+                                        pieSelectedMonth--
                                     }
                                 },
                                 onNext = {
-                                    if (selectedMonth == 11) {
-                                        selectedMonth = 0
-                                        selectedYear++
+                                    if (pieSelectedMonth == 11) {
+                                        pieSelectedMonth = 0
+                                        pieSelectedYear++
                                     } else {
-                                        selectedMonth++
+                                        pieSelectedMonth++
                                     }
                                 },
                                 isDark = isDark
@@ -7394,108 +7487,51 @@ fun ChartsScreen(
                     }
                     ChartFilterMode.YEAR -> {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.Center
                         ) {
                             SegmentedFilterPicker(
                                 label = if (language == AppLanguage.BN) "নির্বাচিত বছর:" else "Selected Year:",
-                                valueDisplay = formatYearDisplay(selectedYear, language),
-                                onPrevious = { selectedYear-- },
-                                onNext = { selectedYear++ },
+                                valueDisplay = formatYearDisplay(pieSelectedYear, language),
+                                onPrevious = { pieSelectedYear-- },
+                                onNext = { pieSelectedYear++ },
                                 isDark = isDark
                             )
                         }
                     }
-                    ChartFilterMode.MONTH_TO_MONTH -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                    ChartFilterMode.DAY -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             SegmentedFilterPicker(
-                                label = if (language == AppLanguage.BN) "শুরু:" else "Start:",
-                                valueDisplay = formatMonthYearDisplay(startMonth, startYear, language),
+                                label = if (language == AppLanguage.BN) "নির্বাচিত দিন:" else "Selected Day:",
+                                valueDisplay = "${formatNumber(pieSelectedDay, language)} ${formatMonthYearDisplay(pieSelectedMonth, pieSelectedYear, language)}",
                                 onPrevious = {
-                                    if (startMonth == 0) {
-                                        startMonth = 11
-                                        startYear--
-                                    } else {
-                                        startMonth--
-                                    }
+                                    val cal = java.util.Calendar.getInstance()
+                                    cal.set(java.util.Calendar.YEAR, pieSelectedYear)
+                                    cal.set(java.util.Calendar.MONTH, pieSelectedMonth)
+                                    cal.set(java.util.Calendar.DAY_OF_MONTH, pieSelectedDay)
+                                    cal.add(java.util.Calendar.DAY_OF_MONTH, -1)
+                                    pieSelectedYear = cal.get(java.util.Calendar.YEAR)
+                                    pieSelectedMonth = cal.get(java.util.Calendar.MONTH)
+                                    pieSelectedDay = cal.get(java.util.Calendar.DAY_OF_MONTH)
                                 },
                                 onNext = {
-                                    val sVal = startYear * 12 + startMonth
-                                    val eVal = endYear * 12 + endMonth
-                                    if (sVal < eVal) {
-                                        if (startMonth == 11) {
-                                            startMonth = 0
-                                            startYear++
-                                        } else {
-                                            startMonth++
-                                        }
-                                    }
-                                },
-                                isDark = isDark
-                            )
-                            
-                            SegmentedFilterPicker(
-                                label = if (language == AppLanguage.BN) "শেষ:" else "End:",
-                                valueDisplay = formatMonthYearDisplay(endMonth, endYear, language),
-                                onPrevious = {
-                                    val sVal = startYear * 12 + startMonth
-                                    val eVal = endYear * 12 + endMonth
-                                    if (eVal > sVal) {
-                                        if (endMonth == 0) {
-                                            endMonth = 11
-                                            endYear--
-                                        } else {
-                                            endMonth--
-                                        }
-                                    }
-                                },
-                                onNext = {
-                                    if (endMonth == 11) {
-                                        endMonth = 0
-                                        endYear++
-                                    } else {
-                                        endMonth++
-                                    }
+                                    val cal = java.util.Calendar.getInstance()
+                                    cal.set(java.util.Calendar.YEAR, pieSelectedYear)
+                                    cal.set(java.util.Calendar.MONTH, pieSelectedMonth)
+                                    cal.set(java.util.Calendar.DAY_OF_MONTH, pieSelectedDay)
+                                    cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                                    pieSelectedYear = cal.get(java.util.Calendar.YEAR)
+                                    pieSelectedMonth = cal.get(java.util.Calendar.MONTH)
+                                    pieSelectedDay = cal.get(java.util.Calendar.DAY_OF_MONTH)
                                 },
                                 isDark = isDark
                             )
                         }
                     }
-                    ChartFilterMode.YEAR_TO_YEAR -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            SegmentedFilterPicker(
-                                label = if (language == AppLanguage.BN) "শুরু বছর:" else "Start Year:",
-                                valueDisplay = formatYearDisplay(startYearY2Y, language),
-                                onPrevious = { startYearY2Y-- },
-                                onNext = {
-                                    if (startYearY2Y < endYearY2Y) {
-                                        startYearY2Y++
-                                    }
-                                },
-                                isDark = isDark
-                            )
-                            
-                            SegmentedFilterPicker(
-                                label = if (language == AppLanguage.BN) "শেষ বছর:" else "End Year:",
-                                valueDisplay = formatYearDisplay(endYearY2Y, language),
-                                onPrevious = {
-                                    if (endYearY2Y > startYearY2Y) {
-                                        endYearY2Y--
-                                    }
-                                },
-                                onNext = { endYearY2Y++ },
-                                isDark = isDark
-                            )
-                        }
-                    }
+                    else -> {}
                 }
             }
         }
@@ -7520,12 +7556,114 @@ fun ChartsScreen(
             isDark = isDark
         )
 
+
+        // --- TIMELINE FILTER ---
+        FintechGradientCard(
+            gradientColors = cardBg,
+            cornerRadius = 24.dp,
+            padding = PaddingValues(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Title Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ফিল্টার ও সময়কাল" else "Filters & Time Period",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
+                    )
+                    
+                    Icon(
+                        imageVector = Icons.Rounded.FilterList,
+                        contentDescription = "Filter",
+                        tint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CustomChartFilterChip(
+                        selected = timelineChartFilterMode == ChartFilterMode.MONTH,
+                        label = if (language == AppLanguage.BN) "মাস" else "Month",
+                        onClick = { timelineChartFilterMode = ChartFilterMode.MONTH },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = timelineChartFilterMode == ChartFilterMode.YEAR,
+                        label = if (language == AppLanguage.BN) "বছর" else "Year",
+                        onClick = { timelineChartFilterMode = ChartFilterMode.YEAR },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = timelineChartFilterMode == ChartFilterMode.MONTH_TO_MONTH,
+                        label = if (language == AppLanguage.BN) "মাস টু মাস" else "Month-to-Month",
+                        onClick = { timelineChartFilterMode = ChartFilterMode.MONTH_TO_MONTH },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = timelineChartFilterMode == ChartFilterMode.YEAR_TO_YEAR,
+                        label = if (language == AppLanguage.BN) "বছর টু বছর" else "Year-to-Year",
+                        onClick = { timelineChartFilterMode = ChartFilterMode.YEAR_TO_YEAR },
+                        isDark = isDark
+                    )
+                }
+
+                when (timelineChartFilterMode) {
+                    ChartFilterMode.MONTH -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "নির্বাচিত মাস:" else "Selected Month:",
+                                valueDisplay = formatMonthYearDisplay(timelineSelectedMonth, timelineSelectedYear, language),
+                                onPrevious = {
+                                    if (timelineSelectedMonth == 0) {
+                                        timelineSelectedMonth = 11
+                                        timelineSelectedYear--
+                                    } else {
+                                        timelineSelectedMonth--
+                                    }
+                                },
+                                onNext = {
+                                    if (timelineSelectedMonth == 11) {
+                                        timelineSelectedMonth = 0
+                                        timelineSelectedYear++
+                                    } else {
+                                        timelineSelectedMonth++
+                                    }
+                                },
+                                isDark = isDark
+                            )
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+
         // Display Header Label based on current state
-        val displayPeriodLabel = when (filterMode) {
-            ChartFilterMode.MONTH -> formatMonthYearDisplay(selectedMonth, selectedYear, language)
-            ChartFilterMode.YEAR -> formatYearDisplay(selectedYear, language)
+        val displayPeriodLabel = when (timelineChartFilterMode) {
+            ChartFilterMode.MONTH -> formatMonthYearDisplay(timelineSelectedMonth, timelineSelectedYear, language)
+            ChartFilterMode.YEAR -> formatYearDisplay(timelineSelectedYear, language)
             ChartFilterMode.MONTH_TO_MONTH -> "${formatMonthYearDisplay(startMonth, startYear, language)} - ${formatMonthYearDisplay(endMonth, endYear, language)}"
             ChartFilterMode.YEAR_TO_YEAR -> "${formatYearDisplay(startYearY2Y, language)} - ${formatYearDisplay(endYearY2Y, language)}"
+            ChartFilterMode.DAY -> formatMonthYearDisplay(timelineSelectedMonth, timelineSelectedYear, language)
         }
 
         // --- TIMELINE SPLINE CHART 1: INCOME & EXPENSE ---
@@ -7980,49 +8118,5 @@ fun GoogleDriveRestoreListDialog(
             },
             onDismiss = { fileToDelete = null }
         )
-    }
-}
-
-class NotchedBottomBarShape(
-    val notchRadius: Dp = 38.dp,
-    val controlOffset: Dp = 14.dp
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val path = Path().apply {
-            val r = with(density) { notchRadius.toPx() }
-            val c = with(density) { controlOffset.toPx() }
-            val cx = size.width / 2f
-            
-            moveTo(0f, 0f)
-            lineTo(cx - r - c, 0f)
-            
-            cubicTo(
-                x1 = cx - r - c / 2f,
-                y1 = 0f,
-                x2 = cx - r,
-                y2 = r,
-                x3 = cx,
-                y3 = r
-            )
-            
-            cubicTo(
-                x1 = cx + r,
-                y1 = r,
-                x2 = cx + r + c / 2f,
-                y2 = 0f,
-                x3 = cx + r + c,
-                y3 = 0f
-            )
-            
-            lineTo(size.width, 0f)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        return Outline.Generic(path)
     }
 }
