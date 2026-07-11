@@ -498,10 +498,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val googleEmail by viewModel.googleEmail.collectAsState()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
-
-    val profileName = if (isGoogleSignedIn) (googleName ?: rawProfileName) else rawProfileName
-    val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawProfileEmail) else rawProfileEmail
-    val profilePhotoUri = if (isGoogleSignedIn) (googlePhotoUrl ?: rawProfilePhotoUri) else rawProfilePhotoUri
+    
+    val profileName = rawProfileName ?: (if (isGoogleSignedIn) googleName else null) ?: ""
+    val profileEmail = rawProfileEmail ?: (if (isGoogleSignedIn) googleEmail else null) ?: ""
+    val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     val context = LocalContext.current
 
@@ -655,13 +655,21 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             when (initialAction) {
                 "ACTION_DEBT_CREDIT", "ACTION_VIEW_DEBT", "ACTION_VIEW_CREDIT" -> "debts"
                 "ACTION_SAVINGS" -> "savings"
-                "ACTION_SETTINGS", "ACTION_BACKUP" -> "settings"
+                "ACTION_SETTINGS", "ACTION_BACKUP", "ACTION_SETTINGS_PROFILE", "ACTION_GOOGLE_SIGN_IN" -> "settings"
                 "ACTION_CHARTS" -> "charts"
                 else -> "dashboard"
             }
         )
     }
-    var settingsFilter by remember { mutableStateOf("") }
+    var settingsFilter by remember(initialAction) {
+        mutableStateOf(
+            when (initialAction) {
+                "ACTION_SETTINGS_PROFILE" -> "expand_profile"
+                "ACTION_BACKUP" -> "BACKUP"
+                else -> ""
+            }
+        )
+    }
     var transactionFilter by remember(initialAction) { 
         mutableStateOf(
             when(initialAction) {
@@ -685,8 +693,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val composeCoroutineScope = rememberCoroutineScope()
     var showAddTransactionDialog by remember(initialAction) { mutableStateOf(initialAction == "ACTION_ADD_TRANSACTION") }
     var editingPerson by remember { mutableStateOf<Person?>(null) }
-    var showAddPersonDialog by remember { mutableStateOf(false) }
-    var showAddSavingsGoalDialog by remember { mutableStateOf(false) }
+    var showAddPersonDialog by remember { mutableStateOf(initialAction == "ACTION_DEBT_CREDIT") }
+    var showAddSavingsGoalDialog by remember { mutableStateOf(initialAction == "ACTION_SAVINGS") }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
@@ -706,9 +714,16 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isSyncing by viewModel.isSyncing.collectAsState()
 
 
-    var showBackupConfirm by remember(initialAction) { mutableStateOf(initialAction == "ACTION_BACKUP") }
+    var showBackupConfirm by remember(initialAction) { mutableStateOf(false) }
     var cloudBackupStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
     var showRestoreListDialog by remember { mutableStateOf(false) }
+
+    // Logic for triggering sign-in automatically if action is GOOGLE_SIGN_IN
+    LaunchedEffect(initialAction) {
+        if (initialAction == "ACTION_GOOGLE_SIGN_IN" && !isGoogleSignedIn) {
+            triggerGoogleSignIn()
+        }
+    }
     if (showExitConfirm) {
         AlertDialog(
             onDismissRequest = { showExitConfirm = false },
@@ -771,9 +786,13 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         Scaffold(
             containerColor = if (isDarkTheme) Color.Black else Color.White,
             topBar = {
-                Surface(
-                    color = FintechBlue,
-                    modifier = Modifier.fillMaxWidth()
+                val topBarGradient = Brush.linearGradient(
+                    colors = GradientsList[0]
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(topBarGradient)
                 ) {
                     Row(
                         modifier = Modifier
@@ -888,10 +907,13 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
             },
             bottomBar = {
+                val bottomBarGradient = Brush.linearGradient(
+                    colors = GradientsList[0]
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(FintechBlue)
+                        .background(bottomBarGradient)
                         .navigationBarsPadding()
                         .padding(horizontal = 8.dp, vertical = 0.dp)
                 ) {
@@ -1470,6 +1492,28 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 }
 
 @Composable
+fun getGreeting(language: AppLanguage): String {
+    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    return if (language == AppLanguage.BN) {
+        when (hour) {
+            in 5..11 -> "শুভ সকাল,"
+            in 12..15 -> "শুভ দুপুর,"
+            in 16..17 -> "শুভ বিকাল,"
+            in 18..19 -> "শুভ সন্ধ্যা,"
+            else -> "শুভ রাত্রি,"
+        }
+    } else {
+        when (hour) {
+            in 5..11 -> "Good Morning,"
+            in 12..15 -> "Good Afternoon,"
+            in 16..17 -> "Good Afternoon,"
+            in 18..19 -> "Good Evening,"
+            else -> "Good Night,"
+        }
+    }
+}
+
+@Composable
 fun DashboardScreen(
     language: AppLanguage,
     isDark: Boolean,
@@ -1542,11 +1586,7 @@ fun DashboardScreen(
                     .testTag("dashboard_profile_card")
                     .padding(top = 8.dp)
                     .clickable { 
-                        if (isGoogleSignedIn) {
-                            onNavigate("settings", "expand_profile")
-                        } else {
-                            onSignInClick()
-                        }
+                        onNavigate("settings", "expand_profile")
                     }
             ) {
                 Row(
@@ -1563,19 +1603,19 @@ fun DashboardScreen(
                             .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!isGoogleSignedIn) {
-                            Icon(
-                                imageVector = Icons.Rounded.Cloud,
-                                contentDescription = "Sign in to backup",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else if (profilePhotoUri != null) {
+                        if (profilePhotoUri != null) {
                             AsyncImage(
                                 model = profilePhotoUri,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
+                            )
+                        } else if (!isGoogleSignedIn) {
+                            Icon(
+                                imageVector = Icons.Rounded.Cloud,
+                                contentDescription = "Sign in to backup",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
                             )
                         } else {
                             val initials = if (profileName.isNotBlank()) {
@@ -1607,7 +1647,7 @@ fun DashboardScreen(
                     // Profile text details
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (language == AppLanguage.BN) "স্বাগতম," else "Welcome,",
+                            text = getGreeting(language),
                             color = Color.White.copy(alpha = 0.75f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
@@ -4899,9 +4939,9 @@ fun SettingsScreen(
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val driveStatusMessage by viewModel.driveStatusMessage.collectAsState()
 
-    val profileName = if (isGoogleSignedIn) (googleName ?: rawProfileName) else rawProfileName
-    val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawProfileEmail) else rawProfileEmail
-    val profilePhotoUri = if (isGoogleSignedIn) (googlePhotoUrl ?: rawProfilePhotoUri) else rawProfilePhotoUri
+    val profileName = rawProfileName ?: (if (isGoogleSignedIn) googleName else null) ?: ""
+    val profileEmail = rawProfileEmail ?: (if (isGoogleSignedIn) googleEmail else null) ?: ""
+    val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
@@ -4942,13 +4982,12 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // --- 1. USER PROFILE EDIT CARD ---
-        if (isGoogleSignedIn) {
-            SettingCategory(
-                title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
-                isDark = isDark,
-                icon = Icons.Rounded.Person,
-                initiallyExpanded = (filter == "expand_profile")
-            ) {
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
+            isDark = isDark,
+            icon = Icons.Rounded.Person,
+            initiallyExpanded = (filter == "expand_profile")
+        ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -5122,7 +5161,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
         // --- 2. DARK MODE CARD ---
         SettingCategory(
@@ -5435,7 +5473,8 @@ fun SettingsScreen(
         SettingCategory(
             title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
             isDark = isDark,
-            icon = Icons.Rounded.Backup
+            icon = Icons.Rounded.Backup,
+            initiallyExpanded = (filter == "BACKUP")
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -6493,13 +6532,14 @@ fun ChartSection(
 
 @Composable
 fun SplashScreen(isDark: Boolean) {
-    val bgColor = if (isDark) Color(0xFF0F121F) else Color.White
+    // Force white background as requested
+    val bgColor = Color.White
     
     // Pulse animation for the logo
     val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.12f,
+        targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -6523,7 +6563,7 @@ fun SplashScreen(isDark: Boolean) {
                 painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.glossy_3d_pie_chart_logo_1783711271663),
                 contentDescription = "App Logo",
                 modifier = Modifier
-                    .size(140.dp)
+                    .size(300.dp) // Increased size to 300.dp for more prominence
                     .graphicsLayer(
                         scaleX = scale,
                         scaleY = scale
@@ -6539,7 +6579,7 @@ fun SplashScreen(isDark: Boolean) {
                 .size(44.dp),
             color = FintechBlue,
             strokeWidth = 4.dp,
-            trackColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+            trackColor = Color.Black.copy(alpha = 0.05f)
         )
     }
 }

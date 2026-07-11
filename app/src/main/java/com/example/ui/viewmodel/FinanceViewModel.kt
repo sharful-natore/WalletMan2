@@ -609,6 +609,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _googlePhotoUrl.value = null
             _isGoogleSignedIn.value = false
         }
+        com.example.widget.updateAllWidgets(context)
     }
 
     fun handleGoogleSignInSuccess(
@@ -825,6 +826,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Download Failed: ${e.localizedMessage}"
                 onError(e.localizedMessage ?: "Unknown restore error")
+            } finally {
+                _isSyncing.value = false
             }
         }
     }

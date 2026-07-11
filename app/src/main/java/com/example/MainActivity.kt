@@ -45,8 +45,8 @@ class MainActivity : ComponentActivity() {
             
             LaunchedEffect(isDarkTheme) {
                 enableEdgeToEdge(
-                    statusBarStyle = SystemBarStyle.dark(0xFF3F8CFF.toInt()),
-                    navigationBarStyle = SystemBarStyle.dark(0xFF3F8CFF.toInt())
+                    statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+                    navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                 )
                 
                 // Explicitly configure status bar and navigation bar icon visibility using WindowCompat

@@ -106,8 +106,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val rawEmail = prefs.getString("user_email", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
 
             val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-            val refreshToken = gPrefs.getString("google_refresh_token", null)
-            val isGoogleSignedIn = !refreshToken.isNullOrEmpty()
+            val isGoogleSignedIn = !gPrefs.getString("google_email", null).isNullOrEmpty()
 
             val googleName = gPrefs.getString("google_name", null)
             val googleEmail = gPrefs.getString("google_email", null)
@@ -118,26 +117,48 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             }
             views.setOnClickPendingIntent(R.id.btn_profile_action, PendingIntent.getActivity(context, 15, profileActionIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
+            val profileIntent = Intent(context, MainActivity::class.java).apply {
+                action = if (isGoogleSignedIn) "ACTION_SETTINGS_PROFILE" else "ACTION_GOOGLE_SIGN_IN"
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+
             val profileName = if (isGoogleSignedIn) (googleName ?: rawName) else rawName
             val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawEmail) else rawEmail
 
-            // Determine initials
-            val initials = if (profileName.isNotBlank()) {
-                profileName.split(" ")
-                    .filter { it.isNotBlank() }
-                    .take(2)
-                    .mapNotNull { it.firstOrNull()?.toString() }
-                    .joinToString("")
-                    .uppercase()
-            } else ""
+            // Load profile photo if available
+            val photoUri = prefs.getString("user_photo", null) ?: gPrefs.getString("google_photo_url", null)
+            
+            if (!photoUri.isNullOrEmpty()) {
+                try {
+                    val bitmap = if (photoUri.startsWith("http")) {
+                        val client = okhttp3.OkHttpClient()
+                        val request = okhttp3.Request.Builder().url(photoUri).build()
+                        val response = client.newCall(request).execute()
+                        if (response.isSuccessful) {
+                            val bytes = response.body?.bytes()
+                            if (bytes != null) android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) else null
+                        } else null
+                    } else {
+                        val contentUri = android.net.Uri.parse(photoUri)
+                        context.contentResolver.openInputStream(contentUri)?.use {
+                            android.graphics.BitmapFactory.decodeStream(it)
+                        }
+                    }
 
-            if (initials.isNotEmpty()) {
-                views.setViewVisibility(R.id.iv_avatar, android.view.View.GONE)
-                views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.VISIBLE)
-                views.setTextViewText(R.id.tv_avatar_initials, initials)
+                    if (bitmap != null) {
+                        views.setImageViewBitmap(R.id.iv_avatar, bitmap)
+                        views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
+                        views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
+                        views.setInt(R.id.iv_avatar, "setColorFilter", 0)
+                    } else {
+                        showInitials(views, profileName)
+                    }
+                } catch (e: Exception) {
+                    showInitials(views, profileName)
+                }
             } else {
-                views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
-                views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
+                showInitials(views, profileName)
             }
 
             val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -174,7 +195,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             views.setTextViewText(R.id.tv_profile_email, displayEmail)
 
             // Update profile action icon
-            val actionIcon = if (isGoogleSignedIn) R.drawable.ic_shortcut_backup else R.drawable.ic_settings
+            val actionIcon = if (isGoogleSignedIn) R.drawable.ic_cloud_backup else R.drawable.ic_settings
             views.setImageViewResource(R.id.iv_profile_action, actionIcon)
 
             // Dynamic card headers based on language
@@ -201,6 +222,28 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     }
 
     appWidgetManager.updateAppWidget(appWidgetId, views)
+}
+
+private fun showInitials(views: RemoteViews, profileName: String) {
+    val initials = if (profileName.isNotBlank()) {
+        profileName.split(" ")
+            .filter { it.isNotBlank() }
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.toString() }
+            .joinToString("")
+            .uppercase()
+    } else ""
+
+    if (initials.isNotEmpty()) {
+        views.setViewVisibility(R.id.iv_avatar, android.view.View.GONE)
+        views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.VISIBLE)
+        views.setTextViewText(R.id.tv_avatar_initials, initials)
+    } else {
+        views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
+        views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
+        views.setImageViewResource(R.id.iv_avatar, R.drawable.ic_app_logo)
+        views.setInt(R.id.iv_avatar, "setColorFilter", android.graphics.Color.WHITE)
+    }
 }
 
 fun updateAllWidgets(context: Context) {
