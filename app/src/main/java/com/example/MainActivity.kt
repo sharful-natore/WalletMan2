@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+            val language by viewModel.language.collectAsState()
             
             LaunchedEffect(isDarkTheme) {
                 enableEdgeToEdge(
@@ -56,7 +57,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             
-            MyApplicationTheme(darkTheme = isDarkTheme) {
+            MyApplicationTheme(darkTheme = isDarkTheme, language = language) {
                 // Get action from intent, but also listen for changes via setIntent(intent) in onNewIntent
                 val action = intent?.action
                 FinanceNoteApp(viewModel = viewModel, initialAction = action)

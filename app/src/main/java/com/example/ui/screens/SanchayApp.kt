@@ -149,9 +149,9 @@ fun MonthYearPickerDialog(
         text = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.weight(1.2f)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
@@ -172,7 +172,7 @@ fun MonthYearPickerDialog(
                         }
                     }
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(8.dp))
                     val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
@@ -215,13 +215,17 @@ fun SpecificDatePickerDialog(
     initialYear: Int,
     initialMonth: Int,
     initialDay: Int,
+    initialHour: Int = 12,
+    initialMinute: Int = 0,
     language: AppLanguage,
     onDismiss: () -> Unit,
-    onConfirm: (year: Int, month: Int, day: Int) -> Unit
+    onConfirm: (year: Int, month: Int, day: Int, hour: Int, minute: Int) -> Unit
 ) {
     var selectedYear by remember { mutableStateOf(initialYear) }
     var selectedMonth by remember { mutableStateOf(initialMonth) }
     var selectedDay by remember { mutableStateOf(initialDay) }
+    var selectedHour by remember { mutableStateOf(initialHour) }
+    var selectedMinute by remember { mutableStateOf(initialMinute) }
     
     val monthsBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
     val monthsEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
@@ -229,14 +233,14 @@ fun SpecificDatePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (language == AppLanguage.BN) "তারিখ নির্বাচন করুন" else "Select Date") },
+        title = { Text(if (language == AppLanguage.BN) "তারিখ ও সময় নির্বাচন করুন" else "Select Date & Time") },
         text = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column {
-                    Text(if (language == AppLanguage.BN) "দিন" else "Day", style = MaterialTheme.typography.labelMedium)
+                Column(modifier = Modifier.weight(0.9f)) {
+                    Text(if (language == AppLanguage.BN) "দিন" else "Day", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
                         items(31) { index ->
@@ -248,17 +252,17 @@ fun SpecificDatePickerDialog(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
                                     .clickable { selectedDay = d }
-                                    .padding(6.dp),
+                                    .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(formatNumber(d, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(formatNumber(d, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                             }
                         }
                     }
                 }
 
-                Column(modifier = Modifier.weight(1.2f)) {
-                    Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelMedium)
+                Column(modifier = Modifier.weight(1.3f)) {
+                    Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
                         items(12) { index ->
@@ -270,17 +274,17 @@ fun SpecificDatePickerDialog(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
                                     .clickable { selectedMonth = m }
-                                    .padding(6.dp),
+                                    .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(months[index], fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(months[index], fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 11.sp, maxLines = 1)
                             }
                         }
                     }
                 }
 
-                Column {
-                    Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelMedium)
+                Column(modifier = Modifier.weight(1.0f)) {
+                    Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
                     val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
                     val years = (currentYear - 3..currentYear + 2).toList()
@@ -294,10 +298,52 @@ fun SpecificDatePickerDialog(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
                                     .clickable { selectedYear = y }
-                                    .padding(6.dp),
+                                    .padding(4.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(formatNumber(y, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(formatNumber(y, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+
+                Column(modifier = Modifier.weight(0.9f)) {
+                    Text(if (language == AppLanguage.BN) "ঘণ্টা" else "Hour", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(24) { h ->
+                            val isSelected = selectedHour == h
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedHour = h }
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(formatNumber(h, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+
+                Column(modifier = Modifier.weight(0.9f)) {
+                    Text(if (language == AppLanguage.BN) "মিনিট" else "Min", style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                        items(60) { m ->
+                            val isSelected = selectedMinute == m
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable { selectedMinute = m }
+                                    .padding(4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(formatNumber(m, language), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontSize = 12.sp)
                             }
                         }
                     }
@@ -305,7 +351,7 @@ fun SpecificDatePickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay) }) {
+            TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay, selectedHour, selectedMinute) }) {
                 Text(Translation.get("confirm", language))
             }
         },
@@ -707,6 +753,25 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     var highlightedTxId by remember { mutableStateOf<Int?>(null) }
     var highlightedPersonId by remember { mutableStateOf<Int?>(null) }
     var highlightedGoalId by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(highlightedTxId) {
+        if (highlightedTxId != null) {
+            kotlinx.coroutines.delay(3000)
+            highlightedTxId = null
+        }
+    }
+    LaunchedEffect(highlightedPersonId) {
+        if (highlightedPersonId != null) {
+            kotlinx.coroutines.delay(3000)
+            highlightedPersonId = null
+        }
+    }
+    LaunchedEffect(highlightedGoalId) {
+        if (highlightedGoalId != null) {
+            kotlinx.coroutines.delay(3000)
+            highlightedGoalId = null
+        }
+    }
 
     var showSearch by remember { mutableStateOf(false) }
 
@@ -1207,7 +1272,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             filter = transactionFilter,
                                             onFilterChange = { transactionFilter = it },
                                             timeFilter = timeFilter,
-                                            onTimeFilterChange = handleTimeFilterChange
+                                            onTimeFilterChange = handleTimeFilterChange,
+                                            highlightedTxId = highlightedTxId
                                         )
                                         2 -> DebtsScreen(
                                             language = language,
@@ -1219,7 +1285,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             filter = debtFilter,
                                             onFilterChange = { debtFilter = it },
                                             timeFilter = timeFilter,
-                                            onTimeFilterChange = handleTimeFilterChange
+                                            onTimeFilterChange = handleTimeFilterChange,
+                                            highlightedPersonId = highlightedPersonId
                                         )
                                         3 -> SavingsScreen(
                                             language = language,
@@ -1232,7 +1299,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                 showSavingsContributionDialog = goal
                                                 isWithdrawMode = isWithdraw
                                             },
-                                            onEditGoal = { goalToEdit = it }
+                                            onEditGoal = { goalToEdit = it },
+                                            highlightedGoalId = highlightedGoalId
                                         )
                                     }
                                 }
@@ -1360,7 +1428,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         initialDay = calendar.get(java.util.Calendar.DAY_OF_MONTH),
                         language = language,
                         onDismiss = { showDatePickerState = false },
-                        onConfirm = { year, month, day ->
+                        onConfirm = { year, month, day, _, _ ->
                             timeFilter = "CUSTOM_DATE:$year-$month-$day"
                             showDatePickerState = false
                         }
@@ -2182,14 +2250,18 @@ fun TransactionRowItem(
                         when (tx.category) {
                             "Salary" -> "বেতন"
                             "Business" -> "ব্যবসা"
-                            "Freelancing" -> "ফ্রিল্যান্সিং"
-                            "Investment" -> "বিনিয়োগ"
+                            "Agriculture" -> "কৃষি"
+                            "Gift" -> "উপহার"
+                            "Sales" -> "বিক্রয়"
+                            "Honorarium" -> "সম্মানী"
                             "Food" -> "খাবার"
-                            "Rent" -> "ভাড়া"
-                            "Shopping" -> "শপিং"
-                            "Bills" -> "বিল"
+                            "Housing" -> "বাসস্থান"
+                            "Transport" -> "যাতায়াত"
+                            "Shopping" -> "কেনাকাটা"
                             "Medical" -> "চিকিৎসা"
-                            "Entertainment" -> "বিনোদন"
+                            "Education" -> "শিক্ষা"
+                            "Clothing" -> "পোশাক"
+                            "Others" -> "অন্যান্য"
                             "Lending" -> "ধার দেওয়া"
                             "Borrowing" -> "ধার নেওয়া"
                             "Repay Paid" -> Translation.get("debt_repaid", language)
@@ -2384,7 +2456,8 @@ fun TransactionsScreen(
     filter: String = "ALL",
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
-    onTimeFilterChange: (String) -> Unit = {}
+    onTimeFilterChange: (String) -> Unit = {},
+    highlightedTxId: Int? = null
 ) {
     val timeFilteredTransactions = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
@@ -2549,7 +2622,7 @@ fun TransactionsScreen(
                         }
                         items(txs) { tx ->
                             Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                                TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction, onEditTransaction)
+                                TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction, onEditTransaction, isHighlighted = (tx.id == highlightedTxId))
                             }
                         }
                     }
@@ -2587,7 +2660,8 @@ fun DebtsScreen(
     filter: String = "ALL",
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
-    onTimeFilterChange: (String) -> Unit = {}
+    onTimeFilterChange: (String) -> Unit = {},
+    highlightedPersonId: Int? = null
 ) {
     val filteredDebts = remember(personDebts, filter) {
         when (filter) {
@@ -2728,7 +2802,7 @@ fun DebtsScreen(
                 ) {
                     items(filteredDebts) { item ->
                         Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                            PersonDebtRowItem(item, language, isDark, onPersonClick, onDeletePerson)
+                            PersonDebtRowItem(item, language, isDark, onPersonClick, onDeletePerson, isHighlighted = (item.person.id == highlightedPersonId))
                         }
                     }
                     item {
@@ -2998,6 +3072,13 @@ fun PersonDebtRowItem(
                             Text(text = item.person.phone, fontSize = 11.sp, color = Color.Gray)
                         }
                     }
+                    if (item.person.address.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 1.dp)) {
+                            Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = item.person.address, fontSize = 11.sp, color = Color.Gray)
+                        }
+                    }
                 }
             }
 
@@ -3036,7 +3117,8 @@ fun SavingsScreen(
     onAddSavingsGoalClick: () -> Unit,
     onGoalClick: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
-    onEditGoal: (SavingsGoal) -> Unit
+    onEditGoal: (SavingsGoal) -> Unit,
+    highlightedGoalId: Int? = null
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -3094,7 +3176,7 @@ fun SavingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(savingsGoals) { goal ->
-                        SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal)
+                        SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
                     }
                     item {
                         Spacer(modifier = Modifier.height(80.dp))
@@ -3127,7 +3209,8 @@ fun SavingsGoalCardItem(
     profileName: String,
     onGoalClick: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
-    onEditGoal: (SavingsGoal) -> Unit
+    onEditGoal: (SavingsGoal) -> Unit,
+    isHighlighted: Boolean = false
 ) {
     val gradient = GradientsList[goal.colorIndex % GradientsList.size]
 
@@ -3136,6 +3219,10 @@ fun SavingsGoalCardItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(170.dp)
+            .then(
+                if (isHighlighted) Modifier.border(4.dp, Color(0xFFFBBF24), RoundedCornerShape(24.dp))
+                else Modifier
+            )
             .combinedClickable(
                 onClick = { onGoalClick(goal) },
                 onLongClick = { onEditGoal(goal) }
@@ -3289,8 +3376,22 @@ fun AddTransactionDialog(
     var selectedPersonId by remember { mutableStateOf<Int?>(editTransaction?.personId) }
     var category by remember { mutableStateOf(editTransaction?.category ?: "Food") }
 
-    val categoriesIncome = listOf("Salary", "Business", "Freelancing", "Investment", "Others")
-    val categoriesExpense = listOf("Food", "Rent", "Shopping", "Bills", "Medical", "Entertainment", "Others")
+    var previousPersonIds by remember { mutableStateOf(persons.map { it.id }.toSet()) }
+
+    LaunchedEffect(persons) {
+        val currentIds = persons.map { it.id }.toSet()
+        val addedIds = currentIds - previousPersonIds
+        if (addedIds.isNotEmpty()) {
+            val newPerson = persons.find { it.id in addedIds }
+            if (newPerson != null) {
+                selectedPersonId = newPerson.id
+            }
+        }
+        previousPersonIds = currentIds
+    }
+
+    val categoriesIncome = listOf("Salary", "Business", "Agriculture", "Gift", "Sales", "Honorarium", "Others")
+    val categoriesExpense = listOf("Food", "Housing", "Transport", "Shopping", "Medical", "Education", "Clothing", "Others")
 
     val types = listOf(
         Pair("INCOME", "tx_type_income"),
@@ -3326,7 +3427,7 @@ fun AddTransactionDialog(
             ) {
                 item {
                     Text(
-                        Translation.get("add_tx", language),
+                        Translation.get(if (editTransaction != null) "edit_tx" else "add_tx", language),
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = textColor,
@@ -3489,14 +3590,18 @@ fun AddTransactionDialog(
                                     when (category) {
                                         "Salary" -> "বেতন"
                                         "Business" -> "ব্যবসা"
-                                        "Freelancing" -> "ফ্রিল্যান্সিং"
-                                        "Investment" -> "বিনিয়োগ"
+                                        "Agriculture" -> "কৃষি"
+                                        "Gift" -> "উপহার"
+                                        "Sales" -> "বিক্রয়"
+                                        "Honorarium" -> "সম্মানী"
                                         "Food" -> "খাবার"
-                                        "Rent" -> "ভাড়া"
-                                        "Shopping" -> "শপিং"
-                                        "Bills" -> "বিল"
+                                        "Housing" -> "বাসস্থান"
+                                        "Transport" -> "যাতায়াত"
+                                        "Shopping" -> "কেনাকাটা"
                                         "Medical" -> "চিকিৎসা"
-                                        "Entertainment" -> "বিনোদন"
+                                        "Education" -> "শিক্ষা"
+                                        "Clothing" -> "পোশাক"
+                                        "Others" -> "অন্যান্য"
                                         else -> category
                                     }
                                 } else {
@@ -3526,14 +3631,18 @@ fun AddTransactionDialog(
                                             when (cat) {
                                                 "Salary" -> "বেতন"
                                                 "Business" -> "ব্যবসা"
-                                                "Freelancing" -> "ফ্রিল্যান্সিং"
-                                                "Investment" -> "বিনিয়োগ"
+                                                "Agriculture" -> "কৃষি"
+                                                "Gift" -> "উপহার"
+                                                "Sales" -> "বিক্রয়"
+                                                "Honorarium" -> "সম্মানী"
+                                                "Others" -> "অন্যান্য"
                                                 "Food" -> "খাবার"
-                                                "Rent" -> "ভাড়া"
-                                                "Shopping" -> "শপিং"
-                                                "Bills" -> "বিল"
+                                                "Housing" -> "বাসস্থান"
+                                                "Transport" -> "যাতায়াত"
+                                                "Shopping" -> "কেনাকাটা"
+                                                "Education" -> "শিক্ষা"
                                                 "Medical" -> "চিকিৎসা"
-                                                "Entertainment" -> "বিনোদন"
+                                                "Clothing" -> "পোশাক"
                                                 else -> cat
                                             }
                                         } else cat
@@ -3613,18 +3722,25 @@ fun AddTransactionDialog(
                     
                     if (showManualDatePicker) {
                         val calendar = java.util.Calendar.getInstance()
+                        if (customTimestamp != null) {
+                            calendar.timeInMillis = customTimestamp!!
+                        }
                         val curYear = calendar.get(java.util.Calendar.YEAR)
                         val curMonth = calendar.get(java.util.Calendar.MONTH) + 1
                         val curDay = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+                        val curHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+                        val curMinute = calendar.get(java.util.Calendar.MINUTE)
                         SpecificDatePickerDialog(
                             initialYear = curYear,
                             initialMonth = curMonth,
                             initialDay = curDay,
+                            initialHour = curHour,
+                            initialMinute = curMinute,
                             language = language,
                             onDismiss = { showManualDatePicker = false },
-                            onConfirm = { year, month, day ->
+                            onConfirm = { year, month, day, hour, minute ->
                                 calendar.clear()
-                                calendar.set(year, month - 1, day)
+                                calendar.set(year, month - 1, day, hour, minute)
                                 customTimestamp = calendar.timeInMillis
                                 showManualDatePicker = false
                             }
@@ -4520,18 +4636,26 @@ fun PersonDetailOverlay(
                             color = if (isDark) Color.White else Color(0xFF1E222F)
                         )
                         if (personDebt.person.phone.isNotEmpty()) {
-                            Text(
-                                text = personDebt.person.phone,
-                                fontSize = 13.sp,
-                                color = Color.Gray
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                                Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = personDebt.person.phone,
+                                    fontSize = 13.sp,
+                                    color = Color.Gray
+                                )
+                            }
                         }
                         if (personDebt.person.address.isNotEmpty()) {
-                            Text(
-                                text = personDebt.person.address,
-                                fontSize = 12.sp,
-                                color = Color.Gray.copy(alpha = 0.8f)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                                Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = personDebt.person.address,
+                                    fontSize = 13.sp,
+                                    color = Color.Gray
+                                )
+                            }
                         }
                     }
                     
@@ -6426,6 +6550,618 @@ fun SettingsScreen(
 
 
 
+fun getMonthlySumsForYear(
+    transactions: List<Transaction>,
+    year: Int,
+    type: String
+): List<Double> {
+    val cal = java.util.Calendar.getInstance()
+    val sums = DoubleArray(12) { 0.0 }
+    for (tx in transactions) {
+        if (tx.type == type) {
+            cal.timeInMillis = tx.timestamp
+            if (cal.get(java.util.Calendar.YEAR) == year) {
+                val month = cal.get(java.util.Calendar.MONTH)
+                if (month in 0..11) {
+                    sums[month] += tx.amount
+                }
+            }
+        }
+    }
+    return sums.toList()
+}
+
+fun formatShortCurrency(value: Double, language: AppLanguage): String {
+    val formatted = when {
+        value == 0.0 -> "0"
+        value >= 100000.0 -> {
+            val lakhs = value / 100000.0
+            if (language == AppLanguage.BN) {
+                "${String.format("%.1f", lakhs)} লাখ"
+            } else {
+                "${String.format("%.1f", lakhs)}L"
+            }
+        }
+        value >= 1000.0 -> {
+            val thousands = value / 1000.0
+            if (language == AppLanguage.BN) {
+                "${String.format("%.1f", thousands)}কে"
+            } else {
+                "${String.format("%.1f", thousands)}K"
+            }
+        }
+        else -> "${value.toInt()}"
+    }
+    val withPrefix = "৳$formatted"
+    return if (language == AppLanguage.BN) {
+        withPrefix
+            .replace("0", "০")
+            .replace("1", "১")
+            .replace("2", "২")
+            .replace("3", "৩")
+            .replace("4", "৪")
+            .replace("5", "৫")
+            .replace("6", "৬")
+            .replace("7", "৭")
+            .replace("8", "৮")
+            .replace("9", "৯")
+    } else {
+        withPrefix
+    }
+}
+
+data class ChartDataset(
+    val label: String,
+    val data: List<Double>,
+    val color: Color
+)
+
+@Composable
+fun TimelineSplineChart(
+    title: String,
+    datasets: List<ChartDataset>,
+    monthsLabels: List<String>,
+    language: AppLanguage,
+    isDark: Boolean
+) {
+    val bgColor = if (isDark) listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
+    val textColor = if (isDark) Color.White else Color(0xFF1E293B)
+    val gridColor = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
+
+    FintechGradientCard(
+        gradientColors = bgColor,
+        cornerRadius = 24.dp,
+        padding = PaddingValues(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    ) {
+        Column {
+            // Title & Legends Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    color = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Legends in a Row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    datasets.forEach { dataset ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(dataset.color)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = dataset.label,
+                                color = textColor.copy(alpha = 0.8f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Graph Area using Canvas
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val canvasWidth = size.width
+                    val canvasHeight = size.height
+
+                    val paddingLeft = 55.dp.toPx()
+                    val paddingRight = 15.dp.toPx()
+                    val paddingTop = 15.dp.toPx()
+                    val paddingBottom = 25.dp.toPx()
+
+                    val usableWidth = canvasWidth - paddingLeft - paddingRight
+                    val usableHeight = canvasHeight - paddingTop - paddingBottom
+
+                    // 1. Calculate Y max
+                    val maxVal = datasets.flatMap { it.data }.maxOrNull() ?: 0.0
+                    val yMax = if (maxVal <= 0.0) 1000.0 else maxVal * 1.15
+                    val bottomY = canvasHeight - paddingBottom
+
+                    // 2. Draw Horizontal Grid Lines & Y-Axis Labels
+                    val gridLinesCount = 4
+                    val textPaint = android.graphics.Paint().apply {
+                        color = (if (isDark) android.graphics.Color.WHITE else android.graphics.Color.DKGRAY)
+                        textSize = 9.dp.toPx()
+                        textAlign = android.graphics.Paint.Align.RIGHT
+                        isAntiAlias = true
+                        alpha = 130
+                    }
+
+                    for (i in 0 until gridLinesCount) {
+                        val fraction = i.toFloat() / (gridLinesCount - 1)
+                        val y = paddingTop + fraction * usableHeight
+                        
+                        // Grid Line
+                        drawLine(
+                            color = gridColor,
+                            start = Offset(paddingLeft, y),
+                            end = Offset(canvasWidth - paddingRight, y),
+                            strokeWidth = 1.dp.toPx()
+                        )
+
+                        // Y-Axis Label
+                        val labelVal = yMax * (1f - fraction)
+                        val labelStr = formatShortCurrency(labelVal, language)
+                        drawContext.canvas.nativeCanvas.drawText(
+                            labelStr,
+                            paddingLeft - 8.dp.toPx(),
+                            y + 4.dp.toPx(), // offset to center vertically with line
+                            textPaint
+                        )
+                    }
+
+                    // 3. Draw Splines & Fills for each dataset
+                    val numLabels = monthsLabels.size
+                    val maxIdx = if (numLabels > 1) numLabels - 1 else 1
+
+                    datasets.forEach { dataset ->
+                        val points = mutableListOf<Offset>()
+                        for (idx in 0 until numLabels) {
+                            val v = if (idx < dataset.data.size) dataset.data[idx] else 0.0
+                            val x = paddingLeft + idx * (usableWidth / maxIdx.toFloat())
+                            val y = paddingTop + (1f - (v / yMax).toFloat()) * usableHeight
+                            points.add(Offset(x, y))
+                        }
+
+                        if (points.isNotEmpty()) {
+                            val strokePath = Path()
+                            val fillPath = Path()
+
+                            strokePath.moveTo(points[0].x, points[0].y)
+                            fillPath.moveTo(points[0].x, points[0].y)
+
+                            for (i in 0 until points.size - 1) {
+                                val p0 = points[i]
+                                val p1 = points[i + 1]
+
+                                val controlX1 = p0.x + (p1.x - p0.x) / 2f
+                                val controlY1 = p0.y
+                                val controlX2 = p1.x - (p1.x - p0.x) / 2f
+                                val controlY2 = p1.y
+
+                                strokePath.cubicTo(controlX1, controlY1, controlX2, controlY2, p1.x, p1.y)
+                                fillPath.cubicTo(controlX1, controlY1, controlX2, controlY2, p1.x, p1.y)
+                            }
+
+                            fillPath.lineTo(points.last().x, bottomY)
+                            fillPath.lineTo(points.first().x, bottomY)
+                            fillPath.close()
+
+                            // Draw gradient fill under curve
+                            drawPath(
+                                path = fillPath,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        dataset.color.copy(alpha = 0.25f),
+                                        dataset.color.copy(alpha = 0.01f)
+                                    ),
+                                    startY = paddingTop,
+                                    endY = bottomY
+                                )
+                            )
+
+                            // Draw smooth line stroke
+                            drawPath(
+                                path = strokePath,
+                                color = dataset.color,
+                                style = Stroke(
+                                    width = 2.5.dp.toPx(),
+                                    join = StrokeJoin.Round,
+                                    cap = StrokeCap.Round
+                                )
+                            )
+
+                            // Draw dots on data points
+                            points.forEach { pt ->
+                                drawCircle(
+                                    color = dataset.color,
+                                    radius = 3.5.dp.toPx(),
+                                    center = pt
+                                )
+                                drawCircle(
+                                    color = if (isDark) Color(0xFF131724) else Color.White,
+                                    radius = 1.5.dp.toPx(),
+                                    center = pt
+                                )
+                            }
+                        }
+                    }
+
+                    // 4. Draw X-Axis Labels (Months)
+                    val xLabelPaint = android.graphics.Paint().apply {
+                        color = (if (isDark) android.graphics.Color.WHITE else android.graphics.Color.DKGRAY)
+                        textSize = 8.dp.toPx()
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                        alpha = 150
+                    }
+
+                    for (idx in 0 until numLabels) {
+                        val x = paddingLeft + idx * (usableWidth / maxIdx.toFloat())
+                        val monthLabel = monthsLabels[idx]
+                        drawContext.canvas.nativeCanvas.drawText(
+                            monthLabel,
+                            x,
+                            canvasHeight - 6.dp.toPx(),
+                            xLabelPaint
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum class ChartFilterMode {
+    MONTH, YEAR, MONTH_TO_MONTH, YEAR_TO_YEAR
+}
+
+fun isTxInMonth(txTimestamp: Long, year: Int, month: Int): Boolean {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = txTimestamp
+    return cal.get(java.util.Calendar.YEAR) == year && cal.get(java.util.Calendar.MONTH) == month
+}
+
+fun isTxInYear(txTimestamp: Long, year: Int): Boolean {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = txTimestamp
+    return cal.get(java.util.Calendar.YEAR) == year
+}
+
+fun isTxInMonthRange(txTimestamp: Long, startYear: Int, startMonth: Int, endYear: Int, endMonth: Int): Boolean {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = txTimestamp
+    val txYear = cal.get(java.util.Calendar.YEAR)
+    val txMonth = cal.get(java.util.Calendar.MONTH)
+    
+    val startVal = startYear * 12 + startMonth
+    val endVal = endYear * 12 + endMonth
+    val txVal = txYear * 12 + txMonth
+    
+    return txVal in startVal..endVal
+}
+
+fun isTxInYearRange(txTimestamp: Long, startYear: Int, endYear: Int): Boolean {
+    val cal = java.util.Calendar.getInstance()
+    cal.timeInMillis = txTimestamp
+    val txYear = cal.get(java.util.Calendar.YEAR)
+    return txYear in startYear..endYear
+}
+
+data class SplineChartData(
+    val labels: List<String>,
+    val incomeSums: List<Double>,
+    val expenseSums: List<Double>,
+    val lendSums: List<Double>,
+    val borrowSums: List<Double>
+)
+
+fun calculateSplineChartData(
+    transactions: List<Transaction>,
+    filterMode: ChartFilterMode,
+    selectedYear: Int,
+    selectedMonth: Int,
+    startYear: Int,
+    startMonth: Int,
+    endYear: Int,
+    endMonth: Int,
+    startYearY2Y: Int,
+    endYearY2Y: Int,
+    language: AppLanguage
+): SplineChartData {
+    val cal = java.util.Calendar.getInstance()
+    val banglaMonths = listOf("জানু", "ফেব্রু", "মার্চ", "এপ্রি", "মে", "জুন", "জুলা", "আগস্ট", "সেপ্টে", "অক্টো", "নভে", "ডিসে")
+    val englishMonths = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    val monthsLabels = if (language == AppLanguage.BN) banglaMonths else englishMonths
+
+    when (filterMode) {
+        ChartFilterMode.MONTH, ChartFilterMode.YEAR -> {
+            val yearToUse = selectedYear
+            val incomes = DoubleArray(12) { 0.0 }
+            val expenses = DoubleArray(12) { 0.0 }
+            val lends = DoubleArray(12) { 0.0 }
+            val borrows = DoubleArray(12) { 0.0 }
+            
+            for (tx in transactions) {
+                cal.timeInMillis = tx.timestamp
+                if (cal.get(java.util.Calendar.YEAR) == yearToUse) {
+                    val month = cal.get(java.util.Calendar.MONTH)
+                    if (month in 0..11) {
+                        when (tx.type) {
+                            "INCOME" -> incomes[month] += tx.amount
+                            "EXPENSE" -> expenses[month] += tx.amount
+                            "LEND" -> lends[month] += tx.amount
+                            "BORROW" -> borrows[month] += tx.amount
+                        }
+                    }
+                }
+            }
+            return SplineChartData(
+                labels = monthsLabels,
+                incomeSums = incomes.toList(),
+                expenseSums = expenses.toList(),
+                lendSums = lends.toList(),
+                borrowSums = borrows.toList()
+            )
+        }
+        ChartFilterMode.MONTH_TO_MONTH -> {
+            val labelsList = mutableListOf<String>()
+            val incomesList = mutableListOf<Double>()
+            val expensesList = mutableListOf<Double>()
+            val lendsList = mutableListOf<Double>()
+            val borrowsList = mutableListOf<Double>()
+
+            var curYear = startYear
+            var curMonth = startMonth
+            val endTotalMonths = endYear * 12 + endMonth
+            
+            var count = 0
+            while ((curYear * 12 + curMonth <= endTotalMonths) && count < 24) {
+                val monthName = monthsLabels[curMonth]
+                val yearShort = curYear % 100
+                val displayYr = if (language == AppLanguage.BN) {
+                    val yrStr = yearShort.toString()
+                    val yrFormatted = yrStr
+                        .replace("0", "০")
+                        .replace("1", "১")
+                        .replace("2", "২")
+                        .replace("3", "৩")
+                        .replace("4", "৪")
+                        .replace("5", "৫")
+                        .replace("6", "৬")
+                        .replace("7", "৭")
+                        .replace("8", "৮")
+                        .replace("9", "৯")
+                    "'$yrFormatted"
+                } else {
+                    "'$yearShort"
+                }
+                labelsList.add("$monthName $displayYr")
+                
+                var monthlyIncome = 0.0
+                var monthlyExpense = 0.0
+                var monthlyLend = 0.0
+                var monthlyBorrow = 0.0
+                
+                for (tx in transactions) {
+                    cal.timeInMillis = tx.timestamp
+                    if (cal.get(java.util.Calendar.YEAR) == curYear && cal.get(java.util.Calendar.MONTH) == curMonth) {
+                        when (tx.type) {
+                            "INCOME" -> monthlyIncome += tx.amount
+                            "EXPENSE" -> monthlyExpense += tx.amount
+                            "LEND" -> monthlyLend += tx.amount
+                            "BORROW" -> monthlyBorrow += tx.amount
+                        }
+                    }
+                }
+                
+                incomesList.add(monthlyIncome)
+                expensesList.add(monthlyExpense)
+                lendsList.add(monthlyLend)
+                borrowsList.add(monthlyBorrow)
+                
+                curMonth++
+                if (curMonth > 11) {
+                    curMonth = 0
+                    curYear++
+                }
+                count++
+            }
+            return SplineChartData(
+                labels = if (labelsList.isEmpty()) listOf("") else labelsList,
+                incomeSums = if (incomesList.isEmpty()) listOf(0.0) else incomesList,
+                expenseSums = if (expensesList.isEmpty()) listOf(0.0) else expensesList,
+                lendSums = if (lendsList.isEmpty()) listOf(0.0) else lendsList,
+                borrowSums = if (borrowsList.isEmpty()) listOf(0.0) else borrowsList
+            )
+        }
+        ChartFilterMode.YEAR_TO_YEAR -> {
+            val labelsList = mutableListOf<String>()
+            val incomesList = mutableListOf<Double>()
+            val expensesList = mutableListOf<Double>()
+            val lendsList = mutableListOf<Double>()
+            val borrowsList = mutableListOf<Double>()
+            
+            val sYr = startYearY2Y
+            val eYr = if (endYearY2Y < startYearY2Y) startYearY2Y else endYearY2Y
+            val yearsRange = (sYr..eYr).take(10)
+            
+            for (year in yearsRange) {
+                val displayYr = if (language == AppLanguage.BN) {
+                    year.toString()
+                        .replace("0", "০")
+                        .replace("1", "১")
+                        .replace("2", "২")
+                        .replace("3", "৩")
+                        .replace("4", "৪")
+                        .replace("5", "৫")
+                        .replace("6", "৬")
+                        .replace("7", "৭")
+                        .replace("8", "৮")
+                        .replace("9", "৯")
+                } else {
+                    year.toString()
+                }
+                labelsList.add(displayYr)
+                
+                var yearlyIncome = 0.0
+                var yearlyExpense = 0.0
+                var yearlyLend = 0.0
+                var yearlyBorrow = 0.0
+                
+                for (tx in transactions) {
+                    cal.timeInMillis = tx.timestamp
+                    if (cal.get(java.util.Calendar.YEAR) == year) {
+                        when (tx.type) {
+                            "INCOME" -> yearlyIncome += tx.amount
+                            "EXPENSE" -> yearlyExpense += tx.amount
+                            "LEND" -> yearlyLend += tx.amount
+                            "BORROW" -> yearlyBorrow += tx.amount
+                        }
+                    }
+                }
+                
+                incomesList.add(yearlyIncome)
+                expensesList.add(yearlyExpense)
+                lendsList.add(yearlyLend)
+                borrowsList.add(yearlyBorrow)
+            }
+            return SplineChartData(
+                labels = if (labelsList.isEmpty()) listOf("") else labelsList,
+                incomeSums = if (incomesList.isEmpty()) listOf(0.0) else incomesList,
+                expenseSums = if (expensesList.isEmpty()) listOf(0.0) else expensesList,
+                lendSums = if (lendsList.isEmpty()) listOf(0.0) else lendsList,
+                borrowSums = if (borrowsList.isEmpty()) listOf(0.0) else borrowsList
+            )
+        }
+    }
+}
+
+@Composable
+fun CustomChartFilterChip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    isDark: Boolean
+) {
+    val containerColor = if (selected) {
+        if (isDark) Color(0xFF3B82F6) else Color(0xFF2563EB)
+    } else {
+        if (isDark) Color(0xFF131724) else Color(0xFFF1F5F9)
+    }
+    
+    val contentColor = if (selected) {
+        Color.White
+    } else {
+        if (isDark) Color.White.copy(alpha = 0.7f) else Color(0xFF1E293B).copy(alpha = 0.7f)
+    }
+    
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = contentColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+fun SegmentedFilterPicker(
+    label: String,
+    valueDisplay: String,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    isDark: Boolean
+) {
+    val textColor = if (isDark) Color.White else Color(0xFF1E293B)
+    val buttonBg = if (isDark) Color(0xFF131724) else Color(0xFFF1F5F9)
+    val containerBg = if (isDark) Color(0xFF1A1D2B) else Color(0xFFE2E8F0)
+    
+    Row(
+        modifier = Modifier
+            .background(containerBg, RoundedCornerShape(16.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (label.isNotEmpty()) {
+            Text(
+                text = label,
+                color = textColor.copy(alpha = 0.6f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 6.dp, end = 8.dp)
+            )
+        }
+        
+        IconButton(
+            onClick = onPrevious,
+            modifier = Modifier.size(32.dp),
+            colors = IconButtonDefaults.iconButtonColors(containerColor = buttonBg)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowLeft,
+                contentDescription = "Previous",
+                tint = textColor,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        
+        Text(
+            text = valueDisplay,
+            color = textColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 14.dp)
+        )
+        
+        IconButton(
+            onClick = onNext,
+            modifier = Modifier.size(32.dp),
+            colors = IconButtonDefaults.iconButtonColors(containerColor = buttonBg)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowRight,
+                contentDescription = "Next",
+                tint = textColor,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
 @Composable
 fun ChartsScreen(
     language: AppLanguage,
@@ -6434,8 +7170,64 @@ fun ChartsScreen(
     persons: List<Person>,
     onBack: () -> Unit
 ) {
-    val incomeTransactions = transactions.filter { it.type == "INCOME" || it.type == "BORROW" || it.type == "REPAY_RECEIVED" }
-    val expenseTransactions = transactions.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }
+    var filterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
+
+    // Calendar & Defaults
+    val currentCal = java.util.Calendar.getInstance()
+    val currentYear = currentCal.get(java.util.Calendar.YEAR)
+    val currentMonth = currentCal.get(java.util.Calendar.MONTH) // 0-indexed
+
+    // Mode-specific states:
+    // 1. MONTH mode (default: current month/year)
+    var selectedMonth by remember { mutableStateOf(currentMonth) }
+    var selectedYear by remember { mutableStateOf(currentYear) }
+
+    // 2. MONTH_TO_MONTH mode (default: Jan of current year to current month)
+    var startMonth by remember { mutableStateOf(0) } // Jan
+    var startYear by remember { mutableStateOf(currentYear) }
+    var endMonth by remember { mutableStateOf(currentMonth) }
+    var endYear by remember { mutableStateOf(currentYear) }
+
+    // 3. YEAR_TO_YEAR mode (default: last year to current year)
+    var startYearY2Y by remember { mutableStateOf(currentYear - 1) }
+    var endYearY2Y by remember { mutableStateOf(currentYear) }
+
+    // Month Names
+    val bnMonthNamesFull = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+    val enMonthNamesFull = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+
+    fun formatMonthYearDisplay(month: Int, year: Int, language: AppLanguage): String {
+        val monthStr = if (language == AppLanguage.BN) bnMonthNamesFull[month] else enMonthNamesFull[month]
+        val yearStr = formatNumber(year, language)
+        return "$monthStr, $yearStr"
+    }
+
+    fun formatYearDisplay(year: Int, language: AppLanguage): String {
+        return formatNumber(year, language)
+    }
+
+    // Filter transactions for Pie Charts based on selection
+    val filteredTxsForPie = remember(transactions, filterMode, selectedYear, selectedMonth, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y) {
+        transactions.filter { tx ->
+            when (filterMode) {
+                ChartFilterMode.MONTH -> {
+                    isTxInMonth(tx.timestamp, selectedYear, selectedMonth)
+                }
+                ChartFilterMode.YEAR -> {
+                    isTxInYear(tx.timestamp, selectedYear)
+                }
+                ChartFilterMode.MONTH_TO_MONTH -> {
+                    isTxInMonthRange(tx.timestamp, startYear, startMonth, endYear, endMonth)
+                }
+                ChartFilterMode.YEAR_TO_YEAR -> {
+                    isTxInYearRange(tx.timestamp, startYearY2Y, endYearY2Y)
+                }
+            }
+        }
+    }
+
+    val incomeTransactions = filteredTxsForPie.filter { it.type == "INCOME" }
+    val expenseTransactions = filteredTxsForPie.filter { it.type == "EXPENSE" }
     
     val incomesByCategory = incomeTransactions.groupBy { it.category }.mapValues { it.value.sumOf { tx -> tx.amount } }
     val expensesByCategory = expenseTransactions.groupBy { it.category }.mapValues { it.value.sumOf { tx -> tx.amount } }
@@ -6444,6 +7236,49 @@ fun ChartsScreen(
     val totalExpense = expenseTransactions.sumOf { it.amount }
 
     val palette = listOf(Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF06B6D4))
+
+    // Calculate Spline Chart Data dynamically based on filter selection
+    val splineChartData = remember(transactions, filterMode, selectedYear, selectedMonth, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y, language) {
+        calculateSplineChartData(
+            transactions = transactions,
+            filterMode = filterMode,
+            selectedYear = selectedYear,
+            selectedMonth = selectedMonth,
+            startYear = startYear,
+            startMonth = startMonth,
+            endYear = endYear,
+            endMonth = endMonth,
+            startYearY2Y = startYearY2Y,
+            endYearY2Y = endYearY2Y,
+            language = language
+        )
+    }
+
+    val dataset1 = listOf(
+        ChartDataset(
+            label = if (language == AppLanguage.BN) "আয়" else "Income",
+            data = splineChartData.incomeSums,
+            color = Color(0xFF10B981)
+        ),
+        ChartDataset(
+            label = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
+            data = splineChartData.expenseSums,
+            color = Color(0xFFEF4444)
+        )
+    )
+
+    val dataset2 = listOf(
+        ChartDataset(
+            label = if (language == AppLanguage.BN) "পাওনা" else "Lend",
+            data = splineChartData.lendSums,
+            color = Color(0xFF3B82F6)
+        ),
+        ChartDataset(
+            label = if (language == AppLanguage.BN) "দেনা" else "Borrow",
+            data = splineChartData.borrowSums,
+            color = Color(0xFFFBBF24)
+        )
+    )
 
     Column(
         modifier = Modifier
@@ -6454,13 +7289,214 @@ fun ChartsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         androidx.activity.compose.BackHandler(onBack = onBack)
+
+        // --- CONTROL CARD ---
+        val cardBg = if (isDark) listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
+        val textColor = if (isDark) Color.White else Color(0xFF1E293B)
         
-        Text(
-            text = if (language == AppLanguage.BN) "আয় ব্যয়ের চার্ট" else "Income & Expense Chart",
-            color = if (isDark) Color.White else Color(0xFF1E293B),
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp
-        )
+        FintechGradientCard(
+            gradientColors = cardBg,
+            cornerRadius = 24.dp,
+            padding = PaddingValues(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Title Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ফিল্টার ও সময়কাল" else "Filters & Time Period",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
+                    )
+                    
+                    Icon(
+                        imageVector = Icons.Rounded.FilterList,
+                        contentDescription = "Filter",
+                        tint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                
+                // Chips for filterMode
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CustomChartFilterChip(
+                        selected = filterMode == ChartFilterMode.MONTH,
+                        label = if (language == AppLanguage.BN) "মাস" else "Month",
+                        onClick = { filterMode = ChartFilterMode.MONTH },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = filterMode == ChartFilterMode.YEAR,
+                        label = if (language == AppLanguage.BN) "বছর" else "Year",
+                        onClick = { filterMode = ChartFilterMode.YEAR },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = filterMode == ChartFilterMode.MONTH_TO_MONTH,
+                        label = if (language == AppLanguage.BN) "মাস টু মাস" else "Month-to-Month",
+                        onClick = { filterMode = ChartFilterMode.MONTH_TO_MONTH },
+                        isDark = isDark
+                    )
+                    CustomChartFilterChip(
+                        selected = filterMode == ChartFilterMode.YEAR_TO_YEAR,
+                        label = if (language == AppLanguage.BN) "বছর টু বছর" else "Year-to-Year",
+                        onClick = { filterMode = ChartFilterMode.YEAR_TO_YEAR },
+                        isDark = isDark
+                    )
+                }
+                
+                // Selectors Area
+                when (filterMode) {
+                    ChartFilterMode.MONTH -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "নির্বাচিত মাস:" else "Selected Month:",
+                                valueDisplay = formatMonthYearDisplay(selectedMonth, selectedYear, language),
+                                onPrevious = {
+                                    if (selectedMonth == 0) {
+                                        selectedMonth = 11
+                                        selectedYear--
+                                    } else {
+                                        selectedMonth--
+                                    }
+                                },
+                                onNext = {
+                                    if (selectedMonth == 11) {
+                                        selectedMonth = 0
+                                        selectedYear++
+                                    } else {
+                                        selectedMonth++
+                                    }
+                                },
+                                isDark = isDark
+                            )
+                        }
+                    }
+                    ChartFilterMode.YEAR -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "নির্বাচিত বছর:" else "Selected Year:",
+                                valueDisplay = formatYearDisplay(selectedYear, language),
+                                onPrevious = { selectedYear-- },
+                                onNext = { selectedYear++ },
+                                isDark = isDark
+                            )
+                        }
+                    }
+                    ChartFilterMode.MONTH_TO_MONTH -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "শুরু:" else "Start:",
+                                valueDisplay = formatMonthYearDisplay(startMonth, startYear, language),
+                                onPrevious = {
+                                    if (startMonth == 0) {
+                                        startMonth = 11
+                                        startYear--
+                                    } else {
+                                        startMonth--
+                                    }
+                                },
+                                onNext = {
+                                    val sVal = startYear * 12 + startMonth
+                                    val eVal = endYear * 12 + endMonth
+                                    if (sVal < eVal) {
+                                        if (startMonth == 11) {
+                                            startMonth = 0
+                                            startYear++
+                                        } else {
+                                            startMonth++
+                                        }
+                                    }
+                                },
+                                isDark = isDark
+                            )
+                            
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "শেষ:" else "End:",
+                                valueDisplay = formatMonthYearDisplay(endMonth, endYear, language),
+                                onPrevious = {
+                                    val sVal = startYear * 12 + startMonth
+                                    val eVal = endYear * 12 + endMonth
+                                    if (eVal > sVal) {
+                                        if (endMonth == 0) {
+                                            endMonth = 11
+                                            endYear--
+                                        } else {
+                                            endMonth--
+                                        }
+                                    }
+                                },
+                                onNext = {
+                                    if (endMonth == 11) {
+                                        endMonth = 0
+                                        endYear++
+                                    } else {
+                                        endMonth++
+                                    }
+                                },
+                                isDark = isDark
+                            )
+                        }
+                    }
+                    ChartFilterMode.YEAR_TO_YEAR -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "শুরু বছর:" else "Start Year:",
+                                valueDisplay = formatYearDisplay(startYearY2Y, language),
+                                onPrevious = { startYearY2Y-- },
+                                onNext = {
+                                    if (startYearY2Y < endYearY2Y) {
+                                        startYearY2Y++
+                                    }
+                                },
+                                isDark = isDark
+                            )
+                            
+                            SegmentedFilterPicker(
+                                label = if (language == AppLanguage.BN) "শেষ বছর:" else "End Year:",
+                                valueDisplay = formatYearDisplay(endYearY2Y, language),
+                                onPrevious = {
+                                    if (endYearY2Y > startYearY2Y) {
+                                        endYearY2Y--
+                                    }
+                                },
+                                onNext = { endYearY2Y++ },
+                                isDark = isDark
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // --- INCOME CHART ---
         ChartSection(
@@ -6481,8 +7517,34 @@ fun ChartsScreen(
             language = language,
             isDark = isDark
         )
+
+        // Display Header Label based on current state
+        val displayPeriodLabel = when (filterMode) {
+            ChartFilterMode.MONTH -> formatMonthYearDisplay(selectedMonth, selectedYear, language)
+            ChartFilterMode.YEAR -> formatYearDisplay(selectedYear, language)
+            ChartFilterMode.MONTH_TO_MONTH -> "${formatMonthYearDisplay(startMonth, startYear, language)} - ${formatMonthYearDisplay(endMonth, endYear, language)}"
+            ChartFilterMode.YEAR_TO_YEAR -> "${formatYearDisplay(startYearY2Y, language)} - ${formatYearDisplay(endYearY2Y, language)}"
+        }
+
+        // --- TIMELINE SPLINE CHART 1: INCOME & EXPENSE ---
+        TimelineSplineChart(
+            title = if (language == AppLanguage.BN) "আয় ও ব্যয় ট্রেন্ড ($displayPeriodLabel)" else "Income & Expense Trend ($displayPeriodLabel)",
+            datasets = dataset1,
+            monthsLabels = splineChartData.labels,
+            language = language,
+            isDark = isDark
+        )
+
+        // --- TIMELINE SPLINE CHART 2: LEND & BORROW ---
+        TimelineSplineChart(
+            title = if (language == AppLanguage.BN) "দেনা ও পাওনা ট্রেন্ড ($displayPeriodLabel)" else "Lend & Borrow Trend ($displayPeriodLabel)",
+            datasets = dataset2,
+            monthsLabels = splineChartData.labels,
+            language = language,
+            isDark = isDark
+        )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(80.dp))
     }
 }
 
@@ -6508,7 +7570,7 @@ fun ChartSection(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = title,
-                color = textColor,
+                color = Color(0xFF3B82F6),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -6518,7 +7580,7 @@ fun ChartSection(
                 Box(modifier = Modifier.height(150.dp), contentAlignment = Alignment.Center) {
                     Text(
                         text = if (language == AppLanguage.BN) "কোন তথ্য নেই" else "No Data Available",
-                        color = Color.White.copy(alpha = 0.5f)
+                        color = textColor.copy(alpha = 0.5f)
                     )
                 }
             } else {
@@ -6527,9 +7589,9 @@ fun ChartSection(
                 val totalFloat = total.toFloat()
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                     modifier = Modifier.fillMaxWidth(),
+                     verticalAlignment = Alignment.CenterVertically,
+                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -6550,12 +7612,12 @@ fun ChartSection(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "Total",
-                                color = textColor.copy(alpha = 0.6f),
+                                color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 10.sp
                             )
                             Text(
                                 text = formatCurrency(total, language),
-                                color = textColor,
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
@@ -6580,14 +7642,14 @@ fun ChartSection(
                                 Column {
                                     Text(
                                         text = label,
-                                        color = Color.White,
+                                        color = textColor,
                                         fontSize = 12.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = "${formatCurrency(value, language)} ($percent%)",
-                                        color = Color.White.copy(alpha = 0.7f),
+                                        color = textColor.copy(alpha = 0.7f),
                                         fontSize = 10.sp
                                     )
                                 }

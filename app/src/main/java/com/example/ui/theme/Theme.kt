@@ -6,6 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.example.ui.AppLanguage
 
 private val DarkColorScheme = darkColorScheme(
     primary = FintechBlue,
@@ -34,13 +35,15 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    language: AppLanguage = AppLanguage.BN,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val typography = getTypographyForLanguage(language)
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = typography,
         content = content
     )
 }

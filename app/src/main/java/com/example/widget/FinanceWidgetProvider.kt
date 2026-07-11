@@ -79,8 +79,8 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         try {
             val dao = AppDatabase.getDatabase(context).financeDao()
             val allTxs = dao.getAllTransactionsList()
-            val income = allTxs.filter { it.type == "INCOME" || it.type == "REPAY_RECEIVED" || it.type == "BORROW" }.sumOf { it.amount }
-            val expense = allTxs.filter { it.type == "EXPENSE" || it.type == "LEND" || it.type == "REPAY_PAID" }.sumOf { it.amount }
+            val income = allTxs.filter { it.type == "INCOME" }.sumOf { it.amount }
+            val expense = allTxs.filter { it.type == "EXPENSE" }.sumOf { it.amount }
             val balance = income - expense
 
             val persons = dao.getAllPersonsList()
@@ -139,11 +139,13 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                             val bytes = response.body?.bytes()
                             if (bytes != null) android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) else null
                         } else null
-                    } else {
+                    } else if (photoUri.startsWith("content://")) {
                         val contentUri = android.net.Uri.parse(photoUri)
                         context.contentResolver.openInputStream(contentUri)?.use {
                             android.graphics.BitmapFactory.decodeStream(it)
                         }
+                    } else {
+                        android.graphics.BitmapFactory.decodeFile(photoUri)
                     }
 
                     if (bitmap != null) {
