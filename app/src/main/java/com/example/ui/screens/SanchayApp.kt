@@ -538,6 +538,8 @@ fun formatDateHeader(dateStr: String, lang: AppLanguage): String {
 fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
+    val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
     
     val rawProfileName by viewModel.profileName.collectAsState()
     val rawProfileEmail by viewModel.profileEmail.collectAsState()
@@ -942,13 +944,38 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             }
 
                             IconButton(
-                                onClick = { viewModel.toggleLanguage(context) },
+                                onClick = {
+                                    if (isGoogleSignedIn) {
+                                        viewModel.uploadToFirestore(
+                                            onComplete = {
+                                                Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সম্পন্ন হয়েছে!" else "Cloud sync completed!", Toast.LENGTH_SHORT).show()
+                                            },
+                                            onError = { err ->
+                                                Toast.makeText(context, "${if (language == AppLanguage.BN) "সিঙ্ক ব্যর্থ হয়েছে: " else "Sync failed: "}$err", Toast.LENGTH_LONG).show()
+                                            }
+                                        )
+                                    } else {
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক চালু করতে সেটিংস থেকে গুগল দিয়ে সাইন-ইন করুন!" else "Please sign in with Google in settings to enable cloud sync!", Toast.LENGTH_LONG).show()
+                                    }
+                                },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Language,
-                                    contentDescription = "Toggle Language",
-                                    tint = Color.White,
+                                    imageVector = if (!isGoogleSignedIn) {
+                                        Icons.Rounded.CloudOff
+                                    } else if (hasUnsavedChanges) {
+                                        Icons.Rounded.Sync
+                                    } else {
+                                        Icons.Rounded.CloudDone
+                                    },
+                                    contentDescription = "Cloud Sync",
+                                    tint = if (!isGoogleSignedIn) {
+                                        Color.White.copy(alpha = 0.5f)
+                                    } else if (hasUnsavedChanges) {
+                                        Color(0xFFFFD54F)
+                                    } else {
+                                        Color(0xFF81C784)
+                                    },
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -6854,8 +6881,8 @@ fun TimelineSplineChart(
                         .fillMaxHeight()
                 ) {
                     val availableWidth = maxWidth
-                    val minItemWidth = 50.dp
-                    val dynamicWidth = maxOf(availableWidth, (monthsLabels.size * minItemWidth.value).dp)
+                    val minItemWidth = 42.dp
+                    val dynamicWidth = maxOf(availableWidth * 0.85f, (monthsLabels.size * minItemWidth.value).dp)
 
                     Box(
                         modifier = Modifier

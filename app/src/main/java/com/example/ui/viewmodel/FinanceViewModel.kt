@@ -229,6 +229,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri))
             com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
         }
     }
 
@@ -236,6 +237,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.updatePerson(person)
             com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
         }
     }
 
@@ -243,6 +245,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.deletePerson(id)
             com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
         }
     }
 
@@ -266,6 +269,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 )
             )
             com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
         }
     }
 
@@ -273,6 +277,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.updateTransaction(transaction)
             com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
         }
     }
 
@@ -280,6 +285,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.deleteTransaction(id)
             com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
         }
     }
 
@@ -299,6 +305,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     cardholderName = cardholderName
                 )
             )
+            onLocalDatabaseChanged()
         }
     }
 
@@ -326,6 +333,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         note = note
                     )
                 )
+                onLocalDatabaseChanged()
             }
         }
     }
@@ -333,6 +341,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun deleteSavingsGoal(id: Int) {
         viewModelScope.launch {
             repository.deleteSavingsGoal(id)
+            onLocalDatabaseChanged()
         }
     }
 
@@ -346,12 +355,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val updated = goal.copy(savedAmount = goal.savedAmount + delta)
                 repository.insertSavingsGoal(updated)
             }
+            onLocalDatabaseChanged()
         }
     }
 
     fun updateSavingsGoal(goal: SavingsGoal) {
         viewModelScope.launch {
             repository.insertSavingsGoal(goal)
+            onLocalDatabaseChanged()
         }
     }
 
@@ -426,6 +437,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         // Also initialize Google Drive state to ensure persistence
         initGoogleDrive(context)
 
+        startRealtimeSync()
+
         if (notifEnabled) {
             val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)
             try {
@@ -456,6 +469,201 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _profileSocial.value = social
         _profileAddress.value = address
         com.example.widget.updateAllWidgets(context)
+        startRealtimeSync()
+    }
+
+    // Firestore Sync States
+    private val _hasUnsavedChanges = MutableStateFlow(false)
+    val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+
+    private val _firestoreSyncStatus = MutableStateFlow<String?>(null)
+    val firestoreSyncStatus: StateFlow<String?> = _firestoreSyncStatus.asStateFlow()
+
+    private var firestore: com.google.firebase.firestore.FirebaseFirestore? = null
+
+    private fun getFirestore(context: Context): com.google.firebase.firestore.FirebaseFirestore {
+        if (firestore == null) {
+            try {
+                if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
+                    val options = com.google.firebase.FirebaseOptions.Builder()
+                        .setProjectId(BuildConfig.Firestore_Project_ID.ifBlank { "financenote-dc6f8" })
+                        .setApplicationId(BuildConfig.Firestore_APP_ID.ifBlank { "1:549900777284:android:b661159d57ed30542bc911" })
+                        .setApiKey("AIzaSyCngAmaOYL3jzyZj9JFKrmaYSkaNA5uIHQ")
+                        .build()
+                    com.google.firebase.FirebaseApp.initializeApp(context, options)
+                }
+                firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                try {
+                    firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                } catch (ex: Exception) {
+                    ex.printStackTrace()
+                }
+            }
+        }
+        return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
+    }
+
+    private fun onLocalDatabaseChanged() {
+        if (_isGoogleSignedIn.value && !_googleEmail.value.isNullOrBlank()) {
+            _hasUnsavedChanges.value = true
+            uploadToFirestore()
+        } else {
+            _hasUnsavedChanges.value = false
+            _firestoreSyncStatus.value = null
+        }
+    }
+
+    private var uploadJob: kotlinx.coroutines.Job? = null
+    
+    fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
+        val email = _googleEmail.value
+        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+            _firestoreSyncStatus.value = "Sign-in required"
+            onError?.invoke("Not signed in to Google")
+            return
+        }
+        uploadJob?.cancel()
+        uploadJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(1000) // Debounce rapid edits
+            _firestoreSyncStatus.value = "Syncing..."
+            try {
+                val backupData = repository.getBackupData()
+                val json = backupAdapter.toJson(backupData)
+                val db = getFirestore(getApplication())
+                val data = mapOf(
+                    "backupJson" to json,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+                db.collection("users").document(email).set(data)
+                    .addOnSuccessListener {
+                        _hasUnsavedChanges.value = false
+                        _firestoreSyncStatus.value = "Synced"
+                        onComplete?.invoke()
+                    }
+                    .addOnFailureListener { e ->
+                        _firestoreSyncStatus.value = "Failed"
+                        onError?.invoke(e.localizedMessage ?: "Unknown Firestore error")
+                    }
+            } catch (e: Exception) {
+                _firestoreSyncStatus.value = "Error"
+                onError?.invoke(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    fun pullFromFirestore(onSuccess: () -> Unit, onError: (String) -> Unit) {
+        val email = _googleEmail.value
+        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+            _firestoreSyncStatus.value = "Sign-in required"
+            onError("Not signed in to Google")
+            return
+        }
+        viewModelScope.launch {
+            _firestoreSyncStatus.value = "Downloading..."
+            try {
+                val db = getFirestore(getApplication())
+                db.collection("users").document(email).get()
+                    .addOnSuccessListener { document ->
+                        if (document != null && document.exists()) {
+                            val json = document.getString("backupJson") ?: ""
+                            if (json.isNotEmpty()) {
+                                viewModelScope.launch {
+                                    try {
+                                        val backupData = backupAdapter.fromJson(json)
+                                        if (backupData != null) {
+                                            repository.restoreBackupData(backupData)
+                                            com.example.widget.updateAllWidgets(getApplication())
+                                            _hasUnsavedChanges.value = false
+                                            _firestoreSyncStatus.value = "Synced"
+                                            onSuccess()
+                                        } else {
+                                            onError("Invalid backup format")
+                                        }
+                                    } catch (e: Exception) {
+                                        onError(e.localizedMessage ?: "Restore failed")
+                                    }
+                                }
+                            } else {
+                                onError("No backup data found on server")
+                            }
+                        } else {
+                            onError("No Firestore document found")
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        _firestoreSyncStatus.value = "Failed"
+                        onError(e.localizedMessage ?: "Download failed")
+                    }
+            } catch (e: Exception) {
+                onError(e.localizedMessage ?: "Initialization failed")
+            }
+        }
+    }
+
+    private var firestoreListener: com.google.firebase.firestore.ListenerRegistration? = null
+
+    fun startRealtimeSync() {
+        firestoreListener?.remove()
+        val email = _googleEmail.value
+        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+            _firestoreSyncStatus.value = null
+            return
+        }
+        try {
+            val db = getFirestore(getApplication())
+            firestoreListener = db.collection("users").document(email)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        error.printStackTrace()
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        val remoteJson = snapshot.getString("backupJson") ?: ""
+                        if (remoteJson.isNotEmpty() && !_hasUnsavedChanges.value) {
+                            viewModelScope.launch {
+                                try {
+                                    val currentLocalData = repository.getBackupData()
+                                    val remoteData = backupAdapter.fromJson(remoteJson)
+                                    if (remoteData != null) {
+                                        val localTxCount = currentLocalData.transactions.size
+                                        val remoteTxCount = remoteData.transactions.size
+                                        if (remoteTxCount != localTxCount ||
+                                            remoteData.persons.size != currentLocalData.persons.size ||
+                                            remoteData.savingsGoals.size != currentLocalData.savingsGoals.size ||
+                                            remoteData.savingsTransactions.size != currentLocalData.savingsTransactions.size) {
+                                            repository.restoreBackupData(remoteData)
+                                            com.example.widget.updateAllWidgets(getApplication())
+                                            _firestoreSyncStatus.value = "Synced"
+                                        } else {
+                                            _firestoreSyncStatus.value = "Synced"
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                    } else {
+                        // Document doesn't exist on server yet (new signed-in user), upload current local DB as initial backup
+                        uploadToFirestore()
+                    }
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun stopRealtimeSync() {
+        firestoreListener?.remove()
+        firestoreListener = null
+        _firestoreSyncStatus.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopRealtimeSync()
     }
 
     // Backup & Restore operations
@@ -657,6 +865,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _isGoogleSignedIn.value = true
                 _driveStatusMessage.value = "Successfully Signed In!"
                 com.example.widget.updateAllWidgets(context)
+                startRealtimeSync()
                 onSuccess()
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
@@ -952,6 +1161,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _isGoogleSignedIn.value = false
         _driveStatusMessage.value = "Signed Out"
         com.example.widget.updateAllWidgets(context)
+        stopRealtimeSync()
         onSuccess()
     }
 }
