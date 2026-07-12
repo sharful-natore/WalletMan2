@@ -2223,11 +2223,11 @@ fun DashboardScreen(
                             .clickable { onNavigate("charts", "") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.vital_signs_24),
+                        Image(
+                            painter = painterResource(id = R.drawable.monitoring_24),
                             contentDescription = "Charts",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
+                            colorFilter = ColorFilter.tint(Color.White)
                         )
                     }
                 }
@@ -7439,7 +7439,7 @@ fun TimelineSplineChart(
             cornerRadius = 24.dp,
             padding = PaddingValues(16.dp),
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth()
                 .padding(horizontal = 16.dp)
         ) {
         Column {
@@ -7482,8 +7482,6 @@ fun TimelineSplineChart(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Graph Area using Row: Fixed Left Y-Axis, Scrollable Right Canvas
             Row(
                 modifier = Modifier
@@ -7494,7 +7492,7 @@ fun TimelineSplineChart(
                 // 1. Fixed Y-axis labels on the Left
                 Canvas(
                     modifier = Modifier
-                        .width(55.dp)
+                        .width(30.dp)
                         .fillMaxHeight()
                 ) {
                     val canvasHeight = size.height
@@ -7521,7 +7519,7 @@ fun TimelineSplineChart(
                         val labelStr = formatShortCurrency(labelVal, language)
                         drawContext.canvas.nativeCanvas.drawText(
                             labelStr,
-                            size.width - 8.dp.toPx(),
+                            size.width - 3.dp.toPx(),
                             y + 4.dp.toPx(),
                             textPaint
                         )
