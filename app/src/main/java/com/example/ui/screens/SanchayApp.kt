@@ -1094,8 +1094,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         // Item 2: Transactions
                         BottomNavItem(
                             tab = "transactions",
-                            icon = painterResource(id = R.drawable.compare_arrows_24),
-                            testTag = "nav_transactions"
+                            icon = painterResource(id = R.drawable.order_approve_24),
+                            testTag = "nav_transactions",
+                            iconSize = 24.dp
                         )
 
                         // Center: Central FAB!
@@ -2224,7 +2225,7 @@ fun DashboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.monitoring_24),
+                            painter = painterResource(id = R.drawable.timeline_24),
                             contentDescription = "Charts",
                             modifier = Modifier.size(24.dp),
                             colorFilter = ColorFilter.tint(Color.White)
@@ -6320,21 +6321,27 @@ fun SettingsScreen(
                                 color = if (isDark) Color.Gray else Color(0xFF64748B)
                             )
                         }
-                        Text(
-                            text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "লগইন" else "Login"),
-                            color = if (isGoogleSignedIn) FintechRed else FintechBlue,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clickable {
-                                    if (isGoogleSignedIn) {
-                                        showLogoutConfirm = true
-                                    } else {
-                                        onSignInClick()
-                                    }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = {
+                                if (isGoogleSignedIn) {
+                                    showLogoutConfirm = true
+                                } else {
+                                    onSignInClick()
                                 }
-                                .padding(4.dp)
-                        )
+                            },
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isGoogleSignedIn) FintechRed else FintechBlue),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(start = 8.dp)
+                        ) {
+                            Text(
+                                text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "লগইন" else "Login"),
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                     if (!driveStatusMessage.isNullOrEmpty()) {
                         Text(
@@ -6565,75 +6572,6 @@ fun SettingsScreen(
             }
         }
 
-        // --- 4. APP LANGUAGE CARD ---
-        SettingCategory(
-            title = if (language == AppLanguage.BN) "অ্যাপের ভাষা / App Language" else "App Language",
-            isDark = isDark,
-            icon = Icons.Rounded.Language,
-            initiallyExpanded = false
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = if (language == AppLanguage.BN) "আপনার পছন্দের ভাষা নির্বাচন করুন" else "Choose your preferred language",
-                    fontSize = 13.sp,
-                    color = if (isDark) Color.Gray else Color(0xFF64748B)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Bangla Button
-                    val isBn = language == AppLanguage.BN
-                    Button(
-                        onClick = { if (!isBn) viewModel.toggleLanguage(context) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isBn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isBn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
-                        ),
-                        contentPadding = PaddingValues(12.dp)
-                    ) {
-                        Text(
-                            text = "বাংলা (Bangla)",
-                            color = if (isBn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    // English Button
-                    val isEn = language == AppLanguage.EN
-                    Button(
-                        onClick = { if (!isEn) viewModel.toggleLanguage(context) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isEn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isEn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
-                        ),
-                        contentPadding = PaddingValues(12.dp)
-                    ) {
-                        Text(
-                            text = "English",
-                            color = if (isEn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-        }
 
 
         // --- 6. APP ERROR LOG (SUPPORT) CARD ---
@@ -7530,7 +7468,9 @@ fun TimelineSplineChart(
                 val scrollState = rememberScrollState()
                 LaunchedEffect(monthsLabels) {
                     kotlinx.coroutines.delay(100)
-                    scrollState.scrollTo(scrollState.maxValue)
+                    if (scrollState.maxValue > 0) {
+                        scrollState.scrollTo(scrollState.maxValue / 2)
+                    }
                 }
 
                 BoxWithConstraints(
@@ -7546,6 +7486,7 @@ fun TimelineSplineChart(
                         modifier = Modifier
                             .fillMaxSize()
                             .horizontalScroll(scrollState)
+                            .padding(end = maxWidth / 2)
                     ) {
                         Canvas(
                             modifier = Modifier

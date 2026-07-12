@@ -77,7 +77,7 @@
                 android:text="Shariful Islam"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="13sp"
+                android:textSize="16sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -87,7 +87,7 @@
                 android:layout_height="wrap_content"
                 android:text="connect.shariful@gmail.com"
                 android:textColor="#B3FFFFFF"
-                android:textSize="8sp"
+                android:textSize="11sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
         </LinearLayout>

@@ -112,7 +112,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val googleEmail = gPrefs.getString("google_email", null)
 
             val profileActionIntent = Intent(context, MainActivity::class.java).apply {
-                action = if (isGoogleSignedIn) "ACTION_BACKUP" else "ACTION_GOOGLE_SIGN_IN"
+                action = if (isGoogleSignedIn) "ACTION_SYNC_REALTIME" else "ACTION_GOOGLE_SIGN_IN"
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             views.setOnClickPendingIntent(R.id.btn_profile_action, PendingIntent.getActivity(context, 15, profileActionIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -198,7 +198,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             views.setTextViewText(R.id.tv_profile_email, displayEmail)
 
             // Update profile action icon
-            val actionIcon = if (isGoogleSignedIn) R.drawable.ic_cloud_backup else R.drawable.ic_settings
+            val actionIcon = if (isGoogleSignedIn) R.drawable.ic_sync_24 else R.drawable.ic_settings
             views.setImageViewResource(R.id.iv_profile_action, actionIcon)
 
             // Dynamic card headers based on language
