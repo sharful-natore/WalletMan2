@@ -89,6 +89,9 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSavingsTransaction(transaction: SavingsTransaction): Long
 
+    @Update
+    suspend fun updateSavingsTransaction(transaction: SavingsTransaction)
+
     @Query("DELETE FROM savings_transactions WHERE goalId = :goalId")
     suspend fun deleteSavingsTransactionsByGoal(goalId: Int)
     

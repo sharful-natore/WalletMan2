@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,7 +89,7 @@ fun BackupStatsDialog(
                             modifier = Modifier.weight(1f),
                             title = if (language == AppLanguage.BN) "মোট আয়" else "Total Income",
                             value = "৳${stats.totalIncome}",
-                            icon = Icons.Rounded.TrendingUp,
+                            icon = Icons.AutoMirrored.Rounded.TrendingUp,
                             iconColor = Color(0xFF10B981),
                             isDark = isDark
                         )
@@ -96,7 +97,7 @@ fun BackupStatsDialog(
                             modifier = Modifier.weight(1f),
                             title = if (language == AppLanguage.BN) "মোট ব্যয়" else "Total Expense",
                             value = "৳${stats.totalExpense}",
-                            icon = Icons.Rounded.TrendingDown,
+                            icon = Icons.AutoMirrored.Rounded.TrendingDown,
                             iconColor = Color(0xFFEF4444),
                             isDark = isDark
                         )

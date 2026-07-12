@@ -65,6 +65,8 @@ data class BackupStats(
 
 class FinanceViewModel(private val repository: FinanceRepository, application: Application) : AndroidViewModel(application) {
 
+    val updateManager = UpdateManager()
+
     // Preferences & UI State
     private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
@@ -345,6 +347,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun updateSavingsTransaction(oldTx: SavingsTransaction, newTx: SavingsTransaction) {
+        viewModelScope.launch {
+            repository.updateSavingsTransaction(newTx)
+            val currentList = savingsGoals.value
+            val goal = currentList.find { it.id == oldTx.goalId }
+            if (goal != null) {
+                val oldContribution = if (oldTx.isDeposit) oldTx.amount else -oldTx.amount
+                val newContribution = if (newTx.isDeposit) newTx.amount else -newTx.amount
+                val difference = newContribution - oldContribution
+                val updated = goal.copy(savedAmount = goal.savedAmount + difference)
+                repository.insertSavingsGoal(updated)
+                onLocalDatabaseChanged()
+            }
+        }
+    }
+
     fun deleteSavingsTransaction(tx: SavingsTransaction) {
         viewModelScope.launch {
             repository.deleteSavingsTransaction(tx.id)
@@ -417,6 +435,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _profileSocial.value = prefs.getString("user_social", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
         _profileAddress.value = prefs.getString("user_address", "Parkol, Baraigram, Natore") ?: "Parkol, Baraigram, Natore"
         
+        val lastSync = prefs.getLong("last_firestore_sync_time", 0L)
+        _lastSyncTime.value = if (lastSync == 0L) null else lastSync
+
         // Load language and theme, defaulting language to BN and theme to false (Light)
         val savedLangStr = prefs.getString("app_language", AppLanguage.BN.name) ?: AppLanguage.BN.name
         _language.value = try { AppLanguage.valueOf(savedLangStr) } catch (e: Exception) { AppLanguage.BN }
@@ -479,6 +500,112 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _firestoreSyncStatus = MutableStateFlow<String?>(null)
     val firestoreSyncStatus: StateFlow<String?> = _firestoreSyncStatus.asStateFlow()
 
+    private val _lastSyncTime = MutableStateFlow<Long?>(null)
+    val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
+
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    init {
+        registerNetworkCallback()
+    }
+
+    private fun registerNetworkCallback() {
+        try {
+            val connectivityManager = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            if (connectivityManager != null) {
+                val request = android.net.NetworkRequest.Builder()
+                    .addCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: android.net.Network) {
+                        super.onAvailable(network)
+                        // Internet is back! If there are unsaved changes, trigger sync
+                        if (_hasUnsavedChanges.value && _isGoogleSignedIn.value) {
+                            uploadToFirestore()
+                        }
+                    }
+                }
+                connectivityManager.registerNetworkCallback(request, networkCallback!!)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        try {
+            val connectivityManager = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            if (connectivityManager != null && networkCallback != null) {
+                connectivityManager.unregisterNetworkCallback(networkCallback!!)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun isNetworkAvailable(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        if (connectivityManager != null) {
+            val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            if (capabilities != null) {
+                if (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+                    capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun showSyncNotification(title: String, message: String) {
+        val context = getApplication<Application>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+        if (notificationManager != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    "finance_sync_channel",
+                    "Finance Sync Status",
+                    android.app.NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Notifications about cloud database sync status"
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+            
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    return
+                }
+            }
+
+            val builder = androidx.core.app.NotificationCompat.Builder(context, "finance_sync_channel")
+                .setSmallIcon(com.example.R.drawable.ic_pie_chart)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true)
+
+            notificationManager.notify(9988, builder.build())
+        }
+    }
+
+    private fun updateSyncSuccess(context: Context, isUpload: Boolean) {
+        val now = System.currentTimeMillis()
+        _lastSyncTime.value = now
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putLong("last_firestore_sync_time", now).apply()
+        
+        val isBn = _language.value == AppLanguage.BN
+        val title = if (isBn) "ক্লাউড সিঙ্ক সম্পন্ন" else "Cloud Sync Completed"
+        val message = if (isBn) {
+            if (isUpload) "আপনার তথ্য ক্লাউডে সফলভাবে সংরক্ষিত হয়েছে!" else "নতুন তথ্য ক্লাউড থেকে সফলভাবে রিস্টোর হয়েছে!"
+        } else {
+            if (isUpload) "Your data has been successfully saved to the cloud!" else "New data has been successfully restored from the cloud!"
+        }
+        showSyncNotification(title, message)
+    }
+
     private var firestore: com.google.firebase.firestore.FirebaseFirestore? = null
 
     private fun getFirestore(context: Context): com.google.firebase.firestore.FirebaseFirestore {
@@ -531,15 +658,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             try {
                 val backupData = repository.getBackupData()
                 val json = backupAdapter.toJson(backupData)
+                val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 val db = getFirestore(getApplication())
                 val data = mapOf(
-                    "backupJson" to json,
+                    "backupJson" to encryptedJson,
                     "updatedAt" to System.currentTimeMillis()
                 )
                 db.collection("users").document(email).set(data)
                     .addOnSuccessListener {
                         _hasUnsavedChanges.value = false
                         _firestoreSyncStatus.value = "Synced"
+                        updateSyncSuccess(getApplication(), true)
                         onComplete?.invoke()
                     }
                     .addOnFailureListener { e ->
@@ -571,12 +700,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             if (json.isNotEmpty()) {
                                 viewModelScope.launch {
                                     try {
-                                        val backupData = backupAdapter.fromJson(json)
+                                        val decryptedJson = BackupEncryptionHelper.decrypt(json)
+                                        val backupData = backupAdapter.fromJson(decryptedJson)
                                         if (backupData != null) {
                                             repository.restoreBackupData(backupData)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             _hasUnsavedChanges.value = false
                                             _firestoreSyncStatus.value = "Synced"
+                                            updateSyncSuccess(getApplication(), false)
                                             onSuccess()
                                         } else {
                                             onError("Invalid backup format")
@@ -625,7 +756,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             viewModelScope.launch {
                                 try {
                                     val currentLocalData = repository.getBackupData()
-                                    val remoteData = backupAdapter.fromJson(remoteJson)
+                                    val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                    val remoteData = backupAdapter.fromJson(decryptedJson)
                                     if (remoteData != null) {
                                         val localTxCount = currentLocalData.transactions.size
                                         val remoteTxCount = remoteData.transactions.size
@@ -636,6 +768,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                             repository.restoreBackupData(remoteData)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             _firestoreSyncStatus.value = "Synced"
+                                            updateSyncSuccess(getApplication(), false)
                                         } else {
                                             _firestoreSyncStatus.value = "Synced"
                                         }
@@ -664,12 +797,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     override fun onCleared() {
         super.onCleared()
         stopRealtimeSync()
+        unregisterNetworkCallback()
     }
 
     // Backup & Restore operations
     fun parseBackupJson(json: String): FinanceBackup? {
         return try {
-            backupAdapter.fromJson(json)
+            val decryptedJson = BackupEncryptionHelper.decrypt(json)
+            backupAdapter.fromJson(decryptedJson)
         } catch (e: Exception) {
             null
         }
@@ -718,7 +853,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             try {
                 val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
                 val json = backupAdapter.indent("  ").toJson(backupData)
-                outputStream.use { it.write(json.toByteArray()) }
+                val encryptedJson = BackupEncryptionHelper.encrypt(json)
+                outputStream.use { it.write(encryptedJson.toByteArray()) }
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
@@ -730,7 +866,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             try {
                 val jsonContent = inputStream.use { it.bufferedReader().readText() }
-                val backupData = backupAdapter.fromJson(jsonContent)
+                val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
+                val backupData = backupAdapter.fromJson(decryptedJson)
                 if (backupData != null) {
                     repository.restoreBackupData(backupData)
                     com.example.widget.updateAllWidgets(getApplication())
@@ -749,12 +886,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             try {
                 val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
                 val json = backupAdapter.indent("  ").toJson(backupData)
+                val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 
                 // Write to local private file financenote_backup.json
                 val backupFile = File(context.filesDir, "financenote_backup.json")
-                backupFile.writeText(json)
+                backupFile.writeText(encryptedJson)
                 
-                onSuccess(json)
+                onSuccess(encryptedJson)
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
             }
@@ -776,7 +914,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     json ?: throw Exception("JSON backup code is empty")
                 }
                 
-                val backupData = backupAdapter.fromJson(jsonContent)
+                val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
+                val backupData = backupAdapter.fromJson(decryptedJson)
                 if (backupData != null) {
                     repository.restoreBackupData(backupData)
                     com.example.widget.updateAllWidgets(getApplication())
@@ -817,6 +956,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
+    private val _lastGDriveBackupTime = MutableStateFlow<Long?>(null)
+    val lastGDriveBackupTime: StateFlow<Long?> = _lastGDriveBackupTime.asStateFlow()
+
+    private val _autoBackupIntervalDays = MutableStateFlow(-1)
+    val autoBackupIntervalDays: StateFlow<Int> = _autoBackupIntervalDays.asStateFlow()
+
     private val client = OkHttpClient()
 
     // Initialize Google State from Shared Prefs
@@ -826,11 +971,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val name = prefs.getString("google_name", null)
         val photoUrl = prefs.getString("google_photo_url", null)
 
+        val lastBackup = prefs.getLong("last_gdrive_backup_time", 0L)
+        _lastGDriveBackupTime.value = if (lastBackup == 0L) null else lastBackup
+        _autoBackupIntervalDays.value = prefs.getInt("auto_backup_interval_days", -1)
+
         if (!email.isNullOrEmpty()) {
             _googleEmail.value = email
             _googleName.value = name
             _googlePhotoUrl.value = photoUrl
             _isGoogleSignedIn.value = true
+            
+            // Trigger auto-backup check
+            checkAndTriggerAutoBackup(context)
         } else {
             _googleEmail.value = null
             _googleName.value = null
@@ -838,6 +990,35 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _isGoogleSignedIn.value = false
         }
         com.example.widget.updateAllWidgets(context)
+    }
+
+    fun setAutoBackupIntervalDays(context: Context, days: Int) {
+        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putInt("auto_backup_interval_days", days).apply()
+        _autoBackupIntervalDays.value = days
+        
+        checkAndTriggerAutoBackup(context)
+    }
+
+    fun checkAndTriggerAutoBackup(context: Context) {
+        val intervalDays = _autoBackupIntervalDays.value
+        if (intervalDays <= 0) return // -1 or 0 means Never/off
+        if (!_isGoogleSignedIn.value) return // must be signed in
+        if (_isSyncing.value) return // already syncing
+
+        val lastBackup = _lastGDriveBackupTime.value ?: 0L
+        val currentTime = System.currentTimeMillis()
+        val intervalMillis = intervalDays * 24L * 60L * 60L * 1000L
+
+        if (currentTime - lastBackup >= intervalMillis) {
+            backupToGoogleDrive(
+                context = context,
+                customFileName = "finance_note_auto_backup_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())}.json",
+                comment = "Automatic scheduled backup",
+                onSuccess = {},
+                onError = {}
+            )
+        }
     }
 
     fun handleGoogleSignInSuccess(
@@ -866,6 +1047,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _driveStatusMessage.value = "Successfully Signed In!"
                 com.example.widget.updateAllWidgets(context)
                 startRealtimeSync()
+                checkAndTriggerAutoBackup(context)
                 onSuccess()
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
@@ -905,6 +1087,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 // 1. Get database data JSON string with comment and createdAt metadata
                 val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
                 val json = backupAdapter.indent("  ").toJson(backupData)
+                val encryptedJson = BackupEncryptionHelper.encrypt(json)
 
                 // 2. Create timestamp and fileName
                 val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
@@ -918,7 +1101,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     append("{\"name\": \"$fileName\", \"mimeType\": \"application/json\"}\r\n")
                     append("--$boundary\r\n")
                     append("Content-Type: application/json\r\n\r\n")
-                    append(json)
+                    append(encryptedJson)
                     append("\r\n--$boundary--\r\n")
                 }
 
@@ -937,6 +1120,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
                 if (createResponse.isSuccessful) {
                     _driveStatusMessage.value = "Backup successfully created: $fileName"
+                    val now = System.currentTimeMillis()
+                    val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    prefs.edit().putLong("last_gdrive_backup_time", now).apply()
+                    _lastGDriveBackupTime.value = now
                     onSuccess()
                 } else {
                     val errBody = createResponse.body?.string() ?: ""
@@ -1085,7 +1272,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (downloadResponse.isSuccessful) {
                     val jsonContent = downloadResponse.body?.string() ?: ""
                     _driveStatusMessage.value = "Restoring database content..."
-                    val backupData = backupAdapter.fromJson(jsonContent)
+                    val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
+                    val backupData = backupAdapter.fromJson(decryptedJson)
                     if (backupData != null) {
                        repository.restoreBackupData(backupData)
                        com.example.widget.updateAllWidgets(getApplication())

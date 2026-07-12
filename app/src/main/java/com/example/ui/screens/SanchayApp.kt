@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.text.*
 import androidx.compose.material.icons.*
 import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -555,6 +556,29 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     val context = LocalContext.current
+    
+    val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
+    val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
+    var showUpdatePopup by remember(initialAction) { mutableStateOf(initialAction == "ACTION_SHOW_UPDATE") }
+
+    LaunchedEffect(Unit) {
+        viewModel.updateManager.checkForUpdates(context) { isAvailable ->
+            if (isAvailable) {
+                // If it's a force update, show popup immediately. 
+                // Otherwise, show system notification as requested.
+                val info = viewModel.updateManager.updateInfo.value
+                if (info.isForceUpdate) {
+                    showUpdatePopup = true
+                } else {
+                    UpdateNotificationHelper.showUpdateNotification(
+                        context, 
+                        if (language == AppLanguage.BN) "BN" else "EN",
+                        info.latestVersion
+                    )
+                }
+            }
+        }
+    }
 
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -749,6 +773,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     var showAddSavingsGoalDialog by remember { mutableStateOf(initialAction == "ACTION_SAVINGS") }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
+    var savingsTxToEdit by remember { mutableStateOf<SavingsTransaction?>(null) }
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
@@ -779,6 +804,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     }
 
     var showSearch by remember { mutableStateOf(false) }
+    var showRealtimeSyncDialog by remember { mutableStateOf(false) }
 
     val driveStatusMessage by viewModel.driveStatusMessage.collectAsState()
     val googleDriveFiles by viewModel.googleDriveFiles.collectAsState()
@@ -945,18 +971,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
                             IconButton(
                                 onClick = {
-                                    if (isGoogleSignedIn) {
-                                        viewModel.uploadToFirestore(
-                                            onComplete = {
-                                                Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সম্পন্ন হয়েছে!" else "Cloud sync completed!", Toast.LENGTH_SHORT).show()
-                                            },
-                                            onError = { err ->
-                                                Toast.makeText(context, "${if (language == AppLanguage.BN) "সিঙ্ক ব্যর্থ হয়েছে: " else "Sync failed: "}$err", Toast.LENGTH_LONG).show()
-                                            }
-                                        )
-                                    } else {
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক চালু করতে সেটিংস থেকে গুগল দিয়ে সাইন-ইন করুন!" else "Please sign in with Google in settings to enable cloud sync!", Toast.LENGTH_LONG).show()
-                                    }
+                                    showRealtimeSyncDialog = true
                                 },
                                 modifier = Modifier.size(36.dp)
                             ) {
@@ -969,13 +984,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                         Icons.Rounded.CloudDone
                                     },
                                     contentDescription = "Cloud Sync",
-                                    tint = if (!isGoogleSignedIn) {
-                                        Color.White.copy(alpha = 0.5f)
-                                    } else if (hasUnsavedChanges) {
-                                        Color(0xFFFFD54F)
-                                    } else {
-                                        Color(0xFF81C784)
-                                    },
+                                    tint = Color.White,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1033,7 +1042,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         @Composable
                         fun BottomNavItem(
                             tab: String,
-                            icon: ImageVector,
+                            icon: Any,
                             testTag: String,
                             iconSize: androidx.compose.ui.unit.Dp = 24.dp
                         ) {
@@ -1056,12 +1065,21 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                         .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
                                         .padding(horizontal = 16.dp, vertical = 6.dp)
                                  ) {
-                                    Icon(
-                                        imageVector = icon,
-                                        contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
-                                        modifier = Modifier.size(iconSize)
-                                    )
+                                    if (icon is ImageVector) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                            modifier = Modifier.size(iconSize)
+                                        )
+                                    } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
+                                        Icon(
+                                            painter = icon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                            modifier = Modifier.size(iconSize)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1076,7 +1094,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         // Item 2: Transactions
                         BottomNavItem(
                             tab = "transactions",
-                            icon = Icons.Rounded.ListAlt,
+                            icon = painterResource(id = R.drawable.compare_arrows_24),
                             testTag = "nav_transactions"
                         )
 
@@ -1191,6 +1209,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     language = language,
                                     isDark = isDarkTheme,
                                     filter = settingsFilter,
+                                    onShowUpdatePopup = { showUpdatePopup = true },
                                     onBack = { activeTab = "dashboard" },
                                     onSignInClick = { triggerGoogleSignIn() },
                                     onBackupClick = {
@@ -1420,20 +1439,37 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     )
                 }
 
-                if (showSavingsContributionDialog != null) {
-                    val goal = showSavingsContributionDialog!!
-                    SavingsContributionDialog(
-                        language = language,
-                        savingsGoal = goal,
-                        isDark = isDarkTheme,
-                        initialIsWithdraw = isWithdrawMode,
-                        onDismiss = { showSavingsContributionDialog = null },
-                        onConfirm = { amount, isWithdraw, note ->
-                            val finalAmount = if (isWithdraw) -amount else amount
-                            viewModel.addSavingsContribution(goal.id, finalAmount, note)
-                            showSavingsContributionDialog = null
-                        }
-                    )
+                if (showSavingsContributionDialog != null || savingsTxToEdit != null) {
+                    val goalId = savingsTxToEdit?.goalId ?: showSavingsContributionDialog?.id ?: 0
+                    val goal = savingsGoals.find { it.id == goalId } ?: showSavingsContributionDialog
+                    if (goal != null) {
+                        SavingsContributionDialog(
+                            language = language,
+                            savingsGoal = goal,
+                            isDark = isDarkTheme,
+                            initialIsWithdraw = isWithdrawMode,
+                            txToEdit = savingsTxToEdit,
+                            onDismiss = { 
+                                showSavingsContributionDialog = null 
+                                savingsTxToEdit = null
+                            },
+                            onConfirm = { amount, isWithdraw, note ->
+                                val finalAmount = if (isWithdraw) -amount else amount
+                                if (savingsTxToEdit != null) {
+                                    val updatedTx = savingsTxToEdit!!.copy(
+                                        amount = amount,
+                                        isDeposit = !isWithdraw,
+                                        note = note
+                                    )
+                                    viewModel.updateSavingsTransaction(savingsTxToEdit!!, updatedTx)
+                                    savingsTxToEdit = null
+                                } else {
+                                    viewModel.addSavingsContribution(goal.id, finalAmount, note)
+                                    showSavingsContributionDialog = null
+                                }
+                            }
+                        )
+                    }
                 }
 
                 if (showMonthPickerState) {
@@ -1487,7 +1523,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 showSavingsContributionDialog = goalObj
                                 isWithdrawMode = isWithdraw
                             },
-                            onDeleteTx = { viewModel.deleteSavingsTransaction(it) }
+                            onDeleteTx = { viewModel.deleteSavingsTransaction(it) },
+                            onEditTx = { savingsTxToEdit = it }
                         )
                     }
                 }
@@ -1622,7 +1659,288 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             }
         }
     }
+
+    if (showRealtimeSyncDialog) {
+        val isNetworkAvailable = viewModel.isNetworkAvailable(context)
+        val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
+        val lastSyncTime by viewModel.lastSyncTime.collectAsState()
+        val syncStatus by viewModel.firestoreSyncStatus.collectAsState()
+
+        AlertDialog(
+            onDismissRequest = { showRealtimeSyncDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Sync,
+                        contentDescription = null,
+                        tint = if (isDarkTheme) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "রিয়েল-টাইম ক্লাউড সিঙ্ক" else "Real-time Cloud Sync",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Sign-in Status Notice
+                    if (!isGoogleSignedIn) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDarkTheme) Color(0x1AFF5252) else Color(0xFFFFEBEE)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Warning,
+                                    contentDescription = null,
+                                    tint = Color.Red
+                                )
+                                Text(
+                                    text = if (language == AppLanguage.BN) {
+                                        "ক্লাউড সিঙ্ক ব্যবহার করতে প্রথমে সেটিংস থেকে গুগল দিয়ে সাইন-ইন সম্পন্ন করুন।"
+                                    } else {
+                                        "Please sign in with Google in settings to enable cloud sync."
+                                    },
+                                    fontSize = 13.sp,
+                                    color = if (isDarkTheme) Color(0xFFFF8A80) else Color(0xFFD32F2F),
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    } else {
+                        // Signed In User Info
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "ইউজার অ্যাকাউন্ট:" else "User Account:",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                            )
+                            Text(
+                                text = googleEmail ?: "",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDarkTheme) Color(0xFF90CAF9) else Color(0xFF1E88E5)
+                            )
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+
+                        // Network Status Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "নেটওয়ার্ক স্ট্যাটাস:" else "Network Status:",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isNetworkAvailable) Color(0xFF4CAF50) else Color(0xFFF44336))
+                                )
+                                Text(
+                                    text = if (isNetworkAvailable) {
+                                        if (language == AppLanguage.BN) "অনলাইন" else "Online"
+                                    } else {
+                                        if (language == AppLanguage.BN) "অফলাইন" else "Offline"
+                                    },
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isNetworkAvailable) Color(0xFF4CAF50) else Color(0xFFF44336)
+                                )
+                            }
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+
+                        // Unsaved Changes Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা আছে কিনা:" else "Unsaved Data Status:",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                            )
+                            Text(
+                                text = if (hasUnsavedChanges) {
+                                    if (language == AppLanguage.BN) "হ্যাঁ (সিঙ্ক প্রয়োজন)" else "Yes (Sync needed)"
+                                } else {
+                                    if (language == AppLanguage.BN) "না (সব সংরক্ষিত)" else "No (Fully saved)"
+                                },
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasUnsavedChanges) Color(0xFFFFB300) else Color(0xFF4CAF50)
+                            )
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+
+                        // Last Sync Time Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "সর্বশেষ সিঙ্ক:" else "Last Synced:",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                            )
+                            Text(
+                                text = formatSyncTime(lastSyncTime, language),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                            )
+                        }
+
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+
+                        // Sync status description if syncing
+                        if (!syncStatus.isNullOrEmpty()) {
+                            Text(
+                                text = "${if (language == AppLanguage.BN) "স্ট্যাটাস: " else "Status: "}$syncStatus",
+                                fontSize = 13.sp,
+                                fontStyle = FontStyle.Italic,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (isGoogleSignedIn) {
+                    Button(
+                        onClick = {
+                            if (!isNetworkAvailable) {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "ইন্টারনেট কানেকশন নেই! অনুগ্রহ করে কানেকশন চালু করুন।" else "No internet connection! Please check your network.", Toast.LENGTH_LONG).show()
+                            } else {
+                                viewModel.uploadToFirestore(
+                                    onComplete = {
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সফলভাবে সম্পন্ন হয়েছে!" else "Cloud sync completed successfully!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { err ->
+                                        Toast.makeText(context, "${if (language == AppLanguage.BN) "সিঙ্ক ব্যর্থ হয়েছে: " else "Sync failed: "}$err", Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDarkTheme) Color(0xFF2563EB) else Color(0xFF1E40AF)
+                        )
+                    ) {
+                        Icon(imageVector = Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (language == AppLanguage.BN) "এখনই সিঙ্ক করুন" else "Sync Now")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRealtimeSyncDialog = false }) {
+                    Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close")
+                }
+            }
+        )
+    }
+
+    if (showUpdatePopup) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!updateInfo.isForceUpdate) {
+                    showUpdatePopup = false
+                }
+            },
+            properties = if (updateInfo.isForceUpdate) {
+                androidx.compose.ui.window.DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+            } else {
+                androidx.compose.ui.window.DialogProperties()
+            },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Rounded.Update, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(24.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "নতুন আপডেট উপলব্ধ!" else "New Update Available!",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "অ্যাপের একটি নতুন সংস্করণ (${updateInfo.latestVersion}) পাওয়া যাচ্ছে। আরও উন্নত ফিচার ও সিকিউরিটির জন্য এখনই আপডেট করুন।"
+                        else "A new version of the app (${updateInfo.latestVersion}) is available. Please update to get the latest features and security improvements.",
+                        fontSize = 14.sp
+                    )
+                    if (updateInfo.isForceUpdate) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "এটি একটি আবশ্যক আপডেট। চালিয়ে যেতে আপডেট করুন।" else "This is a required update. Please update to continue.",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FintechRed
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateInfo.updateUrl))
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                ) {
+                    Text(text = if (language == AppLanguage.BN) "আপডেট করুন" else "Update Now", color = Color.White)
+                }
+            },
+            dismissButton = {
+                if (!updateInfo.isForceUpdate) {
+                    TextButton(onClick = { showUpdatePopup = false }) {
+                        Text(if (language == AppLanguage.BN) "পরে করব" else "Later", color = Color.Gray)
+                    }
+                }
+            }
+        )
+    }
 }
+
 
 @Composable
 fun getGreeting(language: AppLanguage): String {
@@ -1771,7 +2089,7 @@ fun DashboardScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.Person,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = FintechBlue,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -1783,7 +2101,7 @@ fun DashboardScreen(
                         Text(
                             text = getGreeting(language),
                             color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 11.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Text(
@@ -1811,7 +2129,7 @@ fun DashboardScreen(
                             }
                         } else {
                             Text(
-                                text = if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর করার জন্য সাইন-ইন করুন" else "Sign in to backup & restore",
+                                text = if (language == AppLanguage.BN) "ডেটা ব্যাকআপ/রিস্টোর ও সিঙ্ক করতে সাইন ইন করুন" else "Sign in to backup/restore and sync data",
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,
@@ -1854,7 +2172,7 @@ fun DashboardScreen(
                                     .size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Login,
+                                    imageVector = Icons.AutoMirrored.Rounded.Login,
                                     contentDescription = if (language == AppLanguage.BN) "গুগল সাইন-ইন" else "Google Sign-In",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
@@ -1900,14 +2218,13 @@ fun DashboardScreen(
                     Box(
                         modifier = Modifier
                             .size(46.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.15f))
-                            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
                             .clickable { onNavigate("charts", "") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_pie_chart),
+                            painter = painterResource(id = R.drawable.vital_signs_24),
                             contentDescription = "Charts",
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
@@ -1934,7 +2251,7 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_trending_up),
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(16.dp)
@@ -2208,7 +2525,7 @@ fun TransactionRowItem(
                 showDetails = false
                 onEdit(tx)
             },
-            onShare = {
+            onShareText = {
                 val shareText = buildString {
                     append(if (language == AppLanguage.BN) "মানি রসিদ\n" else "Money Receipt\n")
                     append("-------------------\n")
@@ -2223,13 +2540,16 @@ fun TransactionRowItem(
                     }
                     append(if (language == AppLanguage.BN) "তারিখ: " else "Date: ").append(formatDate(tx.timestamp, language)).append("\n")
                     append("-------------------\n")
-                    append(if (language == AppLanguage.BN) "সঞ্চয় অ্যাপ থেকে শেয়ার করা হয়েছে" else "Shared via Sanchay App")
+                    append(if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে শেয়ার করা হয়েছে" else "Shared via Finance Note")
                 }
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(intent, if (language == AppLanguage.BN) "শেয়ার করুন" else "Share via"))
+            },
+            onShareImage = { bitmap ->
+                shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে ট্রানজ্যাকশন মেমো" else "Transaction Memo from Finance Note")
             }
         )
     }
@@ -2386,11 +2706,43 @@ fun TransactionDetailsDialog(
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
-    onShare: () -> Unit
+    onShareText: () -> Unit,
+    onShareImage: (android.graphics.Bitmap) -> Unit
 ) {
     val bgColor = if (isDark) Color(0xFF1E2235) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val subtitleColor = if (isDark) Color.LightGray else Color(0xFF64748B)
+
+    var showShareOptions by remember { mutableStateOf(false) }
+    val screenshotState = rememberScreenshotState()
+
+    if (showShareOptions) {
+        AlertDialog(
+            onDismissRequest = { showShareOptions = false },
+            title = { Text(if (language == AppLanguage.BN) "কিভাবে শেয়ার করবেন?" else "How to share?") },
+            text = {
+                Column {
+                    TextButton(onClick = { 
+                        showShareOptions = false
+                        onShareText()
+                    }) {
+                        Text(if (language == AppLanguage.BN) "টেক্সট হিসেবে" else "As Text", color = FintechBlue)
+                    }
+                    TextButton(onClick = {
+                        showShareOptions = false
+                        screenshotState.createBitmap()?.let { onShareImage(it) }
+                    }) {
+                        Text(if (language == AppLanguage.BN) "ছবি হিসেবে (স্ক্রিনশট)" else "As Image (Screenshot)", color = FintechBlue)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showShareOptions = false }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
+                }
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2405,6 +2757,7 @@ fun TransactionDetailsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .captureToPicture(screenshotState)
                     .background(if (isDark) Color(0xFF141724) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -2440,7 +2793,7 @@ fun TransactionDetailsDialog(
                 
                 if (tx.note.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    Divider(color = subtitleColor.copy(alpha = 0.2f))
+                    HorizontalDivider(color = subtitleColor.copy(alpha = 0.2f))
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = if (language == AppLanguage.BN) "নোট:" else "Note:", color = subtitleColor, fontSize = 13.sp)
                     Text(text = tx.note, color = textColor, fontSize = 14.sp)
@@ -2461,7 +2814,7 @@ fun TransactionDetailsDialog(
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
                     }
-                    IconButton(onClick = onShare) {
+                    IconButton(onClick = { showShareOptions = true }) {
                         Icon(Icons.Rounded.Share, contentDescription = "Share", tint = FintechBlue)
                     }
                 }
@@ -3078,11 +3431,11 @@ fun PersonDebtRowItem(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Text(
-                            text = item.person.name.take(1).uppercase(),
-                            color = FintechBlue,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 18.sp
+                        Icon(
+                            imageVector = Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
@@ -3277,7 +3630,7 @@ fun SavingsGoalCardItem(
                         verticalArrangement = Arrangement.SpaceEvenly
                     ) {
                         repeat(3) {
-                            Divider(color = Color.White.copy(alpha = 0.1f), thickness = 0.5.dp)
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 0.5.dp)
                         }
                     }
                 }
@@ -3571,7 +3924,7 @@ fun AddTransactionDialog(
                                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                                             unfocusedBorderColor = labelColor
                                         ),
-                                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                                     )
                                     ExposedDropdownMenu(
                                         expanded = personDropdownExpanded,
@@ -3651,7 +4004,7 @@ fun AddTransactionDialog(
                                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                                         unfocusedBorderColor = labelColor
                                     ),
-                                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                                 )
                                 ExposedDropdownMenu(
                                     expanded = categoryDropdownExpanded,
@@ -3893,7 +4246,7 @@ fun AddPersonDialog(
                             Icon(
                                 imageVector = Icons.Rounded.Person,
                                 contentDescription = null,
-                                tint = labelColor,
+                                tint = FintechBlue,
                                 modifier = Modifier.size(32.dp)
                             )
                         }
@@ -4130,7 +4483,7 @@ fun AddSavingsGoalDialog(
                                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                                     unfocusedBorderColor = labelColor
                                 ),
-                                modifier = Modifier.fillMaxWidth().menuAnchor()
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
                             )
                             ExposedDropdownMenu(
                                 expanded = sectorDropdownExpanded,
@@ -4252,12 +4605,13 @@ fun SavingsContributionDialog(
     savingsGoal: SavingsGoal,
     isDark: Boolean,
     initialIsWithdraw: Boolean = false,
+    txToEdit: SavingsTransaction? = null,
     onDismiss: () -> Unit,
     onConfirm: (Double, Boolean, String) -> Unit
 ) {
-    var amountStr by remember { mutableStateOf("") }
-    var noteStr by remember { mutableStateOf("") }
-    var isWithdraw by remember { mutableStateOf(initialIsWithdraw) }
+    var amountStr by remember { mutableStateOf(if (txToEdit != null) txToEdit.amount.toString() else "") }
+    var noteStr by remember { mutableStateOf(txToEdit?.note ?: "") }
+    var isWithdraw by remember { mutableStateOf(txToEdit?.let { !it.isDeposit } ?: initialIsWithdraw) }
     val context = LocalContext.current
 
     val dialogBg = if (isDark) Color(0xFF141724) else Color.White
@@ -4396,11 +4750,25 @@ fun SavingsGoalDetailOverlay(
     onDeleteGoal: (Int) -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
-    onDeleteTx: (SavingsTransaction) -> Unit
+    onDeleteTx: (SavingsTransaction) -> Unit,
+    onEditTx: (SavingsTransaction) -> Unit
 ) {
+    val context = LocalContext.current
     val txList by transactionsFlow.collectAsState(initial = emptyList())
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var selectedSavingsTx by remember { mutableStateOf<SavingsTransaction?>(null) }
+    var txToDelete by remember { mutableStateOf<SavingsTransaction?>(null) }
+    
+    if (txToDelete != null) {
+        DeleteVerificationDialog(
+            language = language,
+            onConfirm = {
+                onDeleteTx(txToDelete!!)
+                txToDelete = null
+            },
+            onDismiss = { txToDelete = null }
+        )
+    }
 
     if (showDeleteConfirm) {
         DeleteVerificationDialog(
@@ -4608,8 +4976,36 @@ fun SavingsGoalDetailOverlay(
             isDark = isDark,
             onDismiss = { selectedSavingsTx = null },
             onDelete = {
-                onDeleteTx(tx)
+                txToDelete = tx
                 selectedSavingsTx = null
+            },
+            onEdit = {
+                onEditTx(tx)
+                selectedSavingsTx = null
+            },
+            onShareText = {
+                val shareText = buildString {
+                    append(if (language == AppLanguage.BN) "সঞ্চয় ট্রানজ্যাকশন মেমো\n" else "Savings Transaction Memo\n")
+                    append("-------------------\n")
+                    val typeStr = if (tx.isDeposit) (if (language == AppLanguage.BN) "জমা" else "Deposit") else (if (language == AppLanguage.BN) "উত্তোলন" else "Withdraw")
+                    append(if (language == AppLanguage.BN) "ধরণ: " else "Type: ").append(typeStr).append("\n")
+                    append(if (language == AppLanguage.BN) "পরিমাণ: " else "Amount: ").append(formatCurrency(tx.amount, language)).append("\n")
+                    append(if (language == AppLanguage.BN) "লক্ষ্য: " else "Goal: ").append(goal.title).append("\n")
+                    if (tx.note.isNotBlank()) {
+                        append(if (language == AppLanguage.BN) "নোট: " else "Note: ").append(tx.note).append("\n")
+                    }
+                    append(if (language == AppLanguage.BN) "তারিখ: " else "Date: ").append(formatDate(tx.timestamp, language)).append("\n")
+                    append("-------------------\n")
+                    append(if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে শেয়ার করা হয়েছে" else "Shared via Finance Note")
+                }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                }
+                context.startActivity(Intent.createChooser(intent, if (language == AppLanguage.BN) "শেয়ার করুন" else "Share via"))
+            },
+            onShareImage = { bitmap ->
+                shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে সঞ্চয় মেমো" else "Savings Memo from Finance Note")
             }
         )
     }
@@ -4622,11 +5018,45 @@ fun SavingsTransactionDetailsDialog(
     language: AppLanguage,
     isDark: Boolean,
     onDismiss: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onShareText: () -> Unit,
+    onShareImage: (android.graphics.Bitmap) -> Unit
 ) {
     val bgColor = if (isDark) Color(0xFF1E2235) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val subtitleColor = if (isDark) Color.LightGray else Color(0xFF64748B)
+
+    var showShareOptions by remember { mutableStateOf(false) }
+    val screenshotState = rememberScreenshotState()
+
+    if (showShareOptions) {
+        AlertDialog(
+            onDismissRequest = { showShareOptions = false },
+            title = { Text(if (language == AppLanguage.BN) "কিভাবে শেয়ার করবেন?" else "How to share?") },
+            text = {
+                Column {
+                    TextButton(onClick = { 
+                        showShareOptions = false
+                        onShareText()
+                    }) {
+                        Text(if (language == AppLanguage.BN) "টেক্সট হিসেবে" else "As Text", color = FintechBlue)
+                    }
+                    TextButton(onClick = {
+                        showShareOptions = false
+                        screenshotState.createBitmap()?.let { onShareImage(it) }
+                    }) {
+                        Text(if (language == AppLanguage.BN) "ছবি হিসেবে (স্ক্রিনশট)" else "As Image (Screenshot)", color = FintechBlue)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showShareOptions = false }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
+                }
+            }
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -4641,6 +5071,7 @@ fun SavingsTransactionDetailsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .captureToPicture(screenshotState)
                     .background(if (isDark) Color(0xFF141724) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -4667,28 +5098,39 @@ fun SavingsTransactionDetailsDialog(
                 DetailRow(if (language == AppLanguage.BN) "লক্ষ্য:" else "Goal:", goalName)
                 DetailRow(if (language == AppLanguage.BN) "তারিখ:" else "Date:", formatDate(tx.timestamp, language))
                 
-                if (tx.note.isNotEmpty()) {
-                    DetailRow(if (language == AppLanguage.BN) "নোট:" else "Note:", tx.note)
+                if (tx.note.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HorizontalDivider(color = subtitleColor.copy(alpha = 0.2f))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = if (language == AppLanguage.BN) "নোট:" else "Note:", color = subtitleColor, fontSize = 13.sp)
+                    Text(text = tx.note, color = textColor, fontSize = 14.sp)
                 }
             }
         },
+        containerColor = bgColor,
         confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(if (language == AppLanguage.BN) "ঠিক আছে" else "OK", color = Color.White)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = FintechBlue)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
+                    }
+                    IconButton(onClick = { showShareOptions = true }) {
+                        Icon(Icons.Rounded.Share, contentDescription = "Share", tint = FintechBlue)
+                    }
+                }
+                
+                TextButton(onClick = onDismiss) {
+                    Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close", color = FintechBlue)
+                }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDelete,
-                colors = ButtonDefaults.textButtonColors(contentColor = FintechRed)
-            ) {
-                Text(if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete")
-            }
-        },
-        containerColor = bgColor
+        }
     )
 }
 
@@ -5242,12 +5684,14 @@ fun SettingCategory(
             }
         }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: FinanceViewModel,
     language: AppLanguage,
     isDark: Boolean,
     filter: String = "",
+    onShowUpdatePopup: () -> Unit,
     onBack: () -> Unit,
     onSignInClick: () -> Unit,
     onBackupClick: () -> Unit,
@@ -5272,6 +5716,8 @@ fun SettingsScreen(
     val googleEmail by viewModel.googleEmail.collectAsState()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val driveStatusMessage by viewModel.driveStatusMessage.collectAsState()
+    val lastGDriveBackupTime by viewModel.lastGDriveBackupTime.collectAsState()
+    val autoBackupIntervalDays by viewModel.autoBackupIntervalDays.collectAsState()
 
     val profileName = rawProfileName ?: (if (isGoogleSignedIn) googleName else null) ?: ""
     val profileEmail = rawProfileEmail ?: (if (isGoogleSignedIn) googleEmail else null) ?: ""
@@ -5282,6 +5728,10 @@ fun SettingsScreen(
     var showTermsDialog by remember { mutableStateOf(false) }
     var showErrorLogDialog by remember { mutableStateOf(false) }
     var currentLogsText by remember { mutableStateOf("") }
+    var autoBackupDropdownExpanded by remember { mutableStateOf(false) }
+    
+    val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
+    val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.initGoogleDrive(context)
@@ -5521,7 +5971,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
                         fontSize = 16.sp,
@@ -5544,142 +5994,6 @@ fun SettingsScreen(
                         uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
                     )
                 )
-            }
-        }
-
-        // --- 3. NOTIFICATION WIDGET CARD ---
-        val notificationEnabled by viewModel.isNotificationEnabled.collectAsState()
-        val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) {
-                viewModel.toggleNotification(context)
-            } else {
-                Toast.makeText(context, if (language == AppLanguage.BN) "নটিফিকেশন পারমিশন প্রয়োজন" else "Notification permission required", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        SettingCategory(
-            title = if (language == AppLanguage.BN) "কুইক একশন উইজেট" else "Quick Action Widget",
-            isDark = isDark,
-            icon = Icons.Rounded.NotificationsActive,
-            initiallyExpanded = true
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.SmartButton,
-                        contentDescription = null,
-                        tint = FintechBlue,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "নটিফিকেশন বার উইজেট" else "Notification Bar Widget",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isDark) Color.White else Color(0xFF1E293B)
-                    )
-                    Text(
-                        text = if (language == AppLanguage.BN) "দ্রুত একশন বাটনগুলো নটিফিকেশন বারে দেখান" else "Show quick action buttons in notification bar",
-                        fontSize = 12.sp,
-                        color = if (isDark) Color.Gray else Color(0xFF64748B)
-                    )
-                }
-                Switch(
-                    checked = notificationEnabled,
-                    onCheckedChange = { 
-                        if (!notificationEnabled && android.os.Build.VERSION.SDK_INT >= 33) {
-                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            viewModel.toggleNotification(context)
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = FintechBlue,
-                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
-                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
-                    )
-                )
-            }
-        }
-
-        // --- 4. APP LANGUAGE CARD ---
-        SettingCategory(
-            title = if (language == AppLanguage.BN) "অ্যাপের ভাষা / App Language" else "App Language",
-            isDark = isDark,
-            icon = Icons.Rounded.Language,
-            initiallyExpanded = true
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = if (language == AppLanguage.BN) "আপনার পছন্দের ভাষা নির্বাচন করুন" else "Choose your preferred language",
-                    fontSize = 13.sp,
-                    color = if (isDark) Color.Gray else Color(0xFF64748B)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Bangla Button
-                    val isBn = language == AppLanguage.BN
-                    Button(
-                        onClick = { if (!isBn) viewModel.toggleLanguage(context) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isBn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isBn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
-                        ),
-                        contentPadding = PaddingValues(12.dp)
-                    ) {
-                        Text(
-                            text = "বাংলা (Bangla)",
-                            color = if (isBn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    // English Button
-                    val isEn = language == AppLanguage.EN
-                    Button(
-                        onClick = { if (!isEn) viewModel.toggleLanguage(context) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isEn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
-                        ),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (isEn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
-                        ),
-                        contentPadding = PaddingValues(12.dp)
-                    ) {
-                        Text(
-                            text = "English",
-                            color = if (isEn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
             }
         }
 
@@ -5808,7 +6122,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
             isDark = isDark,
             icon = Icons.Rounded.Backup,
-            initiallyExpanded = (filter == "BACKUP")
+            initiallyExpanded = true
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -6038,6 +6352,111 @@ fun SettingsScreen(
                         fontSize = 12.sp,
                         color = if (isDark) Color.Gray else Color(0xFF64748B)
                     )
+
+                    // Last Backup Time Info Row & Auto Backup Setting
+                    if (isGoogleSignedIn) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            HorizontalDivider(color = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "সর্বশেষ ক্লাউড ব্যাকআপ:" else "Last Cloud Backup:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.LightGray else Color(0xFF475569)
+                                )
+                                Text(
+                                    text = formatSyncTime(lastGDriveBackupTime, language),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FintechBlue
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "স্বয়ংক্রিয় ব্যাকআপের সময়কাল:" else "Auto Backup Interval:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.LightGray else Color(0xFF475569)
+                                )
+                                
+                                val intervalOptions = listOf(-1, 1, 2, 5, 7, 15, 30)
+                                val selectedText = when (autoBackupIntervalDays) {
+                                    -1 -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                                    1 -> if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"
+                                    2 -> if (language == AppLanguage.BN) "২ দিন পর পর" else "Every 2 Days"
+                                    5 -> if (language == AppLanguage.BN) "৫ দিন পর পর" else "Every 5 Days"
+                                    7 -> if (language == AppLanguage.BN) "৭ দিন পর পর" else "Every 7 Days"
+                                    15 -> if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"
+                                    30 -> if (language == AppLanguage.BN) "৩০ দিন পর পর" else "Every 30 Days"
+                                    else -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                                }
+
+                                ExposedDropdownMenuBox(
+                                    expanded = autoBackupDropdownExpanded,
+                                    onExpandedChange = { autoBackupDropdownExpanded = !autoBackupDropdownExpanded },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    OutlinedTextField(
+                                        value = selectedText,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                                            focusedBorderColor = FintechBlue,
+                                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                            unfocusedContainerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFF8FAFC),
+                                            focusedContainerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFF8FAFC)
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = autoBackupDropdownExpanded) }
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = autoBackupDropdownExpanded,
+                                        onDismissRequest = { autoBackupDropdownExpanded = false }
+                                    ) {
+                                        intervalOptions.forEach { days ->
+                                            val itemText = when (days) {
+                                                -1 -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                                                1 -> if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"
+                                                2 -> if (language == AppLanguage.BN) "২ দিন পর পর" else "Every 2 Days"
+                                                5 -> if (language == AppLanguage.BN) "৫ দিন পর পর" else "Every 5 Days"
+                                                7 -> if (language == AppLanguage.BN) "৭ দিন পর পর" else "Every 7 Days"
+                                                15 -> if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"
+                                                30 -> if (language == AppLanguage.BN) "৩০ দিন পর পর" else "Every 30 Days"
+                                                else -> ""
+                                            }
+                                            DropdownMenuItem(
+                                                text = { Text(itemText, fontSize = 13.sp) },
+                                                onClick = {
+                                                    viewModel.setAutoBackupIntervalDays(context, days)
+                                                    autoBackupDropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            HorizontalDivider(color = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0))
+                        }
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -6080,6 +6499,143 @@ fun SettingsScreen(
             }
         }
 
+        // --- 3. NOTIFICATION WIDGET CARD ---
+        val notificationEnabled by viewModel.isNotificationEnabled.collectAsState()
+        val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                viewModel.toggleNotification(context)
+            } else {
+                Toast.makeText(context, if (language == AppLanguage.BN) "নটিফিকেশন পারমিশন প্রয়োজন" else "Notification permission required", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "কুইক একশন উইজেট" else "Quick Action Widget",
+            isDark = isDark,
+            icon = Icons.Rounded.NotificationsActive,
+            initiallyExpanded = false
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SmartButton,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "নটিফিকেশন বার উইজেট" else "Notification Bar Widget",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "দ্রুত একশন বাটনগুলো নটিফিকেশন বারে দেখান" else "Show quick action buttons in notification bar",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                }
+                Switch(
+                    checked = notificationEnabled,
+                    onCheckedChange = { 
+                        if (!notificationEnabled && android.os.Build.VERSION.SDK_INT >= 33) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            viewModel.toggleNotification(context)
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = FintechBlue,
+                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                    )
+                )
+            }
+        }
+
+        // --- 4. APP LANGUAGE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অ্যাপের ভাষা / App Language" else "App Language",
+            isDark = isDark,
+            icon = Icons.Rounded.Language,
+            initiallyExpanded = false
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "আপনার পছন্দের ভাষা নির্বাচন করুন" else "Choose your preferred language",
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Bangla Button
+                    val isBn = language == AppLanguage.BN
+                    Button(
+                        onClick = { if (!isBn) viewModel.toggleLanguage(context) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isBn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isBn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
+                        ),
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Text(
+                            text = "বাংলা (Bangla)",
+                            color = if (isBn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    // English Button
+                    val isEn = language == AppLanguage.EN
+                    Button(
+                        onClick = { if (!isEn) viewModel.toggleLanguage(context) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isEn) FintechBlue else (if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9))
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isEn) FintechBlue else (if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1))
+                        ),
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
+                        Text(
+                            text = "English",
+                            color = if (isEn) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+
+
         // --- 6. APP ERROR LOG (SUPPORT) CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "অ্যাপ এর লগ (সাপোর্ট)" else "App Error Log (Support)",
@@ -6119,6 +6675,7 @@ fun SettingsScreen(
             }
         }
 
+        
         // --- 7. ABOUT DEVELOPER CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "ডেভেলপার প্রোফাইল" else "Developer Profile",
@@ -6309,10 +6866,106 @@ fun SettingsScreen(
                         color = if (isDark) Color.Gray else Color(0xFF64748B)
                     )
                     Text(
-                        text = "1.3.0",
+                        text = viewModel.updateManager.getAppVersionName(context),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                }
+                
+                HorizontalDivider(color = if (isDark) Color(0xFF1E2235) else Color(0xFFE2E8F0))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !isCheckingForUpdate) {
+                            viewModel.updateManager.checkForUpdates(context) { isAvailable ->
+                                if (isAvailable) {
+                                    onShowUpdatePopup()
+                                } else {
+                                    android.widget.Toast.makeText(context, if (language == AppLanguage.BN) "আপনি সর্বশেষ সংস্করণ ব্যবহার করছেন" else "You are using the latest version", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "আপডেট চেক করুন" else "Check for Updates",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    if (isCheckingForUpdate) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = FintechBlue,
+                            strokeWidth = 2.dp
+                        )
+                    } else if (updateInfo.isUpdateAvailable) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "আপডেট উপলব্ধ" else "Update Available",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981) // Green
+                        )
+                    } else {
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+
+        // --- 4.5 SHARE APP CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অ্যাপটি শেয়ার করুন" else "Share App",
+            isDark = isDark,
+            icon = Icons.Rounded.Share,
+            initiallyExpanded = true
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "বন্ধু ও পরিজনদের সাথে অ্যাপটি শেয়ার করুন" else "Share the app with friends and family",
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
+                )
+                Button(
+                    onClick = {
+                        val shareText = buildString {
+                            append(if (language == AppLanguage.BN) "দৈনন্দিন লেনদেন, দেনাপাওনা ও সঞ্চয়ের হিসাব রাখতে ডাউনলোড করুন ফাইন্যান্স নোট অ্যাপ: " else "Download Finance Note app to keep track of your daily transactions, debts, and savings: ")
+                            append("\n")
+                            val updateInfoStr = context.getSharedPreferences("FinancePrefs", android.content.Context.MODE_PRIVATE).getString("update_info", null)
+                            var link = "https://sites.google.com/view/financenote/home?authuser=0"
+                            if (updateInfoStr != null) {
+                                try {
+                                    val obj = org.json.JSONObject(updateInfoStr)
+                                    val url = obj.optString("update_url", "")
+                                    if (url.isNotBlank()) link = url
+                                } catch (e: Exception) {}
+                            }
+                            append(link)
+                        }
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_TEXT, shareText)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, if (language == AppLanguage.BN) "শেয়ার করুন" else "Share via"))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    contentPadding = PaddingValues(14.dp)
+                ) {
+                    Icon(imageVector = Icons.Rounded.Share, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "শেয়ার করুন" else "Share Now",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color.White
                     )
                 }
             }
@@ -6375,39 +7028,41 @@ fun SettingsScreen(
             }
         }
 
-        // --- 10. BOTTOM SPONSORED AD CARD ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (isDark) Color(0xFF141724) else Color.White)
-                .border(1.dp, if (isDark) Color(0xFF1F2937) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        // --- 10. VISIT WEBSITE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "আমাদের ওয়েবসাইট ভিজিট করুন" else "Visit Our Website",
+            isDark = isDark,
+            icon = Icons.Rounded.Public,
+            initiallyExpanded = true
         ) {
-            Text(
-                text = if (language == AppLanguage.BN) "📢 স্পন্সরড বিজ্ঞাপন" else "📢 Sponsored Ad",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color.Gray else Color(0xFF64748B)
-            )
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(FintechBlue.copy(alpha = 0.15f))
-                    .clickable {
-                        Toast.makeText(context, if (language == AppLanguage.BN) "বিজ্ঞাপন মুক্ত করুন!" else "Free Ads!", Toast.LENGTH_SHORT).show()
-                    }
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = if (language == AppLanguage.BN) "মুক্ত বিজ্ঞাপন" else "Free Ad",
-                    color = FintechBlue,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp
+                    text = if (language == AppLanguage.BN) "অ্যাপের আপডেট ও তথ্য জানতে আমাদের ওয়েবসাইট ভিজিট করুন" else "Visit our website for app updates and information",
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
                 )
+                Button(
+                    onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://sites.google.com/view/financenote/home?authuser=0"))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    contentPadding = PaddingValues(14.dp)
+                ) {
+                    Icon(imageVector = Icons.Rounded.Public, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "ওয়েবসাইট ভিজিট করুন" else "Visit Website",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color.White
+                    )
+                }
             }
         }
 
@@ -6440,6 +7095,7 @@ fun SettingsScreen(
         )
     }
 
+
     if (showPrivacyDialog) {
         AlertDialog(
             onDismissRequest = { showPrivacyDialog = false },
@@ -6456,22 +7112,22 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "১. তথ্য সংগ্রহ ও ব্যবহার:\nFinance Note অ্যাপটি একটি সম্পূর্ণ অফলাইন-ফার্স্ট অ্যাপ্লিকেশন। আপনার সমস্ত হিসাব, সঞ্চয় এবং লেনদেনের তথ্য শুধুমাত্র আপনার ডিভাইসের লোকাল ডাটাবেজে সংরক্ষিত থাকে। আমরা আমাদের কোনো সার্ভারে আপনার ব্যক্তিগত বা আর্থিক তথ্য সংগ্রহ, সংরক্ষণ বা ট্র্যাক করি না।"
-                            else "1. Information Collection & Use:\nFinance Note is a fully offline-first application. All your financial records, savings, and transaction data are stored solely on your local device. We do not collect, store, or track your personal or financial data on any external servers.",
+                            "১. তথ্য সংগ্রহ ও ব্যবহার:\nSanchay অ্যাপটি লোকাল-ফার্স্ট এবং ক্লাউড-সিঙ্ক সাপোর্ট করে। আপনার সমস্ত হিসাব ও লেনদেনের তথ্য ডিভাইসের নিরাপদ লোকাল SQLite (Room) ডাটাবেজে সংরক্ষিত থাকে। আপনি রিয়েল-টাইম ক্লাউড সিঙ্ক অন করলে ফায়ারবেস সিকিউর লাইনে আপনার ফায়ারবেস ক্লাউড ডাটাবেজে সেটি সিঙ্ক হয়।"
+                            else "1. Information Collection & Use:\nSanchay is a local-first application with optional secure cloud sync. All your transaction records are stored securely on your device using SQLite (Room). If real-time cloud sync is enabled, it synchronizes securely with Firestore database.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "২. গুগল ড্রাইভ ব্যাকআপ:\nঅ্যাপের ক্লাউড ব্যাকআপ ফিচারটি ব্যবহারের জন্য যখন আপনি গুগল ড্রাইভ কানেক্ট করেন, তখন আপনার অনুমতি নিয়ে শুধুমাত্র অ্যাপের তৈরি করা ফাইলটি আপনার নিজস্ব গুগল ড্রাইভে আপলোড করা হয়। এই ব্যাকআপ ফাইলটির উপর আমাদের বা অন্য কোনো তৃতীয় পক্ষের কোনো নিয়ন্ত্রণ বা এক্সেস নেই।"
-                            else "2. Google Drive Backup:\nWhen you connect and use the Google Drive backup feature, the app uploads your backup file directly to your personal Google Drive account. Neither we nor any third party has access to or control over this backup file.",
+                            "২. মিলিটারী-গ্রেড AES-256 এনক্রিপশন:\nআপনার সর্বোচ্চ সুরক্ষার জন্য, গুগল ড্রাইভ ব্যাকআপ, লোকাল ব্যাকআপ ফাইল, ক্লাউড সিঙ্ক এবং কপি করা ব্যাকআপ কোডসহ সকল ধরনের ব্যাকআপ ফাইল মিলিটারী-গ্রেড AES-256 এনক্রিপশন দ্বারা অত্যন্ত সুরক্ষিতভাবে এনক্রিপ্ট করা হয়। রিস্টোর করার সময় আমাদের অ্যাপটি স্বয়ংক্রিয়ভাবে তা ডিক্রিপ্ট করে নেয়।"
+                            else "2. Military-Grade AES-256 Encryption:\nFor your maximum security, all backups—including Google Drive, local backup files, cloud sync records, and exported clipboard codes—are fully encrypted using military-grade AES-256 encryption. The app automatically decrypts them securely during restore.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "৩. নিরাপত্তা:\nআপনার ফাইন্যান্সিয়াল সিকিউরিটি আমাদের সর্বোচ্চ অগ্রাধিকার। যেহেতু আপনার সমস্ত তথ্য ডিভাইসে অফলাইনে থাকে, তাই আপনার ডিভাইসের নিরাপত্তা বজায় রাখা আপনার দায়িত্ব। আমরা কোনো প্রকার ট্র্যাকিং কুকি বা এনালিটিক্স টুল ব্যবহার করি না।"
-                            else "3. Data Security:\nYour financial security is our top priority. Since all records remain offline on your device, maintaining your device security is your responsibility. We do not use any hidden tracking cookies or analytics tools.",
+                            "৩. স্বয়ংক্রিয় ব্যাকআপের সময়কাল:\nগুগল সাইন-ইন করা থাকলে আপনি নির্দিষ্ট দিন অন্তর অন্তর (যেমন- ১ দিন, ৭ দিন ইত্যাদি) সম্পূর্ণ স্বয়ংক্রিয় গুগল ড্রাইভ ব্যাকআপ ফিচারটি ব্যবহারের সুবিধা পাবেন যা আপনার নিজস্ব গুগল ড্রাইভে আপলোড হবে।"
+                            else "3. Google Drive Auto Backup:\nWhen signed in with Google, you can set a custom interval (e.g. daily, weekly) for the app to automatically back up your encrypted financial data securely to your Google Drive folder.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
@@ -6504,22 +7160,22 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "১. অ্যাপের ব্যবহার:\nFinance Note অ্যাপটি ব্যক্তিগত ব্যবহারের জন্য তৈরি করা হয়েছে। আপনার কোনো ভুল ডাটা এন্ট্রি বা অসাবধানতাবশত ডাটা ডিলিট হওয়ার জন্য অ্যাপ কর্তৃপক্ষ দায়ী থাকবে না।"
-                            else "1. App Usage:\nFinance Note is designed for personal money management. The app and its developers are not responsible for any data loss, accidental deletions, or financial discrepancies resulting from user input errors.",
+                            "১. অ্যাপের ব্যবহার:\nSanchay অ্যাপটি ব্যক্তিগত অর্থ ব্যবস্থাপনার জন্য তৈরি করা হয়েছে। ভুল এন্ট্রি, পাসওয়ার্ড ভুলে যাওয়া বা ডিভাইসের ত্রুটির কারণে ডাটা নষ্ট হলে অ্যাপ কর্তৃপক্ষ দায়ী থাকবে না।"
+                            else "1. App Usage:\nSanchay is designed for personal money management. The app and its developers are not responsible for any data loss, forgotten password, or device malfunction resulting in data discrepancy.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "২. ব্যাকআপের দায়িত্ব:\nআপনার ডাটার নিরাপত্তা এবং ব্যাকআপের সম্পূর্ণ দায়িত্ব আপনার। নিয়মিত ক্লাউড ব্যাকআপ নেওয়ার পরামর্শ দেওয়া হচ্ছে, যাতে ফোন হারিয়ে গেলে বা নষ্ট হলে ডাটা রিস্টোর করা সম্ভব হয়।"
-                            else "2. Backup Responsibility:\nYou are solely responsible for backing up your financial data. We highly recommend taking regular backups on Google Drive to prevent data loss in case of hardware failure or phone replacement.",
+                            "২. ব্যাকআপ ও সিঙ্কের সততা:\nগুগল ড্রাইভ অটো ব্যাকআপ এবং রিয়েল-টাইম ক্লাউড সিঙ্ক ফিচার ব্যবহার করতে ইন্টারনেট সংযোগ প্রয়োজন। আপনার নিরাপত্তার স্বার্থে সমস্ত সংরক্ষিত ফাইল মিলিটারী-গ্রেড AES-256 এনক্রিপ্ট করে সিকিউর ক্লাউডে আপলোড করা হয়।"
+                            else "2. Backup & Sync Integrity:\nInternet connectivity is required to use Google Drive automatic backups and real-time cloud sync. For your absolute security, all backup files are encrypted using military-grade AES-256 before being uploaded.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "৩. পরিবর্তন ও আপডেট:\nআমরা অ্যাপের কার্যকারিতা ও নিরাপত্তা বাড়াতে যেকোনো সময় অ্যাপে আপডেট বা পরিবর্তন আনতে পারি।"
-                            else "3. Updates & Modifications:\nWe reserve the right to release updates or modify features to improve performance, usability, and app security at any time.",
+                            "৩. পরিবর্তন ও আপডেট:\nঅ্যাপের গতিশীলতা, নিরাপত্তা ও নির্ভরযোগ্যতা সর্বোচ্চ পর্যায়ে বজায় রাখতে আমরা যেকোনো সময় অ্যাপে আপডেট বা সংস্করণ জারি করতে পারি।"
+                            else "3. Service Updates:\nWe reserve the right to deploy updates and modifications to maximize security, usability, and visual elegance of Sanchay at any time.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
@@ -6612,7 +7268,7 @@ fun SettingsScreen(
                                         val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                             type = "text/plain"
                                             putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf("connect.shariful@gmail.com"))
-                                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Sanchay (Finance Note) Error Log Report")
+                                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Finance Note Error Log Report")
                                             putExtra(android.content.Intent.EXTRA_TEXT, currentLogsText)
                                         }
                                         context.startActivity(android.content.Intent.createChooser(intent, "Send Email"))
@@ -6639,7 +7295,7 @@ fun SettingsScreen(
                                         } else {
                                             currentLogsText
                                         }
-                                        val message = "Hi Developer, here is my Sanchay App Error Report:\n\n$truncatedLogs"
+                                        val message = "Hi Developer, here is my Finance Note Error Report:\n\n$truncatedLogs"
                                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599?text=${android.net.Uri.encode(message)}"))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
@@ -6774,14 +7430,18 @@ fun TimelineSplineChart(
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val gridColor = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
 
-    FintechGradientCard(
-        gradientColors = bgColor,
-        cornerRadius = 24.dp,
-        padding = PaddingValues(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
     ) {
+        FintechGradientCard(
+            gradientColors = bgColor,
+            cornerRadius = 24.dp,
+            padding = PaddingValues(16.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(horizontal = 16.dp)
+        ) {
         Column {
             // Title & Legends Row
             Row(
@@ -6881,8 +7541,8 @@ fun TimelineSplineChart(
                         .fillMaxHeight()
                 ) {
                     val availableWidth = maxWidth
-                    val minItemWidth = 42.dp
-                    val dynamicWidth = maxOf(availableWidth * 0.85f, (monthsLabels.size * minItemWidth.value).dp)
+                    val minItemWidth = 25.2.dp // 42.dp reduced by 40%
+                    val dynamicWidth = maxOf(availableWidth * 0.51f, (monthsLabels.size * minItemWidth.value).dp) // 0.85f reduced by 40%
 
                     Box(
                         modifier = Modifier
@@ -7023,6 +7683,7 @@ fun TimelineSplineChart(
                 }
             }
         }
+    }
     }
 }
 
@@ -7398,7 +8059,7 @@ fun SegmentedFilterPicker(
             colors = IconButtonDefaults.iconButtonColors(containerColor = buttonBg)
         ) {
             Icon(
-                imageVector = Icons.Rounded.KeyboardArrowLeft,
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
                 contentDescription = "Previous",
                 tint = textColor,
                 modifier = Modifier.size(16.dp)
@@ -7424,7 +8085,7 @@ fun SegmentedFilterPicker(
             colors = IconButtonDefaults.iconButtonColors(containerColor = buttonBg)
         ) {
             Icon(
-                imageVector = Icons.Rounded.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = "Next",
                 tint = textColor,
                 modifier = Modifier.size(16.dp)
@@ -8216,7 +8877,7 @@ fun ChartsScreen(
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { tempYear-- }) {
-                            Icon(Icons.Rounded.KeyboardArrowLeft, contentDescription = "Prev Year")
+                            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "Prev Year")
                         }
                         Text(
                             text = formatYearDisplay(tempYear, language),
@@ -8224,7 +8885,7 @@ fun ChartsScreen(
                             color = if (isDark) Color.White else Color(0xFF1E293B)
                         )
                         IconButton(onClick = { tempYear++ }) {
-                            Icon(Icons.Rounded.KeyboardArrowRight, contentDescription = "Next Year")
+                            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Next Year")
                         }
                     }
                 }
@@ -8310,7 +8971,7 @@ fun ChartsScreen(
                                     tempMonth--
                                 }
                             }) {
-                                Icon(Icons.Rounded.KeyboardArrowLeft, contentDescription = "Prev Month")
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "Prev Month")
                             }
                             Text(
                                 text = if (language == AppLanguage.BN) bnMonthNamesFull[tempMonth] else enMonthNamesFull[tempMonth],
@@ -8326,13 +8987,13 @@ fun ChartsScreen(
                                     tempMonth++
                                 }
                             }) {
-                                Icon(Icons.Rounded.KeyboardArrowRight, contentDescription = "Next Month")
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Next Month")
                             }
                         }
                         
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = { tempYear-- }) {
-                                Icon(Icons.Rounded.KeyboardArrowLeft, contentDescription = "Prev Year")
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "Prev Year")
                             }
                             Text(
                                 text = formatYearDisplay(tempYear, language),
@@ -8341,7 +9002,7 @@ fun ChartsScreen(
                                 color = if (isDark) Color.White else Color(0xFF1E293B)
                             )
                             IconButton(onClick = { tempYear++ }) {
-                                Icon(Icons.Rounded.KeyboardArrowRight, contentDescription = "Next Year")
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Next Year")
                             }
                         }
                     }
@@ -8658,7 +9319,7 @@ fun GoogleDriveRestoreListDialog(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Rounded.InsertDriveFile,
+                                        imageVector = Icons.AutoMirrored.Rounded.InsertDriveFile,
                                         contentDescription = null,
                                         tint = FintechBlue,
                                         modifier = Modifier.size(28.dp)
@@ -8814,4 +9475,30 @@ fun GoogleDriveRestoreListDialog(
             onDismiss = { fileToDelete = null }
         )
     }
+}
+
+fun formatSyncTime(timestamp: Long?, language: AppLanguage): String {
+    if (timestamp == null || timestamp == 0L) {
+        return if (language == AppLanguage.BN) "কখনো সিঙ্ক হয়নি" else "Never synced"
+    }
+    val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault())
+    val formatted = sdf.format(java.util.Date(timestamp))
+    if (language == AppLanguage.BN) {
+        return formatted
+            .replace("AM", "পূর্বাহ্ণ")
+            .replace("PM", "অপরাহ্ণ")
+            .replace("Jan", "জানুয়ারি")
+            .replace("Feb", "ফেব্রুয়ারি")
+            .replace("Mar", "মার্চ")
+            .replace("Apr", "এপ্রিল")
+            .replace("May", "মে")
+            .replace("Jun", "জুন")
+            .replace("Jul", "জুলাই")
+            .replace("Aug", "আগস্ট")
+            .replace("Sep", "সেপ্টেম্বর")
+            .replace("Oct", "অক্টোবর")
+            .replace("Nov", "নভেম্বর")
+            .replace("Dec", "ডিসেম্বর")
+    }
+    return formatted
 }

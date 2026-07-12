@@ -68,7 +68,7 @@
                 android:layout_height="wrap_content"
                 android:text="স্বাগতম,"
                 android:textColor="#CCFFFFFF"
-                android:textSize="8sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/tv_profile_name"
@@ -77,7 +77,7 @@
                 android:text="Shariful Islam"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="11sp"
+                android:textSize="13sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -136,7 +136,7 @@
                 android:layout_height="wrap_content"
                 android:text="আয়"
                 android:textColor="#CCFFFFFF"
-                android:textSize="8sp" />
+                android:textSize="10sp" />
             <TextView
                 android:id="@+id/tv_income"
                 android:layout_below="@id/lbl_income"
@@ -145,7 +145,7 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:maxLines="1" />
             <ImageView
                 android:layout_width="12dp"
@@ -172,7 +172,7 @@
                 android:layout_height="wrap_content"
                 android:text="ব্যয়"
                 android:textColor="#CCFFFFFF"
-                android:textSize="8sp" />
+                android:textSize="10sp" />
             <TextView
                 android:id="@+id/tv_expense"
                 android:layout_below="@id/lbl_expense"
@@ -181,7 +181,7 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:maxLines="1" />
             <ImageView
                 android:layout_width="12dp"
@@ -208,7 +208,7 @@
                 android:layout_height="wrap_content"
                 android:text="দেনা"
                 android:textColor="#CCFFFFFF"
-                android:textSize="8sp" />
+                android:textSize="10sp" />
             <TextView
                 android:id="@+id/tv_debt"
                 android:layout_below="@id/lbl_debt"
@@ -217,7 +217,7 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:maxLines="1" />
             <ImageView
                 android:layout_width="12dp"
@@ -244,7 +244,7 @@
                 android:layout_height="wrap_content"
                 android:text="পাওনা"
                 android:textColor="#CCFFFFFF"
-                android:textSize="8sp" />
+                android:textSize="10sp" />
             <TextView
                 android:id="@+id/tv_credit"
                 android:layout_below="@id/lbl_credit"
@@ -253,7 +253,7 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="9sp"
+                android:textSize="11sp"
                 android:maxLines="1" />
             <ImageView
                 android:layout_width="12dp"

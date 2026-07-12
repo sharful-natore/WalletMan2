@@ -197,6 +197,7 @@ fun SearchDialog(
                                         tx = tx,
                                         language = language,
                                         isDark = isDark,
+                                        searchQuery = searchQuery,
                                         onSelect = { onNavigateToTransaction(tx.id) }
                                     )
                                 }
@@ -216,6 +217,7 @@ fun SearchDialog(
                                         person = person,
                                         language = language,
                                         isDark = isDark,
+                                        searchQuery = searchQuery,
                                         onSelect = { onNavigateToPerson(person.id) }
                                     )
                                 }
@@ -235,6 +237,7 @@ fun SearchDialog(
                                         goal = goal,
                                         language = language,
                                         isDark = isDark,
+                                        searchQuery = searchQuery,
                                         onSelect = { onNavigateToGoal(goal.id) }
                                     )
                                 }
@@ -344,6 +347,7 @@ fun TransactionSearchItem(
     tx: Transaction,
     language: AppLanguage,
     isDark: Boolean,
+    searchQuery: String,
     onSelect: () -> Unit
 ) {
     Card(
@@ -403,15 +407,16 @@ fun TransactionSearchItem(
                         "Others" -> "অন্যান্য"
                         else -> tx.category
                     }
+                    val highlightColor = if (isDark) Color(0xFFFFB300) else Color(0xFFF57C00)
                     Text(
-                        text = if (language == AppLanguage.BN) banglaCat else tx.category,
+                        text = highlightMatch(if (language == AppLanguage.BN) banglaCat else tx.category, searchQuery, highlightColor),
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color(0xFF1E293B),
                         fontSize = 14.sp
                     )
                     if (tx.note.isNotBlank()) {
                         Text(
-                            text = tx.note,
+                            text = highlightMatch(tx.note, searchQuery, highlightColor),
                             fontSize = 12.sp,
                             color = Color.Gray,
                             maxLines = 1,
@@ -435,6 +440,7 @@ fun PersonSearchItem(
     person: Person,
     language: AppLanguage,
     isDark: Boolean,
+    searchQuery: String,
     onSelect: () -> Unit
 ) {
     Card(
@@ -472,14 +478,15 @@ fun PersonSearchItem(
             Spacer(modifier = Modifier.width(12.dp))
 
             Column {
+                val highlightColor = if (isDark) Color(0xFFFFB300) else Color(0xFFF57C00)
                 Text(
-                    text = person.name,
+                    text = highlightMatch(person.name, searchQuery, highlightColor),
                     fontWeight = FontWeight.Bold,
                     color = if (isDark) Color.White else Color(0xFF1E293B),
                     fontSize = 14.sp
                 )
                 Text(
-                    text = if (person.phone.isNotBlank()) person.phone else (if (language == AppLanguage.BN) "ফোন নম্বর নেই" else "No phone"),
+                    text = if (person.phone.isNotBlank()) highlightMatch(person.phone, searchQuery, highlightColor) else highlightMatch(if (language == AppLanguage.BN) "ফোন নম্বর নেই" else "No phone", searchQuery, highlightColor),
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
@@ -493,6 +500,7 @@ fun GoalSearchItem(
     goal: SavingsGoal,
     language: AppLanguage,
     isDark: Boolean,
+    searchQuery: String,
     onSelect: () -> Unit
 ) {
     Card(
@@ -532,8 +540,9 @@ fun GoalSearchItem(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column {
+                    val highlightColor = if (isDark) Color(0xFFFFB300) else Color(0xFFF57C00)
                     Text(
-                        text = goal.title,
+                        text = highlightMatch(goal.title, searchQuery, highlightColor),
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color(0xFF1E293B),
                         fontSize = 14.sp

@@ -57,6 +57,10 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun insertSavingsTransaction(transaction: SavingsTransaction): Long {
         return financeDao.insertSavingsTransaction(transaction)
     }
+
+    suspend fun updateSavingsTransaction(transaction: SavingsTransaction) {
+        financeDao.updateSavingsTransaction(transaction)
+    }
     
     suspend fun deleteSavingsTransaction(id: Int) {
         financeDao.deleteSavingsTransactionById(id)
