@@ -36,10 +36,6 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         action = "ACTION_SAVINGS"
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
-    val backupIntent = Intent(context, MainActivity::class.java).apply {
-        action = "ACTION_BACKUP"
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-    }
 
     val incomeViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_INCOME"
@@ -63,10 +59,15 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
+    val syncIntent = Intent(context, MainActivity::class.java).apply {
+        action = "ACTION_SYNC_TRIGGER"
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+    }
+
     views.setOnClickPendingIntent(R.id.btn_add_tx, PendingIntent.getActivity(context, 1, txIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_person, PendingIntent.getActivity(context, 2, personIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_saving, PendingIntent.getActivity(context, 3, savingIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-    views.setOnClickPendingIntent(R.id.btn_backup, PendingIntent.getActivity(context, 4, backupIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.btn_sync, PendingIntent.getActivity(context, 4, syncIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     
     views.setOnClickPendingIntent(R.id.card_income, PendingIntent.getActivity(context, 10, incomeViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_expense, PendingIntent.getActivity(context, 11, expenseViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -111,12 +112,6 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val googleName = gPrefs.getString("google_name", null)
             val googleEmail = gPrefs.getString("google_email", null)
 
-            val profileActionIntent = Intent(context, MainActivity::class.java).apply {
-                action = if (isGoogleSignedIn) "ACTION_SYNC_REALTIME" else "ACTION_GOOGLE_SIGN_IN"
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            }
-            views.setOnClickPendingIntent(R.id.btn_profile_action, PendingIntent.getActivity(context, 15, profileActionIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-
             val profileIntent = Intent(context, MainActivity::class.java).apply {
                 action = if (isGoogleSignedIn) "ACTION_SETTINGS_PROFILE" else "ACTION_GOOGLE_SIGN_IN"
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -124,7 +119,6 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
             val profileName = if (isGoogleSignedIn) (googleName ?: rawName) else rawName
-            val profileEmail = if (isGoogleSignedIn) (googleEmail ?: rawEmail) else rawEmail
 
             // Load profile photo if available
             val photoUri = prefs.getString("user_photo", null) ?: gPrefs.getString("google_photo_url", null)
@@ -190,16 +184,15 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             }
             views.setTextViewText(R.id.tv_profile_name, displayName)
 
-            val displayEmail = if (isGoogleSignedIn) {
-                profileEmail
-            } else {
-                if (isBn) "গুগল সাইন-ইন করুন" else "Sign in with Google"
-            }
-            views.setTextViewText(R.id.tv_profile_email, displayEmail)
+            // Digital clock
+            val now = java.util.Calendar.getInstance()
+            val clockHour = now.get(java.util.Calendar.HOUR)
+            val minute = now.get(java.util.Calendar.MINUTE)
+            val ampm = if (now.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
+            val dateStr = java.text.SimpleDateFormat("dd MMM, EEE", java.util.Locale.getDefault()).format(now.time)
 
-            // Update profile action icon
-            val actionIcon = if (isGoogleSignedIn) R.drawable.ic_sync_24 else R.drawable.ic_settings
-            views.setImageViewResource(R.id.iv_profile_action, actionIcon)
+            views.setTextViewText(R.id.tv_time_hm_ampm, String.format("%02d:%02d %s", if (clockHour == 0) 12 else clockHour, minute, ampm))
+            views.setTextViewText(R.id.tv_date_day, dateStr)
 
             // Dynamic card headers based on language
             val labelIncome = if (isBn) "আয়" else "Income"

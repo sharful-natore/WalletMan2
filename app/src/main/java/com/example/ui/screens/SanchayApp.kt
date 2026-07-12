@@ -564,12 +564,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     LaunchedEffect(Unit) {
         viewModel.updateManager.checkForUpdates(context) { isAvailable ->
             if (isAvailable) {
-                // If it's a force update, show popup immediately. 
-                // Otherwise, show system notification as requested.
+                showUpdatePopup = true
                 val info = viewModel.updateManager.updateInfo.value
-                if (info.isForceUpdate) {
-                    showUpdatePopup = true
-                } else {
+                if (!info.isForceUpdate) {
                     UpdateNotificationHelper.showUpdateNotification(
                         context, 
                         if (language == AppLanguage.BN) "BN" else "EN",
@@ -1136,8 +1133,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         // Item 3: Debts
                         BottomNavItem(
                             tab = "debts",
-                            icon = Icons.Rounded.Group,
-                            testTag = "nav_debts"
+                            icon = painterResource(id = R.drawable.ic_lend_borrow_new),
+                            testTag = "nav_debts",
+                            iconSize = 24.dp
                         )
 
                         // Item 4: Savings

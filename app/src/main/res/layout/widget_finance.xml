@@ -13,8 +13,8 @@
         android:layout_height="64dp"
         android:layout_margin="2dp"
         android:layout_marginBottom="4dp"
-        android:background="@drawable/widget_gradient_card_bg"
-        android:padding="8dp"
+        android:background="@drawable/widget_card_bg"
+        android:padding="12dp"
         android:clickable="true"
         android:focusable="true">
 
@@ -77,39 +77,40 @@
                 android:text="Shariful Islam"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="16sp"
+                android:textSize="20sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
-            <TextView
-                android:id="@+id/tv_profile_email"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="connect.shariful@gmail.com"
-                android:textColor="#B3FFFFFF"
-                android:textSize="11sp"
-                android:maxLines="1"
-                android:ellipsize="end" />
         </LinearLayout>
         
-        <!-- Action Button (Sync or Login) -->
-        <RelativeLayout
-            android:id="@+id/btn_profile_action"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+        <!-- Digital Clock -->
+        <LinearLayout
+            android:id="@+id/clock_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_alignParentRight="true"
             android:layout_centerVertical="true"
-            android:background="@drawable/widget_button_bg"
-            android:gravity="center"
-            android:clickable="true">
+            android:orientation="vertical"
+            android:gravity="right"
+            android:layout_marginRight="8dp">
             
-            <ImageView
-                android:id="@+id/iv_profile_action"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:src="@drawable/ic_settings"
-                android:tint="#FFFFFF" />
-        </RelativeLayout>
+            <TextView
+                android:id="@+id/tv_time_hm_ampm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12:00 PM"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="16sp" />
+                
+            <TextView
+                android:id="@+id/tv_date_day"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="12 Jul, Sat"
+                android:textColor="#CCFFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
 
     </RelativeLayout>
 
@@ -127,8 +128,8 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="4dp"
-            android:background="@drawable/widget_gradient_card_bg"
-            android:padding="6dp"
+            android:background="@drawable/widget_card_bg"
+            android:padding="10dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_income"
@@ -163,8 +164,8 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="4dp"
-            android:background="@drawable/widget_gradient_card_bg"
-            android:padding="6dp"
+            android:background="@drawable/widget_card_bg"
+            android:padding="10dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_expense"
@@ -199,8 +200,8 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="4dp"
-            android:background="@drawable/widget_gradient_card_bg"
-            android:padding="6dp"
+            android:background="@drawable/widget_card_bg"
+            android:padding="10dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_debt"
@@ -235,8 +236,8 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_margin="4dp"
-            android:background="@drawable/widget_gradient_card_bg"
-            android:padding="6dp"
+            android:background="@drawable/widget_card_bg"
+            android:padding="10dp"
             android:clickable="true">
             <TextView
                 android:id="@+id/lbl_credit"
@@ -325,9 +326,9 @@
                 android:tint="#FFFFFF" />
         </LinearLayout>
 
-        <!-- Cloud Backup Button -->
+        <!-- Sync Button -->
         <LinearLayout
-            android:id="@+id/btn_backup"
+            android:id="@+id/btn_sync"
             android:layout_width="43dp"
             android:layout_height="43dp"
             android:layout_marginHorizontal="6dp"
@@ -338,7 +339,7 @@
             <ImageView
                 android:layout_width="21dp"
                 android:layout_height="21dp"
-                android:src="@drawable/ic_cloud_backup"
+                android:src="@drawable/ic_sync_24"
                 android:tint="#FFFFFF" />
         </LinearLayout>
     </LinearLayout>
