@@ -8039,7 +8039,7 @@ fun ChartsScreen(
     persons: List<Person>,
     onBack: () -> Unit
 ) {
-    var pieChartFilterMode by remember { mutableStateOf(ChartFilterMode.DAY) }
+    var pieChartFilterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
     var timelineChartFilterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
 
     // Dialog state variables for manual picking

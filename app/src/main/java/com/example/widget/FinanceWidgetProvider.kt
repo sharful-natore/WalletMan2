@@ -191,7 +191,8 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val ampm = if (now.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
             val dateStr = java.text.SimpleDateFormat("dd MMM, EEE", java.util.Locale.getDefault()).format(now.time)
 
-            views.setTextViewText(R.id.tv_time_hm_ampm, String.format("%02d:%02d %s", if (clockHour == 0) 12 else clockHour, minute, ampm))
+            views.setTextViewText(R.id.tv_time_hm, String.format("%02d:%02d", if (clockHour == 0) 12 else clockHour, minute))
+            views.setTextViewText(R.id.tv_ampm, ampm)
             views.setTextViewText(R.id.tv_date_day, dateStr)
 
             // Dynamic card headers based on language
