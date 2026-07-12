@@ -336,6 +336,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun deleteSavingsTransaction(tx: SavingsTransaction) {
+        viewModelScope.launch {
+            repository.deleteSavingsTransaction(tx.id)
+            val currentList = savingsGoals.value
+            val goal = currentList.find { it.id == tx.goalId }
+            if (goal != null) {
+                val delta = if (tx.isDeposit) -tx.amount else tx.amount
+                val updated = goal.copy(savedAmount = goal.savedAmount + delta)
+                repository.insertSavingsGoal(updated)
+            }
+        }
+    }
+
     fun updateSavingsGoal(goal: SavingsGoal) {
         viewModelScope.launch {
             repository.insertSavingsGoal(goal)

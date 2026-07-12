@@ -149,10 +149,11 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                     }
 
                     if (bitmap != null) {
-                        views.setImageViewBitmap(R.id.iv_avatar, bitmap)
+                        val circled = getCircledBitmap(bitmap)
+                        views.setImageViewBitmap(R.id.iv_avatar, circled)
                         views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
+                        views.setViewVisibility(R.id.iv_default_logo, android.view.View.GONE)
                         views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
-                        views.setInt(R.id.iv_avatar, "setColorFilter", 0)
                     } else {
                         showInitials(views, profileName)
                     }
@@ -238,14 +239,46 @@ private fun showInitials(views: RemoteViews, profileName: String) {
 
     if (initials.isNotEmpty()) {
         views.setViewVisibility(R.id.iv_avatar, android.view.View.GONE)
+        views.setViewVisibility(R.id.iv_default_logo, android.view.View.GONE)
         views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.VISIBLE)
         views.setTextViewText(R.id.tv_avatar_initials, initials)
     } else {
-        views.setViewVisibility(R.id.iv_avatar, android.view.View.VISIBLE)
+        views.setViewVisibility(R.id.iv_avatar, android.view.View.GONE)
+        views.setViewVisibility(R.id.iv_default_logo, android.view.View.VISIBLE)
         views.setViewVisibility(R.id.tv_avatar_initials, android.view.View.GONE)
-        views.setImageViewResource(R.id.iv_avatar, R.drawable.ic_app_logo)
-        views.setInt(R.id.iv_avatar, "setColorFilter", android.graphics.Color.WHITE)
     }
+}
+
+private fun getCircledBitmap(bitmap: android.graphics.Bitmap): android.graphics.Bitmap {
+    val size = Math.min(bitmap.width, bitmap.height)
+    val output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(output)
+    val paint = android.graphics.Paint()
+    paint.isAntiAlias = true
+    
+    val r = size / 2f
+    val borderSize = (size * 0.05f).toInt().coerceAtLeast(4) // Solid thick white border
+    
+    canvas.drawARGB(0, 0, 0, 0)
+    
+    // Draw solid circle of original image
+    paint.style = android.graphics.Paint.Style.FILL
+    canvas.drawCircle(r, r, r - borderSize, paint)
+    
+    paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+    // Draw cropped original bitmap
+    val srcRect = android.graphics.Rect(0, 0, bitmap.width, bitmap.height)
+    val dstRect = android.graphics.RectF(borderSize.toFloat(), borderSize.toFloat(), (size - borderSize).toFloat(), (size - borderSize).toFloat())
+    canvas.drawBitmap(bitmap, srcRect, dstRect, paint)
+    
+    // Draw white border
+    paint.xfermode = null
+    paint.style = android.graphics.Paint.Style.STROKE
+    paint.color = android.graphics.Color.WHITE
+    paint.strokeWidth = borderSize.toFloat()
+    canvas.drawCircle(r, r, r - borderSize / 2f, paint)
+    
+    return output
 }
 
 fun updateAllWidgets(context: Context) {
