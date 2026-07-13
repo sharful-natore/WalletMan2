@@ -564,7 +564,7 @@ class NotchedBottomBarShape(
             arcTo(
                 rect = androidx.compose.ui.geometry.Rect(centerX - r, cr - r, centerX + r, cr + r),
                 startAngleDegrees = 180f,
-                sweepAngleDegrees = 180f,
+                sweepAngleDegrees = -180f,
                 forceMoveTo = false
             )
             
@@ -3193,7 +3193,7 @@ fun TransactionsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(90.dp)) // Floating button padding
+                        Spacer(modifier = Modifier.height(16.dp)) // Floating button padding
                     }
                 }
             }
@@ -3359,7 +3359,7 @@ fun DebtsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(90.dp))
+                        Spacer(modifier = Modifier.height(110.dp))
                     }
                 }
             }
@@ -3372,7 +3372,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 0.dp, end = 16.dp)
+                .padding(bottom = 92.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Person", tint = Color.White)
@@ -3732,7 +3732,7 @@ fun SavingsScreen(
                         SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
                     }
                     item {
-                        Spacer(modifier = Modifier.height(90.dp))
+                        Spacer(modifier = Modifier.height(110.dp))
                     }
                 }
             }
@@ -3745,7 +3745,7 @@ fun SavingsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 0.dp, end = 16.dp)
+                .padding(bottom = 92.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Goal", tint = Color.White)
