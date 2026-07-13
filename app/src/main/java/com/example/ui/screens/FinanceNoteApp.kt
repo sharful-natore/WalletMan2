@@ -590,6 +590,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
     val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
+    val showCloudDataFoundDialog by viewModel.showCloudDataFoundDialog.collectAsState()
+    val pendingCloudData by viewModel.pendingCloudData.collectAsState()
     
     val rawProfileName by viewModel.profileName.collectAsState()
     val rawProfileEmail by viewModel.profileEmail.collectAsState()
@@ -1151,6 +1153,29 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             }
                         }
                     }
+
+                    // 0. Frosted Glass Notch Glow/Shadow Effect
+                    Box(
+                        modifier = Modifier
+                            .width(160.dp)
+                            .height(80.dp) // Match navbar height
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = navBarPadding)
+                            .graphicsLayer { 
+                                clip = true 
+                                shape = RectangleShape
+                            } // Strictly clip to 80dp height
+                            .background(
+                                Brush.verticalGradient(
+                                    0.0f to Color.Transparent,
+                                    0.2f to (if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f)),
+                                    0.5f to (if (isDarkTheme) Color.White.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.35f)),
+                                    0.8f to (if (isDarkTheme) Color.White.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.15f)),
+                                    1.0f to Color.Transparent
+                                )
+                            )
+                            .blur(35.dp)
+                    )
 
                     // 1. Clipped and styled navigation bar background with Notch Cut shape
                     Box(
@@ -1975,6 +2000,94 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         )
     }
 
+    if (showCloudDataFoundDialog && pendingCloudData != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCloudDataFoundDialog() },
+            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(28.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "ক্লাউড ডেটা পাওয়া গেছে" else "Cloud Data Found",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "আপনার এই গুগল অ্যাকাউন্টে পূর্বের ব্যাকআপ ডাটা পাওয়া গেছে। আপনি কি সেই ডাটা রিস্টোর করতে চান? \n\nসতর্কতা: রিস্টোর করলে বর্তমান লোকাল ডাটা মুছে যাবে।"
+                        else "Previous backup data was found on this Google account. Do you want to restore that data?\n\nWarning: Restoring will overwrite your current local data.",
+                        fontSize = 14.sp,
+                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Rounded.Info, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN)
+                                "মোট লেনদেন: ${pendingCloudData?.transactions?.size ?: 0}"
+                            else "Total Transactions: ${pendingCloudData?.transactions?.size ?: 0}",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            viewModel.confirmCloudSync(context, backupLocalFirst = true) {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর সফল হয়েছে!" else "Backup & Restore successful!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                    ) {
+                        Text(if (language == AppLanguage.BN) "ব্যাকআপ নিয়ে রিস্টোর করুন" else "Backup & Restore", color = Color.White)
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.confirmCloudSync(context, backupLocalFirst = false) {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "রিস্টোর সফল হয়েছে!" else "Restore successful!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDarkTheme) Color.DarkGray else Color.LightGray)
+                    ) {
+                        Text(if (language == AppLanguage.BN) "সরাসরি রিস্টোর (ব্যাকআপ ছাড়া)" else "Restore (No Backup)", color = if (isDarkTheme) Color.White else Color.Black)
+                    }
+                }
+            },
+            dismissButton = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            viewModel.skipCloudSyncAndOverwrite(context)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (language == AppLanguage.BN) "লোকাল ডাটা রাখুন (ক্লাউড আপডেট করুন)" else "Keep Local (Update Cloud)", color = FintechBlue)
+                    }
+                    TextButton(
+                        onClick = { viewModel.dismissCloudDataFoundDialog() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
+                    }
+                }
+            }
+        )
+    }
+
     if (showUpdatePopup) {
         AlertDialog(
             onDismissRequest = {
@@ -2384,7 +2497,7 @@ fun DashboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_chart_bar_new),
+                            painter = painterResource(id = R.drawable.ic_custom_pie_chart),
                             contentDescription = "Charts",
                             modifier = Modifier
                                 .size(24.dp)
@@ -2651,7 +2764,7 @@ fun DashboardScreen(
 
         // Buffer space at bottom to stay above navbar
         item {
-            Spacer(modifier = Modifier.height(90.dp))
+            Spacer(modifier = Modifier.height(110.dp))
         }
     }
 }
@@ -3193,7 +3306,7 @@ fun TransactionsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(16.dp)) // Floating button padding
+                        Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                     }
                 }
             }
@@ -3372,7 +3485,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 92.dp, end = 16.dp)
+                .padding(bottom = 102.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Person", tint = Color.White)
@@ -3745,7 +3858,7 @@ fun SavingsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 92.dp, end = 16.dp)
+                .padding(bottom = 102.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Goal", tint = Color.White)

@@ -516,6 +516,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _firestoreSyncStatus = MutableStateFlow<String?>(null)
     val firestoreSyncStatus: StateFlow<String?> = _firestoreSyncStatus.asStateFlow()
 
+    private val _showCloudDataFoundDialog = MutableStateFlow(false)
+    val showCloudDataFoundDialog: StateFlow<Boolean> = _showCloudDataFoundDialog.asStateFlow()
+
+    private val _pendingCloudData = MutableStateFlow<FinanceBackup?>(null)
+    val pendingCloudData: StateFlow<FinanceBackup?> = _pendingCloudData.asStateFlow()
+
+    fun dismissCloudDataFoundDialog() {
+        _showCloudDataFoundDialog.value = false
+        _pendingCloudData.value = null
+    }
+
     private val _lastSyncTime = MutableStateFlow<Long?>(null)
     val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
 
@@ -1148,19 +1159,40 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _profileEmail.value = email
                 _profilePhotoUri.value = account.photoUrl?.toString()
                 
-                // Save to general prefs so it persists
-                val mainPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                mainPrefs.edit()
-                    .putString("user_name", account.displayName ?: "Google User")
-                    .putString("user_email", email)
-                    .putString("user_photo", account.photoUrl?.toString())
-                    .apply()
+                // Check if Firestore has data before starting automatic sync
+                val db = getFirestore(context)
+                db.collection("users").document(email).get()
+                    .addOnSuccessListener { document ->
+                        if (document != null && document.exists()) {
+                            val remoteJson = document.getString("backupJson") ?: ""
+                            if (remoteJson.isNotEmpty()) {
+                                try {
+                                    val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                    val remoteData = backupAdapter.fromJson(decryptedJson)
+                                    if (remoteData != null) {
+                                        _pendingCloudData.value = remoteData
+                                        _showCloudDataFoundDialog.value = true
+                                        onSuccess()
+                                        return@addOnSuccessListener
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                        
+                        // If no remote data found or error parsing, proceed normally
+                        startRealtimeSync()
+                        checkAndTriggerAutoBackup(context)
+                        onSuccess()
+                    }
+                    .addOnFailureListener {
+                        // On failure, just proceed normally
+                        startRealtimeSync()
+                        checkAndTriggerAutoBackup(context)
+                        onSuccess()
+                    }
 
-                _driveStatusMessage.value = "Successfully Signed In!"
-                com.example.widget.updateAllWidgets(context)
-                startRealtimeSync()
-                checkAndTriggerAutoBackup(context)
-                onSuccess()
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
                 onError(e.localizedMessage ?: "Unknown error")
@@ -1451,19 +1483,111 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun confirmCloudSync(context: Context, backupLocalFirst: Boolean, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val dataToRestore = _pendingCloudData.value ?: return@launch
+            
+            if (backupLocalFirst) {
+                // Create a backup file in Google Drive with timestamp
+                val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                backupToGoogleDrive(
+                    context = context,
+                    customFileName = "finance_note_backup_pre_sync_$timestamp",
+                    comment = "Auto-backup before cloud sync",
+                    onSuccess = {
+                        // After successful backup, restore from cloud
+                        viewModelScope.launch {
+                            repository.restoreBackupData(dataToRestore)
+                            com.example.widget.updateAllWidgets(context)
+                            val email = _googleEmail.value
+                            if (email != null) {
+                                try {
+                                    val decryptedJson = backupAdapter.toJson(dataToRestore)
+                                    context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                        .edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                } catch (e: Exception) { e.printStackTrace() }
+                            }
+                            startRealtimeSync()
+                            dismissCloudDataFoundDialog()
+                            onComplete()
+                        }
+                    },
+                    onError = {
+                        // If backup fails, we should probably warn or still proceed depending on risk
+                        // For now let's just proceed to restore as requested
+                        viewModelScope.launch {
+                            repository.restoreBackupData(dataToRestore)
+                            com.example.widget.updateAllWidgets(context)
+                            startRealtimeSync()
+                            dismissCloudDataFoundDialog()
+                            onComplete()
+                        }
+                    }
+                )
+            } else {
+                repository.restoreBackupData(dataToRestore)
+                com.example.widget.updateAllWidgets(context)
+                val email = _googleEmail.value
+                if (email != null) {
+                    try {
+                        val decryptedJson = backupAdapter.toJson(dataToRestore)
+                        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                            .edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                    } catch (e: Exception) { e.printStackTrace() }
+                }
+                startRealtimeSync()
+                dismissCloudDataFoundDialog()
+                onComplete()
+            }
+        }
+    }
+
+    fun skipCloudSyncAndOverwrite(context: Context) {
+        viewModelScope.launch {
+            uploadToFirestore(
+                onComplete = {
+                    startRealtimeSync()
+                    dismissCloudDataFoundDialog()
+                },
+                onError = {
+                    startRealtimeSync()
+                    dismissCloudDataFoundDialog()
+                }
+            )
+        }
+    }
+
     fun signOutFromGoogle(context: Context, onSuccess: () -> Unit) {
-        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-        val currentEmail = prefs.getString("google_email", null)
-        prefs.edit()
+        val googlePrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        val currentEmail = googlePrefs.getString("google_email", null)
+        googlePrefs.edit()
             .remove("google_email")
             .remove("google_name")
             .remove("google_photo_url")
             .apply()
         
         if (!currentEmail.isNullOrBlank()) {
-            prefs.edit().putString("last_google_email", currentEmail).apply()
+            googlePrefs.edit().putString("last_google_email", currentEmail).apply()
         }
         
+        // Clear main profile data as well
+        val profilePrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        profilePrefs.edit()
+            .remove("user_name")
+            .remove("user_email")
+            .remove("user_photo")
+            .remove("user_phone")
+            .remove("user_social")
+            .remove("user_address")
+            .apply()
+
+        _profileName.value = ""
+        _profileEmail.value = ""
+        _profilePhotoUri.value = null
+        _profilePhone.value = ""
+        _profileSocial.value = ""
+        _profileAddress.value = ""
+
         _googleEmail.value = null
         _googleName.value = null
         _googlePhotoUrl.value = null
