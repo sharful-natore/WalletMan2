@@ -33,7 +33,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun MyApplicationTheme(
+fun FinanceNoteTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     language: AppLanguage = AppLanguage.BN,
     content: @Composable () -> Unit

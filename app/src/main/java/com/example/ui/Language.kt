@@ -91,7 +91,7 @@ object Translation {
         "select_image" to "ছবি নির্বাচন করুন",
         "error_empty_amount" to "দয়া করে টাকার পরিমাণ লিখুন",
         "error_empty_person" to "দয়া করে ব্যক্তি নির্বাচন করুন",
-        "error_empty_title" to "দয়া করে Finance Noteের নাম লিখুন",
+        "error_empty_title" to "দয়া করে সঞ্চয়ের নাম লিখুন",
         "address" to "ঠিকানা",
         "photo_uri" to "ছবির লিঙ্ক",
         "total_dena" to "মোট দেনা",

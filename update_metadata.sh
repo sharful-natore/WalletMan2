@@ -1,2 +1,2 @@
 #!/bin/bash
-jq '.name = "Sanchay"' metadata.json > temp.json && mv temp.json metadata.json
+jq '.name = "Finance Note"' metadata.json > temp.json && mv temp.json metadata.json

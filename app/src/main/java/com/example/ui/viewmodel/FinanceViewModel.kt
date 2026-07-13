@@ -1142,6 +1142,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _googleName.value = account.displayName ?: "Google User"
                 _googlePhotoUrl.value = account.photoUrl?.toString()
                 _isGoogleSignedIn.value = true
+                
+                // Update profile states as well so they match the Google account immediately
+                _profileName.value = account.displayName ?: "Google User"
+                _profileEmail.value = email
+                _profilePhotoUri.value = account.photoUrl?.toString()
+                
+                // Save to general prefs so it persists
+                val mainPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                mainPrefs.edit()
+                    .putString("user_name", account.displayName ?: "Google User")
+                    .putString("user_email", email)
+                    .putString("user_photo", account.photoUrl?.toString())
+                    .apply()
+
                 _driveStatusMessage.value = "Successfully Signed In!"
                 com.example.widget.updateAllWidgets(context)
                 startRealtimeSync()

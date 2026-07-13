@@ -997,12 +997,12 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             }
                             
                             val screenTitle = when {
-                                selectedSavingsGoalDetail != null -> if (language == AppLanguage.BN) "Finance Note কার্ড" else "Savings Card"
+                                selectedSavingsGoalDetail != null -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
                                 selectedPersonDetail != null -> Translation.get("details", language)
                                 activeTab == "dashboard" -> Translation.get("dashboard", language)
                                 activeTab == "transactions" -> Translation.get("transactions", language)
                                 activeTab == "debts" -> Translation.get("debts", language)
-                                activeTab == "savings" -> if (language == AppLanguage.BN) "Finance Note কার্ড" else "Savings Card"
+                                activeTab == "savings" -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
                                 activeTab == "settings" -> Translation.get("settings", language)
                                 activeTab == "charts" -> if (language == AppLanguage.BN) "রিপোর্ট চার্ট" else "Report Chart"
                                 else -> Translation.get("dashboard", language)
@@ -1156,12 +1156,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(68.dp + navBarPadding)
+                            .height(80.dp + navBarPadding)
+                            .blur(20.dp)
                             .background(
                                 Brush.verticalGradient(
                                     0.0f to Color.Transparent,
-                                    0.3f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.75f),
-                                    1.0f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.95f)
+                                    0.2f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.2f),
+                                    0.5f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.90f),
+                                    1.0f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 1.0f)
                                 )
                             )
                     )
@@ -1227,21 +1229,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
-                    // 1.5 Custom downward soft shadow for the FAB (no shadow above)
-                    Box(
-                        modifier = Modifier
-                            .padding(bottom = 8.dp + navBarPadding)
-                            .offset(y = 12.dp) // Offset downwards so shadow only falls below
-                            .size(64.dp)
-                            .drawBehind {
-                                drawCircle(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(Color.Black.copy(alpha = 0.25f), Color.Transparent)
-                                    ),
-                                    radius = size.width / 2 + 8.dp.toPx()
-                                )
-                            }
-                    )
 
                     // 2. Floating Add Button sits beautifully centered in the notch cutout
                     Box(
@@ -1275,6 +1262,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     .background(if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC))
                     .padding(
                         top = innerPadding.calculateTopPadding(),
+                        bottom = innerPadding.calculateBottomPadding(),
                         start = innerPadding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
                         end = innerPadding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
                     )
@@ -2679,7 +2667,7 @@ fun DashboardScreen(
 
         // Buffer space at bottom
         item {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
@@ -3221,7 +3209,7 @@ fun TransactionsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(80.dp)) // Floating button padding
+                        Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                     }
                 }
             }
@@ -3234,7 +3222,7 @@ fun TransactionsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp, end = 16.dp)
+                .padding(bottom = 120.dp, end = 16.dp)
                 .testTag("fab_add_tx")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add", tint = Color.White)
@@ -3400,7 +3388,7 @@ fun DebtsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(80.dp))
+                        Spacer(modifier = Modifier.height(110.dp))
                     }
                 }
             }
@@ -3413,7 +3401,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp, end = 16.dp)
+                .padding(bottom = 120.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Person", tint = Color.White)
@@ -3724,7 +3712,7 @@ fun SavingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (language == AppLanguage.BN) "আপনার Finance Note কার্ডসমূহ" else "Your Savings Cards",
+                    text = if (language == AppLanguage.BN) "আপনার সঞ্চয় কার্ডসমূহ" else "Your Savings Cards",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = FintechBlue
@@ -3773,7 +3761,7 @@ fun SavingsScreen(
                         SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
                     }
                     item {
-                        Spacer(modifier = Modifier.height(80.dp))
+                        Spacer(modifier = Modifier.height(110.dp))
                     }
                 }
             }
@@ -3786,7 +3774,7 @@ fun SavingsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp, end = 16.dp)
+                .padding(bottom = 120.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Goal", tint = Color.White)
@@ -4594,7 +4582,7 @@ fun AddSavingsGoalDialog(
             ) {
                 item {
                     Text(
-                        if (language == AppLanguage.BN) "নতুন Finance Note কার্ড" else "New Savings Card",
+                        if (language == AppLanguage.BN) "নতুন সঞ্চয় কার্ড" else "New Savings Card",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = textColor
@@ -5009,7 +4997,7 @@ fun SavingsGoalDetailOverlay(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (language == AppLanguage.BN) "Finance Note কার্ডের বিস্তারিত" else "Savings Card Details",
+                    text = if (language == AppLanguage.BN) "সঞ্চয় কার্ডের বিস্তারিত" else "Savings Card Details",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FintechBlue,
@@ -5196,7 +5184,7 @@ fun SavingsGoalDetailOverlay(
             },
             onShareText = {
                 val shareText = buildString {
-                    append(if (language == AppLanguage.BN) "Finance Note ট্রানজ্যাকশন মেমো\n" else "Savings Transaction Memo\n")
+                    append(if (language == AppLanguage.BN) "সঞ্চয় ট্রানজ্যাকশন মেমো\n" else "Savings Transaction Memo\n")
                     append("-------------------\n")
                     val typeStr = if (tx.isDeposit) (if (language == AppLanguage.BN) "জমা" else "Deposit") else (if (language == AppLanguage.BN) "উত্তোলন" else "Withdraw")
                     append(if (language == AppLanguage.BN) "ধরণ: " else "Type: ").append(typeStr).append("\n")
@@ -5216,7 +5204,7 @@ fun SavingsGoalDetailOverlay(
                 context.startActivity(Intent.createChooser(intent, if (language == AppLanguage.BN) "শেয়ার করুন" else "Share via"))
             },
             onShareImage = { bitmap ->
-                shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে Finance Note মেমো" else "Savings Memo from Finance Note")
+                shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে সঞ্চয় মেমো" else "Savings Memo from Finance Note")
             }
         )
     }
@@ -7094,7 +7082,7 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         val shareText = buildString {
-                            append(if (language == AppLanguage.BN) "দৈনন্দিন লেনদেন, দেনাপাওনা ও Finance Noteের হিসাব রাখতে ডাউনলোড করুন ফাইন্যান্স নোট অ্যাপ: " else "Download Finance Note app to keep track of your daily transactions, debts, and savings: ")
+                            append(if (language == AppLanguage.BN) "দৈনন্দিন লেনদেন, দেনাপাওনা ও সঞ্চয়ের হিসাব রাখতে ডাউনলোড করুন ফাইন্যান্স নোট অ্যাপ: " else "Download Finance Note app to keep track of your daily transactions, debts, and savings: ")
                             append("\n")
                             val updateInfoStr = context.getSharedPreferences("FinancePrefs", android.content.Context.MODE_PRIVATE).getString("update_info", null)
                             var link = "https://sites.google.com/view/financenote/home?authuser=0"
@@ -7225,7 +7213,7 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(110.dp))
     }
 
     if (showLogoutConfirm) {

@@ -17,7 +17,7 @@ object BackupEncryptionHelper {
         0x65.toByte(), 0x79.toByte(), 0x32.toByte(), 0x30.toByte(),
         0x32.toByte(), 0x36.toByte(), 0x21.toByte(), 0x40.toByte(),
         0x23.toByte(), 0x24.toByte(), 0x25.toByte(), 0x5e.toByte()
-    ) // "SanchaySecureBackupKey2026!@#$%" (exactly 32 bytes)
+    ) // "FinanceNoteSecureBackupKey2026!@#$%" (exactly 32 bytes)
 
     fun encrypt(plainText: String): String {
         return try {

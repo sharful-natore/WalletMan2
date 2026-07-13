@@ -203,7 +203,7 @@ fun BackupStatsDialog(
                         )
                         StatItemCard(
                             modifier = Modifier.weight(1f),
-                            title = if (language == AppLanguage.BN) "মোট Finance Note কার্ড" else "Total Savings Cards",
+                            title = if (language == AppLanguage.BN) "মোট সঞ্চয় কার্ড" else "Total Savings Cards",
                             value = "${stats.totalCards}",
                             icon = Icons.Rounded.CreditCard,
                             iconColor = Color(0xFF8B5CF6),

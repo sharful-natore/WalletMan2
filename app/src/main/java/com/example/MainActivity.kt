@@ -13,7 +13,7 @@ import androidx.core.view.WindowCompat
 import com.example.data.AppDatabase
 import com.example.data.FinanceRepository
 import com.example.ui.screens.FinanceNoteApp
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.FinanceNoteTheme
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.ui.viewmodel.FinanceViewModelFactory
 
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
             val language by viewModel.language.collectAsState()
             val action by actionState
             
-            MyApplicationTheme(darkTheme = isDarkTheme, language = language) {
+            FinanceNoteTheme(darkTheme = isDarkTheme, language = language) {
                 FinanceNoteApp(viewModel = viewModel, initialAction = action)
             }
         }
