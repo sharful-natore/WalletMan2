@@ -564,7 +564,7 @@ class NotchedBottomBarShape(
             arcTo(
                 rect = androidx.compose.ui.geometry.Rect(centerX - r, cr - r, centerX + r, cr + r),
                 startAngleDegrees = 180f,
-                sweepAngleDegrees = -180f,
+                sweepAngleDegrees = 180f,
                 forceMoveTo = false
             )
             
@@ -3197,19 +3197,6 @@ fun TransactionsScreen(
                     }
                 }
             }
-        }
-
-        // Add Floating Action Button
-        FloatingActionButton(
-            onClick = onAddTransactionClick,
-            containerColor = FintechBlue,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 0.dp, end = 16.dp)
-                .testTag("fab_add_tx")
-        ) {
-            Icon(Icons.Rounded.Add, contentDescription = "Add", tint = Color.White)
         }
     }
 }
