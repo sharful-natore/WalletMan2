@@ -116,8 +116,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="২৯ আষাঢ়, ১৪৩৩ বঙ্গাব্দ"
-                android:textColor="#E0F2FE"
-                android:textSize="8.5sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9.5sp"
                 android:layout_marginTop="2dp"
                 android:maxLines="1"
                 android:ellipsize="end" />
@@ -128,8 +129,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="২৭ মহররম, ১৪৪৮ হিজরি"
-                android:textColor="#F0FDF4"
-                android:textSize="8.5sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9.5sp"
                 android:layout_marginTop="2dp"
                 android:maxLines="1"
                 android:ellipsize="end" />

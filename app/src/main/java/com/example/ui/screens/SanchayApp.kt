@@ -1157,14 +1157,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 16.dp) // Leave space at the top for the cutout
-                            .height(56.dp + navBarPadding)
+                            .height(52.dp + navBarPadding)
                             .clip(NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp))
                             .background(bottomBarGradient)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(56.dp)
+                                .height(52.dp)
                                 .align(Alignment.TopCenter),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -1216,7 +1216,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     // 1.5 Custom downward soft shadow for the FAB (no shadow above)
                     Box(
                         modifier = Modifier
-                            .padding(bottom = 12.dp + navBarPadding)
+                            .padding(bottom = 8.dp + navBarPadding)
                             .offset(y = 12.dp) // Offset downwards so shadow only falls below
                             .size(64.dp)
                             .drawBehind {
@@ -1232,7 +1232,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     // 2. Floating Add Button sits beautifully centered in the notch cutout
                     Box(
                         modifier = Modifier
-                            .padding(bottom = 12.dp + navBarPadding) // Lowered from 32.dp to 12.dp to nestle perfectly in the notch
+                            .padding(bottom = 8.dp + navBarPadding) // Lowered to nestle perfectly in the notch
                             .size(64.dp)
                             .clip(CircleShape)
                             .background(
@@ -1240,7 +1240,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
                                 )
                             )
-                            .border(4.dp, if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC), CircleShape) // Matches app background for seamless cutout
                             .clickable { showAddTransactionDialog = true }
                             .testTag("fab_add_transaction"),
                         contentAlignment = Alignment.Center
