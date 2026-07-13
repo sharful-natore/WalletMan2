@@ -536,9 +536,9 @@ fun formatDateHeader(dateStr: String, lang: AppLanguage): String {
 }
 
 class NotchedBottomBarShape(
-    private val notchRadiusDp: Dp = 38.dp,
-    private val depthDp: Dp = 34.dp,
-    private val edgeRadiusDp: Dp = 12.dp
+    private val notchRadiusDp: Dp = 34.dp,
+    private val depthDp: Dp = 30.dp,
+    private val edgeRadiusDp: Dp = 10.dp
 ) : Shape {
     override fun createOutline(
         size: Size,
@@ -553,63 +553,34 @@ class NotchedBottomBarShape(
             moveTo(0f, 0f)
             val centerX = size.width / 2f
             
-            // The lowest point of the notch circle is at y = d.
-            // So centerY + r = d => centerY = d - r.
+            // Semicircular notch center
             val centerY = d - r
             
-            // Solve for x_shoulder:
-            // (x_shoulder - centerX)^2 + (r_shoulder - centerY)^2 = (r + r_shoulder)^2
-            // Let r_shoulder = cr
-            val term = (r + cr) * (r + cr) - (cr - centerY) * (cr - centerY)
-            val xShoulder = centerX - kotlin.math.sqrt(term.coerceAtLeast(0f))
-            val xShoulderRight = centerX + kotlin.math.sqrt(term.coerceAtLeast(0f))
+            // Distance between shoulder circle center and notch circle center is exactly r + cr
+            val dist = r + cr
+            val dy = centerY + cr
+            val term = dist * dist - dy * dy
+            val dx = kotlin.math.sqrt(term.coerceAtLeast(0f))
             
-            val startX = xShoulder
-            val endX = xShoulderRight
+            val startX = centerX - dx
+            val endX = centerX + dx
             
             lineTo(startX, 0f)
             
-            val dx = centerX - xShoulder
-            val dy = centerY - cr
-            val dist = r + cr // distance between centers is exactly r + cr since they are tangent
+            val theta = kotlin.math.atan2(dy, dx)
+            val thetaDeg = Math.toDegrees(theta.toDouble()).toFloat()
             
-            // Tangency point on left side:
-            val tX1 = xShoulder + (dx / dist) * cr
-            val tY1 = cr + (dy / dist) * cr
+            // Left shoulder arc (mathematically perfect circle)
+            val rectLeft = androidx.compose.ui.geometry.Rect(centerX - dx - cr, -2f * cr, centerX - dx + cr, 0f)
+            arcTo(rectLeft, 270f, thetaDeg + 90f, false)
             
-            // Left shoulder arc
-            val kCr = cr * 0.5522847f
-            cubicTo(
-                startX + kCr, 0f,
-                tX1 + (dy / dist) * kCr, tY1 - (dx / dist) * kCr,
-                tX1, tY1
-            )
+            // Circular notch arc (mathematically perfect circle)
+            val rectNotch = androidx.compose.ui.geometry.Rect(centerX - r, centerY - r, centerX + r, centerY + r)
+            arcTo(rectNotch, 180f + thetaDeg, -2f * thetaDeg, false)
             
-            // Right tangency point (symmetric):
-            val tX2 = centerX + (centerX - tX1)
-            val tY2 = tY1
-            
-            // Left half of the circular notch
-            val kR = r * 0.5522847f
-            cubicTo(
-                tX1 - (dy / dist) * kR, tY1 + (dx / dist) * kR,
-                centerX - kR, d,
-                centerX, d
-            )
-            
-            // Right half of the circular notch
-            cubicTo(
-                centerX + kR, d,
-                tX2 + (dy / dist) * kR, tY2 + (dx / dist) * kR,
-                tX2, tY2
-            )
-            
-            // Right shoulder arc
-            cubicTo(
-                tX2 - (dy / dist) * kCr, tY2 - (dx / dist) * kCr,
-                endX - kCr, 0f,
-                endX, 0f
-            )
+            // Right shoulder arc (mathematically perfect circle)
+            val rectRight = androidx.compose.ui.geometry.Rect(centerX + dx - cr, -2f * cr, centerX + dx + cr, 0f)
+            arcTo(rectRight, 360f - thetaDeg, thetaDeg - 90f, false)
             
             lineTo(size.width, 0f)
             lineTo(size.width, size.height)
@@ -1192,15 +1163,15 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp) // Leave space at the top for the cutout
-                            .height(64.dp + navBarPadding)
-                            .clip(NotchedBottomBarShape(notchRadiusDp = 38.dp, depthDp = 34.dp, edgeRadiusDp = 12.dp))
+                            .padding(top = 14.dp) // Leave space at the top for the cutout
+                            .height(56.dp + navBarPadding)
+                            .clip(NotchedBottomBarShape(notchRadiusDp = 34.dp, depthDp = 30.dp, edgeRadiusDp = 10.dp))
                             .background(bottomBarGradient)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(64.dp)
+                                .height(56.dp)
                                 .align(Alignment.TopCenter),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -1225,7 +1196,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             }
 
                             // Spacer in the middle for the notch cutout
-                            Spacer(modifier = Modifier.width(76.dp))
+                            Spacer(modifier = Modifier.width(68.dp))
 
                             // Right-side items
                             Row(
@@ -1252,14 +1223,16 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     // 2. Floating Add Button sits beautifully centered in the notch cutout
                     Box(
                         modifier = Modifier
-                            .padding(bottom = 38.dp + navBarPadding) // Sits beautifully half-in, half-out of the notch, with spacious margin
+                            .padding(bottom = 12.dp + navBarPadding) // Lowered from 32.dp to 12.dp to nestle perfectly in the notch
                             .size(60.dp)
+                            .shadow(4.dp, CircleShape) // Subtle premium shadow
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
                                 )
                             )
+                            .border(4.dp, Color.White, CircleShape) // Slightly increased border (from 3.dp to 4.dp)
                             .clickable { showAddTransactionDialog = true }
                             .testTag("fab_add_transaction"),
                         contentAlignment = Alignment.Center
@@ -1279,7 +1252,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 modifier = Modifier
                     .fillMaxSize()
                     .background(if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC))
-                    .padding(innerPadding)
+                    .padding(
+                        top = innerPadding.calculateTopPadding(),
+                        start = innerPadding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                        end = innerPadding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    )
             ) {
                 // Background Glows for Premium fintech look (Only on Dark mode for sleek visuals)
                 if (isDarkTheme) {
@@ -1792,6 +1769,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
         AlertDialog(
             onDismissRequest = { showRealtimeSyncDialog = false },
+            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1987,7 +1965,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isDarkTheme) Color(0xFF2563EB) else Color(0xFF1E40AF)
+                            containerColor = FintechBlue
                         )
                     ) {
                         Icon(imageVector = Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -2406,9 +2384,9 @@ fun DashboardScreen(
                         modifier = Modifier
                             .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
                             .size(46.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.08f))
-                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
                             .clickable { onNavigate("charts", "") },
                         contentAlignment = Alignment.Center
                     ) {
@@ -2524,14 +2502,15 @@ fun DashboardScreen(
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
+                    padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(80.dp)
+                        .height(82.dp)
                         .clickable { onNavigate("debts", "DENA") }
                         .testTag("dashboard_i_owe_card")
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -2539,17 +2518,19 @@ fun DashboardScreen(
                             Text(
                                 text = Translation.get("i_owe", language),
                                 color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                modifier = Modifier.basicMarquee()
                             )
                             Text(
                                 text = formatCurrency(iOwe, language),
                                 color = Color.White,
-                                fontSize = 20.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1,
                                 modifier = Modifier
-                                    .padding(top = 4.dp)
+                                    .padding(top = 2.dp)
                                     .basicMarquee()
                             )
                         }
@@ -2557,7 +2538,7 @@ fun DashboardScreen(
                             imageVector = Icons.Rounded.ArrowUpward,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -2566,14 +2547,15 @@ fun DashboardScreen(
                 FintechGradientCard(
                     gradientColors = GradientsList[0],
                     cornerRadius = 24.dp,
+                    padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(80.dp)
+                        .height(82.dp)
                         .clickable { onNavigate("debts", "PAWN") }
                         .testTag("dashboard_owed_to_me_card")
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -2581,17 +2563,19 @@ fun DashboardScreen(
                             Text(
                                 text = Translation.get("owed_to_me", language),
                                 color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                modifier = Modifier.basicMarquee()
                             )
                             Text(
                                 text = formatCurrency(owedToMe, language),
                                 color = Color.White,
-                                fontSize = 20.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1,
                                 modifier = Modifier
-                                    .padding(top = 4.dp)
+                                    .padding(top = 2.dp)
                                     .basicMarquee()
                             )
                         }
@@ -2599,7 +2583,7 @@ fun DashboardScreen(
                             imageVector = Icons.Rounded.ArrowDownward,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

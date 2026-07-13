@@ -217,7 +217,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             views.setBoolean(R.id.tv_credit, "setSelected", true)
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -477,7 +477,7 @@ private fun getIslamicDate(cal: java.util.Calendar, isBn: Boolean): String {
         } else {
             "$hDay $monthName, $hYear AH"
         }
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
         return if (isBn) "১ রমজান, ১৪৪৭ হিজরি" else "1 Ramadan, 1447 AH"
     }
 }

@@ -417,9 +417,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
         }
 
-        // Check if service is actually running
-        if (!com.example.widget.FinanceNotificationService.isRunning) {
-            isActuallyEnabled = false
+        // If enabled but not running, try to start it
+        if (isActuallyEnabled && !com.example.widget.FinanceNotificationService.isRunning) {
+            val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) { 
+                e.printStackTrace() 
+                isActuallyEnabled = false
+            }
+        } else if (!isActuallyEnabled && com.example.widget.FinanceNotificationService.isRunning) {
+            val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)
+            context.stopService(intent)
         }
 
         _isNotificationEnabled.value = isActuallyEnabled
@@ -459,6 +472,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         initGoogleDrive(context)
 
         startRealtimeSync()
+
+        // Update home screen widgets immediately on start to show fresh data
+        com.example.widget.updateAllWidgets(context)
 
         if (notifEnabled) {
             val intent = Intent(context, com.example.widget.FinanceNotificationService::class.java)
