@@ -160,8 +160,14 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="11sp"
-                android:maxLines="1" />
+                android:textSize="10sp"
+                android:maxLines="1"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
             <ImageView
                 android:layout_width="12dp"
                 android:layout_height="12dp"
@@ -196,8 +202,14 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="11sp"
-                android:maxLines="1" />
+                android:textSize="10sp"
+                android:maxLines="1"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
             <ImageView
                 android:layout_width="12dp"
                 android:layout_height="12dp"
@@ -232,8 +244,14 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="11sp"
-                android:maxLines="1" />
+                android:textSize="10sp"
+                android:maxLines="1"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
             <ImageView
                 android:layout_width="12dp"
                 android:layout_height="12dp"
@@ -268,8 +286,14 @@
                 android:text="৳ 0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="11sp"
-                android:maxLines="1" />
+                android:textSize="10sp"
+                android:maxLines="1"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:scrollHorizontally="true"
+                android:singleLine="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true" />
             <ImageView
                 android:layout_width="12dp"
                 android:layout_height="12dp"

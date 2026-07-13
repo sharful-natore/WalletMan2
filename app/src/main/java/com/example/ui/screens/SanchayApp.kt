@@ -7464,12 +7464,6 @@ fun TimelineSplineChart(
 
                 // 2. Scrollable Plot Area on the Right
                 val scrollState = rememberScrollState()
-                LaunchedEffect(monthsLabels) {
-                    kotlinx.coroutines.delay(100)
-                    if (scrollState.maxValue > 0) {
-                        scrollState.scrollTo(scrollState.maxValue / 2)
-                    }
-                }
 
                 BoxWithConstraints(
                     modifier = Modifier
@@ -7477,14 +7471,25 @@ fun TimelineSplineChart(
                         .fillMaxHeight()
                 ) {
                     val availableWidth = maxWidth
-                    val minItemWidth = 25.2.dp // 42.dp reduced by 40%
-                    val dynamicWidth = maxOf(availableWidth * 0.51f, (monthsLabels.size * minItemWidth.value).dp) // 0.85f reduced by 40%
+                    val minItemWidth = 25.2.dp
+                    val dynamicWidth = maxOf(availableWidth * 0.51f, (monthsLabels.size * minItemWidth.value).dp)
+
+                    LaunchedEffect(monthsLabels, dynamicWidth, maxWidth) {
+                        kotlinx.coroutines.delay(100)
+                        if (dynamicWidth > maxWidth) {
+                            scrollState.scrollTo((scrollState.maxValue / 2).coerceAtLeast(0))
+                        } else {
+                            scrollState.scrollTo(0)
+                        }
+                    }
+
+                    val paddingEnd = if (dynamicWidth > maxWidth) maxWidth / 2 else 0.dp
 
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .horizontalScroll(scrollState)
-                            .padding(end = maxWidth / 2)
+                            .padding(end = paddingEnd)
                     ) {
                         Canvas(
                             modifier = Modifier
