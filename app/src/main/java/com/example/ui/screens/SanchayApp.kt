@@ -1156,17 +1156,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(72.dp + navBarPadding)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.6f),
-                                        (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.9f),
-                                        if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)
-                                    )
-                                )
-                            )
+                            .padding(top = 16.dp)
+                            .height(52.dp + navBarPadding)
+                            .background((if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.6f))
                     )
 
                     // 1. Clipped and styled navigation bar background with Notch Cut shape
@@ -2415,7 +2407,7 @@ fun DashboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.timeline_24),
+                            painter = painterResource(id = R.drawable.ic_chart_bar_new),
                             contentDescription = "Charts",
                             modifier = Modifier
                                 .size(24.dp)
@@ -8397,7 +8389,7 @@ fun ChartsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(top = 4.dp, bottom = 80.dp),
+            .padding(top = 4.dp, bottom = 50.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

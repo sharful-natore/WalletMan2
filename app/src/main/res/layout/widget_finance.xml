@@ -14,7 +14,7 @@
         android:layout_margin="2dp"
         android:layout_marginBottom="4dp"
         android:background="@drawable/widget_card_bg"
-        android:padding="16dp"
+        android:padding="10dp"
         android:clickable="true"
         android:focusable="true">
 
