@@ -964,7 +964,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         colorScheme = MaterialTheme.colorScheme
     ) {
         Scaffold(
-            containerColor = if (isDarkTheme) Color.Black else Color.White,
+            containerColor = Color.Transparent,
             topBar = {
                 val topBarGradient = Brush.linearGradient(
                     colors = GradientsList[0]
@@ -1152,27 +1152,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
-                    // 0. Background fade overlay to obscure scrolling content behind the notch
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp + navBarPadding)
-                            .blur(20.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    0.0f to Color.Transparent,
-                                    0.2f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.2f),
-                                    0.5f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.90f),
-                                    1.0f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 1.0f)
-                                )
-                            )
-                    )
-
                     // 1. Clipped and styled navigation bar background with Notch Cut shape
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp) // Leave space at the top for the cutout
+                            .padding(top = 0.dp) // Removed 16dp space to avoid "fixed card" look
                             .height(52.dp + navBarPadding)
                             .clip(NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp))
                             .background(bottomBarGradient)
@@ -1262,7 +1246,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     .background(if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC))
                     .padding(
                         top = innerPadding.calculateTopPadding(),
-                        bottom = innerPadding.calculateBottomPadding(),
+                        bottom = 0.dp,
                         start = innerPadding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
                         end = innerPadding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
                     )
@@ -2665,9 +2649,9 @@ fun DashboardScreen(
             }
         }
 
-        // Buffer space at bottom
+        // Buffer space at bottom to stay above navbar
         item {
-            Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(90.dp))
         }
     }
 }
@@ -3209,7 +3193,7 @@ fun TransactionsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                        Spacer(modifier = Modifier.height(90.dp)) // Floating button padding
                     }
                 }
             }
@@ -3222,7 +3206,7 @@ fun TransactionsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 120.dp, end = 16.dp)
+                .padding(bottom = 0.dp, end = 16.dp)
                 .testTag("fab_add_tx")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add", tint = Color.White)
@@ -3388,7 +3372,7 @@ fun DebtsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(110.dp))
+                        Spacer(modifier = Modifier.height(90.dp))
                     }
                 }
             }
@@ -3401,7 +3385,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 120.dp, end = 16.dp)
+                .padding(bottom = 0.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Person", tint = Color.White)
@@ -3761,7 +3745,7 @@ fun SavingsScreen(
                         SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
                     }
                     item {
-                        Spacer(modifier = Modifier.height(110.dp))
+                        Spacer(modifier = Modifier.height(90.dp))
                     }
                 }
             }
@@ -3774,7 +3758,7 @@ fun SavingsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 120.dp, end = 16.dp)
+                .padding(bottom = 0.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Goal", tint = Color.White)
@@ -7213,7 +7197,7 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(110.dp))
+        Spacer(modifier = Modifier.height(90.dp))
     }
 
     if (showLogoutConfirm) {
@@ -9051,7 +9035,7 @@ fun ChartsScreen(
             targetIndex = targetScrollIndex
         )
         
-        Spacer(modifier = Modifier.height(80.dp))
+        Spacer(modifier = Modifier.height(90.dp))
     }
 
     // --- Manual selection Pickers ---
@@ -9752,6 +9736,7 @@ fun GoogleDriveRestoreListDialog(
             },
             onDismiss = { fileToDelete = null }
         )
+        Spacer(modifier = Modifier.height(90.dp))
     }
 }
 
