@@ -1152,6 +1152,23 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
+                    // 0. Background fade overlay to obscure scrolling content behind the notch
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(72.dp + navBarPadding)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.6f),
+                                        (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.9f),
+                                        if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)
+                                    )
+                                )
+                            )
+                    )
+
                     // 1. Clipped and styled navigation bar background with Notch Cut shape
                     Box(
                         modifier = Modifier
@@ -7670,7 +7687,7 @@ fun TimelineSplineChart(
                 ) {
                     val availableWidth = maxWidth
                     val minItemWidth = 25.2.dp
-                    val dynamicWidth = maxOf(availableWidth * 0.51f, (monthsLabels.size * minItemWidth.value).dp)
+                    val dynamicWidth = maxOf(availableWidth, (monthsLabels.size * minItemWidth.value).dp)
                     val density = androidx.compose.ui.platform.LocalDensity.current
 
                     LaunchedEffect(monthsLabels, dynamicWidth, maxWidth, targetIndex, scrollState.maxValue) {
@@ -8380,7 +8397,7 @@ fun ChartsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(top = 4.dp, bottom = 4.dp),
+            .padding(top = 4.dp, bottom = 80.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
