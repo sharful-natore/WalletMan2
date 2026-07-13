@@ -2,7 +2,7 @@
     <string name="app_name">Finance Note</string>
     <string name="shortcut_add_tx">লেনদেন যোগ</string>
     <string name="shortcut_debt_credit">দেনাপাওনা</string>
-    <string name="shortcut_savings">সঞ্চয় কার্ড</string>
+    <string name="shortcut_savings">Finance Note কার্ড</string>
     <string name="shortcut_backup">ক্লাউড ব্যাকআপ</string>
     <string name="shortcut_dashboard">ড্যাশবোর্ড</string>
     <string name="shortcut_settings">সেটিংস</string>

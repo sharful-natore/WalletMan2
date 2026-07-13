@@ -997,12 +997,12 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             }
                             
                             val screenTitle = when {
-                                selectedSavingsGoalDetail != null -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
+                                selectedSavingsGoalDetail != null -> if (language == AppLanguage.BN) "Finance Note কার্ড" else "Savings Card"
                                 selectedPersonDetail != null -> Translation.get("details", language)
                                 activeTab == "dashboard" -> Translation.get("dashboard", language)
                                 activeTab == "transactions" -> Translation.get("transactions", language)
                                 activeTab == "debts" -> Translation.get("debts", language)
-                                activeTab == "savings" -> if (language == AppLanguage.BN) "সঞ্চয় কার্ড" else "Savings Card"
+                                activeTab == "savings" -> if (language == AppLanguage.BN) "Finance Note কার্ড" else "Savings Card"
                                 activeTab == "settings" -> Translation.get("settings", language)
                                 activeTab == "charts" -> if (language == AppLanguage.BN) "রিপোর্ট চার্ট" else "Report Chart"
                                 else -> Translation.get("dashboard", language)
@@ -1156,9 +1156,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp)
-                            .height(52.dp + navBarPadding)
-                            .background((if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.6f))
+                            .height(68.dp + navBarPadding)
+                            .background(
+                                Brush.verticalGradient(
+                                    0.0f to Color.Transparent,
+                                    0.3f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.75f),
+                                    1.0f to (if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)).copy(alpha = 0.95f)
+                                )
+                            )
                     )
 
                     // 1. Clipped and styled navigation bar background with Notch Cut shape
@@ -2820,18 +2825,26 @@ fun TransactionRowItem(
                         tx.category
                     }
 
-                    val isDebtType = tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED")
-                    val titleText = if (isDebtType && linkedPerson != null) {
+                    val titleText = run {
                         val typeSuffix = when (tx.type) {
-                            "LEND" -> if (language == AppLanguage.BN) "ধার প্রদান" else "Lending"
-                            "BORROW" -> if (language == AppLanguage.BN) "ধার গ্রহন" else "Borrowing"
-                            "REPAY_PAID" -> if (language == AppLanguage.BN) "পরিশোধ" else "Repaid"
-                            "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "প্রাপ্তি" else "Received"
+                            "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
+                            "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
+                            "REPAY_PAID" -> if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
+                            "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
+                            "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
+                            "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
                             else -> ""
                         }
-                        "${linkedPerson.name} - ($typeSuffix)"
-                    } else {
-                        if (linkedPerson != null) "$formattedCategory (${linkedPerson.name})" else formattedCategory
+                        val baseName = if (tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
+                            linkedPerson.name
+                        } else {
+                            if (linkedPerson != null) "$formattedCategory (${linkedPerson.name})" else formattedCategory
+                        }
+                        if (typeSuffix.isNotEmpty()) {
+                            "$baseName ($typeSuffix)"
+                        } else {
+                            baseName
+                        }
                     }
 
                     Text(
@@ -3221,7 +3234,7 @@ fun TransactionsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 16.dp, end = 8.dp)
+                .padding(bottom = 100.dp, end = 16.dp)
                 .testTag("fab_add_tx")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add", tint = Color.White)
@@ -3400,7 +3413,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 16.dp, end = 8.dp)
+                .padding(bottom = 100.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Person", tint = Color.White)
@@ -3711,7 +3724,7 @@ fun SavingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (language == AppLanguage.BN) "আপনার সঞ্চয় কার্ডসমূহ" else "Your Savings Cards",
+                    text = if (language == AppLanguage.BN) "আপনার Finance Note কার্ডসমূহ" else "Your Savings Cards",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = FintechBlue
@@ -3773,7 +3786,7 @@ fun SavingsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 16.dp, end = 8.dp)
+                .padding(bottom = 100.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
             Icon(Icons.Rounded.Add, contentDescription = "Add Goal", tint = Color.White)
@@ -3881,7 +3894,7 @@ fun SavingsGoalCardItem(
                 
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = if (maskBalance) "৳ ••••" else formatCurrency(goal.savedAmount, language),
+                        text = if (maskBalance) "৳ ●●●●" else formatCurrency(goal.savedAmount, language),
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
@@ -4581,7 +4594,7 @@ fun AddSavingsGoalDialog(
             ) {
                 item {
                     Text(
-                        if (language == AppLanguage.BN) "নতুন সঞ্চয় কার্ড" else "New Savings Card",
+                        if (language == AppLanguage.BN) "নতুন Finance Note কার্ড" else "New Savings Card",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = textColor
@@ -4717,8 +4730,9 @@ fun AddSavingsGoalDialog(
                         Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = customSectorName,
-                            onValueChange = { customSectorName = it },
+                            onValueChange = { customSectorName = it.uppercase() },
                             label = { Text(if (language == AppLanguage.BN) "খাতের নাম লিখুন" else "Enter Sector Name") },
+                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = labelColor,
@@ -4995,7 +5009,7 @@ fun SavingsGoalDetailOverlay(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (language == AppLanguage.BN) "সঞ্চয় কার্ডের বিস্তারিত" else "Savings Card Details",
+                    text = if (language == AppLanguage.BN) "Finance Note কার্ডের বিস্তারিত" else "Savings Card Details",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FintechBlue,
@@ -5182,7 +5196,7 @@ fun SavingsGoalDetailOverlay(
             },
             onShareText = {
                 val shareText = buildString {
-                    append(if (language == AppLanguage.BN) "সঞ্চয় ট্রানজ্যাকশন মেমো\n" else "Savings Transaction Memo\n")
+                    append(if (language == AppLanguage.BN) "Finance Note ট্রানজ্যাকশন মেমো\n" else "Savings Transaction Memo\n")
                     append("-------------------\n")
                     val typeStr = if (tx.isDeposit) (if (language == AppLanguage.BN) "জমা" else "Deposit") else (if (language == AppLanguage.BN) "উত্তোলন" else "Withdraw")
                     append(if (language == AppLanguage.BN) "ধরণ: " else "Type: ").append(typeStr).append("\n")
@@ -5202,7 +5216,7 @@ fun SavingsGoalDetailOverlay(
                 context.startActivity(Intent.createChooser(intent, if (language == AppLanguage.BN) "শেয়ার করুন" else "Share via"))
             },
             onShareImage = { bitmap ->
-                shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে সঞ্চয় মেমো" else "Savings Memo from Finance Note")
+                shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে Finance Note মেমো" else "Savings Memo from Finance Note")
             }
         )
     }
@@ -5362,13 +5376,16 @@ fun PersonDetailOverlay(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(12.dp)
         ) {
             // Header - Simplified (removed Close button to reduce empty space as requested by user)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Person Bio Card (Frosted Card)
-            FrostedGlassCard(isDark = isDark) {
+            FrostedGlassCard(
+                isDark = isDark,
+                padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -7077,7 +7094,7 @@ fun SettingsScreen(
                 Button(
                     onClick = {
                         val shareText = buildString {
-                            append(if (language == AppLanguage.BN) "দৈনন্দিন লেনদেন, দেনাপাওনা ও সঞ্চয়ের হিসাব রাখতে ডাউনলোড করুন ফাইন্যান্স নোট অ্যাপ: " else "Download Finance Note app to keep track of your daily transactions, debts, and savings: ")
+                            append(if (language == AppLanguage.BN) "দৈনন্দিন লেনদেন, দেনাপাওনা ও Finance Noteের হিসাব রাখতে ডাউনলোড করুন ফাইন্যান্স নোট অ্যাপ: " else "Download Finance Note app to keep track of your daily transactions, debts, and savings: ")
                             append("\n")
                             val updateInfoStr = context.getSharedPreferences("FinancePrefs", android.content.Context.MODE_PRIVATE).getString("update_info", null)
                             var link = "https://sites.google.com/view/financenote/home?authuser=0"
@@ -7254,22 +7271,22 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "১. তথ্য সংগ্রহ ও ব্যবহার:\nSanchay অ্যাপটি লোকাল-ফার্স্ট এবং ক্লাউড-সিঙ্ক সাপোর্ট করে। আপনার সমস্ত হিসাব ও লেনদেনের তথ্য ডিভাইসের নিরাপদ লোকাল SQLite (Room) ডাটাবেজে সংরক্ষিত থাকে। আপনি রিয়েল-টাইম ক্লাউড সিঙ্ক অন করলে ফায়ারবেস সিকিউর লাইনে আপনার ফায়ারবেস ক্লাউড ডাটাবেজে সেটি সিঙ্ক হয়।"
-                            else "1. Information Collection & Use:\nSanchay is a local-first application with optional secure cloud sync. All your transaction records are stored securely on your device using SQLite (Room). If real-time cloud sync is enabled, it synchronizes securely with Firestore database.",
+                            "১. তথ্য সংগ্রহ ও ব্যবহার:\nFinance Note একটি আধুনিক ও নিরাপদ পার্সোনাল ফাইন্যান্স ম্যানেজার। আপনার এন্ট্রি করা সমস্ত ডাটা ডিফল্টভাবে আপনার ডিভাইসের লোকাল SQLite (Room) ডাটাবেজে অত্যন্ত সুরক্ষিতভাবে সংরক্ষিত থাকে। আপনি যদি স্বেচ্ছায় 'ক্লাউড সিঙ্ক' অপশনটি চালু করেন তবেই তা আমাদের এনক্রিপ্টেড ফায়ারবেস ক্লাউড সার্ভারে সিঙ্ক হবে।"
+                            else "1. Data Collection & Usage:\nFinance Note is a modern and secure personal finance manager. By default, all your data is stored locally on your device in a secure SQLite (Room) database. Data is only synchronized with our encrypted Firebase Cloud server if you explicitly enable the 'Cloud Sync' feature.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "২. মিলিটারী-গ্রেড AES-256 এনক্রিপশন:\nআপনার সর্বোচ্চ সুরক্ষার জন্য, গুগল ড্রাইভ ব্যাকআপ, লোকাল ব্যাকআপ ফাইল, ক্লাউড সিঙ্ক এবং কপি করা ব্যাকআপ কোডসহ সকল ধরনের ব্যাকআপ ফাইল মিলিটারী-গ্রেড AES-256 এনক্রিপশন দ্বারা অত্যন্ত সুরক্ষিতভাবে এনক্রিপ্ট করা হয়। রিস্টোর করার সময় আমাদের অ্যাপটি স্বয়ংক্রিয়ভাবে তা ডিক্রিপ্ট করে নেয়।"
-                            else "2. Military-Grade AES-256 Encryption:\nFor your maximum security, all backups—including Google Drive, local backup files, cloud sync records, and exported clipboard codes—are fully encrypted using military-grade AES-256 encryption. The app automatically decrypts them securely during restore.",
+                            "২. এন্ড-টু-এন্ড AES-256 এনক্রিপশন:\nআপনার সর্বোচ্চ নিরাপত্তার কথা মাথায় রেখে, গুগল ড্রাইভ ব্যাকআপ, ক্লাউড সিঙ্ক, এবং লোকাল ব্যাকআপ ফাইলসহ সকল প্রকার তথ্য মিলিটারী-গ্রেড AES-256 এনক্রিপশন দ্বারা এনক্রিপ্ট করা হয়। যার ফলে আপনার পাসওয়ার্ড বা ব্যাকআপ কোড ছাড়া কেউ আপনার তথ্য ডিক্রিপ্ট করতে পারবে না।"
+                            else "2. End-to-End AES-256 Encryption:\nFor your maximum security, all backup formats—including Google Drive backups, cloud sync records, and local files—are encrypted using military-grade AES-256 encryption. This ensures that only you, with your unique backup code, can access your data.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "৩. স্বয়ংক্রিয় ব্যাকআপের সময়কাল:\nগুগল সাইন-ইন করা থাকলে আপনি নির্দিষ্ট দিন অন্তর অন্তর (যেমন- ১ দিন, ৭ দিন ইত্যাদি) সম্পূর্ণ স্বয়ংক্রিয় গুগল ড্রাইভ ব্যাকআপ ফিচারটি ব্যবহারের সুবিধা পাবেন যা আপনার নিজস্ব গুগল ড্রাইভে আপলোড হবে।"
-                            else "3. Google Drive Auto Backup:\nWhen signed in with Google, you can set a custom interval (e.g. daily, weekly) for the app to automatically back up your encrypted financial data securely to your Google Drive folder.",
+                            "৩. নিরাপদ ব্যাকআপ পলিসি:\n Finance Note আপনার কোনো ব্যক্তিগত তথ্য বা পাসওয়ার্ড আমাদের সার্ভারে জমা রাখে না। আপনার গুগল ড্রাইভ ব্যাকআপ আপনার নিজস্ব ড্রাইভ ফোল্ডারে সংরক্ষিত থাকে যা সম্পূর্ণ আপনার নিয়ন্ত্রণাধীন।"
+                            else "3. Secure Backup Policy:\nFinance Note does not store any of your private credentials or passwords on our servers. Your Google Drive backups are stored in your own personal drive folder, remaining under your full control at all times.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
@@ -7302,22 +7319,22 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "১. অ্যাপের ব্যবহার:\nSanchay অ্যাপটি ব্যক্তিগত অর্থ ব্যবস্থাপনার জন্য তৈরি করা হয়েছে। ভুল এন্ট্রি, পাসওয়ার্ড ভুলে যাওয়া বা ডিভাইসের ত্রুটির কারণে ডাটা নষ্ট হলে অ্যাপ কর্তৃপক্ষ দায়ী থাকবে না।"
-                            else "1. App Usage:\nSanchay is designed for personal money management. The app and its developers are not responsible for any data loss, forgotten password, or device malfunction resulting in data discrepancy.",
+                            "১. অ্যাপের ব্যবহার:\nFinance Note অ্যাপটি শুধুমাত্র ব্যক্তিগত ব্যবহারের জন্য তৈরি। ভুল এন্ট্রি, ডিভাইসের হার্ডওয়্যার ত্রুটি বা পাসওয়ার্ড ভুলে যাওয়ার কারণে ডাটা নষ্ট হলে কর্তৃপক্ষ দায়ী থাকবে না। তবে আমরা সর্বদা আপনার ডাটা সুরক্ষিত রাখতে সচেষ্ট।"
+                            else "1. App Usage:\nFinance Note is strictly for personal financial management. The developers are not liable for data loss caused by incorrect manual entries, hardware failure, or forgotten backup passwords.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "২. ব্যাকআপ ও সিঙ্কের সততা:\nগুগল ড্রাইভ অটো ব্যাকআপ এবং রিয়েল-টাইম ক্লাউড সিঙ্ক ফিচার ব্যবহার করতে ইন্টারনেট সংযোগ প্রয়োজন। আপনার নিরাপত্তার স্বার্থে সমস্ত সংরক্ষিত ফাইল মিলিটারী-গ্রেড AES-256 এনক্রিপ্ট করে সিকিউর ক্লাউডে আপলোড করা হয়।"
-                            else "2. Backup & Sync Integrity:\nInternet connectivity is required to use Google Drive automatic backups and real-time cloud sync. For your absolute security, all backup files are encrypted using military-grade AES-256 before being uploaded.",
+                            "২. ক্লাউড ও সিকিউরিটি:\nক্লাউড সিঙ্ক এবং গুগল ড্রাইভ ব্যাকআপ ফিচার ব্যবহারের জন্য ইন্টারনেট সংযোগ আবশ্যক। আপনার সিকিউরিটির স্বার্থে সমস্ত ব্যাকআপ ফাইল ডিভাইস থেকেই এনক্রিপ্ট হয়ে আপলোড হয়।"
+                            else "2. Cloud & Security:\nAn active internet connection is required for Cloud Sync and Google Drive backup features. For your security, all backup files are encrypted on-device before being uploaded.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "৩. পরিবর্তন ও আপডেট:\nঅ্যাপের গতিশীলতা, নিরাপত্তা ও নির্ভরযোগ্যতা সর্বোচ্চ পর্যায়ে বজায় রাখতে আমরা যেকোনো সময় অ্যাপে আপডেট বা সংস্করণ জারি করতে পারি।"
-                            else "3. Service Updates:\nWe reserve the right to deploy updates and modifications to maximize security, usability, and visual elegance of Sanchay at any time.",
+                            "৩. পলিসি পরিবর্তন:\nইউজার এক্সপেরিয়েন্স এবং সিকিউরিটি আপডেট বজায় রাখতে Finance Note যেকোনো সময় অ্যাপের শর্তাবলী ও ফিচার পরিবর্তন করার অধিকার সংরক্ষণ করে।"
+                            else "3. Policy Changes:\nFinance Note reserves the right to update these terms and features at any time to ensure the highest standards of security and user experience.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
