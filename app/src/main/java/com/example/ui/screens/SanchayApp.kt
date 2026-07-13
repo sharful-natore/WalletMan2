@@ -535,6 +535,91 @@ fun formatDateHeader(dateStr: String, lang: AppLanguage): String {
     }
 }
 
+class NotchedBottomBarShape(
+    private val notchRadiusDp: Dp = 38.dp,
+    private val depthDp: Dp = 34.dp,
+    private val edgeRadiusDp: Dp = 12.dp
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val r = with(density) { notchRadiusDp.toPx() }
+        val d = with(density) { depthDp.toPx() }
+        val cr = with(density) { edgeRadiusDp.toPx() }
+        
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            val centerX = size.width / 2f
+            
+            // The lowest point of the notch circle is at y = d.
+            // So centerY + r = d => centerY = d - r.
+            val centerY = d - r
+            
+            // Solve for x_shoulder:
+            // (x_shoulder - centerX)^2 + (r_shoulder - centerY)^2 = (r + r_shoulder)^2
+            // Let r_shoulder = cr
+            val term = (r + cr) * (r + cr) - (cr - centerY) * (cr - centerY)
+            val xShoulder = centerX - kotlin.math.sqrt(term.coerceAtLeast(0f))
+            val xShoulderRight = centerX + kotlin.math.sqrt(term.coerceAtLeast(0f))
+            
+            val startX = xShoulder
+            val endX = xShoulderRight
+            
+            lineTo(startX, 0f)
+            
+            val dx = centerX - xShoulder
+            val dy = centerY - cr
+            val dist = r + cr // distance between centers is exactly r + cr since they are tangent
+            
+            // Tangency point on left side:
+            val tX1 = xShoulder + (dx / dist) * cr
+            val tY1 = cr + (dy / dist) * cr
+            
+            // Left shoulder arc
+            val kCr = cr * 0.5522847f
+            cubicTo(
+                startX + kCr, 0f,
+                tX1 + (dy / dist) * kCr, tY1 - (dx / dist) * kCr,
+                tX1, tY1
+            )
+            
+            // Right tangency point (symmetric):
+            val tX2 = centerX + (centerX - tX1)
+            val tY2 = tY1
+            
+            // Left half of the circular notch
+            val kR = r * 0.5522847f
+            cubicTo(
+                tX1 - (dy / dist) * kR, tY1 + (dx / dist) * kR,
+                centerX - kR, d,
+                centerX, d
+            )
+            
+            // Right half of the circular notch
+            cubicTo(
+                centerX + kR, d,
+                tX2 + (dy / dist) * kR, tY2 + (dx / dist) * kR,
+                tX2, tY2
+            )
+            
+            // Right shoulder arc
+            cubicTo(
+                tX2 - (dy / dist) * kCr, tY2 - (dx / dist) * kCr,
+                endX - kCr, 0f,
+                endX, 0f
+            )
+            
+            lineTo(size.width, 0f)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
 @Composable
 fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val language by viewModel.language.collectAsState()
@@ -577,6 +662,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         }
     }
 
+    var pendingDifferentAccountLogin by remember { mutableStateOf<com.google.android.gms.auth.api.signin.GoogleSignInAccount?>(null) }
+
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -595,16 +682,23 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         try {
             val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
             if (account != null) {
-                viewModel.handleGoogleSignInSuccess(
-                    context = context,
-                    account = account,
-                    onSuccess = {
-                        Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
-                    },
-                    onError = { err ->
-                        Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
-                    }
-                )
+                val email = account.email
+                val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                val lastEmail = prefs.getString("last_google_email", null)
+                if (lastEmail != null && email != null && lastEmail != email) {
+                    pendingDifferentAccountLogin = account
+                } else {
+                    viewModel.handleGoogleSignInSuccess(
+                        context = context,
+                        account = account,
+                        onSuccess = {
+                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { err ->
+                            Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
             } else {
                 Toast.makeText(context, if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে।" else "Sign-in failed.", Toast.LENGTH_SHORT).show()
             }
@@ -722,52 +816,17 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         filteredPersonDebts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
     }
 
-    var activeTab by remember(initialAction) {
-        mutableStateOf(
-            when (initialAction) {
-                "ACTION_DEBT_CREDIT", "ACTION_VIEW_DEBT", "ACTION_VIEW_CREDIT" -> "debts"
-                "ACTION_SAVINGS" -> "savings"
-                "ACTION_VIEW_INCOME", "ACTION_VIEW_EXPENSE" -> "transactions"
-                "ACTION_SETTINGS", "ACTION_BACKUP", "ACTION_SETTINGS_PROFILE", "ACTION_GOOGLE_SIGN_IN" -> "settings"
-                "ACTION_CHARTS" -> "charts"
-                else -> "dashboard"
-            }
-        )
-    }
-    var settingsFilter by remember(initialAction) {
-        mutableStateOf(
-            when (initialAction) {
-                "ACTION_SETTINGS_PROFILE" -> "expand_profile"
-                "ACTION_BACKUP" -> "BACKUP"
-                else -> ""
-            }
-        )
-    }
-    var transactionFilter by remember(initialAction) { 
-        mutableStateOf(
-            when(initialAction) {
-                "ACTION_VIEW_INCOME" -> "INCOME"
-                "ACTION_VIEW_EXPENSE" -> "EXPENSE"
-                else -> "ALL"
-            }
-        )
-    }
-    var debtFilter by remember(initialAction) { 
-        mutableStateOf(
-            when(initialAction) {
-                "ACTION_VIEW_DEBT" -> "DEBT"
-                "ACTION_VIEW_CREDIT" -> "CREDIT"
-                else -> "ALL"
-            }
-        )
-    }
+    var activeTab by remember { mutableStateOf("dashboard") }
+    var settingsFilter by remember { mutableStateOf("") }
+    var transactionFilter by remember { mutableStateOf("ALL") }
+    var debtFilter by remember { mutableStateOf("ALL") }
 
     // Dialog & overlay states
     val composeCoroutineScope = rememberCoroutineScope()
-    var showAddTransactionDialog by remember(initialAction) { mutableStateOf(initialAction == "ACTION_ADD_TRANSACTION") }
+    var showAddTransactionDialog by remember { mutableStateOf(false) }
     var editingPerson by remember { mutableStateOf<Person?>(null) }
-    var showAddPersonDialog by remember { mutableStateOf(initialAction == "ACTION_DEBT_CREDIT") }
-    var showAddSavingsGoalDialog by remember { mutableStateOf(initialAction == "ACTION_SAVINGS") }
+    var showAddPersonDialog by remember { mutableStateOf(false) }
+    var showAddSavingsGoalDialog by remember { mutableStateOf(false) }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
     var savingsTxToEdit by remember { mutableStateOf<SavingsTransaction?>(null) }
@@ -809,23 +868,75 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isSyncing by viewModel.isSyncing.collectAsState()
 
 
-    var showBackupConfirm by remember(initialAction) { mutableStateOf(initialAction == "ACTION_BACKUP") }
+    var showBackupConfirm by remember { mutableStateOf(false) }
     var cloudBackupStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
     var showRestoreListDialog by remember { mutableStateOf(false) }
 
     // Logic for triggering sign-in or backup automatically from intents
     LaunchedEffect(initialAction, isGoogleSignedIn) {
-        if (initialAction == "ACTION_GOOGLE_SIGN_IN" && !isGoogleSignedIn) {
-            triggerGoogleSignIn()
-        }
-        if (initialAction == "ACTION_BACKUP") {
-            if (!isGoogleSignedIn) {
+        if (initialAction != null) {
+            if (initialAction == "ACTION_REFRESH_WIDGET") {
+                com.example.widget.updateAllWidgets(context)
+            }
+            if (initialAction == "ACTION_GOOGLE_SIGN_IN" && !isGoogleSignedIn) {
                 triggerGoogleSignIn()
-            } else {
-                val backupData = viewModel.getCurrentDatabaseBackup()
-                val stats = viewModel.calculateBackupStats(backupData)
-                cloudBackupStats = stats
-                showBackupConfirm = true
+            }
+            if (initialAction == "ACTION_BACKUP") {
+                if (!isGoogleSignedIn) {
+                    triggerGoogleSignIn()
+                } else {
+                    val backupData = viewModel.getCurrentDatabaseBackup()
+                    val stats = viewModel.calculateBackupStats(backupData)
+                    cloudBackupStats = stats
+                    showBackupConfirm = true
+                }
+            }
+            
+            // Route tab selection and dialog visibility based on intent actions
+            when (initialAction) {
+                "ACTION_DEBT_CREDIT" -> {
+                    activeTab = "debts"
+                    showAddPersonDialog = true
+                }
+                "ACTION_VIEW_DEBT" -> {
+                    activeTab = "debts"
+                    debtFilter = "DEBT"
+                }
+                "ACTION_VIEW_CREDIT" -> {
+                    activeTab = "debts"
+                    debtFilter = "CREDIT"
+                }
+                "ACTION_SAVINGS" -> {
+                    activeTab = "savings"
+                    showAddSavingsGoalDialog = false
+                }
+                "ACTION_VIEW_INCOME" -> {
+                    activeTab = "transactions"
+                    transactionFilter = "INCOME"
+                }
+                "ACTION_VIEW_EXPENSE" -> {
+                    activeTab = "transactions"
+                    transactionFilter = "EXPENSE"
+                }
+                "ACTION_SETTINGS" -> {
+                    activeTab = "settings"
+                }
+                "ACTION_SETTINGS_PROFILE" -> {
+                    activeTab = "settings"
+                    settingsFilter = "expand_profile"
+                }
+                "ACTION_GOOGLE_SIGN_IN" -> {
+                    activeTab = "settings"
+                }
+                "ACTION_CHARTS" -> {
+                    activeTab = "charts"
+                }
+                "ACTION_ADD_TRANSACTION" -> {
+                    showAddTransactionDialog = true
+                }
+                "ACTION_SYNC_TRIGGER" -> {
+                    showRealtimeSyncDialog = true
+                }
             }
         }
     }
@@ -1023,127 +1134,141 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 val bottomBarGradient = Brush.linearGradient(
                     colors = GradientsList[0]
                 )
+                val density = LocalDensity.current
+                val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .background(bottomBarGradient)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 0.dp)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Helper for bottom bar items
+                    @Composable
+                    fun BottomNavItem(
+                        tab: String,
+                        icon: Any,
+                        testTag: String,
+                        iconSize: androidx.compose.ui.unit.Dp = 24.dp
                     ) {
-                        // Helper for bottom bar items
-                        @Composable
-                        fun BottomNavItem(
-                            tab: String,
-                            icon: Any,
-                            testTag: String,
-                            iconSize: androidx.compose.ui.unit.Dp = 24.dp
-                        ) {
-                            val isSelected = activeTab == tab
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .clickable { 
-                                        activeTab = tab
-                                        selectedPersonDetail = null
-                                        selectedSavingsGoalDetail = null
-                                    }
-                                    .padding(horizontal = 2.dp, vertical = 2.dp)
-                                    .testTag(testTag),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                                 ) {
-                                    if (icon is ImageVector) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
-                                            modifier = Modifier.size(iconSize)
-                                        )
-                                    } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
-                                        Icon(
-                                            painter = icon,
-                                            contentDescription = null,
-                                            tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
-                                            modifier = Modifier.size(iconSize)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Item 1: Dashboard
-                        BottomNavItem(
-                            tab = "dashboard",
-                            icon = Icons.Rounded.SpaceDashboard,
-                            testTag = "nav_dashboard"
-                        )
-
-                        // Item 2: Transactions
-                        BottomNavItem(
-                            tab = "transactions",
-                            icon = painterResource(id = R.drawable.order_approve_24),
-                            testTag = "nav_transactions",
-                            iconSize = 24.dp
-                        )
-
-                        // Center: Central FAB!
+                        val isSelected = activeTab == tab
                         Box(
                             modifier = Modifier
-                                .offset(y = (-20).dp)
-                                .size(72.dp)
-                                .background(if (isDarkTheme) Color.Black else Color.White, CircleShape)
-                                .clickable(
-                                    indication = null,
-                                    interactionSource = remember { MutableInteractionSource() }
-                                ) { showAddTransactionDialog = true }
-                                .testTag("fab_add_transaction_outer"),
+                                .clip(CircleShape)
+                                .clickable { 
+                                    activeTab = tab
+                                    selectedPersonDetail = null
+                                    selectedSavingsGoalDetail = null
+                                }
+                                .padding(horizontal = 2.dp, vertical = 2.dp)
+                                .testTag(testTag),
                             contentAlignment = Alignment.Center
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(58.dp)
                                     .clip(CircleShape)
-                                    .background(
-                                        Brush.linearGradient(
-                                            colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
-                                        )
+                                    .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                             ) {
+                                if (icon is ImageVector) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                        modifier = Modifier.size(iconSize)
                                     )
-                                    .testTag("fab_add_transaction"),
-                                contentAlignment = Alignment.Center
+                                } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
+                                    Icon(
+                                        painter = icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                        modifier = Modifier.size(iconSize)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 1. Clipped and styled navigation bar background with Notch Cut shape
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp) // Leave space at the top for the cutout
+                            .height(64.dp + navBarPadding)
+                            .clip(NotchedBottomBarShape(notchRadiusDp = 38.dp, depthDp = 34.dp, edgeRadiusDp = 12.dp))
+                            .background(bottomBarGradient)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                                .align(Alignment.TopCenter),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Left-side items
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = "Add Transaction",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(26.dp)
+                                BottomNavItem(
+                                    tab = "dashboard",
+                                    icon = Icons.Rounded.SpaceDashboard,
+                                    testTag = "nav_dashboard"
+                                )
+                                BottomNavItem(
+                                    tab = "transactions",
+                                    icon = painterResource(id = R.drawable.order_approve_24),
+                                    testTag = "nav_transactions",
+                                    iconSize = 24.dp
+                                )
+                            }
+
+                            // Spacer in the middle for the notch cutout
+                            Spacer(modifier = Modifier.width(76.dp))
+
+                            // Right-side items
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                BottomNavItem(
+                                    tab = "debts",
+                                    icon = painterResource(id = R.drawable.ic_lend_borrow_new),
+                                    testTag = "nav_debts",
+                                    iconSize = 24.dp
+                                )
+                                BottomNavItem(
+                                    tab = "savings",
+                                    icon = Icons.Rounded.AccountBalance,
+                                    testTag = "nav_savings",
+                                    iconSize = 24.dp
                                 )
                             }
                         }
+                    }
 
-                        // Item 3: Debts
-                        BottomNavItem(
-                            tab = "debts",
-                            icon = painterResource(id = R.drawable.ic_lend_borrow_new),
-                            testTag = "nav_debts",
-                            iconSize = 24.dp
-                        )
-
-                        // Item 4: Savings
-                        BottomNavItem(
-                            tab = "savings",
-                            icon = Icons.Rounded.AccountBalance,
-                            testTag = "nav_savings",
-                            iconSize = 24.dp
+                    // 2. Floating Add Button sits beautifully centered in the notch cutout
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 38.dp + navBarPadding) // Sits beautifully half-in, half-out of the notch, with spacious margin
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
+                                )
+                            )
+                            .clickable { showAddTransactionDialog = true }
+                            .testTag("fab_add_transaction"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = "Add Transaction",
+                            tint = Color.White,
+                            modifier = Modifier.size(30.dp)
                         )
                     }
                 }
@@ -1938,6 +2063,56 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             }
         )
     }
+
+    if (pendingDifferentAccountLogin != null) {
+        val account = pendingDifferentAccountLogin!!
+        AlertDialog(
+            onDismissRequest = { pendingDifferentAccountLogin = null },
+            title = {
+                Text(
+                    text = if (language == AppLanguage.BN) "ভিন্ন অ্যাকাউন্ট সনাক্তকরণ" else "Different Account Detected",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (language == AppLanguage.BN)
+                        "আপনি একটি ভিন্ন গুগল অ্যাকাউন্ট (${account.email}) দিয়ে লগইন করার চেষ্টা করছেন। এটি করলে আপনার ফোনে থাকা পূর্ববর্তী অ্যাকাউন্টের সকল লোকাল ডাটা মুছে যাবে এবং নতুন অ্যাকাউন্টের ক্লাউড ডাটা সিঙ্ক হবে। আপনি কি নিশ্চিত যে এগিয়ে যেতে চান?"
+                        else "You are trying to log in with a different Google account (${account.email}). Doing this will delete all previous local data on your phone and sync the new account's cloud data. Are you sure you want to proceed?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
+                    onClick = {
+                        val act = pendingDifferentAccountLogin
+                        pendingDifferentAccountLogin = null
+                        if (act != null) {
+                            viewModel.clearAllDataLocal {
+                                viewModel.handleGoogleSignInSuccess(
+                                    context = context,
+                                    account = act,
+                                    onSuccess = {
+                                        Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { err ->
+                                        Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                ) {
+                    Text(if (language == AppLanguage.BN) "মুছে ফেলুন এবং কানেক্ট করুন" else "Clear and Connect", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDifferentAccountLogin = null }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                }
+            }
+        )
+    }
 }
 
 
@@ -1991,6 +2166,16 @@ fun DashboardScreen(
     viewModel: FinanceViewModel? = null
 ) {
     val context = LocalContext.current
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             viewModel?.let { vm ->
@@ -2197,7 +2382,7 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = Translation.get("total_balance", language),
                             color = Color.White.copy(alpha = 0.85f),
@@ -2209,23 +2394,30 @@ fun DashboardScreen(
                             color = Color.White,
                             fontSize = 34.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                            maxLines = 1,
+                            modifier = Modifier
+                                .padding(vertical = 2.dp)
+                                .basicMarquee()
                         )
                     }
 
-                    // Bottom-right decorative card chip icon
+                    // Bottom-right decorative card chip icon with matching border and pulsing scale applied to both container and image
                     Box(
                         modifier = Modifier
+                            .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
                             .size(46.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.15f))
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
                             .clickable { onNavigate("charts", "") },
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.timeline_24),
                             contentDescription = "Charts",
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale),
                             colorFilter = ColorFilter.tint(Color.White)
                         )
                     }
@@ -2269,7 +2461,7 @@ fun DashboardScreen(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier.basicMarquee()
                         )
                     }
 
@@ -2304,7 +2496,7 @@ fun DashboardScreen(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier.basicMarquee()
                         )
                     }
                 }
@@ -2339,11 +2531,11 @@ fun DashboardScreen(
                         .testTag("dashboard_i_owe_card")
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
                             Text(
                                 text = Translation.get("i_owe", language),
                                 color = Color.White.copy(alpha = 0.8f),
@@ -2355,7 +2547,10 @@ fun DashboardScreen(
                                 color = Color.White,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(top = 4.dp)
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .basicMarquee()
                             )
                         }
                         Icon(
@@ -2378,11 +2573,11 @@ fun DashboardScreen(
                         .testTag("dashboard_owed_to_me_card")
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f).padding(end = 4.dp)) {
                             Text(
                                 text = Translation.get("owed_to_me", language),
                                 color = Color.White.copy(alpha = 0.8f),
@@ -2394,7 +2589,10 @@ fun DashboardScreen(
                                 color = Color.White,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(top = 4.dp)
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    .basicMarquee()
                             )
                         }
                         Icon(
@@ -3683,7 +3881,7 @@ fun SavingsGoalCardItem(
                 
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = if (maskBalance) "৳ XXXXX" else formatCurrency(goal.savedAmount, language),
+                        text = if (maskBalance) "৳ ••••" else formatCurrency(goal.savedAmount, language),
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold
@@ -6093,6 +6291,14 @@ fun SettingsScreen(
                 isDark = isDark,
                 isRestoreMode = true,
                 initialFileName = pendingLocalRestoreFileName,
+                onBackupRequested = {
+                    localCoroutineScope.launch {
+                        val backupData = viewModel.getCurrentDatabaseBackup()
+                        val stats = viewModel.calculateBackupStats(backupData)
+                        currentDbStats = stats
+                        showLocalBackupStatsDialog = true
+                    }
+                },
                 onConfirm = { _, _ ->
                     viewModel.importBackup(
                         context = context,
@@ -7009,7 +7215,7 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showLogoutConfirm = false },
             title = { Text(if (language == AppLanguage.BN) "লগআউট নিশ্চিতকরণ" else "Confirm Logout") },
-            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান?" else "Are you sure you want to log out of Google Drive?") },
+            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান? লগআউট করলেও আপনার স্থানীয় সকল ডাটা ফোনেই সুরক্ষিত থাকবে।" else "Are you sure you want to log out of Google Drive? Even if you log out, all your current data will remain safe on your phone.") },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
@@ -7360,7 +7566,8 @@ fun TimelineSplineChart(
     datasets: List<ChartDataset>,
     monthsLabels: List<String>,
     language: AppLanguage,
-    isDark: Boolean
+    isDark: Boolean,
+    targetIndex: Int = -1
 ) {
     val bgColor = if (isDark) listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -7473,23 +7680,31 @@ fun TimelineSplineChart(
                     val availableWidth = maxWidth
                     val minItemWidth = 25.2.dp
                     val dynamicWidth = maxOf(availableWidth * 0.51f, (monthsLabels.size * minItemWidth.value).dp)
+                    val density = androidx.compose.ui.platform.LocalDensity.current
 
-                    LaunchedEffect(monthsLabels, dynamicWidth, maxWidth) {
+                    LaunchedEffect(monthsLabels, dynamicWidth, maxWidth, targetIndex, scrollState.maxValue) {
                         kotlinx.coroutines.delay(100)
-                        if (dynamicWidth > maxWidth) {
-                            scrollState.scrollTo((scrollState.maxValue / 2).coerceAtLeast(0))
+                        val maxScroll = scrollState.maxValue
+                        if (maxScroll > 0 && targetIndex >= 0 && targetIndex < monthsLabels.size) {
+                            val paddingLeft = with(density) { 10.dp.toPx() }
+                            val paddingRight = with(density) { 15.dp.toPx() }
+                            val availableWidthPx = with(density) { maxWidth.toPx() }
+                            val dynamicWidthPx = with(density) { dynamicWidth.toPx() }
+                            val usableWidth = dynamicWidthPx - paddingLeft - paddingRight
+                            val numLabels = monthsLabels.size
+                            val maxIdx = if (numLabels > 1) numLabels - 1 else 1
+                            val targetX = paddingLeft + targetIndex * (usableWidth / maxIdx.toFloat())
+                            val scrollPosition = targetX - (availableWidthPx / 2f)
+                            scrollState.scrollTo(scrollPosition.coerceIn(0f, maxScroll.toFloat()).toInt())
                         } else {
                             scrollState.scrollTo(0)
                         }
                     }
 
-                    val paddingEnd = if (dynamicWidth > maxWidth) maxWidth / 2 else 0.dp
-
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .horizontalScroll(scrollState)
-                            .padding(end = paddingEnd)
                     ) {
                         Canvas(
                             modifier = Modifier
@@ -8717,13 +8932,108 @@ fun ChartsScreen(
             ChartFilterMode.DAY -> formatMonthYearDisplay(timelineSelectedMonth, timelineSelectedYear, language)
         }
 
+        val nowCal = java.util.Calendar.getInstance()
+        val cYear = nowCal.get(java.util.Calendar.YEAR)
+        val cMonth = nowCal.get(java.util.Calendar.MONTH)
+        val cDay = nowCal.get(java.util.Calendar.DAY_OF_MONTH)
+
+        val targetScrollIndex = remember(
+            timelineChartFilterMode,
+            timelineSelectedYear,
+            timelineSelectedMonth,
+            startYear,
+            startMonth,
+            endYear,
+            endMonth,
+            startYearY2Y,
+            endYearY2Y,
+            splineChartData.labels
+        ) {
+            when (timelineChartFilterMode) {
+                ChartFilterMode.DAY -> {
+                    if (timelineSelectedYear == cYear && timelineSelectedMonth == cMonth) {
+                        (cDay - 1).coerceIn(0, splineChartData.labels.size - 1)
+                    } else if (timelineSelectedYear < cYear || (timelineSelectedYear == cYear && timelineSelectedMonth < cMonth)) {
+                        splineChartData.labels.size - 1
+                    } else {
+                        0
+                    }
+                }
+                ChartFilterMode.MONTH -> {
+                    if (timelineSelectedYear == cYear) {
+                        cMonth.coerceIn(0, splineChartData.labels.size - 1)
+                    } else if (timelineSelectedYear < cYear) {
+                        splineChartData.labels.size - 1
+                    } else {
+                        0
+                    }
+                }
+                ChartFilterMode.YEAR -> {
+                    val startYr = timelineSelectedYear - 4
+                    if (cYear in startYr..timelineSelectedYear) {
+                        (cYear - startYr).coerceIn(0, splineChartData.labels.size - 1)
+                    } else if (cYear > timelineSelectedYear) {
+                        splineChartData.labels.size - 1
+                    } else {
+                        0
+                    }
+                }
+                ChartFilterMode.MONTH_TO_MONTH -> {
+                    var targetIdx = -1
+                    var curYr = startYear
+                    var curMn = startMonth
+                    val endTotalMonths = endYear * 12 + endMonth
+                    val currentTotalMonths = cYear * 12 + cMonth
+                    
+                    var count = 0
+                    while ((curYr * 12 + curMn <= endTotalMonths) && count < 24) {
+                        if (curYr == cYear && curMn == cMonth) {
+                            targetIdx = count
+                            break
+                        }
+                        curMn++
+                        if (curMn > 11) {
+                            curMn = 0
+                            curYr++
+                        }
+                        count++
+                    }
+                    if (targetIdx != -1) {
+                        targetIdx.coerceIn(0, splineChartData.labels.size - 1)
+                    } else {
+                        if (currentTotalMonths > endTotalMonths) {
+                            splineChartData.labels.size - 1
+                        } else {
+                            0
+                        }
+                    }
+                }
+                ChartFilterMode.YEAR_TO_YEAR -> {
+                    val sYr = startYearY2Y
+                    val eYr = if (endYearY2Y < startYearY2Y) startYearY2Y else endYearY2Y
+                    val yearsRange = (sYr..eYr).take(10)
+                    val foundIdx = yearsRange.indexOf(cYear)
+                    if (foundIdx != -1) {
+                        foundIdx.coerceIn(0, splineChartData.labels.size - 1)
+                    } else {
+                        if (cYear > eYr) {
+                            splineChartData.labels.size - 1
+                        } else {
+                            0
+                        }
+                    }
+                }
+            }
+        }
+
         // --- TIMELINE SPLINE CHART 1: INCOME & EXPENSE ---
         TimelineSplineChart(
             title = if (language == AppLanguage.BN) "আয় ও ব্যয় ট্রেন্ড ($displayPeriodLabel)" else "Income & Expense Trend ($displayPeriodLabel)",
             datasets = dataset1,
             monthsLabels = splineChartData.labels,
             language = language,
-            isDark = isDark
+            isDark = isDark,
+            targetIndex = targetScrollIndex
         )
 
         // --- TIMELINE SPLINE CHART 2: LEND & BORROW ---
@@ -8732,7 +9042,8 @@ fun ChartsScreen(
             datasets = dataset2,
             monthsLabels = splineChartData.labels,
             language = language,
-            isDark = isDark
+            isDark = isDark,
+            targetIndex = targetScrollIndex
         )
         
         Spacer(modifier = Modifier.height(80.dp))
@@ -9105,11 +9416,11 @@ fun SplashScreen(isDark: Boolean) {
     // Force white background as requested
     val bgColor = Color.White
     
-    // Pulse animation for the logo
+    // Pulse animation for the logo, optimized within bounds (0.85f to 1.0f) to prevent clipping
     val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
     val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.15f,
+        initialValue = 0.85f,
+        targetValue = 1.00f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -9133,8 +9444,10 @@ fun SplashScreen(isDark: Boolean) {
             androidx.compose.foundation.Image(
                 painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.app_logo_new),
                 contentDescription = "App Logo",
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                 modifier = Modifier
-                    .size(screenWidth * 0.4f) // 40% of screen width as requested
+                    .size(screenWidth * 0.45f) // Optimized size with safe padding to ensure no clipping
+                    .padding(12.dp)
                     .graphicsLayer(
                         scaleX = scale,
                         scaleY = scale
@@ -9177,6 +9490,20 @@ fun GoogleDriveRestoreListDialog(
     var pendingCloudRestoreFileName by remember { mutableStateOf("") }
     var pendingCloudRestoreJson by remember { mutableStateOf("") }
     var isDownloadingByFileId by remember { mutableStateOf<String?>(null) }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.openOutputStream(it)?.let { outputStream ->
+                viewModel.exportBackupToUri(context, outputStream, "Auto Backup before Cloud Restore", {
+                    Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
+                }, { error ->
+                    Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                })
+            }
+        }
+    }
 
     Dialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -9380,6 +9707,10 @@ fun GoogleDriveRestoreListDialog(
             isDark = isDark,
             isRestoreMode = true,
             initialFileName = pendingCloudRestoreFileName,
+            onBackupRequested = {
+                val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                createDocumentLauncher.launch("financenote_backup_before_restore_$timestamp.json")
+            },
             onConfirm = { _, _ ->
                 viewModel.importBackup(
                     context = context,

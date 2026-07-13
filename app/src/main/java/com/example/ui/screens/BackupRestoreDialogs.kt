@@ -30,11 +30,20 @@ fun BackupStatsDialog(
     isDark: Boolean,
     isRestoreMode: Boolean = false,
     initialFileName: String = "",
+    onBackupRequested: (() -> Unit)? = null,
     onConfirm: (fileName: String, comment: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var fileName by remember { mutableStateOf(initialFileName) }
     var comment by remember { mutableStateOf(stats.comment) }
+
+    // Captcha variables (only used if isRestoreMode is true)
+    val captchaCode = remember {
+        val chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+        (1..4).map { chars.random() }.joinToString("")
+    }
+    var userInput by remember { mutableStateOf("") }
+    val isCorrect = !isRestoreMode || userInput.trim().equals(captchaCode, ignoreCase = true)
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -73,6 +82,67 @@ fun BackupStatsDialog(
                 }
 
                 HorizontalDivider(color = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0))
+
+                // Warning section for Restore Mode
+                if (isRestoreMode) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color(0xFF381E21) else Color(0xFFFFECEF)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Warning,
+                                    contentDescription = null,
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = if (language == AppLanguage.BN) "গুরুত্বপূর্ণ সতর্কতা!" else "Important Warning!",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFEF4444)
+                                )
+                            }
+                            Text(
+                                text = if (language == AppLanguage.BN)
+                                    "ব্যাকআপ রিস্টোর করলে বর্তমান স্থানীয় সকল ডেটা সম্পূর্ণভাবে মুছে যাবে এবং ব্যাকআপ ফাইলের ডেটা দিয়ে প্রতিস্থাপিত হবে।"
+                                    else "Restoring a backup will completely overwrite and delete all your current local data.",
+                                fontSize = 12.sp,
+                                color = if (isDark) Color(0xFFFCA5A5) else Color(0xFF991B1B)
+                            )
+                            
+                            if (onBackupRequested != null) {
+                                Button(
+                                    onClick = onBackupRequested,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF3B82F6)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Icon(Icons.Rounded.Backup, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "বর্তমান ডেটার ব্যাকআপ রাখুন" else "Backup Current Data First",
+                                        fontSize = 11.sp,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Stats Section Title
                 Text(
@@ -222,6 +292,50 @@ fun BackupStatsDialog(
                     )
                 }
 
+                // Captcha Input Field for Restore Mode
+                if (isRestoreMode) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isDark) Color(0xFF282E47) else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "রিস্টোর নিশ্চিত করতে ক্যাপচা কোডটি টাইপ করুন" else "To confirm restore, type the captcha code",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = captchaCode,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 6.sp,
+                            color = Color(0xFF3B82F6),
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                        OutlinedTextField(
+                            value = userInput,
+                            onValueChange = { userInput = it },
+                            placeholder = { Text(if (language == AppLanguage.BN) "ক্যাপচা কোড" else "Captcha Code") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = if (isCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                        )
+                    }
+                }
+
                 // Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -239,9 +353,11 @@ fun BackupStatsDialog(
 
                     Button(
                         onClick = { onConfirm(fileName, comment) },
+                        enabled = isCorrect,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRestoreMode) Color(0xFF10B981) else Color(0xFF3B82F6)
+                            containerColor = if (isRestoreMode) Color(0xFF10B981) else Color(0xFF3B82F6),
+                            disabledContainerColor = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -251,7 +367,7 @@ fun BackupStatsDialog(
                             } else {
                                 if (language == AppLanguage.BN) "ব্যাকআপ নিন" else "Backup"
                             },
-                            color = Color.White,
+                            color = if (isCorrect) Color.White else (if (isDark) Color.Gray else Color(0xFF94A3B8)),
                             fontWeight = FontWeight.Bold
                         )
                     }

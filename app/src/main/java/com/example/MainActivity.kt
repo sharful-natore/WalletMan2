@@ -18,18 +18,26 @@ import com.example.ui.viewmodel.FinanceViewModel
 import com.example.ui.viewmodel.FinanceViewModelFactory
 
 class MainActivity : ComponentActivity() {
+    private val actionState = androidx.compose.runtime.mutableStateOf<String?>(null)
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        actionState.value = intent.action
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        actionState.value = intent?.action
         
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
         )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = false
             isAppearanceLightNavigationBars = false
@@ -52,10 +60,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
             val language by viewModel.language.collectAsState()
+            val action by actionState
             
             MyApplicationTheme(darkTheme = isDarkTheme, language = language) {
-                // Get action from intent, but also listen for changes via setIntent(intent) in onNewIntent
-                val action = intent?.action
                 FinanceNoteApp(viewModel = viewModel, initialAction = action)
             }
         }

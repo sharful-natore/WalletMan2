@@ -55,7 +55,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     }
 
     val profileIntent = Intent(context, MainActivity::class.java).apply {
-        action = "ACTION_SETTINGS"
+        action = "ACTION_REFRESH_WIDGET"
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
@@ -113,7 +113,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val googleEmail = gPrefs.getString("google_email", null)
 
             val profileIntent = Intent(context, MainActivity::class.java).apply {
-                action = if (isGoogleSignedIn) "ACTION_SETTINGS_PROFILE" else "ACTION_GOOGLE_SIGN_IN"
+                action = "ACTION_REFRESH_WIDGET"
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -184,16 +184,15 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             }
             views.setTextViewText(R.id.tv_profile_name, displayName)
 
-            // Digital clock
+            // Gregorian, Bengali, and Arabic Dates
             val now = java.util.Calendar.getInstance()
-            val clockHour = now.get(java.util.Calendar.HOUR)
-            val minute = now.get(java.util.Calendar.MINUTE)
-            val ampm = if (now.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
-            val dateStr = java.text.SimpleDateFormat("dd MMM, EEE", java.util.Locale.getDefault()).format(now.time)
+            val englishDateStr = java.text.SimpleDateFormat("EEEE, d MMMM yyyy", java.util.Locale(if (isBn) "bn" else "en")).format(now.time)
+            val bengaliDateStr = getBengaliDate(now, isBn)
+            val arabicDateStr = getIslamicDate(now, isBn)
 
-            views.setTextViewText(R.id.tv_time_hm, String.format("%02d:%02d", if (clockHour == 0) 12 else clockHour, minute))
-            views.setTextViewText(R.id.tv_ampm, ampm)
-            views.setTextViewText(R.id.tv_date_day, dateStr)
+            views.setTextViewText(R.id.tv_date_english, englishDateStr)
+            views.setTextViewText(R.id.tv_date_bengali, bengaliDateStr)
+            views.setTextViewText(R.id.tv_date_arabic, arabicDateStr)
 
             // Dynamic card headers based on language
             val labelIncome = if (isBn) "আয়" else "Income"
@@ -211,6 +210,11 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             views.setTextViewText(R.id.tv_expense, "৳ ${df.format(expense)}")
             views.setTextViewText(R.id.tv_debt, "৳ ${df.format(totalDena)}")
             views.setTextViewText(R.id.tv_credit, "৳ ${df.format(totalPaona)}")
+
+            views.setBoolean(R.id.tv_income, "setSelected", true)
+            views.setBoolean(R.id.tv_expense, "setSelected", true)
+            views.setBoolean(R.id.tv_debt, "setSelected", true)
+            views.setBoolean(R.id.tv_credit, "setSelected", true)
 
             appWidgetManager.updateAppWidget(appWidgetId, views)
         } catch (e: Exception) {
@@ -290,5 +294,190 @@ fun updateAllWidgets(context: Context) {
         }
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+private fun convertNumberToBengali(numStr: String): String {
+    val bnDigits = charArrayOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
+    return numStr.map { c ->
+        if (c in '0'..'9') bnDigits[c - '0'] else c
+    }.joinToString("")
+}
+
+private fun getBengaliDate(cal: java.util.Calendar, isBn: Boolean): String {
+    val year = cal.get(java.util.Calendar.YEAR)
+    val month = cal.get(java.util.Calendar.MONTH) // 0-indexed
+    val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
+    
+    val isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    val dayOfYear = cal.get(java.util.Calendar.DAY_OF_YEAR)
+    
+    val april14Day = if (isLeap) 105 else 104
+    var bengaliYear = year - 593
+    if (dayOfYear < april14Day) {
+        bengaliYear = year - 594
+    }
+    
+    val bMonthIndex: Int
+    val bDay: Int
+    
+    when (month) {
+        0 -> { // January
+            if (day < 14) {
+                bMonthIndex = 8 // Poush
+                bDay = day + 17
+            } else {
+                bMonthIndex = 9 // Magh
+                bDay = day - 13
+            }
+        }
+        1 -> { // February
+            if (day < 13) {
+                bMonthIndex = 9 // Magh
+                bDay = day + 18
+            } else {
+                bMonthIndex = 10 // Falgun
+                bDay = day - 12
+            }
+        }
+        2 -> { // March
+            val prevMonthDays = if (isLeap) 30 else 29
+            if (day < 15) {
+                bMonthIndex = 10 // Falgun
+                bDay = day + (prevMonthDays - 12)
+            } else {
+                bMonthIndex = 11 // Chaitra
+                bDay = day - 14
+            }
+        }
+        3 -> { // April
+            if (day < 14) {
+                bMonthIndex = 11 // Chaitra
+                bDay = day + 17
+            } else {
+                bMonthIndex = 0 // Boishakh
+                bDay = day - 13
+            }
+        }
+        4 -> { // May
+            if (day < 15) {
+                bMonthIndex = 0 // Boishakh
+                bDay = day + 17
+            } else {
+                bMonthIndex = 1 // Jyaistha
+                bDay = day - 14
+            }
+        }
+        5 -> { // June
+            if (day < 15) {
+                bMonthIndex = 1 // Jyaistha
+                bDay = day + 17
+            } else {
+                bMonthIndex = 2 // Ashadha
+                bDay = day - 14
+            }
+        }
+        6 -> { // July
+            if (day < 16) {
+                bMonthIndex = 2 // Ashadha
+                bDay = day + 16
+            } else {
+                bMonthIndex = 3 // Shravana
+                bDay = day - 15
+            }
+        }
+        7 -> { // August
+            if (day < 16) {
+                bMonthIndex = 3 // Shravana
+                bDay = day + 16
+            } else {
+                bMonthIndex = 4 // Bhadra
+                bDay = day - 15
+            }
+        }
+        8 -> { // September
+            if (day < 16) {
+                bMonthIndex = 4 // Bhadra
+                bDay = day + 16
+            } else {
+                bMonthIndex = 5 // Ashwin
+                bDay = day - 15
+            }
+        }
+        9 -> { // October
+            if (day < 16) {
+                bMonthIndex = 5 // Ashwin
+                bDay = day + 15
+            } else {
+                bMonthIndex = 6 // Kartik
+                bDay = day - 15
+            }
+        }
+        10 -> { // November
+            if (day < 15) {
+                bMonthIndex = 6 // Kartik
+                bDay = day + 16
+            } else {
+                bMonthIndex = 7 // Agrahayan
+                bDay = day - 14
+            }
+        }
+        11 -> { // December
+            if (day < 15) {
+                bMonthIndex = 7 // Agrahayan
+                bDay = day + 16
+            } else {
+                bMonthIndex = 8 // Poush
+                bDay = day - 14
+            }
+        }
+        else -> {
+            bMonthIndex = 0
+            bDay = 1
+        }
+    }
+    
+    val bnMonths = listOf("বৈশাখ", "জ্যৈষ্ঠ", "আষাঢ়", "শ্রাবণ", "ভাদ্র", "আশ্বিন", "কার্তিক", "অগ্রহায়ণ", "পৌষ", "মাঘ", "ফাল্গুন", "চৈত্র")
+    val enMonths = listOf("Boishakh", "Jyaistha", "Ashadha", "Shravana", "Bhadra", "Ashwin", "Kartik", "Agrahayan", "Poush", "Magh", "Falgun", "Chaitra")
+    
+    val monthName = if (isBn) bnMonths[bMonthIndex] else enMonths[bMonthIndex]
+    
+    return if (isBn) {
+        val bnDay = convertNumberToBengali(bDay.toString())
+        val bnYear = convertNumberToBengali(bengaliYear.toString())
+        "$bnDay $monthName, $bnYear বঙ্গাব্দ"
+    } else {
+        "$bDay $monthName, $bengaliYear SB"
+    }
+}
+
+private fun getIslamicDate(cal: java.util.Calendar, isBn: Boolean): String {
+    try {
+        val islamic = android.icu.util.IslamicCalendar()
+        islamic.time = cal.time
+        val hYear = islamic.get(android.icu.util.Calendar.YEAR)
+        val hMonth = islamic.get(android.icu.util.Calendar.MONTH)
+        val hDay = islamic.get(android.icu.util.Calendar.DAY_OF_MONTH)
+        
+        val arMonths = listOf(
+            "মহররম", "সফর", "রবিউল আউয়াল", "রবিউস সানি", "জমাদিউল আউয়াল", "জমাদিউস সানি",
+            "রজব", "শাবান", "রমজান", "শাওয়াল", "জিলকদ", "জিলহজ"
+        )
+        val enArMonths = listOf(
+            "Muharram", "Safar", "Rabi' al-Awwal", "Rabi' ath-Thani", "Jumada al-Awwal", "Jumada ath-Thani",
+            "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"
+        )
+        
+        val monthName = if (isBn) arMonths[hMonth] else enArMonths[hMonth]
+        
+        return if (isBn) {
+            val bnDay = convertNumberToBengali(hDay.toString())
+            val bnYear = convertNumberToBengali(hYear.toString())
+            "$bnDay $monthName, $bnYear হিজরি"
+        } else {
+            "$hDay $monthName, $hYear AH"
+        }
+    } catch (e: Exception) {
+        return if (isBn) "১ রমজান, ১৪৪৭ হিজরি" else "1 Ramadan, 1447 AH"
     }
 }

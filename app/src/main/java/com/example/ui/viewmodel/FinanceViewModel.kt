@@ -78,22 +78,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
 
     // Profile Settings States
-    private val _profileName = MutableStateFlow("Shariful Islam")
+    private val _profileName = MutableStateFlow("")
     val profileName: StateFlow<String> = _profileName.asStateFlow()
 
-    private val _profileEmail = MutableStateFlow("connect.shariful@gmail.com")
+    private val _profileEmail = MutableStateFlow("")
     val profileEmail: StateFlow<String> = _profileEmail.asStateFlow()
 
     private val _profilePhotoUri = MutableStateFlow<String?>(null)
     val profilePhotoUri: StateFlow<String?> = _profilePhotoUri.asStateFlow()
 
-    private val _profilePhone = MutableStateFlow("01768899599")
+    private val _profilePhone = MutableStateFlow("")
     val profilePhone: StateFlow<String> = _profilePhone.asStateFlow()
 
-    private val _profileSocial = MutableStateFlow("connect.shariful@gmail.com")
+    private val _profileSocial = MutableStateFlow("")
     val profileSocial: StateFlow<String> = _profileSocial.asStateFlow()
 
-    private val _profileAddress = MutableStateFlow("Parkol, Baraigram, Natore")
+    private val _profileAddress = MutableStateFlow("")
     val profileAddress: StateFlow<String> = _profileAddress.asStateFlow()
 
     // Moshi JSON adapter configuration
@@ -428,12 +428,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     // Profile Settings Helpers
     fun loadProfile(context: Context) {
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-        _profileName.value = prefs.getString("user_name", "Shariful Islam") ?: "Shariful Islam"
-        _profileEmail.value = prefs.getString("user_email", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
+        _profileName.value = prefs.getString("user_name", "") ?: ""
+        _profileEmail.value = prefs.getString("user_email", "") ?: ""
         _profilePhotoUri.value = prefs.getString("user_photo", null)
-        _profilePhone.value = prefs.getString("user_phone", "01768899599") ?: "01768899599"
-        _profileSocial.value = prefs.getString("user_social", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
-        _profileAddress.value = prefs.getString("user_address", "Parkol, Baraigram, Natore") ?: "Parkol, Baraigram, Natore"
+        _profilePhone.value = prefs.getString("user_phone", "") ?: ""
+        _profileSocial.value = prefs.getString("user_social", "") ?: ""
+        _profileAddress.value = prefs.getString("user_address", "") ?: ""
         
         val lastSync = prefs.getLong("last_firestore_sync_time", 0L)
         _lastSyncTime.value = if (lastSync == 0L) null else lastSync
@@ -632,9 +632,44 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
     }
 
+    fun checkUnsavedChanges() {
+        val email = _googleEmail.value
+        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) {
+            _hasUnsavedChanges.value = false
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val currentData = repository.getBackupData()
+                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+                if (cachedJson == null) {
+                    val hasData = currentData.transactions.isNotEmpty() ||
+                            currentData.persons.isNotEmpty() ||
+                            currentData.savingsGoals.isNotEmpty()
+                    _hasUnsavedChanges.value = hasData
+                } else {
+                    val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
+                    if (cachedData == null) {
+                        _hasUnsavedChanges.value = true
+                    } else {
+                        val isDifferent = currentData.transactions.size != cachedData.transactions.size ||
+                                currentData.persons.size != cachedData.persons.size ||
+                                currentData.savingsGoals.size != cachedData.savingsGoals.size ||
+                                currentData.savingsTransactions.size != cachedData.savingsTransactions.size ||
+                                backupAdapter.toJson(currentData) != backupAdapter.toJson(cachedData)
+                        _hasUnsavedChanges.value = isDifferent
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     private fun onLocalDatabaseChanged() {
         if (_isGoogleSignedIn.value && !_googleEmail.value.isNullOrBlank()) {
-            _hasUnsavedChanges.value = true
+            checkUnsavedChanges()
             uploadToFirestore()
         } else {
             _hasUnsavedChanges.value = false
@@ -666,10 +701,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 )
                 db.collection("users").document(email).set(data)
                     .addOnSuccessListener {
-                        _hasUnsavedChanges.value = false
-                        _firestoreSyncStatus.value = "Synced"
-                        updateSyncSuccess(getApplication(), true)
-                        onComplete?.invoke()
+                        viewModelScope.launch {
+                            try {
+                                val currentData = repository.getBackupData()
+                                val currentJson = backupAdapter.toJson(currentData)
+                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
+                            } catch (e: Exception) { e.printStackTrace() }
+                            _hasUnsavedChanges.value = false
+                            _firestoreSyncStatus.value = "Synced"
+                            updateSyncSuccess(getApplication(), true)
+                            onComplete?.invoke()
+                        }
                     }
                     .addOnFailureListener { e ->
                         _firestoreSyncStatus.value = "Failed"
@@ -705,6 +748,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                         if (backupData != null) {
                                             repository.restoreBackupData(backupData)
                                             com.example.widget.updateAllWidgets(getApplication())
+                                            try {
+                                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                            } catch (e: Exception) { e.printStackTrace() }
                                             _hasUnsavedChanges.value = false
                                             _firestoreSyncStatus.value = "Synced"
                                             updateSyncSuccess(getApplication(), false)
@@ -767,9 +814,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                             remoteData.savingsTransactions.size != currentLocalData.savingsTransactions.size) {
                                             repository.restoreBackupData(remoteData)
                                             com.example.widget.updateAllWidgets(getApplication())
+                                            try {
+                                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                            } catch (e: Exception) { e.printStackTrace() }
                                             _firestoreSyncStatus.value = "Synced"
                                             updateSyncSuccess(getApplication(), false)
                                         } else {
+                                            try {
+                                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                            } catch (e: Exception) { e.printStackTrace() }
                                             _firestoreSyncStatus.value = "Synced"
                                         }
                                     }
@@ -983,6 +1038,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             
             // Trigger auto-backup check
             checkAndTriggerAutoBackup(context)
+            checkUnsavedChanges()
         } else {
             _googleEmail.value = null
             _googleName.value = null
@@ -1038,6 +1094,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     .putString("google_email", email)
                     .putString("google_name", account.displayName ?: "Google User")
                     .putString("google_photo_url", account.photoUrl?.toString())
+                    .putString("last_google_email", email)
                     .apply()
                 
                 _googleEmail.value = email
@@ -1341,7 +1398,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun signOutFromGoogle(context: Context, onSuccess: () -> Unit) {
         val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().apply()
+        val currentEmail = prefs.getString("google_email", null)
+        prefs.edit()
+            .remove("google_email")
+            .remove("google_name")
+            .remove("google_photo_url")
+            .apply()
+        
+        if (!currentEmail.isNullOrBlank()) {
+            prefs.edit().putString("last_google_email", currentEmail).apply()
+        }
         
         _googleEmail.value = null
         _googleName.value = null
@@ -1351,6 +1417,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         com.example.widget.updateAllWidgets(context)
         stopRealtimeSync()
         onSuccess()
+    }
+
+    fun clearAllDataLocal(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                repository.restoreBackupData(FinanceBackup(emptyList(), emptyList(), emptyList(), emptyList()))
+                com.example.widget.updateAllWidgets(getApplication())
+                onComplete()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 }
 

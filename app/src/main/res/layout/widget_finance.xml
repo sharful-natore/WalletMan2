@@ -56,11 +56,14 @@
 
         <!-- Welcome Text and Profile Details -->
         <LinearLayout
+            android:id="@+id/profile_info"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_toRightOf="@id/avatar_container"
+            android:layout_toLeftOf="@id/clock_container"
             android:layout_centerVertical="true"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:layout_marginRight="4dp">
 
             <TextView
                 android:id="@+id/tv_welcome_label"
@@ -68,7 +71,7 @@
                 android:layout_height="wrap_content"
                 android:text="স্বাগতম,"
                 android:textColor="#CCFFFFFF"
-                android:textSize="12sp" />
+                android:textSize="11sp" />
 
             <TextView
                 android:id="@+id/tv_profile_name"
@@ -77,13 +80,13 @@
                 android:text="Shariful Islam"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
-                android:textSize="16sp"
+                android:textSize="14sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
         </LinearLayout>
         
-        <!-- Digital Clock -->
+        <!-- Gregorian, Bengali, and Arabic Dates -->
         <LinearLayout
             android:id="@+id/clock_container"
             android:layout_width="wrap_content"
@@ -92,38 +95,44 @@
             android:layout_centerVertical="true"
             android:orientation="vertical"
             android:gravity="right"
+            android:layout_marginLeft="4dp"
             android:layout_marginRight="8dp">
             
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="bottom">
-                <TextView
-                    android:id="@+id/tv_time_hm"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="12:00"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/tv_ampm"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="PM"
-                    android:textColor="#FFFFFF"
-                    android:layout_marginLeft="4dp"
-                    android:textSize="10sp" />
-            </LinearLayout>
-                
+            <!-- Gregorian Date & Weekday -->
             <TextView
-                android:id="@+id/tv_date_day"
+                android:id="@+id/tv_date_english"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="12 Jul, Sat"
-                android:textColor="#CCFFFFFF"
-                android:textSize="10sp" />
+                android:text="Monday, 13 July 2026"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="9.5sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+                
+            <!-- Bengali Date -->
+            <TextView
+                android:id="@+id/tv_date_bengali"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="২৯ আষাঢ়, ১৪৩৩ বঙ্গাব্দ"
+                android:textColor="#E0F2FE"
+                android:textSize="8.5sp"
+                android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <!-- Arabic Date -->
+            <TextView
+                android:id="@+id/tv_date_arabic"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="২৭ মহররম, ১৪৪৮ হিজরি"
+                android:textColor="#F0FDF4"
+                android:textSize="8.5sp"
+                android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
 
     </RelativeLayout>
@@ -343,7 +352,7 @@
             <ImageView
                 android:layout_width="21dp"
                 android:layout_height="21dp"
-                android:src="@drawable/ic_person_add"
+                android:src="@drawable/ic_lend_borrow_new"
                 android:tint="#FFFFFF" />
         </LinearLayout>
 
