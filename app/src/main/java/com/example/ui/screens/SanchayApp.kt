@@ -537,8 +537,7 @@ fun formatDateHeader(dateStr: String, lang: AppLanguage): String {
 
 class NotchedBottomBarShape(
     private val notchRadiusDp: Dp = 34.dp,
-    private val depthDp: Dp = 30.dp,
-    private val edgeRadiusDp: Dp = 10.dp
+    private val cornerRadiusDp: Dp = 12.dp
 ) : Shape {
     override fun createOutline(
         size: Size,
@@ -546,42 +545,36 @@ class NotchedBottomBarShape(
         density: Density
     ): Outline {
         val r = with(density) { notchRadiusDp.toPx() }
-        val d = with(density) { depthDp.toPx() }
-        val cr = with(density) { edgeRadiusDp.toPx() }
+        val cr = with(density) { cornerRadiusDp.toPx() }
         
         val path = Path().apply {
             moveTo(0f, 0f)
             val centerX = size.width / 2f
             
-            // Semicircular notch center
-            val centerY = d - r
+            // Draw line to the start of the left corner
+            lineTo(centerX - r - cr, 0f)
             
-            // Distance between shoulder circle center and notch circle center is exactly r + cr
-            val dist = r + cr
-            val dy = centerY + cr
-            val term = dist * dist - dy * dy
-            val dx = kotlin.math.sqrt(term.coerceAtLeast(0f))
+            // Left corner (smoothly curves inwards)
+            quadraticBezierTo(
+                centerX - r, 0f, 
+                centerX - r, cr
+            )
             
-            val startX = centerX - dx
-            val endX = centerX + dx
+            // The notch arc (perfect semicircle curving downwards)
+            arcTo(
+                rect = androidx.compose.ui.geometry.Rect(centerX - r, cr - r, centerX + r, cr + r),
+                startAngleDegrees = 180f,
+                sweepAngleDegrees = -180f,
+                forceMoveTo = false
+            )
             
-            lineTo(startX, 0f)
+            // Right corner (smoothly curves outwards to top edge)
+            quadraticBezierTo(
+                centerX + r, 0f, 
+                centerX + r + cr, 0f
+            )
             
-            val theta = kotlin.math.atan2(dy, dx)
-            val thetaDeg = Math.toDegrees(theta.toDouble()).toFloat()
-            
-            // Left shoulder arc (mathematically perfect circle)
-            val rectLeft = androidx.compose.ui.geometry.Rect(centerX - dx - cr, -2f * cr, centerX - dx + cr, 0f)
-            arcTo(rectLeft, 270f, thetaDeg + 90f, false)
-            
-            // Circular notch arc (mathematically perfect circle)
-            val rectNotch = androidx.compose.ui.geometry.Rect(centerX - r, centerY - r, centerX + r, centerY + r)
-            arcTo(rectNotch, 180f + thetaDeg, -2f * thetaDeg, false)
-            
-            // Right shoulder arc (mathematically perfect circle)
-            val rectRight = androidx.compose.ui.geometry.Rect(centerX + dx - cr, -2f * cr, centerX + dx + cr, 0f)
-            arcTo(rectRight, 360f - thetaDeg, thetaDeg - 90f, false)
-            
+            // Draw line to the end of the bar
             lineTo(size.width, 0f)
             lineTo(size.width, size.height)
             lineTo(0f, size.height)
@@ -1163,9 +1156,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 14.dp) // Leave space at the top for the cutout
+                            .padding(top = 16.dp) // Leave space at the top for the cutout
                             .height(56.dp + navBarPadding)
-                            .clip(NotchedBottomBarShape(notchRadiusDp = 34.dp, depthDp = 30.dp, edgeRadiusDp = 10.dp))
+                            .clip(NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp))
                             .background(bottomBarGradient)
                     ) {
                         Row(
@@ -1220,19 +1213,34 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
+                    // 1.5 Custom downward soft shadow for the FAB (no shadow above)
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 12.dp + navBarPadding)
+                            .offset(y = 12.dp) // Offset downwards so shadow only falls below
+                            .size(64.dp)
+                            .drawBehind {
+                                drawCircle(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(Color.Black.copy(alpha = 0.25f), Color.Transparent)
+                                    ),
+                                    radius = size.width / 2 + 8.dp.toPx()
+                                )
+                            }
+                    )
+
                     // 2. Floating Add Button sits beautifully centered in the notch cutout
                     Box(
                         modifier = Modifier
                             .padding(bottom = 12.dp + navBarPadding) // Lowered from 32.dp to 12.dp to nestle perfectly in the notch
-                            .size(60.dp)
-                            .shadow(4.dp, CircleShape) // Subtle premium shadow
+                            .size(64.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
                                 )
                             )
-                            .border(4.dp, Color.White, CircleShape) // Slightly increased border (from 3.dp to 4.dp)
+                            .border(4.dp, if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC), CircleShape) // Matches app background for seamless cutout
                             .clickable { showAddTransactionDialog = true }
                             .testTag("fab_add_transaction"),
                         contentAlignment = Alignment.Center

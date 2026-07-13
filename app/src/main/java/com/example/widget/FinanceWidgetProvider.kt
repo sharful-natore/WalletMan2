@@ -211,11 +211,6 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             views.setTextViewText(R.id.tv_debt, "৳ ${df.format(totalDena)}")
             views.setTextViewText(R.id.tv_credit, "৳ ${df.format(totalPaona)}")
 
-            views.setBoolean(R.id.tv_income, "setSelected", true)
-            views.setBoolean(R.id.tv_expense, "setSelected", true)
-            views.setBoolean(R.id.tv_debt, "setSelected", true)
-            views.setBoolean(R.id.tv_credit, "setSelected", true)
-
             appWidgetManager.updateAppWidget(appWidgetId, views)
         } catch (e: Throwable) {
             e.printStackTrace()

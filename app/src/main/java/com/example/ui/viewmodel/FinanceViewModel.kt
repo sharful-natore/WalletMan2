@@ -815,10 +815,36 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     }
                     if (snapshot != null && snapshot.exists()) {
                         val remoteJson = snapshot.getString("backupJson") ?: ""
-                        if (remoteJson.isNotEmpty() && !_hasUnsavedChanges.value) {
+                        if (remoteJson.isNotEmpty()) {
                             viewModelScope.launch {
                                 try {
                                     val currentLocalData = repository.getBackupData()
+                                    val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                    val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+
+                                    var hasUnsaved = false
+                                    if (cachedJson == null) {
+                                        hasUnsaved = currentLocalData.transactions.isNotEmpty() ||
+                                            currentLocalData.persons.isNotEmpty() ||
+                                            currentLocalData.savingsGoals.isNotEmpty()
+                                    } else {
+                                        val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
+                                        if (cachedData == null) {
+                                            hasUnsaved = true
+                                        } else {
+                                            hasUnsaved = currentLocalData.transactions.size != cachedData.transactions.size ||
+                                                    currentLocalData.persons.size != cachedData.persons.size ||
+                                                    currentLocalData.savingsGoals.size != cachedData.savingsGoals.size ||
+                                                    currentLocalData.savingsTransactions.size != cachedData.savingsTransactions.size ||
+                                                    backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(cachedData)
+                                        }
+                                    }
+
+                                    if (hasUnsaved) {
+                                        _hasUnsavedChanges.value = true
+                                        return@launch // Do not overwrite local data if we have offline changes
+                                    }
+
                                     val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
                                     val remoteData = backupAdapter.fromJson(decryptedJson)
                                     if (remoteData != null) {
@@ -827,18 +853,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                         if (remoteTxCount != localTxCount ||
                                             remoteData.persons.size != currentLocalData.persons.size ||
                                             remoteData.savingsGoals.size != currentLocalData.savingsGoals.size ||
-                                            remoteData.savingsTransactions.size != currentLocalData.savingsTransactions.size) {
+                                            remoteData.savingsTransactions.size != currentLocalData.savingsTransactions.size ||
+                                            backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(remoteData)) {
                                             repository.restoreBackupData(remoteData)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             try {
-                                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                                 prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
                                             } catch (e: Exception) { e.printStackTrace() }
                                             _firestoreSyncStatus.value = "Synced"
                                             updateSyncSuccess(getApplication(), false)
                                         } else {
                                             try {
-                                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                                 prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
                                             } catch (e: Exception) { e.printStackTrace() }
                                             _firestoreSyncStatus.value = "Synced"
