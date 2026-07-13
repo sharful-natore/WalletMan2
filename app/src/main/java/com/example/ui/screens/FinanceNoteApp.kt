@@ -1154,29 +1154,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
-                    // 0. Frosted Glass Notch Glow/Shadow Effect
-                    Box(
-                        modifier = Modifier
-                            .width(160.dp)
-                            .height(80.dp) // Match navbar height
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = navBarPadding)
-                            .graphicsLayer { 
-                                clip = true 
-                                shape = RectangleShape
-                            } // Strictly clip to 80dp height
-                            .background(
-                                Brush.verticalGradient(
-                                    0.0f to Color.Transparent,
-                                    0.2f to (if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f)),
-                                    0.5f to (if (isDarkTheme) Color.White.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.35f)),
-                                    0.8f to (if (isDarkTheme) Color.White.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.15f)),
-                                    1.0f to Color.Transparent
-                                )
-                            )
-                            .blur(35.dp)
-                    )
-
                     // 1. Clipped and styled navigation bar background with Notch Cut shape
                     Box(
                         modifier = Modifier
