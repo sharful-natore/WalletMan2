@@ -2843,8 +2843,10 @@ fun TransactionRowItem(
                 val (color, icon) = when (tx.type) {
                     "INCOME" -> Pair(FintechGreen, Icons.AutoMirrored.Rounded.TrendingUp)
                     "EXPENSE" -> Pair(FintechRed, Icons.AutoMirrored.Rounded.TrendingDown)
-                    "LEND" -> Pair(FintechBlue, Icons.Rounded.ArrowUpward)
-                    "BORROW" -> Pair(Color(0xFFFBBF24), Icons.Rounded.ArrowDownward)
+                    "LEND" -> Pair(FintechGreen, Icons.AutoMirrored.Rounded.TrendingDown)
+                    "BORROW" -> Pair(FintechRed, Icons.AutoMirrored.Rounded.TrendingUp)
+                    "REPAY_RECEIVED" -> Pair(FintechGreen, Icons.AutoMirrored.Rounded.TrendingUp)
+                    "REPAY_PAID" -> Pair(FintechRed, Icons.AutoMirrored.Rounded.TrendingDown)
                     else -> Pair(Color.Gray, Icons.AutoMirrored.Rounded.CompareArrows)
                 }
 
@@ -2940,8 +2942,9 @@ fun TransactionRowItem(
                 else -> "-"
             }
             val amountColor = when (tx.type) {
-                "INCOME", "BORROW", "REPAY_RECEIVED" -> FintechGreen
-                else -> FintechRed
+                "INCOME", "LEND", "REPAY_RECEIVED" -> FintechGreen
+                "EXPENSE", "BORROW", "REPAY_PAID" -> FintechRed
+                else -> Color.Gray
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3343,7 +3346,7 @@ fun DebtsScreen(
                             Text(formatCurrency(totalDena, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                         }
                         Icon(
-                            imageVector = Icons.Rounded.ArrowUpward,
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
@@ -3367,7 +3370,7 @@ fun DebtsScreen(
                             Text(formatCurrency(totalPawn, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                         }
                         Icon(
-                            imageVector = Icons.Rounded.ArrowDownward,
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
@@ -3465,7 +3468,7 @@ fun DebtsScreen(
                 .padding(bottom = 102.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
-            Icon(Icons.Rounded.Add, contentDescription = "Add Person", tint = Color.White)
+            Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
         }
     }
 }
@@ -3787,7 +3790,7 @@ fun SavingsScreen(
                         .background(FintechBlue.copy(alpha = 0.1f))
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Add,
+                        painter = painterResource(id = R.drawable.ic_add_savings),
                         contentDescription = "Add",
                         tint = FintechBlue
                     )
@@ -3838,7 +3841,7 @@ fun SavingsScreen(
                 .padding(bottom = 102.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
-            Icon(Icons.Rounded.Add, contentDescription = "Add Goal", tint = Color.White)
+            Icon(painter = painterResource(id = R.drawable.ic_add_savings), contentDescription = "Add Goal", tint = Color.White)
         }
     }
 }
@@ -5416,6 +5419,29 @@ fun PersonDetailOverlay(
     var actionAmountStr by remember { mutableStateOf("") }
     var actionNoteStr by remember { mutableStateOf("") }
 
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text(if (language == AppLanguage.BN) "ডিলিট নিশ্চিত করুন" else "Confirm Delete") },
+            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে এই ব্যক্তিকে ডিলিট করতে চান?" else "Are you sure you want to delete this person?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirmation = false
+                    onDeletePerson()
+                }) {
+                    Text(if (language == AppLanguage.BN) "হ্যাঁ" else "Yes", color = FintechRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text(if (language == AppLanguage.BN) "না" else "No")
+                }
+            }
+        )
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -5497,7 +5523,7 @@ fun PersonDetailOverlay(
                         IconButton(onClick = { onEditPerson(personDebt.person) }) {
                             Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
                         }
-                        IconButton(onClick = { onDeletePerson() }) {
+                        IconButton(onClick = { showDeleteConfirmation = true }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
                         }
                     }
@@ -7278,17 +7304,45 @@ fun SettingsScreen(
     }
 
     if (showLogoutConfirm) {
+        var shouldBackup by remember { mutableStateOf(true) }
         AlertDialog(
             onDismissRequest = { showLogoutConfirm = false },
             title = { Text(if (language == AppLanguage.BN) "লগআউট নিশ্চিতকরণ" else "Confirm Logout") },
-            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান? লগআউট করলেও আপনার স্থানীয় সকল ডাটা ফোনেই সুরক্ষিত থাকবে।" else "Are you sure you want to log out of Google Drive? Even if you log out, all your current data will remain safe on your phone.") },
+            text = { 
+                Column {
+                    Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান? লগআউট করলেও আপনার স্থানীয় সকল ডাটা ফোনেই সুরক্ষিত থাকবে।" else "Are you sure you want to log out of Google Drive? Even if you log out, all your current data will remain safe on your phone.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { shouldBackup = !shouldBackup }
+                    ) {
+                        Checkbox(
+                            checked = shouldBackup,
+                            onCheckedChange = { shouldBackup = it }
+                        )
+                        Text(if (language == AppLanguage.BN) "লগআউটের আগে ব্যাকআপ নিন" else "Backup before logout")
+                    }
+                }
+            },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
                     onClick = {
                         showLogoutConfirm = false
-                        viewModel.signOutFromGoogle(context) {
-                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                        if (shouldBackup) {
+                            viewModel.backupToGoogleDrive(context, onSuccess = {
+                                viewModel.signOutFromGoogle(context) {
+                                    Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সম্পন্ন হয়েছে এবং লগআউট সফল হয়েছে!" else "Backup completed and logged out successfully!", Toast.LENGTH_SHORT).show()
+                                }
+                            }, onError = {
+                                Toast.makeText(context, "Backup failed: $it", Toast.LENGTH_SHORT).show()
+                            })
+                        } else {
+                            viewModel.signOutFromGoogle(context) {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "লগআউট সফল হয়েছে!" else "Logged out successfully!", Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                 ) {
