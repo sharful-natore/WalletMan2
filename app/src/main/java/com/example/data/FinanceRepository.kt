@@ -88,4 +88,21 @@ class FinanceRepository(private val financeDao: FinanceDao) {
             financeDao.insertSavingsTransactions(backup.savingsTransactions)
         }
     }
+
+    // Trash
+    val allTrashItems: Flow<List<TrashItem>> = financeDao.getAllTrashItems()
+    suspend fun insertTrashItem(item: TrashItem) = financeDao.insertTrashItem(item)
+    suspend fun deleteTrashItemById(id: Int) = financeDao.deleteTrashItemById(id)
+    suspend fun deleteOldTrashItems(threshold: Long) = financeDao.deleteOldTrashItems(threshold)
+    suspend fun getTrashItemById(id: Int): TrashItem? = financeDao.getTrashItemById(id)
+
+    suspend fun getTransactionById(id: Int) = financeDao.getTransactionById(id)
+    suspend fun getSavingsGoalById(id: Int) = financeDao.getSavingsGoalById(id)
+    suspend fun getSavingsTransactionById(id: Int) = financeDao.getSavingsTransactionById(id)
+
+    suspend fun getTransactionsByPersonList(personId: Int) = financeDao.getTransactionsByPersonList(personId)
+    suspend fun getSavingsTransactionsByGoalList(goalId: Int) = financeDao.getSavingsTransactionsByGoalList(goalId)
+
+
 }
+

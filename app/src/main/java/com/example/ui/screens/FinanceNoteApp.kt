@@ -876,15 +876,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             when (initialAction) {
                 "ACTION_DEBT_CREDIT" -> {
                     activeTab = "debts"
-                    showAddPersonDialog = true
                 }
                 "ACTION_VIEW_DEBT" -> {
                     activeTab = "debts"
-                    debtFilter = "DEBT"
+                    debtFilter = "DENA"
                 }
                 "ACTION_VIEW_CREDIT" -> {
                     activeTab = "debts"
-                    debtFilter = "CREDIT"
+                    debtFilter = "PAWN"
                 }
                 "ACTION_SAVINGS" -> {
                     activeTab = "savings"
@@ -1112,7 +1111,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             },
             bottomBar = {
                 val bottomBarGradient = Brush.linearGradient(
-                    colors = GradientsList[0].map { it.copy(alpha = 0.85f) }
+                    colors = GradientsList[0]
                 )
                 
                 val glassBorderColor = if (isDarkTheme) {
@@ -1245,6 +1244,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Box(
                         modifier = Modifier
                             .padding(bottom = 8.dp + navBarPadding) // Lowered to nestle perfectly in the notch
+                            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0xFF6F7BF7), ambientColor = Color(0xFF38BDF8))
                             .size(64.dp)
                             .clip(CircleShape)
                             .background(
@@ -2336,6 +2336,23 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
             }
         )
+    }
+
+    // Custom Notification Overlay
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = customNotification != null,
+            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
+        ) {
+            customNotification?.let { notif ->
+                CustomNotificationOverlay(
+                    notification = notif,
+                    language = language,
+                    isDark = isDarkTheme
+                )
+            }
+        }
     }
 }
 
@@ -3559,7 +3576,8 @@ fun TransactionsScreen(
                 val grouped = filteredTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     grouped.forEach { (date, txs) ->
                         item {
@@ -3746,7 +3764,8 @@ fun DebtsScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     items(filteredDebts) { item ->
                         Box(modifier = Modifier.padding(horizontal = 4.dp)) {
@@ -5457,7 +5476,8 @@ fun SavingsGoalDetailOverlay(
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     items(txList) { tx ->
                         val isDeposit = tx.isDeposit
@@ -6055,7 +6075,8 @@ fun PersonDetailOverlay(
                 val grouped = txList.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     grouped.forEach { (date, txs) ->
                         item {
@@ -6346,6 +6367,7 @@ fun SettingsScreen(
     var showErrorLogDialog by remember { mutableStateOf(false) }
     var currentLogsText by remember { mutableStateOf("") }
     var autoBackupDropdownExpanded by remember { mutableStateOf(false) }
+    var showTrashDialog by remember { mutableStateOf(false) }
     
     val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
     val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
@@ -7118,6 +7140,42 @@ fun SettingsScreen(
             }
         }
 
+
+                // --- TRASH / RECYCLE BIN ---
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ট্র্যাশ (রিসাইকেল বিন)" else "Trash (Recycle Bin)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "যেকোনো ডিলেটেড এন্ট্রি ৩০ দিন পর্যন্ত ট্র্যাশে থাকবে। আপনি চাইলে রিস্টোর বা পার্মানেন্ট ডিলেট করতে পারবেন।" 
+                            else "Deleted entries stay here for 30 days. Restore or permanently delete them.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                    
+                    Button(
+                        onClick = { showTrashDialog = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
+                            contentColor = if (isDark) Color.White else Color.Black
+                        )
+                    ) {
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (language == AppLanguage.BN) "ট্র্যাশ ওপেন করুন" else "Open Trash")
+                    }
+                }
+
+        
         // --- 3. NOTIFICATION WIDGET CARD ---
         val notificationEnabled by viewModel.isNotificationEnabled.collectAsState()
         val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -10284,4 +10342,64 @@ fun formatSyncTime(timestamp: Long?, language: AppLanguage): String {
             .replace("Dec", "ডিসেম্বর")
     }
     return formatted
+}
+
+@Composable
+fun CustomNotificationOverlay(
+    notification: com.example.ui.viewmodel.CustomNotification,
+    language: AppLanguage,
+    isDark: Boolean
+) {
+    val bgColor = if (notification.isSuccess) {
+        if (isDark) Color(0xFF065F46) else Color(0xFFD1FAE5)
+    } else {
+        if (isDark) Color(0xFF991B1B) else Color(0xFFFEE2E2)
+    }
+    
+    val contentColor = if (notification.isSuccess) {
+        if (isDark) Color(0xFF34D399) else Color(0xFF065F46)
+    } else {
+        if (isDark) Color(0xFFF87171) else Color(0xFF991B1B)
+    }
+
+    val icon = when (notification.type) {
+        "SUCCESS" -> Icons.Rounded.CheckCircle
+        "ERROR" -> Icons.Rounded.Error
+        "SIGN_IN" -> Icons.AutoMirrored.Rounded.Login
+        "SIGN_OUT" -> Icons.AutoMirrored.Rounded.Logout
+        "SYNC" -> Icons.Rounded.Sync
+        "BACKUP" -> Icons.Rounded.CloudUpload
+        "RESTORE" -> Icons.Rounded.CloudDownload
+        else -> Icons.Rounded.Info
+    }
+
+    Card(
+        modifier = Modifier
+            .padding(top = 40.dp)
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .shadow(elevation = 12.dp, shape = RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = notification.message,
+                color = contentColor,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
 }

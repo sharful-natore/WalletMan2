@@ -108,6 +108,83 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         .build()
     private val backupAdapter = moshi.adapter(FinanceBackup::class.java)
 
+    private val personAdapter = moshi.adapter(Person::class.java)
+    private val transactionAdapter = moshi.adapter(Transaction::class.java)
+    private val savingsGoalAdapter = moshi.adapter(SavingsGoal::class.java)
+    private val savingsTransactionAdapter = moshi.adapter(SavingsTransaction::class.java)
+
+    private val personWithTxAdapter = moshi.adapter(com.example.data.PersonWithTransactions::class.java)
+    private val goalWithTxAdapter = moshi.adapter(com.example.data.GoalWithTransactions::class.java)
+    private val deletedBackupAdapter = moshi.adapter(com.example.data.DeletedGDriveBackup::class.java)
+
+    
+    val allTrashItems = repository.allTrashItems.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+    
+    fun restoreTrashItem(item: com.example.data.TrashItem) {
+        viewModelScope.launch {
+            when (item.itemType) {
+                "PERSON" -> {
+                    personAdapter.fromJson(item.itemJson)?.let { repository.insertPerson(it) }
+                }
+                "PERSON_WITH_TXS" -> {
+                    personWithTxAdapter.fromJson(item.itemJson)?.let { pWithTx ->
+                        repository.insertPerson(pWithTx.person)
+                        pWithTx.transactions.forEach { tx ->
+                            repository.insertTransaction(tx)
+                        }
+                    }
+                }
+                "TRANSACTION" -> {
+                    transactionAdapter.fromJson(item.itemJson)?.let { repository.insertTransaction(it) }
+                }
+                "SAVINGS_GOAL" -> {
+                    savingsGoalAdapter.fromJson(item.itemJson)?.let { repository.insertSavingsGoal(it) }
+                }
+                "SAVINGS_GOAL_WITH_TXS" -> {
+                    goalWithTxAdapter.fromJson(item.itemJson)?.let { gWithTx ->
+                        repository.insertSavingsGoal(gWithTx.goal)
+                        gWithTx.transactions.forEach { tx ->
+                            repository.insertSavingsTransaction(tx)
+                        }
+                    }
+                }
+                "SAVINGS_TRANSACTION" -> {
+                    savingsTransactionAdapter.fromJson(item.itemJson)?.let { repository.insertSavingsTransaction(it) }
+                }
+                "GDRIVE_BACKUP" -> {
+                    deletedBackupAdapter.fromJson(item.itemJson)?.let { deletedBackup ->
+                        val backup = backupAdapter.fromJson(deletedBackup.backupJson)
+                        if (backup != null) {
+                            restoreFullBackup(backup)
+                        }
+                    }
+                }
+            }
+            if (item.itemType != "GDRIVE_BACKUP") {
+                repository.deleteTrashItemById(item.id)
+                com.example.widget.updateAllWidgets(getApplication())
+                onLocalDatabaseChanged()
+            }
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "আইটেম সফলভাবে রিস্টোর করা হয়েছে" else "Item restored successfully", isSuccess = true, type = "SUCCESS")
+        }
+    }
+    
+    fun permanentDeleteTrashItem(id: Int) {
+        viewModelScope.launch {
+            repository.deleteTrashItemById(id)
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "আইটেম স্থায়ীভাবে মুছে ফেলা হয়েছে" else "Item permanently deleted", isSuccess = true, type = "SUCCESS")
+        }
+    }
+    
+    fun cleanUpOldTrash() {
+        viewModelScope.launch {
+            // 30 days ago
+            val threshold = System.currentTimeMillis() - (30L * 24L * 60L * 60L * 1000L)
+            repository.deleteOldTrashItems(threshold)
+        }
+    }
+
+
     // Database Streams
     val persons: StateFlow<List<Person>> = repository.allPersons
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -238,6 +315,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri))
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি সফলভাবে যুক্ত করা হয়েছে" else "Person added successfully", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -246,14 +324,26 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.updatePerson(person)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি সফলভাবে আপডেট করা হয়েছে" else "Person updated successfully", isSuccess = true, type = "SUCCESS")
         }
     }
 
     fun deletePerson(id: Int) {
         viewModelScope.launch {
+            val p = repository.getPersonById(id)
+            if (p != null) {
+                val txs = repository.getTransactionsByPersonList(id)
+                val pWithTx = com.example.data.PersonWithTransactions(p, txs)
+                repository.insertTrashItem(com.example.data.TrashItem(
+                    originalId = id, 
+                    itemType = "PERSON_WITH_TXS", 
+                    itemJson = personWithTxAdapter.toJson(pWithTx)
+                ))
+            }
             repository.deletePerson(id)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি মুছে ফেলা হয়েছে" else "Person deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -278,6 +368,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             )
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন সফলভাবে সংরক্ষণ করা হয়েছে" else "Transaction saved", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -286,14 +377,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.updateTransaction(transaction)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন আপডেট করা হয়েছে" else "Transaction updated", isSuccess = true, type = "SUCCESS")
         }
     }
 
     fun deleteTransaction(id: Int) {
         viewModelScope.launch {
+            val t = repository.getTransactionById(id)
+            if (t != null) {
+                repository.insertTrashItem(com.example.data.TrashItem(originalId = id, itemType = "TRANSACTION", itemJson = transactionAdapter.toJson(t)))
+            }
             repository.deleteTransaction(id)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন মুছে ফেলা হয়েছে" else "Transaction deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -314,6 +411,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 )
             )
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লক্ষ্য তৈরি করা হয়েছে" else "Savings goal created", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -343,13 +441,25 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 )
                 onLocalDatabaseChanged()
             }
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় যুক্ত করা হয়েছে" else "Contribution added", isSuccess = true, type = "SUCCESS")
         }
     }
 
     fun deleteSavingsGoal(id: Int) {
         viewModelScope.launch {
+            val g = repository.getSavingsGoalById(id)
+            if (g != null) {
+                val txs = repository.getSavingsTransactionsByGoalList(id)
+                val gWithTx = com.example.data.GoalWithTransactions(g, txs)
+                repository.insertTrashItem(com.example.data.TrashItem(
+                    originalId = id, 
+                    itemType = "SAVINGS_GOAL_WITH_TXS", 
+                    itemJson = goalWithTxAdapter.toJson(gWithTx)
+                ))
+            }
             repository.deleteSavingsGoal(id)
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লক্ষ্য মুছে ফেলা হয়েছে" else "Savings goal deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -366,11 +476,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 repository.insertSavingsGoal(updated)
                 onLocalDatabaseChanged()
             }
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লেনদেন আপডেট করা হয়েছে" else "Savings transaction updated", isSuccess = true, type = "SUCCESS")
         }
     }
 
     fun deleteSavingsTransaction(tx: SavingsTransaction) {
         viewModelScope.launch {
+            repository.insertTrashItem(com.example.data.TrashItem(originalId = tx.id, itemType = "SAVINGS_TRANSACTION", itemJson = savingsTransactionAdapter.toJson(tx)))
             repository.deleteSavingsTransaction(tx.id)
             val currentList = savingsGoals.value
             val goal = currentList.find { it.id == tx.goalId }
@@ -380,6 +492,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 repository.insertSavingsGoal(updated)
             }
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লেনদেন মুছে ফেলা হয়েছে" else "Savings transaction deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -387,6 +500,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.insertSavingsGoal(goal)
             onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লক্ষ্য আপডেট করা হয়েছে" else "Savings goal updated", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -1387,6 +1501,55 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     throw Exception("Not signed in to Google or session expired")
                 }
 
+                // First, fetch the file metadata to get the name
+                val metaRequest = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files/$fileId?fields=name")
+                    .header("Authorization", "Bearer $accessToken")
+                    .get()
+                    .build()
+                    
+                var fileName = "Deleted Backup"
+                kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        try {
+                            val metaResponse = client.newCall(metaRequest).execute()
+                            if (metaResponse.isSuccessful) {
+                                val metaJson = org.json.JSONObject(metaResponse.body?.string() ?: "{}")
+                                fileName = metaJson.optString("name", "Deleted Backup")
+                            }
+                        } catch (e: Exception) { /* ignore */ }
+                    }
+                }
+
+                // Fetch file content
+                val getRequest = Request.Builder()
+                    .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
+                    .header("Authorization", "Bearer $accessToken")
+                    .get()
+                    .build()
+
+                var backupJson = ""
+                kotlinx.coroutines.Dispatchers.IO.let { d ->
+                    kotlinx.coroutines.withContext(d) {
+                        try {
+                            val getResponse = client.newCall(getRequest).execute()
+                            if (getResponse.isSuccessful) {
+                                backupJson = getResponse.body?.string() ?: ""
+                            }
+                        } catch(e: Exception) { /* ignore */ }
+                    }
+                }
+
+                if (backupJson.isNotEmpty()) {
+                    val deletedBackup = com.example.data.DeletedGDriveBackup(fileId, fileName, backupJson)
+                    repository.insertTrashItem(com.example.data.TrashItem(
+                        originalId = 0,
+                        itemType = "GDRIVE_BACKUP",
+                        itemJson = deletedBackupAdapter.toJson(deletedBackup)
+                    ))
+                }
+
+                // Now actually delete from Google Drive
                 val request = Request.Builder()
                     .url("https://www.googleapis.com/drive/v3/files/$fileId")
                     .delete()
@@ -1401,6 +1564,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
                 if (response.isSuccessful) {
                     listGoogleDriveFiles(context)
+                    triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ফাইলটি ট্র্যাশে সরানো হয়েছে" else "File moved to trash", isSuccess = true, type = "SUCCESS")
                     onSuccess()
                 } else {
                     val errBody = response.body?.string() ?: ""

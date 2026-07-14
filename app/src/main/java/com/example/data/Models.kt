@@ -95,3 +95,32 @@ data class GoogleDriveFile(
 data class GoogleDriveFilesResponse(
     val files: List<GoogleDriveFile>
 )
+
+@Entity(tableName = "trash_items")
+@JsonClass(generateAdapter = true)
+data class TrashItem(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val originalId: Int,
+    val itemType: String, // "TRANSACTION", "PERSON", "SAVINGS_GOAL", "SAVINGS_TRANSACTION"
+    val itemJson: String,
+    val deletedAt: Long = System.currentTimeMillis()
+)
+
+@JsonClass(generateAdapter = true)
+data class PersonWithTransactions(
+    val person: Person,
+    val transactions: List<Transaction>
+)
+
+@JsonClass(generateAdapter = true)
+data class GoalWithTransactions(
+    val goal: SavingsGoal,
+    val transactions: List<SavingsTransaction>
+)
+
+@JsonClass(generateAdapter = true)
+data class DeletedGDriveBackup(
+    val fileId: String,
+    val fileName: String,
+    val backupJson: String
+)

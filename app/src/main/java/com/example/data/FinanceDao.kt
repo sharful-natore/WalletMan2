@@ -35,6 +35,9 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun getTransactionById(id: Int): Transaction?
+
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun deleteTransactionById(id: Int)
 
@@ -50,6 +53,9 @@ interface FinanceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSavingsGoal(savingsGoal: SavingsGoal): Long
+
+    @Query("SELECT * FROM savings_goals WHERE id = :id LIMIT 1")
+    suspend fun getSavingsGoalById(id: Int): SavingsGoal?
 
     @Query("DELETE FROM savings_goals WHERE id = :id")
     suspend fun deleteSavingsGoalById(id: Int)
@@ -95,6 +101,16 @@ interface FinanceDao {
     @Query("DELETE FROM savings_transactions WHERE goalId = :goalId")
     suspend fun deleteSavingsTransactionsByGoal(goalId: Int)
     
+    @Query("SELECT * FROM savings_transactions WHERE id = :id LIMIT 1")
+    suspend fun getSavingsTransactionById(id: Int): SavingsTransaction?
+
+    @Query("SELECT * FROM transactions WHERE personId = :personId")
+    suspend fun getTransactionsByPersonList(personId: Int): List<Transaction>
+
+    @Query("SELECT * FROM savings_transactions WHERE goalId = :goalId")
+    suspend fun getSavingsTransactionsByGoalList(goalId: Int): List<SavingsTransaction>
+
+
     @Query("DELETE FROM savings_transactions WHERE id = :id")
     suspend fun deleteSavingsTransactionById(id: Int)
 
@@ -106,4 +122,21 @@ interface FinanceDao {
 
     @Query("DELETE FROM savings_transactions")
     suspend fun deleteAllSavingsTransactions()
+
+    // Trash
+    @Query("SELECT * FROM trash_items ORDER BY deletedAt DESC")
+    fun getAllTrashItems(): Flow<List<TrashItem>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrashItem(item: TrashItem)
+
+    @Query("DELETE FROM trash_items WHERE id = :id")
+    suspend fun deleteTrashItemById(id: Int)
+
+    @Query("DELETE FROM trash_items WHERE deletedAt < :threshold")
+    suspend fun deleteOldTrashItems(threshold: Long)
+    
+    @Query("SELECT * FROM trash_items WHERE id = :id LIMIT 1")
+    suspend fun getTrashItemById(id: Int): TrashItem?
 }
+
