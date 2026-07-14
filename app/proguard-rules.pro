@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Firebase
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+
+# Jetpack Compose
+-keep class androidx.compose.** { *; }
+
+# Preserve attributes for library functionality
+-keepattributes *Annotation*,Signature
+-keepattributes SourceFile,LineNumberTable

@@ -15,7 +15,7 @@ android {
   compileSdk = 34
 
   defaultConfig {
-    applicationId = "com.aistudio.financenote.vjqmpz"
+    applicationId = "com.vibestudio.financenote"
     minSdk = 24
     targetSdk = 34
     versionCode = 4
@@ -64,8 +64,8 @@ android {
   buildTypes {
     release {
       isCrunchPngs = true
-      isMinifyEnabled = false
-      isShrinkResources = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
