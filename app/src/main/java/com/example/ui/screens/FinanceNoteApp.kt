@@ -5419,29 +5419,6 @@ fun PersonDetailOverlay(
     var actionAmountStr by remember { mutableStateOf("") }
     var actionNoteStr by remember { mutableStateOf("") }
 
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
-
-    if (showDeleteConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = false },
-            title = { Text(if (language == AppLanguage.BN) "ডিলিট নিশ্চিত করুন" else "Confirm Delete") },
-            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে এই ব্যক্তিকে ডিলিট করতে চান?" else "Are you sure you want to delete this person?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmation = false
-                    onDeletePerson()
-                }) {
-                    Text(if (language == AppLanguage.BN) "হ্যাঁ" else "Yes", color = FintechRed)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text(if (language == AppLanguage.BN) "না" else "No")
-                }
-            }
-        )
-    }
-
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -5523,7 +5500,7 @@ fun PersonDetailOverlay(
                         IconButton(onClick = { onEditPerson(personDebt.person) }) {
                             Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
                         }
-                        IconButton(onClick = { showDeleteConfirmation = true }) {
+                        IconButton(onClick = { onDeletePerson() }) {
                             Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
                         }
                     }
@@ -7304,45 +7281,17 @@ fun SettingsScreen(
     }
 
     if (showLogoutConfirm) {
-        var shouldBackup by remember { mutableStateOf(true) }
         AlertDialog(
             onDismissRequest = { showLogoutConfirm = false },
             title = { Text(if (language == AppLanguage.BN) "লগআউট নিশ্চিতকরণ" else "Confirm Logout") },
-            text = { 
-                Column {
-                    Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান? লগআউট করলেও আপনার স্থানীয় সকল ডাটা ফোনেই সুরক্ষিত থাকবে।" else "Are you sure you want to log out of Google Drive? Even if you log out, all your current data will remain safe on your phone.")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { shouldBackup = !shouldBackup }
-                    ) {
-                        Checkbox(
-                            checked = shouldBackup,
-                            onCheckedChange = { shouldBackup = it }
-                        )
-                        Text(if (language == AppLanguage.BN) "লগআউটের আগে ব্যাকআপ নিন" else "Backup before logout")
-                    }
-                }
-            },
+            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান? লগআউট করলেও আপনার স্থানীয় সকল ডাটা ফোনেই সুরক্ষিত থাকবে।" else "Are you sure you want to log out of Google Drive? Even if you log out, all your current data will remain safe on your phone.") },
             confirmButton = {
                 Button(
                     colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
                     onClick = {
                         showLogoutConfirm = false
-                        if (shouldBackup) {
-                            viewModel.backupToGoogleDrive(context, onSuccess = {
-                                viewModel.signOutFromGoogle(context) {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সম্পন্ন হয়েছে এবং লগআউট সফল হয়েছে!" else "Backup completed and logged out successfully!", Toast.LENGTH_SHORT).show()
-                                }
-                            }, onError = {
-                                Toast.makeText(context, "Backup failed: $it", Toast.LENGTH_SHORT).show()
-                            })
-                        } else {
-                            viewModel.signOutFromGoogle(context) {
-                                Toast.makeText(context, if (language == AppLanguage.BN) "লগআউট সফল হয়েছে!" else "Logged out successfully!", Toast.LENGTH_SHORT).show()
-                            }
+                        viewModel.signOutFromGoogle(context) {
+                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
                         }
                     }
                 ) {
