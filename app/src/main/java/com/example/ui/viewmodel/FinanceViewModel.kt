@@ -44,6 +44,7 @@ import java.io.OutputStream
 import java.io.InputStream
 
 data class CustomNotification(
+    val id: Long = System.currentTimeMillis() + (0..1000).random(),
     val message: String,
     val isSuccess: Boolean = true,
     val type: String = "INFO" // "SUCCESS", "ERROR", "SIGN_IN", "SIGN_OUT", "SYNC", "RESTORE", "BACKUP"
@@ -1225,15 +1226,132 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _autoBackupIntervalDays = MutableStateFlow(-1)
     val autoBackupIntervalDays: StateFlow<Int> = _autoBackupIntervalDays.asStateFlow()
 
-    private val _customNotification = MutableStateFlow<CustomNotification?>(null)
-    val customNotification: StateFlow<CustomNotification?> = _customNotification.asStateFlow()
+    private val _customNotifications = MutableStateFlow<List<CustomNotification>>(emptyList())
+    val customNotifications: StateFlow<List<CustomNotification>> = _customNotifications.asStateFlow()
 
     fun triggerCustomNotification(message: String, isSuccess: Boolean = true, type: String = "INFO") {
-        _customNotification.value = CustomNotification(message, isSuccess, type)
+        val newNotification = CustomNotification(message = message, isSuccess = isSuccess, type = type)
+        _customNotifications.value = _customNotifications.value + newNotification
+        
+        // Auto dismiss after 4 seconds
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(4000)
+            dismissCustomNotification(newNotification.id)
+        }
     }
 
-    fun clearCustomNotification() {
-        _customNotification.value = null
+    fun dismissCustomNotification(id: Long) {
+        _customNotifications.value = _customNotifications.value.filter { it.id != id }
+    }
+
+    fun getTrashItemSummary(item: com.example.data.TrashItem, language: com.example.ui.AppLanguage): String {
+        val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault())
+        return try {
+            when (item.itemType) {
+                "TRANSACTION" -> {
+                    transactionAdapter.fromJson(item.itemJson)?.let { t ->
+                        val amountLabel = if (language == com.example.ui.AppLanguage.BN) "পরিমাণ: " else "Amount: "
+                        val typeLabel = if (language == com.example.ui.AppLanguage.BN) "ধরণ: " else "Type: "
+                        val dateLabel = if (language == com.example.ui.AppLanguage.BN) "তারিখ: " else "Date: "
+                        
+                        val typeText = when(t.type) {
+                            "INCOME" -> if (language == com.example.ui.AppLanguage.BN) "আয়" else "Income"
+                            "EXPENSE" -> if (language == com.example.ui.AppLanguage.BN) "ব্যয়" else "Expense"
+                            "LEND" -> if (language == com.example.ui.AppLanguage.BN) "দেনা (পাওনা হবে)" else "Lend"
+                            "BORROW" -> if (language == com.example.ui.AppLanguage.BN) "পাওনা (দেনা হবে)" else "Borrow"
+                            "REPAY_PAID" -> if (language == com.example.ui.AppLanguage.BN) "পরিশোধ (প্রদান)" else "Repay Paid"
+                            "REPAY_RECEIVED" -> if (language == com.example.ui.AppLanguage.BN) "পরিশোধ (প্রাপ্ত)" else "Repay Received"
+                            else -> t.type
+                        }
+                        
+                        val notePart = if (t.note.isNotBlank()) " | ${t.note}" else ""
+                        val dateText = sdf.format(java.util.Date(t.timestamp))
+                        
+                        "$typeLabel$typeText\n$amountLabel${t.amount}\n$dateLabel$dateText$notePart"
+                    } ?: item.itemJson
+                }
+                "PERSON_WITH_TXS" -> {
+                    personWithTxAdapter.fromJson(item.itemJson)?.let { pWithTx ->
+                        val p = pWithTx.person
+                        val txCount = pWithTx.transactions.size
+                        val net = pWithTx.transactions.sumOf { tx ->
+                            when (tx.type) {
+                                "LEND", "REPAY_PAID" -> tx.amount
+                                "BORROW", "REPAY_RECEIVED" -> -tx.amount
+                                else -> 0.0
+                            }
+                        }
+                        val status = if (net > 0) 
+                            (if (language == com.example.ui.AppLanguage.BN) "পাওনা: " else "Receivable: ") + net
+                        else if (net < 0)
+                            (if (language == com.example.ui.AppLanguage.BN) "দেনা: " else "Payable: ") + (-net)
+                        else (if (language == com.example.ui.AppLanguage.BN) "ব্যালেন্স: ০" else "Balance: 0")
+                        
+                        val txText = if (language == com.example.ui.AppLanguage.BN) " টি লেনদেন" else " transactions"
+                        "${p.name} | $status | $txCount$txText"
+                    } ?: item.itemJson
+                }
+                "PERSON" -> {
+                    personAdapter.fromJson(item.itemJson)?.let { p ->
+                        p.name + (if (p.phone.isNotBlank()) " (${p.phone})" else "")
+                    } ?: item.itemJson
+                }
+                "SAVINGS_GOAL" -> {
+                    savingsGoalAdapter.fromJson(item.itemJson)?.let { g ->
+                        val target = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য: " else "Target: "
+                        "${g.title} | $target${g.targetAmount}"
+                    } ?: item.itemJson
+                }
+                "SAVINGS_GOAL_WITH_TXS" -> {
+                    goalWithTxAdapter.fromJson(item.itemJson)?.let { gWithTx ->
+                        val g = gWithTx.goal
+                        val txCount = gWithTx.transactions.size
+                        val current = gWithTx.transactions.sumOf { it.amount }
+                        val target = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য: " else "Target: "
+                        val saved = if (language == com.example.ui.AppLanguage.BN) "জমা: " else "Saved: "
+                        val txText = if (language == com.example.ui.AppLanguage.BN) " টি লেনদেন" else " transactions"
+                        "${g.title} | $saved$current / $target${g.targetAmount} | $txCount$txText"
+                    } ?: item.itemJson
+                }
+                "GDRIVE_BACKUP" -> {
+                    deletedBackupAdapter.fromJson(item.itemJson)?.let { deletedBackup ->
+                        backupAdapter.fromJson(deletedBackup.backupJson)?.let { b ->
+                            val pCount = b.persons.size
+                            val txCount = b.transactions.size
+                            val gCount = b.savingsGoals.size
+                            val pText = if (language == com.example.ui.AppLanguage.BN) "ব্যক্তি" else "persons"
+                            val txText = if (language == com.example.ui.AppLanguage.BN) "লেনদেন" else "transactions"
+                            val gText = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য" else "goals"
+                            "$txText: $txCount, $pText: $pCount, $gText: $gCount"
+                        }
+                    } ?: item.itemJson
+                }
+                "SAVINGS_TRANSACTION" -> {
+                    savingsTransactionAdapter.fromJson(item.itemJson)?.let { st ->
+                        val amountLabel = if (language == com.example.ui.AppLanguage.BN) "পরিমাণ: " else "Amount: "
+                        val typeLabel = if (language == com.example.ui.AppLanguage.BN) "ধরণ: " else "Type: "
+                        val dateLabel = if (language == com.example.ui.AppLanguage.BN) "তারিখ: " else "Date: "
+                        
+                        val typeText = if (st.isDeposit) 
+                            (if (language == com.example.ui.AppLanguage.BN) "জমা" else "Deposit")
+                        else 
+                            (if (language == com.example.ui.AppLanguage.BN) "উত্তোলন" else "Withdrawal")
+
+                        val dateText = sdf.format(java.util.Date(st.timestamp))
+                        val notePart = if (st.note.isNotBlank()) " | ${st.note}" else ""
+
+                        "$typeLabel$typeText\n$amountLabel${st.amount}\n$dateLabel$dateText$notePart"
+                    } ?: item.itemJson
+                }
+                else -> item.itemJson
+            }
+        } catch (e: Exception) {
+            item.itemJson
+        }
+    }
+
+    fun clearAllNotifications() {
+        _customNotifications.value = emptyList()
     }
 
     private val client = OkHttpClient()

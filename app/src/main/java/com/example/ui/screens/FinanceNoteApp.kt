@@ -590,14 +590,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
     val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
-    val customNotification by viewModel.customNotification.collectAsState()
+    val customNotifications by viewModel.customNotifications.collectAsState()
     
-    LaunchedEffect(customNotification) {
-        if (customNotification != null) {
-            kotlinx.coroutines.delay(4000L)
-            viewModel.clearCustomNotification()
-        }
-    }
     val showCloudDataFoundDialog by viewModel.showCloudDataFoundDialog.collectAsState()
     val pendingCloudData by viewModel.pendingCloudData.collectAsState()
     
@@ -2338,18 +2332,42 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         )
     }
 
-    // Custom Notification Overlay
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        androidx.compose.animation.AnimatedVisibility(
-            visible = customNotification != null,
-            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { -it }) + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { -it }) + androidx.compose.animation.fadeOut()
+    // Custom Notification Overlay Stack
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 48.dp)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            customNotification?.let { notif ->
-                CustomNotificationOverlay(
-                    notification = notif,
-                    language = language,
-                    isDark = isDarkTheme
+            customNotifications.reversed().forEach { notif ->
+                val dismissState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = { value ->
+                        if (value != SwipeToDismissBoxValue.Settled) {
+                            viewModel.dismissCustomNotification(notif.id)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                )
+
+                SwipeToDismissBox(
+                    state = dismissState,
+                    backgroundContent = {},
+                    content = {
+                        CustomNotificationOverlay(
+                            notification = notif,
+                            language = language,
+                            isDark = isDarkTheme
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
@@ -2452,7 +2470,7 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
         item {
@@ -2751,7 +2769,7 @@ fun DashboardScreen(
                 timeFilter = timeFilter,
                 language = language,
                 onTimeFilterChange = onTimeFilterChange,
-                modifier = Modifier.padding(vertical = 6.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
             )
         }
 
@@ -2852,10 +2870,10 @@ fun DashboardScreen(
                     }
                 }
             }
-        }
 
-        // Recent Transactions Section
-        item {
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Recent Transactions Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2933,7 +2951,7 @@ fun DashboardScreen(
                         color = Color.Gray,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
                 }
                 items(txs) { tx ->
@@ -2953,7 +2971,7 @@ fun DashboardScreen(
 
         // Buffer space at bottom to stay above navbar
         item {
-            Spacer(modifier = Modifier.height(110.dp))
+            Spacer(modifier = Modifier.height(70.dp))
         }
     }
 }
@@ -3606,7 +3624,7 @@ fun TransactionsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                        Spacer(modifier = Modifier.height(70.dp)) // Floating button padding
                     }
                 }
             }
@@ -3786,7 +3804,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 110.dp, end = 16.dp)
+                .padding(bottom = 80.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
@@ -4146,7 +4164,7 @@ fun SavingsScreen(
                         SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
                     }
                     item {
-                        Spacer(modifier = Modifier.height(110.dp))
+                        Spacer(modifier = Modifier.height(70.dp))
                     }
                 }
             }
@@ -6368,6 +6386,15 @@ fun SettingsScreen(
     var currentLogsText by remember { mutableStateOf("") }
     var autoBackupDropdownExpanded by remember { mutableStateOf(false) }
     var showTrashDialog by remember { mutableStateOf(false) }
+
+    if (showTrashDialog) {
+        TrashDialog(
+            viewModel = viewModel,
+            language = language,
+            isDarkTheme = isDark,
+            onDismiss = { showTrashDialog = false }
+        )
+    }
     
     val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
     val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
@@ -6409,7 +6436,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
             isDark = isDark,
             icon = Icons.Rounded.Person,
-            initiallyExpanded = (filter == "expand_profile")
+            initiallyExpanded = false
         ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -6582,7 +6609,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
             isDark = isDark,
             icon = Icons.Rounded.NightsStay,
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -6747,7 +6774,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
             isDark = isDark,
             icon = Icons.Rounded.Backup,
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -7139,43 +7166,37 @@ fun SettingsScreen(
                 }
             }
         }
-
-
-                // --- TRASH / RECYCLE BIN ---
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
-                Spacer(modifier = Modifier.height(16.dp))
+        // --- TRASH / RECYCLE BIN ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ট্র্যাশ (রিসাইকেল বিন)" else "Trash (Recycle Bin)",
+            isDark = isDark,
+            icon = Icons.Rounded.DeleteOutline,
+            initiallyExpanded = false
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = if (language == AppLanguage.BN) 
+                        "যেকোনো ডিলেটেড এন্ট্রি ৩০ দিন পর্যন্ত ট্র্যাশে থাকবে। আপনি চাইলে রিস্টোর বা পার্মানেন্ট ডিলেট করতে পারবেন।" 
+                        else "Deleted entries stay here for 30 days. Restore or permanently delete them.",
+                    fontSize = 12.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
+                )
                 
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "ট্র্যাশ (রিসাইকেল বিন)" else "Trash (Recycle Bin)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = if (isDark) Color.White else Color(0xFF1E293B)
-                    )
-                    Text(
-                        text = if (language == AppLanguage.BN) 
-                            "যেকোনো ডিলেটেড এন্ট্রি ৩০ দিন পর্যন্ত ট্র্যাশে থাকবে। আপনি চাইলে রিস্টোর বা পার্মানেন্ট ডিলেট করতে পারবেন।" 
-                            else "Deleted entries stay here for 30 days. Restore or permanently delete them.",
-                        fontSize = 12.sp,
-                        color = if (isDark) Color.Gray else Color(0xFF64748B)
-                    )
-                    
-                    Button(
-                        onClick = { showTrashDialog = true },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
-                            contentColor = if (isDark) Color.White else Color.Black
-                        )
-                    ) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (language == AppLanguage.BN) "ট্র্যাশ ওপেন করুন" else "Open Trash")
-                    }
+                Button(
+                    onClick = { showTrashDialog = true },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
+                        contentColor = if (isDark) Color.White else Color.Black
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Rounded.DeleteSweep, contentDescription = null, tint = if (isDark) Color.White else FintechBlue, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = if (language == AppLanguage.BN) "ট্র্যাশ ওপেন করুন" else "Open Trash", fontSize = 12.sp)
                 }
-
-        
+            }
+        }
         // --- 3. NOTIFICATION WIDGET CARD ---
         val notificationEnabled by viewModel.isNotificationEnabled.collectAsState()
         val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -7297,124 +7318,109 @@ fun SettingsScreen(
                     .clip(RoundedCornerShape(24.dp))
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
+                            colors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF0F172A)) 
+                                     else listOf(Color(0xFF3B82F6), Color(0xFF2563EB))
                         )
                     )
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(24.dp))
                     .padding(20.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // Row 1: Profile Avatar and Title/Subtitle
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(54.dp)
+                                .size(64.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f)),
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Person,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                         Column {
                             Text(
                                 text = "Shariful Islam",
                                 color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = if (language == AppLanguage.BN) "ইউজার এক্সপেরিয়েন্স ও অ্যাপ ডেভেলপার" else "User Experience & App Developer",
-                                color = Color.White.copy(alpha = 0.85f),
-                                fontSize = 12.sp
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    // Row 2: List Items with chevrons
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Item 1: Facebook
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.1f))
-                                .clickable {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://facebook.com/shariful.uxd"))
-                                    context.startActivity(intent)
-                                }
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Rounded.Link, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("facebook.com/shariful.uxd", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
+                        val contactItems = listOf(
+                            Triple(Icons.Rounded.Link, "facebook.com/shariful.uxd", "https://facebook.com/shariful.uxd"),
+                            Triple(Icons.Rounded.Phone, "01768899599", "tel:01768899599"),
+                            Triple(Icons.Rounded.Email, "connect.shariful@gmail.com", "mailto:connect.shariful@gmail.com")
+                        )
 
-                        // Item 2: Mobile / WhatsApp
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.1f))
-                                .clickable {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:01768899599"))
-                                    context.startActivity(intent)
-                                }
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("01768899599", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
-
-                        // Item 3: Email
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.1f))
-                                .clickable {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
-                                        data = android.net.Uri.parse("mailto:connect.shariful@gmail.com")
+                        contactItems.forEach { (icon, text, uri) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .clickable {
+                                        try {
+                                            val intent = if (uri.startsWith("mailto:")) {
+                                                android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                                                    data = android.net.Uri.parse(uri)
+                                                }
+                                            } else {
+                                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(uri))
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {}
                                     }
-                                    context.startActivity(intent)
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(28.dp).background(Color.White.copy(alpha = 0.15f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 }
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Rounded.Email, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("connect.shariful@gmail.com", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                Icon(Icons.Rounded.ArrowForwardIos, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
+                            }
                         }
                     }
 
-                    // Row 3: Contact/Mega button
                     Button(
                         onClick = {
-                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599"))
-                            context.startActivity(intent)
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599"))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {}
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
-                        contentPadding = PaddingValues(12.dp)
+                        contentPadding = PaddingValues(14.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
                     ) {
                         Icon(Icons.Rounded.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = if (language == AppLanguage.BN) 
                                 "নতুন আপডেট পেতে সরাসরি আমাদের সাথে হোয়াটসঅ্যাপে যোগাযোগ করতে এখানে চাপুন" 
@@ -7423,7 +7429,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center,
-                            lineHeight = 15.sp,
+                            lineHeight = 16.sp,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -7584,7 +7590,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "প্রাইভেসি ও শর্তাবলী" else "Privacy & Terms",
             isDark = isDark,
             icon = Icons.Rounded.Security,
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -7674,7 +7680,16 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(90.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    if (showTrashDialog) {
+        TrashDialog(
+            viewModel = viewModel,
+            language = language,
+            isDarkTheme = isDark,
+            onDismiss = { showTrashDialog = false }
+        )
     }
 
     var logoutUserInput by remember { mutableStateOf("") }
@@ -10375,8 +10390,6 @@ fun CustomNotificationOverlay(
 
     Card(
         modifier = Modifier
-            .padding(top = 40.dp)
-            .padding(horizontal = 16.dp)
             .fillMaxWidth()
             .shadow(elevation = 12.dp, shape = RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),

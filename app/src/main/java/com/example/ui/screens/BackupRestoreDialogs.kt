@@ -602,8 +602,8 @@ fun TrashDialog(
                             color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
                         )
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp).background(if (isDarkTheme) Color(0x33FFFFFF) else Color(0x1A000000), RoundedCornerShape(8.dp))) {
-                        Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(16.dp), tint = if (isDarkTheme) Color.White else Color.Black)
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(20.dp), tint = if (isDarkTheme) Color.White else Color.Black)
                     }
                 }
                 
@@ -643,23 +643,31 @@ fun TrashDialog(
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(
-                                            text = if (item.itemType == "GDRIVE_BACKUP") itemTitle else "$itemTitle #${item.originalId}",
+                                            text = itemTitle,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isDarkTheme) Color.White else Color.Black
+                                            color = if (isDarkTheme) Color.White else Color.Black,
+                                            fontSize = 14.sp
                                         )
                                         Text(
                                             text = if (language == AppLanguage.BN) "$daysLeft দিন বাকি" else "$daysLeft days left",
                                             color = if (daysLeft <= 3) com.example.ui.theme.FintechRed else com.example.ui.theme.FintechGreen,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
+                                            fontSize = 11.sp
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = item.itemJson.take(100) + "...",
-                                        fontSize = 12.sp,
-                                        color = Color.Gray
-                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        color = if (isDarkTheme) Color(0xFF1E2433) else Color(0xFFEFF6FF),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = viewModel.getTrashItemSummary(item, language),
+                                            fontSize = 13.sp,
+                                            color = if (isDarkTheme) Color.LightGray else Color.DarkGray,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.height(12.dp))
                                     
                                     if (captchaRequiredId == item.id) {
