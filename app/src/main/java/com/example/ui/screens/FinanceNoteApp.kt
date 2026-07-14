@@ -2470,7 +2470,8 @@ fun DashboardScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 90.dp)
     ) {
         // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
         item {
@@ -2908,6 +2909,7 @@ fun DashboardScreen(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(4.dp))
         }
 
         if (recentTransactions.isEmpty()) {
@@ -2971,7 +2973,7 @@ fun DashboardScreen(
 
         // Buffer space at bottom to stay above navbar
         item {
-            Spacer(modifier = Modifier.height(70.dp))
+            Spacer(modifier = Modifier.height(110.dp))
         }
     }
 }
@@ -3624,7 +3626,7 @@ fun TransactionsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(70.dp)) // Floating button padding
+                        Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                     }
                 }
             }
@@ -3804,7 +3806,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 80.dp, end = 16.dp)
+                .padding(bottom = 110.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
@@ -4158,7 +4160,8 @@ fun SavingsScreen(
                 LazyColumn(
                     modifier = Modifier.weight(1f)
                         .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     items(savingsGoals) { goal ->
                         SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
@@ -5565,6 +5568,7 @@ fun SavingsGoalDetailOverlay(
                             }
                         }
                     }
+                    item { Spacer(modifier = Modifier.height(110.dp)) }
                 }
             }
         }
@@ -6110,6 +6114,7 @@ fun PersonDetailOverlay(
                             TransactionRowItem(tx, language, isDark, listOf(personDebt.person), onDeleteTx, onEditTx)
                         }
                     }
+                    item { Spacer(modifier = Modifier.height(110.dp)) }
                 }
             }
         }
@@ -7680,7 +7685,7 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(200.dp))
     }
 
     if (showTrashDialog) {
@@ -8971,7 +8976,7 @@ fun ChartsScreen(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(top = 4.dp, bottom = 50.dp),
+            .padding(top = 4.dp, bottom = 200.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

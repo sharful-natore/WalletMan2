@@ -575,6 +575,7 @@ fun TrashDialog(
 ) {
     val trashItems by viewModel.allTrashItems.collectAsState()
     var captchaRequiredId by remember { mutableStateOf<Int?>(null) }
+    var restoreConfirmId by remember { mutableStateOf<Int?>(null) }
     var captchaInput by remember { mutableStateOf("") }
     var captchaError by remember { mutableStateOf(false) }
 
@@ -671,7 +672,7 @@ fun TrashDialog(
                                     Spacer(modifier = Modifier.height(12.dp))
                                     
                                     if (captchaRequiredId == item.id) {
-                                        // Captcha mode
+                                        // Captcha mode for delete
                                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             OutlinedTextField(
                                                 value = captchaInput,
@@ -695,11 +696,42 @@ fun TrashDialog(
                                             ) {
                                                 Text(if (language == AppLanguage.BN) "ডিলেট" else "Delete")
                                             }
+                                            IconButton(onClick = { captchaRequiredId = null; captchaInput = "" }) {
+                                                Icon(Icons.Rounded.Close, contentDescription = null)
+                                            }
+                                        }
+                                    } else if (restoreConfirmId == item.id) {
+                                        // Restore confirmation mode
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().background(if (isDarkTheme) Color(0xFF1E293B) else Color(0xFFF1F5F9), RoundedCornerShape(8.dp)).padding(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "রিস্টোর করবেন?" else "Restore this?",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDarkTheme) Color.White else Color.Black
+                                            )
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                TextButton(onClick = { restoreConfirmId = null }) {
+                                                    Text(if (language == AppLanguage.BN) "না" else "No")
+                                                }
+                                                Button(
+                                                    onClick = { 
+                                                        viewModel.restoreTrashItem(item)
+                                                        restoreConfirmId = null
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.FintechGreen)
+                                                ) {
+                                                    Text(if (language == AppLanguage.BN) "হ্যাঁ" else "Yes")
+                                                }
+                                            }
                                         }
                                     } else {
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             Button(
-                                                onClick = { viewModel.restoreTrashItem(item) },
+                                                onClick = { restoreConfirmId = item.id },
                                                 modifier = Modifier.weight(1f),
                                                 colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.FintechGreen)
                                             ) {
