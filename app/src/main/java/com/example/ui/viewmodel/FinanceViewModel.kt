@@ -43,6 +43,12 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.io.InputStream
 
+data class CustomNotification(
+    val message: String,
+    val isSuccess: Boolean = true,
+    val type: String = "INFO" // "SUCCESS", "ERROR", "SIGN_IN", "SIGN_OUT", "SYNC", "RESTORE", "BACKUP"
+)
+
 data class PersonDebt(
     val person: Person,
     val netBalance: Double, // positive = owed to me (pawn), negative = I owe (dena)
@@ -631,6 +637,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             if (isUpload) "Your data has been successfully saved to the cloud!" else "New data has been successfully restored from the cloud!"
         }
         showSyncNotification(title, message)
+        triggerCustomNotification(message, isSuccess = true, type = "SYNC")
     }
 
     private var firestore: com.google.firebase.firestore.FirebaseFirestore? = null
@@ -962,6 +969,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 outputStream.use { it.write(encryptedJson.toByteArray()) }
+                val isBn = _language.value == AppLanguage.BN
+                val msg = if (isBn) "আপনার ডাটা সফলভাবে এনক্রিপ্ট করে ব্যাকআপ ফাইল তৈরি করা হয়েছে!" else "Your data has been successfully encrypted and backup file created!"
+                triggerCustomNotification(msg, isSuccess = true, type = "BACKUP")
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
@@ -978,6 +988,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (backupData != null) {
                     repository.restoreBackupData(backupData)
                     com.example.widget.updateAllWidgets(getApplication())
+                    val isBn = _language.value == AppLanguage.BN
+                    val msg = if (isBn) "ব্যাকআপ ফাইল থেকে আপনার ডাটা সফলভাবে রিস্টোর করা হয়েছে!" else "Your data has been successfully restored from the backup file!"
+                    triggerCustomNotification(msg, isSuccess = true, type = "RESTORE")
                     onSuccess()
                 } else {
                     throw Exception("Invalid backup data format")
@@ -999,6 +1012,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val backupFile = File(context.filesDir, "financenote_backup.json")
                 backupFile.writeText(encryptedJson)
                 
+                val isBn = _language.value == AppLanguage.BN
+                val msg = if (isBn) "লোকাল স্টোরেজে ডাটা ব্যাকআপ সফলভাবে সংরক্ষিত হয়েছে!" else "Local storage data backup successfully saved!"
+                triggerCustomNotification(msg, isSuccess = true, type = "BACKUP")
                 onSuccess(encryptedJson)
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
@@ -1026,6 +1042,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (backupData != null) {
                     repository.restoreBackupData(backupData)
                     com.example.widget.updateAllWidgets(getApplication())
+                    val isBn = _language.value == AppLanguage.BN
+                    val msg = if (isBn) "ব্যাকআপ ডাটা সফলভাবে রিস্টোর করা হয়েছে!" else "Backup data successfully restored!"
+                    triggerCustomNotification(msg, isSuccess = true, type = "RESTORE")
                     onSuccess()
                 } else {
                     throw Exception("Invalid backup data format")
@@ -1068,6 +1087,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private val _autoBackupIntervalDays = MutableStateFlow(-1)
     val autoBackupIntervalDays: StateFlow<Int> = _autoBackupIntervalDays.asStateFlow()
+
+    private val _customNotification = MutableStateFlow<CustomNotification?>(null)
+    val customNotification: StateFlow<CustomNotification?> = _customNotification.asStateFlow()
+
+    fun triggerCustomNotification(message: String, isSuccess: Boolean = true, type: String = "INFO") {
+        _customNotification.value = CustomNotification(message, isSuccess, type)
+    }
+
+    fun clearCustomNotification() {
+        _customNotification.value = null
+    }
 
     private val client = OkHttpClient()
 
@@ -1554,6 +1584,51 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     dismissCloudDataFoundDialog()
                 }
             )
+        }
+    }
+
+    fun performAutoBackupAndSignOut(context: Context, profileName: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                val safeName = profileName.replace(" ", "_").ifBlank { "User" }
+                val fileName = "Auto_backup_on_signout_${timestamp}_${safeName}.json".replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+                val comment = "Auto backup on signout"
+
+                // 1. Local Storage Auto Backup
+                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
+                val json = backupAdapter.indent("  ").toJson(backupData)
+                val encryptedJson = BackupEncryptionHelper.encrypt(json)
+
+                // Save to app external files dir (accessible local storage on phone)
+                val externalDir = context.getExternalFilesDir(null) ?: context.filesDir
+                val backupFile = File(externalDir, fileName)
+                backupFile.writeText(encryptedJson)
+
+                // Also write to standard internal financenote_backup.json for fallback restore
+                val standardBackupFile = File(context.filesDir, "financenote_backup.json")
+                standardBackupFile.writeText(encryptedJson)
+
+                // 2. Google Drive Auto Backup (if signed in)
+                if (_isGoogleSignedIn.value) {
+                    backupToGoogleDrive(
+                        context = context,
+                        customFileName = fileName,
+                        comment = comment,
+                        onSuccess = {
+                            signOutFromGoogle(context, onSuccess)
+                        },
+                        onError = {
+                            signOutFromGoogle(context, onSuccess)
+                        }
+                    )
+                } else {
+                    signOutFromGoogle(context, onSuccess)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                signOutFromGoogle(context, onSuccess)
+            }
         }
     }
 

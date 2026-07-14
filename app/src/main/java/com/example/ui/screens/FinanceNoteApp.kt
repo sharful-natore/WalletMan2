@@ -590,6 +590,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
     val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
+    val customNotification by viewModel.customNotification.collectAsState()
+    
+    LaunchedEffect(customNotification) {
+        if (customNotification != null) {
+            kotlinx.coroutines.delay(4000L)
+            viewModel.clearCustomNotification()
+        }
+    }
     val showCloudDataFoundDialog by viewModel.showCloudDataFoundDialog.collectAsState()
     val pendingCloudData by viewModel.pendingCloudData.collectAsState()
     
@@ -659,6 +667,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         account = account,
                         onSuccess = {
                             Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(
+                                if (language == AppLanguage.BN) "আপনার গুগল অ্যাকাউন্ট সফলভাবে সিস্টেমের সাথে কানেক্ট করা হয়েছে।" else "Your Google account has been successfully connected with the system.",
+                                isSuccess = true,
+                                type = "SIGN_IN"
+                            )
                         },
                         onError = { err ->
                             Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
@@ -798,6 +811,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     var savingsTxToEdit by remember { mutableStateOf<SavingsTransaction?>(null) }
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
+    var showDeletePersonConfirmId by remember { mutableStateOf<Int?>(null) }
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
 
@@ -1097,11 +1111,22 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
             },
             bottomBar = {
-                val bottomBarGradient = Brush.linearGradient(
-                    colors = GradientsList[0]
-                )
                 val density = LocalDensity.current
                 val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                
+                // Frosted Glass colors and gradient (Theme-aware)
+                val glassBaseColor = if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)
+                val glassAccentColor = Color(0xFF6F7BF7) // Sleek brand violet
+                
+                // Vertical gradient of transparency: 0% at the top edge, fading to a frosted semi-transparent theme background at the bottom.
+                val bottomBarGradient = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.Transparent,
+                        0.2f to glassBaseColor.copy(alpha = 0.35f),
+                        0.5f to glassBaseColor.copy(alpha = 0.75f),
+                        1.0f to glassBaseColor.copy(alpha = 0.94f)
+                    )
+                )
                 
                 Box(
                     modifier = Modifier
@@ -1117,6 +1142,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         iconSize: androidx.compose.ui.unit.Dp = 24.dp
                     ) {
                         val isSelected = activeTab == tab
+                        val iconColor = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                        val iconTint = if (isSelected) iconColor else iconColor.copy(alpha = 0.6f)
+                        
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -1132,21 +1160,21 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                                    .background(if (isSelected) (if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color(0xFF1E293B).copy(alpha = 0.12f)) else Color.Transparent)
                                     .padding(horizontal = 16.dp, vertical = 6.dp)
                              ) {
                                 if (icon is ImageVector) {
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                        tint = iconTint,
                                         modifier = Modifier.size(iconSize)
                                     )
                                 } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
                                     Icon(
                                         painter = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                        tint = iconTint,
                                         modifier = Modifier.size(iconSize)
                                     )
                                 }
@@ -1154,15 +1182,58 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
-                    // 1. Clipped and styled navigation bar background with Notch Cut shape
+                    // 1. Clipped and styled navigation bar background with Notch Cut shape and Frosted Glass effect
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 0.dp) // Removed 16dp space to avoid "fixed card" look
                             .height(52.dp + navBarPadding)
                             .clip(NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp))
-                            .background(bottomBarGradient)
                     ) {
+                        // Blurred Glass Background layer (creates soft frosted glassmorphism look)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(bottomBarGradient)
+                                .graphicsLayer {
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                        renderEffect = android.graphics.RenderEffect.createBlurEffect(
+                                            25f, 25f, android.graphics.Shader.TileMode.CLAMP
+                                        ).asComposeRenderEffect()
+                                    }
+                                }
+                        )
+                        
+                        // Subtle brand color glass refraction glow
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            glassAccentColor.copy(alpha = if (isDarkTheme) 0.08f else 0.04f)
+                                        )
+                                    )
+                                )
+                        )
+                        
+                        // High-contrast refraction border (glass edge)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .border(
+                                    width = 1.2.dp,
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            if (isDarkTheme) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.55f),
+                                            Color.Transparent
+                                        )
+                                    ),
+                                    shape = NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp)
+                                )
+                        )
+                        
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1404,7 +1475,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                     showBackupConfirm = true
                                                 }
                                             },
-                                            viewModel = viewModel
+                                            viewModel = viewModel,
+                                            onPersonClick = { person ->
+                                                val foundDebt = filteredPersonDebts.find { it.person.id == person.id }
+                                                if (foundDebt != null) {
+                                                    selectedPersonDetail = foundDebt
+                                                    activeTab = "debts"
+                                                }
+                                            }
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -1418,7 +1496,20 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             onFilterChange = { transactionFilter = it },
                                             timeFilter = timeFilter,
                                             onTimeFilterChange = handleTimeFilterChange,
-                                            highlightedTxId = highlightedTxId
+                                            highlightedTxId = highlightedTxId,
+                                            onNavigateToTab = { tab, filter ->
+                                                activeTab = tab
+                                                if (tab == "transactions") transactionFilter = filter
+                                                if (tab == "debts") debtFilter = filter
+                                                if (tab == "settings") settingsFilter = filter
+                                            },
+                                            onPersonClick = { person ->
+                                                val foundDebt = filteredPersonDebts.find { it.person.id == person.id }
+                                                if (foundDebt != null) {
+                                                    selectedPersonDetail = foundDebt
+                                                    activeTab = "debts"
+                                                }
+                                            }
                                         )
                                         2 -> DebtsScreen(
                                             language = language,
@@ -1659,11 +1750,26 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 showAddPersonDialog = true
                             },
                             onDeletePerson = {
-                                viewModel.deletePerson(debtInfo.person.id)
-                                selectedPersonDetail = null
+                                showDeletePersonConfirmId = debtInfo.person.id
                             }
                         )
                     }
+                }
+
+                if (showDeletePersonConfirmId != null) {
+                    DeleteVerificationDialog(
+                        language = language,
+                        onConfirm = {
+                            showDeletePersonConfirmId?.let { id ->
+                                viewModel.deletePerson(id)
+                            }
+                            showDeletePersonConfirmId = null
+                            selectedPersonDetail = null
+                        },
+                        onDismiss = {
+                            showDeletePersonConfirmId = null
+                        }
+                    )
                 }
 
 
@@ -1977,9 +2083,19 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         )
     }
 
+    var cloudRestoreUserInput by remember { mutableStateOf("") }
+    val cloudRestoreCaptcha = remember(showCloudDataFoundDialog) {
+        val chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+        (1..4).map { chars.random() }.joinToString("")
+    }
+    val isCloudRestoreCaptchaCorrect = cloudRestoreUserInput.trim().equals(cloudRestoreCaptcha, ignoreCase = true)
+
     if (showCloudDataFoundDialog && pendingCloudData != null) {
         AlertDialog(
-            onDismissRequest = { viewModel.dismissCloudDataFoundDialog() },
+            onDismissRequest = { 
+                viewModel.dismissCloudDataFoundDialog() 
+                cloudRestoreUserInput = ""
+            },
             containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2016,29 +2132,81 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             color = Color.Gray
                         )
                     }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isDarkTheme) Color(0xFF282E47) else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "রিস্টোর নিশ্চিত করতে ক্যাপচা কোডটি টাইপ করুন" else "To confirm restore, type the captcha code",
+                            fontSize = 12.sp,
+                            color = if (isDarkTheme) Color.Gray else Color(0xFF64748B),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = cloudRestoreCaptcha,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 6.sp,
+                            color = Color(0xFF10B981),
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                        OutlinedTextField(
+                            value = cloudRestoreUserInput,
+                            onValueChange = { cloudRestoreUserInput = it },
+                            placeholder = { Text(if (language == AppLanguage.BN) "ক্যাপচা কোড" else "Captcha Code") },
+                            modifier = Modifier.fillMaxWidth().testTag("cloud_restore_captcha_input"),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = if (isCloudRestoreCaptchaCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                                unfocusedBorderColor = if (isDarkTheme) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                                focusedTextColor = if (isDarkTheme) Color.White else Color(0xFF1E293B),
+                                unfocusedTextColor = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                            )
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = {
+                            val userInputToClear = cloudRestoreUserInput
+                            cloudRestoreUserInput = ""
                             viewModel.confirmCloudSync(context, backupLocalFirst = true) {
                                 Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর সফল হয়েছে!" else "Backup & Restore successful!", Toast.LENGTH_SHORT).show()
                             }
                         },
+                        enabled = isCloudRestoreCaptchaCorrect,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FintechBlue,
+                            disabledContainerColor = FintechBlue.copy(alpha = 0.5f)
+                        )
                     ) {
                         Text(if (language == AppLanguage.BN) "ব্যাকআপ নিয়ে রিস্টোর করুন" else "Backup & Restore", color = Color.White)
                     }
                     Button(
                         onClick = {
+                            val userInputToClear = cloudRestoreUserInput
+                            cloudRestoreUserInput = ""
                             viewModel.confirmCloudSync(context, backupLocalFirst = false) {
                                 Toast.makeText(context, if (language == AppLanguage.BN) "রিস্টোর সফল হয়েছে!" else "Restore successful!", Toast.LENGTH_SHORT).show()
                             }
                         },
+                        enabled = isCloudRestoreCaptchaCorrect,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isDarkTheme) Color.DarkGray else Color.LightGray)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDarkTheme) Color.DarkGray else Color.LightGray,
+                            disabledContainerColor = (if (isDarkTheme) Color.DarkGray else Color.LightGray).copy(alpha = 0.5f)
+                        )
                     ) {
                         Text(if (language == AppLanguage.BN) "সরাসরি রিস্টোর (ব্যাকআপ ছাড়া)" else "Restore (No Backup)", color = if (isDarkTheme) Color.White else Color.Black)
                     }
@@ -2048,6 +2216,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(
                         onClick = {
+                            cloudRestoreUserInput = ""
                             viewModel.skipCloudSyncAndOverwrite(context)
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -2055,7 +2224,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         Text(if (language == AppLanguage.BN) "লোকাল ডাটা রাখুন (ক্লাউড আপডেট করুন)" else "Keep Local (Update Cloud)", color = FintechBlue)
                     }
                     TextButton(
-                        onClick = { viewModel.dismissCloudDataFoundDialog() },
+                        onClick = { 
+                            cloudRestoreUserInput = ""
+                            viewModel.dismissCloudDataFoundDialog() 
+                        },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
@@ -2155,6 +2327,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     account = act,
                                     onSuccess = {
                                         Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification(
+                                            if (language == AppLanguage.BN) "আপনার নতুন গুগল অ্যাকাউন্টটি সফলভাবে সিঙ্ক করা হয়েছে।" else "Your new Google account has been successfully synced.",
+                                            isSuccess = true,
+                                            type = "SIGN_IN"
+                                        )
                                     },
                                     onError = { err ->
                                         Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
@@ -2224,7 +2401,8 @@ fun DashboardScreen(
     isGoogleSignedIn: Boolean = false,
     onSignInClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
-    viewModel: FinanceViewModel? = null
+    viewModel: FinanceViewModel? = null,
+    onPersonClick: ((Person) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
@@ -2686,6 +2864,28 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold,
                     color = if (isDark) Color.White else Color.DarkGray
                 )
+                TextButton(
+                    onClick = { onNavigate("transactions", "ALL") },
+                    modifier = Modifier.testTag("see_all_transactions_button")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "সব দেখুন" else "See All",
+                            color = FintechBlue,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowForward,
+                            contentDescription = "See All",
+                            tint = FintechBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -2734,7 +2934,16 @@ fun DashboardScreen(
                     )
                 }
                 items(txs) { tx ->
-                    TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction, onEditTransaction)
+                    TransactionRowItem(
+                        tx = tx,
+                        language = language,
+                        isDark = isDark,
+                        persons = persons,
+                        onDelete = onDeleteTransaction,
+                        onEdit = onEditTransaction,
+                        onNavigateToTab = onNavigate,
+                        onPersonClick = onPersonClick
+                    )
                 }
             }
         }
@@ -2756,7 +2965,9 @@ fun TransactionRowItem(
     persons: List<Person>,
     onDelete: (Int) -> Unit,
     onEdit: (Transaction) -> Unit,
-    isHighlighted: Boolean = false
+    isHighlighted: Boolean = false,
+    onNavigateToTab: ((String, String) -> Unit)? = null,
+    onPersonClick: ((Person) -> Unit)? = null
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
@@ -2814,7 +3025,9 @@ fun TransactionRowItem(
             },
             onShareImage = { bitmap ->
                 shareBitmap(context, bitmap, if (language == AppLanguage.BN) "ফাইন্যান্স নোট থেকে ট্রানজ্যাকশন মেমো" else "Transaction Memo from Finance Note")
-            }
+            },
+            onNavigateToTab = onNavigateToTab,
+            onPersonClick = onPersonClick
         )
     }
 
@@ -2831,6 +3044,23 @@ fun TransactionRowItem(
             )
             .testTag("tx_item_${tx.id}")
     ) {
+        // Category Icon and Color as requested:
+        // INCOME: green (FintechGreen)
+        // EXPENSE: red (FintechRed)
+        // BORROW: orange (0xFFF97316)
+        // LEND: yellow (0xFFF59E0B)
+        // REPAY_PAID: purple (0xFF8B5CF6)
+        // REPAY_RECEIVED: blue (0xFF3B82F6)
+        val iconColor = when (tx.type) {
+            "INCOME" -> FintechGreen
+            "EXPENSE" -> FintechRed
+            "LEND" -> Color(0xFFF59E0B)
+            "BORROW" -> Color(0xFFF97316)
+            "REPAY_RECEIVED" -> Color(0xFF3B82F6)
+            "REPAY_PAID" -> Color(0xFF8B5CF6)
+            else -> Color.Gray
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2839,25 +3069,22 @@ fun TransactionRowItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                // Category Icon circle
-                val (color, icon) = when (tx.type) {
-                    "INCOME" -> Pair(FintechGreen, Icons.AutoMirrored.Rounded.TrendingUp)
-                    "EXPENSE" -> Pair(FintechRed, Icons.AutoMirrored.Rounded.TrendingDown)
-                    "LEND" -> Pair(FintechGreen, Icons.AutoMirrored.Rounded.TrendingDown)
-                    "BORROW" -> Pair(FintechRed, Icons.AutoMirrored.Rounded.TrendingUp)
-                    "REPAY_RECEIVED" -> Pair(FintechGreen, Icons.AutoMirrored.Rounded.TrendingUp)
-                    "REPAY_PAID" -> Pair(FintechRed, Icons.AutoMirrored.Rounded.TrendingDown)
-                    else -> Pair(Color.Gray, Icons.AutoMirrored.Rounded.CompareArrows)
-                }
 
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(color.copy(alpha = 0.15f)),
+                        .background(iconColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                    when (tx.type) {
+                        "INCOME" -> Icon(Icons.AutoMirrored.Rounded.TrendingUp, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                        "EXPENSE" -> Icon(Icons.AutoMirrored.Rounded.TrendingDown, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                        "LEND", "BORROW" -> Icon(painterResource(id = R.drawable.ic_lend_borrow_new), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                        "REPAY_RECEIVED" -> Icon(painterResource(id = R.drawable.ic_repay_received), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                        "REPAY_PAID" -> Icon(painterResource(id = R.drawable.ic_repay_paid), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                        else -> Icon(Icons.AutoMirrored.Rounded.CompareArrows, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -2941,11 +3168,7 @@ fun TransactionRowItem(
                 "INCOME", "BORROW", "REPAY_RECEIVED" -> "+"
                 else -> "-"
             }
-            val amountColor = when (tx.type) {
-                "INCOME", "LEND", "REPAY_RECEIVED" -> FintechGreen
-                "EXPENSE", "BORROW", "REPAY_PAID" -> FintechRed
-                else -> Color.Gray
-            }
+            val amountColor = iconColor
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -2982,7 +3205,9 @@ fun TransactionDetailsDialog(
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onShareText: () -> Unit,
-    onShareImage: (android.graphics.Bitmap) -> Unit
+    onShareImage: (android.graphics.Bitmap) -> Unit,
+    onNavigateToTab: ((String, String) -> Unit)? = null,
+    onPersonClick: ((Person) -> Unit)? = null
 ) {
     val bgColor = if (isDark) Color(0xFF1E2235) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -3035,16 +3260,48 @@ fun TransactionDetailsDialog(
                     .captureToPicture(screenshotState)
                     .background(if (isDark) Color(0xFF141724) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Detail Row Helper
-                val DetailRow = @Composable { label: String, value: String ->
+                val DetailRow = @Composable { label: String, value: String, onClick: (() -> Unit)? ->
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .then(
+                                if (onClick != null) {
+                                    Modifier
+                                        .clickable { onClick() }
+                                        .background(if (isDark) Color(0xFF1E2235) else Color(0xFFEDF2F7))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                } else {
+                                    Modifier.padding(vertical = 4.dp)
+                                }
+                            ),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(text = label, color = subtitleColor, fontSize = 13.sp)
-                        Text(text = value, color = textColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = value,
+                                color = if (onClick != null) FintechBlue else textColor,
+                                fontSize = 13.sp,
+                                fontWeight = if (onClick != null) FontWeight.Bold else FontWeight.Medium,
+                                modifier = Modifier.testTag("clickable_memo_${label.replace(":", "").lowercase().trim()}")
+                            )
+                            if (onClick != null) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.ChevronRight,
+                                    contentDescription = "Navigate",
+                                    tint = FintechBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -3058,13 +3315,60 @@ fun TransactionDetailsDialog(
                     else -> tx.type
                 }
                 
-                DetailRow(if (language == AppLanguage.BN) "ধরণ:" else "Type:", typeStr)
-                DetailRow(if (language == AppLanguage.BN) "পরিমাণ:" else "Amount:", formatCurrency(tx.amount, language))
-                DetailRow(if (language == AppLanguage.BN) "ক্যাটাগরি:" else "Category:", tx.category)
-                if (linkedPerson != null) {
-                    DetailRow(if (language == AppLanguage.BN) "ব্যক্তি:" else "Person:", linkedPerson.name)
+                val (targetTab, targetFilter) = when (tx.type) {
+                    "INCOME" -> Pair("transactions", "INCOME")
+                    "EXPENSE" -> Pair("transactions", "EXPENSE")
+                    "LEND", "REPAY_RECEIVED" -> Pair("debts", "PAWN")
+                    "BORROW", "REPAY_PAID" -> Pair("debts", "DENA")
+                    else -> Pair("transactions", "ALL")
                 }
-                DetailRow(if (language == AppLanguage.BN) "তারিখ:" else "Date:", formatDate(tx.timestamp, language))
+
+                DetailRow(
+                    if (language == AppLanguage.BN) "ধরণ:" else "Type:",
+                    typeStr,
+                    if (onNavigateToTab != null) {
+                        {
+                            onDismiss()
+                            onNavigateToTab(targetTab, targetFilter)
+                        }
+                    } else null
+                )
+
+                DetailRow(
+                    if (language == AppLanguage.BN) "পরিমাণ:" else "Amount:",
+                    formatCurrency(tx.amount, language),
+                    null
+                )
+
+                DetailRow(
+                    if (language == AppLanguage.BN) "ক্যাটাগরি:" else "Category:",
+                    tx.category,
+                    if (onNavigateToTab != null) {
+                        {
+                            onDismiss()
+                            onNavigateToTab(targetTab, targetFilter)
+                        }
+                    } else null
+                )
+
+                if (linkedPerson != null) {
+                    DetailRow(
+                        if (language == AppLanguage.BN) "ব্যক্তি:" else "Person:",
+                        linkedPerson.name,
+                        if (onPersonClick != null) {
+                            {
+                                onDismiss()
+                                onPersonClick(linkedPerson)
+                            }
+                        } else null
+                    )
+                }
+
+                DetailRow(
+                    if (language == AppLanguage.BN) "তারিখ:" else "Date:",
+                    formatDate(tx.timestamp, language),
+                    null
+                )
                 
                 if (tx.note.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -3116,7 +3420,9 @@ fun TransactionsScreen(
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
     onTimeFilterChange: (String) -> Unit = {},
-    highlightedTxId: Int? = null
+    highlightedTxId: Int? = null,
+    onNavigateToTab: ((String, String) -> Unit)? = null,
+    onPersonClick: ((Person) -> Unit)? = null
 ) {
     val timeFilteredTransactions = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
@@ -3281,7 +3587,17 @@ fun TransactionsScreen(
                         }
                         items(txs) { tx ->
                             Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                                TransactionRowItem(tx, language, isDark, persons, onDeleteTransaction, onEditTransaction, isHighlighted = (tx.id == highlightedTxId))
+                                TransactionRowItem(
+                                    tx = tx,
+                                    language = language,
+                                    isDark = isDark,
+                                    persons = persons,
+                                    onDelete = onDeleteTransaction,
+                                    onEdit = onEditTransaction,
+                                    isHighlighted = (tx.id == highlightedTxId),
+                                    onNavigateToTab = onNavigateToTab,
+                                    onPersonClick = onPersonClick
+                                )
                             }
                         }
                     }
@@ -3465,7 +3781,7 @@ fun DebtsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 102.dp, end = 16.dp)
+                .padding(bottom = 110.dp, end = 16.dp)
                 .testTag("fab_add_person")
         ) {
             Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
@@ -3838,7 +4154,7 @@ fun SavingsScreen(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 102.dp, end = 16.dp)
+                .padding(bottom = 110.dp, end = 16.dp)
                 .testTag("fab_add_savings_goal")
         ) {
             Icon(painter = painterResource(id = R.drawable.ic_add_savings), contentDescription = "Add Goal", tint = Color.White)
@@ -5990,6 +6306,55 @@ fun SettingsScreen(
     val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     var showLogoutConfirm by remember { mutableStateOf(false) }
+    var isSignoutBackupActive by remember { mutableStateOf(false) }
+    var pendingLocalBackupComment by remember { mutableStateOf("") }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            context.contentResolver.openOutputStream(uri)?.let { outputStream ->
+                viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, {
+                    Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
+                    pendingLocalBackupComment = ""
+                    if (isSignoutBackupActive) {
+                        viewModel.performAutoBackupAndSignOut(context, profileName) {
+                            isSignoutBackupActive = false
+                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(
+                                if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
+                                isSuccess = true,
+                                type = "SIGN_OUT"
+                            )
+                        }
+                    }
+                }, { error ->
+                    Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                    if (isSignoutBackupActive) {
+                        viewModel.performAutoBackupAndSignOut(context, profileName) {
+                            isSignoutBackupActive = false
+                            viewModel.triggerCustomNotification(
+                                if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
+                                isSuccess = true,
+                                type = "SIGN_OUT"
+                            )
+                        }
+                    }
+                })
+            }
+        } else {
+            if (isSignoutBackupActive) {
+                viewModel.performAutoBackupAndSignOut(context, profileName) {
+                    isSignoutBackupActive = false
+                    Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                    viewModel.triggerCustomNotification(
+                        if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
+                        isSuccess = true,
+                        type = "SIGN_OUT"
+                    )
+                }
+            }
+        }
+    }
+
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
     var showErrorLogDialog by remember { mutableStateOf(false) }
@@ -6264,7 +6629,6 @@ fun SettingsScreen(
         }
 
         // --- 5. DATA BACKUP & RESTORE CARD ---
-        var pendingLocalBackupComment by remember { mutableStateOf("") }
         var pendingLocalRestoreData by remember { mutableStateOf<com.example.data.FinanceBackup?>(null) }
         var pendingLocalRestoreStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
         var pendingLocalRestoreFileName by remember { mutableStateOf("") }
@@ -6295,19 +6659,6 @@ fun SettingsScreen(
                 }
             }
             return result
-        }
-
-        val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-            uri?.let {
-                context.contentResolver.openOutputStream(it)?.let { outputStream ->
-                    viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, {
-                        Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
-                        pendingLocalBackupComment = ""
-                    }, { error ->
-                        Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
-                    })
-                }
-            }
         }
 
         val openDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -6581,7 +6932,7 @@ fun SettingsScreen(
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (isGoogleSignedIn) (googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল ইউজার" else "Google User" }) else (if (language == AppLanguage.BN) "লগইন করা নেই" else "Not Signed In"),
                                 fontWeight = FontWeight.Bold,
@@ -6591,10 +6942,12 @@ fun SettingsScreen(
                             Text(
                                 text = if (isGoogleSignedIn) (googleEmail.orEmpty().ifBlank { "drive.user@gmail.com" }) else (if (language == AppLanguage.BN) "ব্যাকআপ রাখতে অনুগ্রহ করে সাইন-ইন করুন" else "Please sign-in to backup your data"),
                                 fontSize = 11.sp,
-                                color = if (isDark) Color.Gray else Color(0xFF64748B)
+                                color = if (isDark) Color.Gray else Color(0xFF64748B),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
                                 if (isGoogleSignedIn) {
@@ -6605,15 +6958,23 @@ fun SettingsScreen(
                             },
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = if (isGoogleSignedIn) FintechRed else FintechBlue),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.padding(start = 8.dp)
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            modifier = Modifier
+                                .width(90.dp)
+                                .height(36.dp)
+                                .align(Alignment.CenterVertically)
                         ) {
-                            Text(
-                                text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "লগইন" else "Login"),
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "লগইন" else "Login"),
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                     if (!driveStatusMessage.isNullOrEmpty()) {
@@ -7280,26 +7641,122 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(90.dp))
     }
 
+    var logoutUserInput by remember { mutableStateOf("") }
+    val logoutCaptcha = remember(showLogoutConfirm) {
+        val chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+        (1..4).map { chars.random() }.joinToString("")
+    }
+    val isLogoutCaptchaCorrect = logoutUserInput.trim().equals(logoutCaptcha, ignoreCase = true)
+
     if (showLogoutConfirm) {
         AlertDialog(
-            onDismissRequest = { showLogoutConfirm = false },
-            title = { Text(if (language == AppLanguage.BN) "লগআউট নিশ্চিতকরণ" else "Confirm Logout") },
-            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে আপনি গুগল ড্রাইভ থেকে লগআউট করতে চান? লগআউট করলেও আপনার স্থানীয় সকল ডাটা ফোনেই সুরক্ষিত থাকবে।" else "Are you sure you want to log out of Google Drive? Even if you log out, all your current data will remain safe on your phone.") },
-            confirmButton = {
-                Button(
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
-                    onClick = {
-                        showLogoutConfirm = false
-                        viewModel.signOutFromGoogle(context) {
-                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
-                        }
+            onDismissRequest = { 
+                showLogoutConfirm = false 
+                logoutUserInput = ""
+            },
+            title = { Text(if (language == AppLanguage.BN) "লগআউট ও ব্যাকআপ নিশ্চিতকরণ" else "Logout & Backup Confirmation") },
+            text = { 
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        if (language == AppLanguage.BN) 
+                            "লগআউট করার পূর্বে আপনি কি একটি ম্যানুয়াল ব্যাকআপ সংরক্ষণ করতে চান? আপনি ম্যানুয়াল ব্যাকআপ না নিলেও গুগল ড্রাইভ এবং লোকাল স্টোরেজে একটি অটো ব্যাকআপ সংরক্ষণ করা হবে।"
+                        else 
+                            "Would you like to save a manual backup before logging out? Even if you don't take a manual backup, an automatic backup will be saved in Google Drive and local storage for your safety."
+                    ) 
+                    
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isDark) Color(0xFF282E47) else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "লগআউট নিশ্চিত করতে ক্যাপচা কোডটি টাইপ করুন" else "To confirm logout, type the captcha code",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = logoutCaptcha,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 6.sp,
+                            color = Color(0xFFEF4444),
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                        OutlinedTextField(
+                            value = logoutUserInput,
+                            onValueChange = { logoutUserInput = it },
+                            placeholder = { Text(if (language == AppLanguage.BN) "ক্যাপচা কোড" else "Captcha Code") },
+                            modifier = Modifier.fillMaxWidth().testTag("logout_captcha_input"),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = if (isLogoutCaptchaCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                        )
                     }
+                }
+            },
+            confirmButton = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Text(if (language == AppLanguage.BN) "লগআউট" else "Logout", color = Color.White)
+                    Button(
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FintechBlue,
+                            disabledContainerColor = FintechBlue.copy(alpha = 0.5f)
+                        ),
+                        enabled = isLogoutCaptchaCorrect,
+                        onClick = {
+                            showLogoutConfirm = false
+                            logoutUserInput = ""
+                            isSignoutBackupActive = true
+                            val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
+                            pendingLocalBackupComment = "Backup before logout"
+                            createDocumentLauncher.launch("financenote_backup_before_logout_$timestamp.json")
+                        }
+                    ) {
+                        Text(if (language == AppLanguage.BN) "ব্যাকআপ নিন ও লগআউট করুন" else "Backup & Logout", color = Color.White)
+                    }
+                    
+                    Button(
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FintechRed,
+                            disabledContainerColor = FintechRed.copy(alpha = 0.5f)
+                        ),
+                        enabled = isLogoutCaptchaCorrect,
+                        onClick = {
+                            showLogoutConfirm = false
+                            logoutUserInput = ""
+                            Toast.makeText(context, if (language == AppLanguage.BN) "অটো ব্যাকআপ তৈরি হচ্ছে এবং লগআউট করা হচ্ছে..." else "Creating auto backup and logging out...", Toast.LENGTH_LONG).show()
+                            viewModel.performAutoBackupAndSignOut(context, profileName) {
+                                Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(
+                                    if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
+                                    isSuccess = true,
+                                    type = "SIGN_OUT"
+                                )
+                            }
+                        }
+                    ) {
+                        Text(if (language == AppLanguage.BN) "শুধু লগআউট (অটো ব্যাকআপ সহ)" else "Just Logout (with Auto Backup)", color = Color.White)
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showLogoutConfirm = false }) {
+                TextButton(onClick = { 
+                    showLogoutConfirm = false 
+                    logoutUserInput = ""
+                }) {
                     Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
                 }
             }
