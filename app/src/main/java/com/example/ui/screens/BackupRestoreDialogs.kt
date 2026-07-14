@@ -576,8 +576,14 @@ fun TrashDialog(
     val trashItems by viewModel.allTrashItems.collectAsState()
     var captchaRequiredId by remember { mutableStateOf<Int?>(null) }
     var restoreConfirmId by remember { mutableStateOf<Int?>(null) }
+    var generatedCaptcha by remember { mutableStateOf("") }
     var captchaInput by remember { mutableStateOf("") }
     var captchaError by remember { mutableStateOf(false) }
+
+    fun generateNewCaptcha() {
+        val chars = "1234567890" // Simplified to numbers for easier typing on mobile
+        generatedCaptcha = (1..4).map { chars.random() }.joinToString("")
+    }
 
     Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
@@ -673,18 +679,32 @@ fun TrashDialog(
                                     
                                     if (captchaRequiredId == item.id) {
                                         // Captcha mode for delete
-                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            OutlinedTextField(
-                                                value = captchaInput,
-                                                onValueChange = { captchaInput = it; captchaError = false },
-                                                modifier = Modifier.weight(1f),
-                                                placeholder = { Text(if (language == AppLanguage.BN) "CONFIRM লিখুন" else "Type CONFIRM") },
-                                                isError = captchaError,
-                                                singleLine = true
-                                            )
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Text(
+                                                    text = generatedCaptcha,
+                                                    color = com.example.ui.theme.FintechRed,
+                                                    fontWeight = FontWeight.Black,
+                                                    fontSize = 18.sp,
+                                                    letterSpacing = 4.sp,
+                                                    modifier = Modifier.background(com.example.ui.theme.FintechRed.copy(alpha = 0.1f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                                OutlinedTextField(
+                                                    value = captchaInput,
+                                                    onValueChange = { captchaInput = it; captchaError = false },
+                                                    modifier = Modifier.weight(1f),
+                                                    placeholder = { Text(if (language == AppLanguage.BN) "সংখ্যাটি লিখুন" else "Type code") },
+                                                    isError = captchaError,
+                                                    singleLine = true,
+                                                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                                                )
+                                                IconButton(onClick = { captchaRequiredId = null; captchaInput = "" }) {
+                                                    Icon(Icons.Rounded.Close, contentDescription = null)
+                                                }
+                                            }
                                             Button(
                                                 onClick = {
-                                                    if (captchaInput.equals("CONFIRM", ignoreCase = true)) {
+                                                    if (captchaInput == generatedCaptcha) {
                                                         viewModel.permanentDeleteTrashItem(item.id)
                                                         captchaRequiredId = null
                                                         captchaInput = ""
@@ -692,12 +712,10 @@ fun TrashDialog(
                                                         captchaError = true
                                                     }
                                                 },
+                                                modifier = Modifier.fillMaxWidth(),
                                                 colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.FintechRed)
                                             ) {
-                                                Text(if (language == AppLanguage.BN) "ডিলেট" else "Delete")
-                                            }
-                                            IconButton(onClick = { captchaRequiredId = null; captchaInput = "" }) {
-                                                Icon(Icons.Rounded.Close, contentDescription = null)
+                                                Text(if (language == AppLanguage.BN) "নিশ্চিত ডিলেট" else "Confirm Delete")
                                             }
                                         }
                                     } else if (restoreConfirmId == item.id) {
@@ -738,7 +756,11 @@ fun TrashDialog(
                                                 Text(if (language == AppLanguage.BN) "রিস্টোর" else "Restore")
                                             }
                                             OutlinedButton(
-                                                onClick = { captchaRequiredId = item.id; captchaInput = "" },
+                                                onClick = { 
+                                                    captchaRequiredId = item.id
+                                                    captchaInput = ""
+                                                    generateNewCaptcha()
+                                                },
                                                 modifier = Modifier.weight(1f),
                                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = com.example.ui.theme.FintechRed),
                                                 border = BorderStroke(1.dp, com.example.ui.theme.FintechRed)

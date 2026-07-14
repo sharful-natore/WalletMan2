@@ -1152,14 +1152,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.70f),
                                         modifier = Modifier.size(iconSize)
                                     )
                                 } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
                                     Icon(
                                         painter = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
+                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.70f),
                                         modifier = Modifier.size(iconSize)
                                     )
                                 }
@@ -1985,11 +1985,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         
                         Text(
                             text = if (hasUnsavedChanges) {
-                                if (language == AppLanguage.BN) "লোকাল ডেটা: ${transactions.size} টি লেনদেন, ${persons.size} জন ব্যক্তি" 
-                                else "Local Data: ${transactions.size} tx, ${persons.size} persons"
+                                val lastTx = transactions.lastOrNull()
+                                val lastPerson = persons.lastOrNull()
+                                val lastItemName = lastTx?.note ?: lastPerson?.name ?: (if (language == AppLanguage.BN) "কোনোটিই নয়" else "None")
+                                if (language == AppLanguage.BN) "সর্বশেষ পরিবর্তন: $lastItemName" 
+                                else "Last change: $lastItemName"
                             } else {
-                                if (language == AppLanguage.BN) "সিঙ্কড ডেটা: ${transactions.size} টি লেনদেন, ${persons.size} জন ব্যক্তি" 
-                                else "Synced Data: ${transactions.size} tx, ${persons.size} persons"
+                                if (language == AppLanguage.BN) "সব ডেটা সিঙ্ক হয়েছে" 
+                                else "All data synced"
                             },
                             fontSize = 12.sp,
                             fontStyle = FontStyle.Italic,
@@ -3075,11 +3078,11 @@ fun TransactionRowItem(
         // REPAY_PAID: purple (0xFF8B5CF6)
         // REPAY_RECEIVED: blue (0xFF3B82F6)
         val iconColor = when (tx.type) {
-            "INCOME" -> FintechGreen
+            "INCOME" -> Color(0xFF0D9488) // Teal
             "EXPENSE" -> FintechRed
-            "LEND" -> Color(0xFFF59E0B)
+            "LEND" -> Color(0xFF0D9488) // Teal
             "BORROW" -> Color(0xFFF97316)
-            "REPAY_RECEIVED" -> Color(0xFF3B82F6)
+            "REPAY_RECEIVED" -> Color(0xFF0D9488) // Teal
             "REPAY_PAID" -> Color(0xFF8B5CF6)
             else -> Color.Gray
         }
@@ -3686,7 +3689,7 @@ fun DebtsScreen(
                             Text(formatCurrency(totalDena, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                         }
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
+                            imageVector = Icons.Rounded.ArrowDownward,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
@@ -3710,7 +3713,7 @@ fun DebtsScreen(
                             Text(formatCurrency(totalPawn, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
                         }
                         Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                            imageVector = Icons.Rounded.ArrowUpward,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(20.dp)
@@ -7317,60 +7320,53 @@ fun SettingsScreen(
             icon = Icons.Rounded.Code,
             initiallyExpanded = false
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF0F172A)) 
-                                     else listOf(Color(0xFF3B82F6), Color(0xFF2563EB))
-                        )
-                    )
-                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(24.dp))
-                    .padding(20.dp)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDark) Color(0xFF1E293B).copy(alpha = 0.5f) else Color(0xFFF1F5F9)
+                ),
+                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(64.dp)
+                                .size(56.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                                .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                                .background(if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Person,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(36.dp)
+                                tint = com.example.ui.theme.FintechBlue,
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                         Column {
                             Text(
                                 text = "Shariful Islam",
-                                color = Color.White,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.5.sp
+                                color = com.example.ui.theme.FintechBlue,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = if (language == AppLanguage.BN) "ইউজার এক্সপেরিয়েন্স ও অ্যাপ ডেভেলপার" else "User Experience & App Developer",
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = if (isDark) Color.Gray else Color(0xFF64748B),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         val contactItems = listOf(
                             Triple(Icons.Rounded.Link, "facebook.com/shariful.uxd", "https://facebook.com/shariful.uxd"),
                             Triple(Icons.Rounded.Phone, "01768899599", "tel:01768899599"),
@@ -7381,8 +7377,7 @@ fun SettingsScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .clickable {
                                         try {
                                             val intent = if (uri.startsWith("mailto:")) {
@@ -7395,23 +7390,33 @@ fun SettingsScreen(
                                             context.startActivity(intent)
                                         } catch (e: Exception) {}
                                     }
-                                    .padding(14.dp),
+                                    .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier.size(28.dp).background(Color.White.copy(alpha = 0.15f), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                }
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = com.example.ui.theme.FintechBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text(text, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                                Icon(Icons.Rounded.ArrowForwardIos, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(12.dp))
+                                Text(
+                                    text = text,
+                                    color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF334155),
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowForwardIos,
+                                    contentDescription = null,
+                                    tint = com.example.ui.theme.FintechBlue.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(10.dp)
+                                )
                             }
                         }
                     }
 
-                    Button(
+                    TextButton(
                         onClick = {
                             try {
                                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599"))
@@ -7419,23 +7424,23 @@ fun SettingsScreen(
                             } catch (e: Exception) {}
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.25f)),
-                        contentPadding = PaddingValues(14.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = com.example.ui.theme.FintechBlue.copy(alpha = 0.1f)
+                        )
                     ) {
-                        Icon(Icons.Rounded.Campaign, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.Campaign,
+                            contentDescription = null,
+                            tint = com.example.ui.theme.FintechBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (language == AppLanguage.BN) 
-                                "নতুন আপডেট পেতে সরাসরি আমাদের সাথে হোয়াটসঅ্যাপে যোগাযোগ করতে এখানে চাপুন" 
-                                else "Tap here to contact us directly on WhatsApp to get new updates",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 16.sp,
-                            modifier = Modifier.weight(1f)
+                            text = if (language == AppLanguage.BN) "হোয়াটসঅ্যাপে যোগাযোগ করুন" else "Contact on WhatsApp",
+                            color = com.example.ui.theme.FintechBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
