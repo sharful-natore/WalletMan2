@@ -390,6 +390,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    private suspend fun restoreFullBackup(backup: FinanceBackup) {
+        repository.restoreBackupData(backup)
+        if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
+            saveProfile(getApplication(),
+                name = backup.profileName.ifBlank { _profileName.value },
+                email = backup.profileEmail.ifBlank { _profileEmail.value },
+                photoUri = backup.profilePhotoUri ?: _profilePhotoUri.value,
+                phone = backup.profilePhone.ifBlank { _profilePhone.value },
+                social = backup.profileSocial.ifBlank { _profileSocial.value },
+                address = backup.profileAddress.ifBlank { _profileAddress.value }
+            )
+        }
+        com.example.widget.updateAllWidgets(getApplication())
+    }
+
     private fun saveImageToInternalStorage(context: Context, uriString: String): String? {
         return try {
             if (!uriString.startsWith("content://")) return uriString
@@ -780,7 +795,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                         val decryptedJson = BackupEncryptionHelper.decrypt(json)
                                         val backupData = backupAdapter.fromJson(decryptedJson)
                                         if (backupData != null) {
-                                            repository.restoreBackupData(backupData)
+                                            restoreFullBackup(backupData)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             try {
                                                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -873,7 +888,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                             remoteData.savingsGoals.size != currentLocalData.savingsGoals.size ||
                                             remoteData.savingsTransactions.size != currentLocalData.savingsTransactions.size ||
                                             backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(remoteData)) {
-                                            repository.restoreBackupData(remoteData)
+                                            restoreFullBackup(remoteData)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             try {
                                                 prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
@@ -925,7 +940,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     suspend fun getCurrentDatabaseBackup(): FinanceBackup {
-        return repository.getBackupData()
+        val backup = repository.getBackupData()
+        return backup.copy(
+            profileName = _profileName.value,
+            profileEmail = _profileEmail.value,
+            profilePhone = _profilePhone.value,
+            profileSocial = _profileSocial.value,
+            profileAddress = _profileAddress.value,
+            profilePhotoUri = _profilePhotoUri.value
+        )
     }
 
     fun calculateBackupStats(backup: FinanceBackup): BackupStats {
@@ -986,7 +1009,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
                 val backupData = backupAdapter.fromJson(decryptedJson)
                 if (backupData != null) {
-                    repository.restoreBackupData(backupData)
+                    restoreFullBackup(backupData)
                     com.example.widget.updateAllWidgets(getApplication())
                     val isBn = _language.value == AppLanguage.BN
                     val msg = if (isBn) "ব্যাকআপ ফাইল থেকে আপনার ডাটা সফলভাবে রিস্টোর করা হয়েছে!" else "Your data has been successfully restored from the backup file!"
@@ -1040,7 +1063,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
                 val backupData = backupAdapter.fromJson(decryptedJson)
                 if (backupData != null) {
-                    repository.restoreBackupData(backupData)
+                    restoreFullBackup(backupData)
                     com.example.widget.updateAllWidgets(getApplication())
                     val isBn = _language.value == AppLanguage.BN
                     val msg = if (isBn) "ব্যাকআপ ডাটা সফলভাবে রিস্টোর করা হয়েছে!" else "Backup data successfully restored!"
@@ -1185,9 +1208,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _isGoogleSignedIn.value = true
                 
                 // Update profile states as well so they match the Google account immediately
-                _profileName.value = account.displayName ?: "Google User"
-                _profileEmail.value = email
-                _profilePhotoUri.value = account.photoUrl?.toString()
+                saveProfile(getApplication(),
+                    name = account.displayName ?: "Google User",
+                    email = email,
+                    photoUri = account.photoUrl?.toString(),
+                    phone = _profilePhone.value,
+                    social = _profileSocial.value,
+                    address = _profileAddress.value
+                )
                 
                 // Check if Firestore has data before starting automatic sync
                 val db = getFirestore(context)
@@ -1449,7 +1477,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
                     val backupData = backupAdapter.fromJson(decryptedJson)
                     if (backupData != null) {
-                       repository.restoreBackupData(backupData)
+                       restoreFullBackup(backupData)
                        com.example.widget.updateAllWidgets(getApplication())
                        _driveStatusMessage.value = "Restore successfully completed!"
                        onSuccess()
@@ -1527,7 +1555,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     onSuccess = {
                         // After successful backup, restore from cloud
                         viewModelScope.launch {
-                            repository.restoreBackupData(dataToRestore)
+                            restoreFullBackup(dataToRestore)
                             com.example.widget.updateAllWidgets(context)
                             val email = _googleEmail.value
                             if (email != null) {
@@ -1546,7 +1574,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         // If backup fails, we should probably warn or still proceed depending on risk
                         // For now let's just proceed to restore as requested
                         viewModelScope.launch {
-                            repository.restoreBackupData(dataToRestore)
+                            restoreFullBackup(dataToRestore)
                             com.example.widget.updateAllWidgets(context)
                             startRealtimeSync()
                             dismissCloudDataFoundDialog()
@@ -1555,7 +1583,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     }
                 )
             } else {
-                repository.restoreBackupData(dataToRestore)
+                restoreFullBackup(dataToRestore)
                 com.example.widget.updateAllWidgets(context)
                 val email = _googleEmail.value
                 if (email != null) {
@@ -1676,7 +1704,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun clearAllDataLocal(onComplete: () -> Unit) {
         viewModelScope.launch {
             try {
-                repository.restoreBackupData(FinanceBackup(emptyList(), emptyList(), emptyList(), emptyList()))
+                restoreFullBackup(FinanceBackup(emptyList(), emptyList(), emptyList(), emptyList()))
                 com.example.widget.updateAllWidgets(getApplication())
                 onComplete()
             } catch (e: Exception) {

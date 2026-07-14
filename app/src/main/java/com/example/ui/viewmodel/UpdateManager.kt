@@ -15,7 +15,8 @@ data class UpdateInfo(
     val isUpdateAvailable: Boolean = false,
     val isForceUpdate: Boolean = false,
     val updateUrl: String = "",
-    val latestVersion: String = ""
+    val latestVersion: String = "",
+    val updateDetails: String = ""
 )
 
 class UpdateManager {
@@ -45,6 +46,7 @@ class UpdateManager {
                 val isForceUpdate = remoteConfig.getBoolean("is_force_update")
                 val latestVersionCode = remoteConfig.getDouble("latest_version_code")
                 val updateUrl = remoteConfig.getString("update_url")
+                val updateDetails = remoteConfig.getString("Update_Details")
                 
                 val currentVersionCode = getAppVersionCode(context)
                 val currentVersionName = getAppVersionName(context)
@@ -55,6 +57,7 @@ class UpdateManager {
                     isUpdateAvailable = isAvailable,
                     isForceUpdate = isForceUpdate,
                     updateUrl = updateUrl,
+                    updateDetails = updateDetails,
                     latestVersion = latestVersionCode.toString()
                 )
                 onComplete?.invoke(isAvailable)

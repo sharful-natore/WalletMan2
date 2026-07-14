@@ -58,7 +58,13 @@ data class FinanceBackup(
     val savingsGoals: List<SavingsGoal>,
     val savingsTransactions: List<SavingsTransaction> = emptyList(),
     val comment: String? = "",
-    val createdAt: Long? = null
+    val createdAt: Long? = null,
+    val profileName: String = "",
+    val profileEmail: String = "",
+    val profilePhone: String = "",
+    val profileSocial: String = "",
+    val profileAddress: String = "",
+    val profilePhotoUri: String? = null
 )
 
 @JsonClass(generateAdapter = true)

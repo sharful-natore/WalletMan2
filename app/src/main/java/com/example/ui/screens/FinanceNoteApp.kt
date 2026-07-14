@@ -610,8 +610,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
     
-    val profileName = rawProfileName ?: (if (isGoogleSignedIn) googleName else null) ?: ""
-    val profileEmail = rawProfileEmail ?: (if (isGoogleSignedIn) googleEmail else null) ?: ""
+    val profileName = rawProfileName.ifBlank { (if (isGoogleSignedIn) googleName else null) ?: "" }
+    val profileEmail = rawProfileEmail.ifBlank { (if (isGoogleSignedIn) googleEmail else null) ?: "" }
     val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     val context = LocalContext.current
@@ -666,7 +666,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         context = context,
                         account = account,
                         onSuccess = {
-                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", isSuccess = true, type = "SUCCESS")
                             viewModel.triggerCustomNotification(
                                 if (language == AppLanguage.BN) "আপনার গুগল অ্যাকাউন্ট সফলভাবে সিস্টেমের সাথে কানেক্ট করা হয়েছে।" else "Your Google account has been successfully connected with the system.",
                                 isSuccess = true,
@@ -674,16 +674,16 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             )
                         },
                         onError = { err ->
-                            Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                            viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", isSuccess = false, type = "ERROR")
                         }
                     )
                 }
             } else {
-                Toast.makeText(context, if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে।" else "Sign-in failed.", Toast.LENGTH_SHORT).show()
+                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে।" else "Sign-in failed.", isSuccess = false, type = "ERROR")
             }
         } catch (e: Exception) {
             val errMsg = e.localizedMessage ?: "Unknown error"
-            Toast.makeText(context, "${if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে: " else "Sign-in failed: "}$errMsg", Toast.LENGTH_LONG).show()
+            viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে: " else "Sign-in failed: "}$errMsg", isSuccess = false, type = "ERROR")
         }
     }
 
@@ -1111,22 +1111,17 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
             },
             bottomBar = {
+                val bottomBarGradient = Brush.linearGradient(
+                    colors = GradientsList[0].map { it.copy(alpha = 0.85f) }
+                )
+                
+                val glassBorderColor = if (isDarkTheme) {
+                    Color.White.copy(alpha = 0.15f)
+                } else {
+                    Color.Black.copy(alpha = 0.08f)
+                }
                 val density = LocalDensity.current
                 val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                
-                // Frosted Glass colors and gradient (Theme-aware)
-                val glassBaseColor = if (isDarkTheme) Color(0xFF0B0D14) else Color(0xFFF8FAFC)
-                val glassAccentColor = Color(0xFF6F7BF7) // Sleek brand violet
-                
-                // Vertical gradient of transparency: 0% at the top edge, fading to a frosted semi-transparent theme background at the bottom.
-                val bottomBarGradient = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.0f to Color.Transparent,
-                        0.2f to glassBaseColor.copy(alpha = 0.35f),
-                        0.5f to glassBaseColor.copy(alpha = 0.75f),
-                        1.0f to glassBaseColor.copy(alpha = 0.94f)
-                    )
-                )
                 
                 Box(
                     modifier = Modifier
@@ -1142,9 +1137,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         iconSize: androidx.compose.ui.unit.Dp = 24.dp
                     ) {
                         val isSelected = activeTab == tab
-                        val iconColor = if (isDarkTheme) Color.White else Color(0xFF1E293B)
-                        val iconTint = if (isSelected) iconColor else iconColor.copy(alpha = 0.6f)
-                        
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -1160,21 +1152,21 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(if (isSelected) (if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color(0xFF1E293B).copy(alpha = 0.12f)) else Color.Transparent)
+                                    .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
                                     .padding(horizontal = 16.dp, vertical = 6.dp)
                              ) {
                                 if (icon is ImageVector) {
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
-                                        tint = iconTint,
+                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
                                         modifier = Modifier.size(iconSize)
                                     )
                                 } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
                                     Icon(
                                         painter = icon,
                                         contentDescription = null,
-                                        tint = iconTint,
+                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.65f),
                                         modifier = Modifier.size(iconSize)
                                     )
                                 }
@@ -1182,58 +1174,20 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         }
                     }
 
-                    // 1. Clipped and styled navigation bar background with Notch Cut shape and Frosted Glass effect
+                    // 1. Clipped and styled navigation bar background with Notch Cut shape
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 0.dp) // Removed 16dp space to avoid "fixed card" look
                             .height(52.dp + navBarPadding)
                             .clip(NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp))
+                            .background(bottomBarGradient)
+                            .border(
+                                width = 1.dp,
+                                color = glassBorderColor,
+                                shape = NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp)
+                            )
                     ) {
-                        // Blurred Glass Background layer (creates soft frosted glassmorphism look)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(bottomBarGradient)
-                                .graphicsLayer {
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                        renderEffect = android.graphics.RenderEffect.createBlurEffect(
-                                            25f, 25f, android.graphics.Shader.TileMode.CLAMP
-                                        ).asComposeRenderEffect()
-                                    }
-                                }
-                        )
-                        
-                        // Subtle brand color glass refraction glow
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Transparent,
-                                            glassAccentColor.copy(alpha = if (isDarkTheme) 0.08f else 0.04f)
-                                        )
-                                    )
-                                )
-                        )
-                        
-                        // High-contrast refraction border (glass edge)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .border(
-                                    width = 1.2.dp,
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            if (isDarkTheme) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.55f),
-                                            Color.Transparent
-                                        )
-                                    ),
-                                    shape = NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp)
-                                )
-                        )
-                        
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1547,7 +1501,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
                 // Dynamic Overlays & Dialogs
                 if (showAddTransactionDialog || transactionToEdit != null) {
-                    AddTransactionDialog(
+                    AddTransactionDialog(viewModel = viewModel, 
                         language = language,
                         persons = persons,
                         isDark = isDarkTheme,
@@ -1579,7 +1533,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
 
                 if (showAddPersonDialog) {
-                    AddPersonDialog(
+                    AddPersonDialog(viewModel = viewModel, 
                         initialPerson = editingPerson,
                         language = language,
                         isDark = isDarkTheme,
@@ -1600,7 +1554,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 }
 
                 if (showAddSavingsGoalDialog || goalToEdit != null) {
-                    AddSavingsGoalDialog(
+                    AddSavingsGoalDialog(viewModel = viewModel, 
                         language = language,
                         isDark = isDarkTheme,
                         initialGoal = goalToEdit,
@@ -1630,7 +1584,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     val goalId = savingsTxToEdit?.goalId ?: showSavingsContributionDialog?.id ?: 0
                     val goal = savingsGoals.find { it.id == goalId } ?: showSavingsContributionDialog
                     if (goal != null) {
-                        SavingsContributionDialog(
+                        SavingsContributionDialog(viewModel = viewModel, 
                             language = language,
                             savingsGoal = goal,
                             isDark = isDarkTheme,
@@ -1792,11 +1746,11 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 customFileName = finalFileName,
                                 comment = comment,
                                 onSuccess = {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", isSuccess = true, type = "SUCCESS")
                                     viewModel.listGoogleDriveFiles(context)
                                 },
                                 onError = { err ->
-                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "ব্যাকআপ ব্যর্থ হয়েছে: " else "Backup failed: "}$err", Toast.LENGTH_LONG).show()
+                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ব্যাকআপ ব্যর্থ হয়েছে: " else "Backup failed: "}$err", isSuccess = false, type = "ERROR")
                                 }
                             )
                         },
@@ -1813,7 +1767,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         viewModel = viewModel,
                         onDismiss = { showRestoreListDialog = false },
                         onRestoreSuccess = {
-                            Toast.makeText(context, if (language == AppLanguage.BN) "ড্রাইভ থেকে রিস্টোর সফল হয়েছে!" else "Drive Restore successful!", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ড্রাইভ থেকে রিস্টোর সফল হয়েছে!" else "Drive Restore successful!", isSuccess = true, type = "SUCCESS")
                             showRestoreListDialog = false
                         },
                         onDelete = { fileId ->
@@ -1821,10 +1775,10 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 context = context,
                                 fileId = fileId,
                                 onSuccess = {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "ফাইলটি সফলভাবে ডিলিট করা হয়েছে!" else "File deleted successfully!", Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ফাইলটি সফলভাবে ডিলিট করা হয়েছে!" else "File deleted successfully!", isSuccess = true, type = "SUCCESS")
                                 },
                                 onError = { err ->
-                                    Toast.makeText(context, "${if (language == AppLanguage.BN) "ডিলিট ব্যর্থ হয়েছে: " else "Delete failed: "}$err", Toast.LENGTH_LONG).show()
+                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ডিলিট ব্যর্থ হয়েছে: " else "Delete failed: "}$err", isSuccess = false, type = "ERROR")
                                 }
                             )
                         },
@@ -1879,7 +1833,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Icon(
                         imageVector = Icons.Rounded.Sync,
                         contentDescription = null,
-                        tint = if (isDarkTheme) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                        tint = Color(0xFF38BDF8),
                         modifier = Modifier.size(28.dp)
                     )
                     Text(
@@ -2032,6 +1986,22 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
                             )
                         }
+                        
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+                        
+                        Text(
+                            text = if (hasUnsavedChanges) {
+                                if (language == AppLanguage.BN) "লোকাল ডেটা: ${transactions.size} টি লেনদেন, ${persons.size} জন ব্যক্তি" 
+                                else "Local Data: ${transactions.size} tx, ${persons.size} persons"
+                            } else {
+                                if (language == AppLanguage.BN) "সিঙ্কড ডেটা: ${transactions.size} টি লেনদেন, ${persons.size} জন ব্যক্তি" 
+                                else "Synced Data: ${transactions.size} tx, ${persons.size} persons"
+                            },
+                            fontSize = 12.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = if (isDarkTheme) Color.Gray else Color.DarkGray,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
 
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
 
@@ -2053,14 +2023,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                     Button(
                         onClick = {
                             if (!isNetworkAvailable) {
-                                Toast.makeText(context, if (language == AppLanguage.BN) "ইন্টারনেট কানেকশন নেই! অনুগ্রহ করে কানেকশন চালু করুন।" else "No internet connection! Please check your network.", Toast.LENGTH_LONG).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ইন্টারনেট কানেকশন নেই! অনুগ্রহ করে কানেকশন চালু করুন।" else "No internet connection! Please check your network.", isSuccess = false, type = "ERROR")
                             } else {
                                 viewModel.uploadToFirestore(
                                     onComplete = {
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সফলভাবে সম্পন্ন হয়েছে!" else "Cloud sync completed successfully!", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সফলভাবে সম্পন্ন হয়েছে!" else "Cloud sync completed successfully!", isSuccess = true, type = "SUCCESS")
                                     },
                                     onError = { err ->
-                                        Toast.makeText(context, "${if (language == AppLanguage.BN) "সিঙ্ক ব্যর্থ হয়েছে: " else "Sync failed: "}$err", Toast.LENGTH_LONG).show()
+                                        viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "সিঙ্ক ব্যর্থ হয়েছে: " else "Sync failed: "}$err", isSuccess = false, type = "ERROR")
                                     }
                                 )
                             }
@@ -2181,7 +2151,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             val userInputToClear = cloudRestoreUserInput
                             cloudRestoreUserInput = ""
                             viewModel.confirmCloudSync(context, backupLocalFirst = true) {
-                                Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর সফল হয়েছে!" else "Backup & Restore successful!", Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর সফল হয়েছে!" else "Backup & Restore successful!", isSuccess = true, type = "SUCCESS")
                             }
                         },
                         enabled = isCloudRestoreCaptchaCorrect,
@@ -2198,7 +2168,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             val userInputToClear = cloudRestoreUserInput
                             cloudRestoreUserInput = ""
                             viewModel.confirmCloudSync(context, backupLocalFirst = false) {
-                                Toast.makeText(context, if (language == AppLanguage.BN) "রিস্টোর সফল হয়েছে!" else "Restore successful!", Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "রিস্টোর সফল হয়েছে!" else "Restore successful!", isSuccess = true, type = "SUCCESS")
                             }
                         },
                         enabled = isCloudRestoreCaptchaCorrect,
@@ -2266,6 +2236,22 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         else "A new version of the app (${updateInfo.latestVersion}) is available. Please update to get the latest features and security improvements.",
                         fontSize = 14.sp
                     )
+                    
+                    if (updateInfo.updateDetails.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "নতুন কী আছে (Changelog):" else "What's New (Changelog):",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = if (isDarkTheme) Color.LightGray else Color.DarkGray
+                        )
+                        Text(
+                            text = updateInfo.updateDetails,
+                            fontSize = 13.sp,
+                            color = if (isDarkTheme) Color.White else Color.Black
+                        )
+                    }
+                    
                     if (updateInfo.isForceUpdate) {
                         Text(
                             text = if (language == AppLanguage.BN) "এটি একটি আবশ্যক আপডেট। চালিয়ে যেতে আপডেট করুন।" else "This is a required update. Please update to continue.",
@@ -2326,7 +2312,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                     context = context,
                                     account = act,
                                     onSuccess = {
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", isSuccess = true, type = "SUCCESS")
                                         viewModel.triggerCustomNotification(
                                             if (language == AppLanguage.BN) "আপনার নতুন গুগল অ্যাকাউন্টটি সফলভাবে সিঙ্ক করা হয়েছে।" else "Your new Google account has been successfully synced.",
                                             isSuccess = true,
@@ -2334,7 +2320,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                         )
                                     },
                                     onError = { err ->
-                                        Toast.makeText(context, "${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", Toast.LENGTH_LONG).show()
+                                        viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", isSuccess = false, type = "ERROR")
                                     }
                                 )
                             }
@@ -4322,7 +4308,7 @@ fun SavingsGoalCardItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddTransactionDialog(
+fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
     language: AppLanguage,
     persons: List<Person>,
     isDark: Boolean,
@@ -4730,9 +4716,9 @@ fun AddTransactionDialog(
                             onClick = {
                                 val amount = amountInputState.toDoubleOrNull() ?: 0.0
                                 if (amount <= 0) {
-                                    Toast.makeText(context, Translation.get("error_empty_amount", language), Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(Translation.get("error_empty_amount", language), isSuccess = false, type = "ERROR")
                                 } else if (isPersonRequired && selectedPersonId == null) {
-                                    Toast.makeText(context, Translation.get("error_empty_person", language), Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(Translation.get("error_empty_person", language), isSuccess = false, type = "ERROR")
                                 } else {
                                     onConfirm(amount, type, category, note, selectedPersonId, customTimestamp ?: System.currentTimeMillis())
                                 }
@@ -4752,7 +4738,7 @@ fun AddTransactionDialog(
         }
 
 @Composable
-fun AddPersonDialog(
+fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
     initialPerson: Person? = null,
     language: AppLanguage,
     isDark: Boolean,
@@ -4904,9 +4890,9 @@ fun AddPersonDialog(
                         onClick = {
                             val trimmedPhone = phone.trim()
                             if (name.trim().isEmpty()) {
-                                Toast.makeText(context, Translation.get("enter_name", language), Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(Translation.get("enter_name", language), isSuccess = true, type = "INFO")
                             } else if (trimmedPhone.isNotEmpty() && (!trimmedPhone.all { it.isDigit() } || trimmedPhone.length != 11)) {
-                                Toast.makeText(context, if (language == AppLanguage.BN) "সঠিক ১১ ডিজিটের ফোন নম্বর লিখুন" else "Enter a valid 11-digit phone number", Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "সঠিক ১১ ডিজিটের ফোন নম্বর লিখুন" else "Enter a valid 11-digit phone number", isSuccess = true, type = "INFO")
                             } else {
                                 onConfirm(name.trim().uppercase(), trimmedPhone, address.trim(), photoUri.trim())
                             }
@@ -4926,7 +4912,7 @@ fun AddPersonDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddSavingsGoalDialog(
+fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
     language: AppLanguage,
     isDark: Boolean,
     initialGoal: SavingsGoal? = null,
@@ -5161,7 +5147,7 @@ fun AddSavingsGoalDialog(
                                 if (title.trim().isNotEmpty()) {
                                     onConfirm(title.trim().uppercase(), target, finalSector, colorIndex, cardholderName.trim().uppercase())
                                 } else {
-                                    Toast.makeText(context, Translation.get("error_empty_title", language), Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(Translation.get("error_empty_title", language), isSuccess = false, type = "ERROR")
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -5179,7 +5165,7 @@ fun AddSavingsGoalDialog(
         }
 
 @Composable
-fun SavingsContributionDialog(
+fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
     language: AppLanguage,
     savingsGoal: SavingsGoal,
     isDark: Boolean,
@@ -5296,12 +5282,12 @@ fun SavingsContributionDialog(
                             val amount = amountStr.toDoubleOrNull() ?: 0.0
                             if (amount > 0) {
                                 if (isWithdraw && amount > savingsGoal.savedAmount) {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "পর্যাপ্ত ব্যালেন্স নেই!" else "Insufficient balance!", Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "পর্যাপ্ত ব্যালেন্স নেই!" else "Insufficient balance!", isSuccess = false, type = "ERROR")
                                 } else {
                                     onConfirm(amount, isWithdraw, noteStr)
                                 }
                             } else {
-                                Toast.makeText(context, Translation.get("error_empty_amount", language), Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(Translation.get("error_empty_amount", language), isSuccess = false, type = "ERROR")
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -6301,8 +6287,8 @@ fun SettingsScreen(
     val lastGDriveBackupTime by viewModel.lastGDriveBackupTime.collectAsState()
     val autoBackupIntervalDays by viewModel.autoBackupIntervalDays.collectAsState()
 
-    val profileName = rawProfileName ?: (if (isGoogleSignedIn) googleName else null) ?: ""
-    val profileEmail = rawProfileEmail ?: (if (isGoogleSignedIn) googleEmail else null) ?: ""
+    val profileName = rawProfileName.ifBlank { (if (isGoogleSignedIn) googleName else null) ?: "" }
+    val profileEmail = rawProfileEmail.ifBlank { (if (isGoogleSignedIn) googleEmail else null) ?: "" }
     val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     var showLogoutConfirm by remember { mutableStateOf(false) }
@@ -6313,12 +6299,12 @@ fun SettingsScreen(
         if (uri != null) {
             context.contentResolver.openOutputStream(uri)?.let { outputStream ->
                 viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, {
-                    Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
+                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", isSuccess = true, type = "SUCCESS")
                     pendingLocalBackupComment = ""
                     if (isSignoutBackupActive) {
                         viewModel.performAutoBackupAndSignOut(context, profileName) {
                             isSignoutBackupActive = false
-                            Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", isSuccess = true, type = "SUCCESS")
                             viewModel.triggerCustomNotification(
                                 if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
                                 isSuccess = true,
@@ -6327,7 +6313,7 @@ fun SettingsScreen(
                         }
                     }
                 }, { error ->
-                    Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                    viewModel.triggerCustomNotification("Error: $error", isSuccess = false, type = "ERROR")
                     if (isSignoutBackupActive) {
                         viewModel.performAutoBackupAndSignOut(context, profileName) {
                             isSignoutBackupActive = false
@@ -6344,7 +6330,7 @@ fun SettingsScreen(
             if (isSignoutBackupActive) {
                 viewModel.performAutoBackupAndSignOut(context, profileName) {
                     isSignoutBackupActive = false
-                    Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", isSuccess = true, type = "SUCCESS")
                     viewModel.triggerCustomNotification(
                         if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
                         isSuccess = true,
@@ -6547,17 +6533,9 @@ fun SettingsScreen(
                                     socialInput,
                                     addressInput
                                 )
-                                Toast.makeText(
-                                    context,
-                                    if (language == AppLanguage.BN) "তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!" else "Information saved successfully!",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!" else "Information saved successfully!", isSuccess = true, type = "SUCCESS")
                             } else {
-                                Toast.makeText(
-                                    context,
-                                    if (language == AppLanguage.BN) "দয়া করে নাম লিখুন" else "Please enter your name",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "দয়া করে নাম লিখুন" else "Please enter your name", isSuccess = true, type = "INFO")
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -6673,10 +6651,10 @@ fun SettingsScreen(
                             pendingLocalRestoreFileName = getFileNameFromUri(context, uri) ?: "Local Backup"
                             pendingLocalRestoreJson = jsonContent
                         } else {
-                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
                         }
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                        viewModel.triggerCustomNotification("Error: ${e.localizedMessage}", isSuccess = false, type = "ERROR")
                     }
                 }
             }
@@ -6728,10 +6706,10 @@ fun SettingsScreen(
                             pendingLocalRestoreStats = null
                             pendingLocalRestoreData = null
                             pendingLocalRestoreJson = ""
-                            Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!" else "Backup successfully restored!", isSuccess = true, type = "SUCCESS")
                         },
                         onError = { error ->
-                            Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                            viewModel.triggerCustomNotification("Error: $error", isSuccess = false, type = "ERROR")
                         }
                     )
                 },
@@ -6828,13 +6806,13 @@ fun SettingsScreen(
                                             pendingLocalRestoreJson = jsonContent
                                             showPasteArea = false
                                         } else {
-                                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
                                         }
                                     } else {
-                                        Toast.makeText(context, if (language == AppLanguage.BN) "কোনো সেভ করা ব্যাকআপ পাওয়া যায়নি!" else "No saved backup found!", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "কোনো সেভ করা ব্যাকআপ পাওয়া যায়নি!" else "No saved backup found!", isSuccess = true, type = "INFO")
                                     }
                                 } catch (e: Exception) {
-                                    Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification("Error: ${e.localizedMessage}", isSuccess = false, type = "ERROR")
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -6873,10 +6851,10 @@ fun SettingsScreen(
                                             pasteJsonInput = ""
                                             showPasteArea = false
                                         } else {
-                                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
                                         }
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification("Error: ${e.localizedMessage}", isSuccess = false, type = "ERROR")
                                     }
                                 }
                             },
@@ -7105,7 +7083,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (!isGoogleSignedIn) {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভে লগইন করুন!" else "Please sign in to Google Drive first!", Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভে লগইন করুন!" else "Please sign in to Google Drive first!", isSuccess = true, type = "INFO")
                                 } else {
                                     onBackupClick()
                                 }
@@ -7121,7 +7099,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (!isGoogleSignedIn) {
-                                    Toast.makeText(context, if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভে লগইন করুন!" else "Please sign in to Google Drive first!", Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভে লগইন করুন!" else "Please sign in to Google Drive first!", isSuccess = true, type = "INFO")
                                 } else {
                                     onRestoreClick()
                                 }
@@ -7146,7 +7124,7 @@ fun SettingsScreen(
             if (isGranted) {
                 viewModel.toggleNotification(context)
             } else {
-                Toast.makeText(context, if (language == AppLanguage.BN) "নটিফিকেশন পারমিশন প্রয়োজন" else "Notification permission required", Toast.LENGTH_SHORT).show()
+                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "নটিফিকেশন পারমিশন প্রয়োজন" else "Notification permission required", isSuccess = true, type = "INFO")
             }
         }
 
@@ -7455,7 +7433,7 @@ fun SettingsScreen(
                                 if (isAvailable) {
                                     onShowUpdatePopup()
                                 } else {
-                                    android.widget.Toast.makeText(context, if (language == AppLanguage.BN) "আপনি সর্বশেষ সংস্করণ ব্যবহার করছেন" else "You are using the latest version", android.widget.Toast.LENGTH_SHORT).show()
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "আপনি সর্বশেষ সংস্করণ ব্যবহার করছেন" else "You are using the latest version", isSuccess = true, type = "INFO")
                                 }
                             }
                         }
@@ -7707,8 +7685,9 @@ fun SettingsScreen(
             },
             confirmButton = {
                 Column(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.End
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Button(
                         colors = ButtonDefaults.buttonColors(
@@ -7723,7 +7702,8 @@ fun SettingsScreen(
                             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
                             pendingLocalBackupComment = "Backup before logout"
                             createDocumentLauncher.launch("financenote_backup_before_logout_$timestamp.json")
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth(0.95f)
                     ) {
                         Text(if (language == AppLanguage.BN) "ব্যাকআপ নিন ও লগআউট করুন" else "Backup & Logout", color = Color.White)
                     }
@@ -7737,27 +7717,30 @@ fun SettingsScreen(
                         onClick = {
                             showLogoutConfirm = false
                             logoutUserInput = ""
-                            Toast.makeText(context, if (language == AppLanguage.BN) "অটো ব্যাকআপ তৈরি হচ্ছে এবং লগআউট করা হচ্ছে..." else "Creating auto backup and logging out...", Toast.LENGTH_LONG).show()
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "অটো ব্যাকআপ তৈরি হচ্ছে এবং লগআউট করা হচ্ছে..." else "Creating auto backup and logging out...", isSuccess = true, type = "INFO")
                             viewModel.performAutoBackupAndSignOut(context, profileName) {
-                                Toast.makeText(context, if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ থেকে লগআউট সফল হয়েছে!" else "Logged out from Google Drive successfully!", isSuccess = true, type = "SUCCESS")
                                 viewModel.triggerCustomNotification(
                                     if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট থেকে সফলভাবে লগআউট করা হয়েছে।" else "Successfully logged out of your account.",
                                     isSuccess = true,
                                     type = "SIGN_OUT"
                                 )
                             }
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth(0.95f)
                     ) {
                         Text(if (language == AppLanguage.BN) "শুধু লগআউট (অটো ব্যাকআপ সহ)" else "Just Logout (with Auto Backup)", color = Color.White)
                     }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { 
-                    showLogoutConfirm = false 
-                    logoutUserInput = ""
-                }) {
-                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                    
+                    TextButton(
+                        onClick = { 
+                            showLogoutConfirm = false 
+                            logoutUserInput = ""
+                        },
+                        modifier = Modifier.fillMaxWidth(0.95f)
+                    ) {
+                        Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                    }
                 }
             }
         )
@@ -7941,7 +7924,7 @@ fun SettingsScreen(
                                         }
                                         context.startActivity(android.content.Intent.createChooser(intent, "Send Email"))
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification("Error: ${e.localizedMessage}", isSuccess = false, type = "ERROR")
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
@@ -7967,7 +7950,7 @@ fun SettingsScreen(
                                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/8801768899599?text=${android.net.Uri.encode(message)}"))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                        viewModel.triggerCustomNotification("Error: ${e.localizedMessage}", isSuccess = false, type = "ERROR")
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
@@ -7994,7 +7977,7 @@ fun SettingsScreen(
                             onClick = {
                                 com.example.data.ErrorLogger.clearErrorLogs(context)
                                 currentLogsText = ""
-                                Toast.makeText(context, if (language == AppLanguage.BN) "এরর লগসমূহ মুছে ফেলা হয়েছে!" else "Error logs cleared!", Toast.LENGTH_SHORT).show()
+                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "এরর লগসমূহ মুছে ফেলা হয়েছে!" else "Error logs cleared!", isSuccess = false, type = "ERROR")
                             }
                         ) {
                             Text(text = if (language == AppLanguage.BN) "লগ মুছুন" else "Clear Logs", color = FintechRed, fontWeight = FontWeight.Bold)
@@ -10023,9 +10006,9 @@ fun GoogleDriveRestoreListDialog(
         uri?.let {
             context.contentResolver.openOutputStream(it)?.let { outputStream ->
                 viewModel.exportBackupToUri(context, outputStream, "Auto Backup before Cloud Restore", {
-                    Toast.makeText(context, if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", Toast.LENGTH_SHORT).show()
+                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", isSuccess = true, type = "SUCCESS")
                 }, { error ->
-                    Toast.makeText(context, "Error: $error", Toast.LENGTH_SHORT).show()
+                    viewModel.triggerCustomNotification("Error: $error", isSuccess = false, type = "ERROR")
                 })
             }
         }
@@ -10182,12 +10165,12 @@ fun GoogleDriveRestoreListDialog(
                                                             pendingCloudRestoreFileName = file.name
                                                             pendingCloudRestoreJson = jsonContent
                                                         } else {
-                                                            Toast.makeText(context, if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", Toast.LENGTH_SHORT).show()
+                                                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
                                                         }
                                                     },
                                                     onError = { err ->
                                                         isDownloadingByFileId = null
-                                                        Toast.makeText(context, "Download failed: $err", Toast.LENGTH_SHORT).show()
+                                                        viewModel.triggerCustomNotification("Download failed: $err", isSuccess = false, type = "ERROR")
                                                     }
                                                 )
                                             },
@@ -10249,7 +10232,7 @@ fun GoogleDriveRestoreListDialog(
                         onRestoreSuccess()
                     },
                     onError = { err ->
-                        Toast.makeText(context, "Error: $err", Toast.LENGTH_SHORT).show()
+                        viewModel.triggerCustomNotification("Error: $err", isSuccess = false, type = "ERROR")
                     }
                 )
             },
