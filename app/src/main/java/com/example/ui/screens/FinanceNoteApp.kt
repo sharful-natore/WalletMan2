@@ -1351,6 +1351,7 @@ fun FinanceNoteApp(
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
     var personToMove by remember { mutableStateOf<Person?>(null) }
+    var personsToMoveIds by remember { mutableStateOf<List<Int>?>(null) }
     var goalToMove by remember { mutableStateOf<SavingsGoal?>(null) }
     var personActionChoice by remember { mutableStateOf<Person?>(null) }
     var goalActionChoice by remember { mutableStateOf<SavingsGoal?>(null) }
@@ -1471,6 +1472,21 @@ fun FinanceNoteApp(
                 personToMove = null
             },
             onDismiss = { personToMove = null }
+        )
+    }
+
+    if (personsToMoveIds != null) {
+        MoveToWorkspaceDialog(
+            itemName = if (language == AppLanguage.BN) "${personsToMoveIds!!.size} জন ব্যক্তি" else "${personsToMoveIds!!.size} persons",
+            language = language,
+            isDark = isDarkTheme,
+            workspaces = workspaceStatsList,
+            currentWorkspaceId = currentWorkspace.id,
+            onConfirm = { targetWorkspaceId ->
+                viewModel.movePersons(personsToMoveIds!!, targetWorkspaceId)
+                personsToMoveIds = null
+            },
+            onDismiss = { personsToMoveIds = null }
         )
     }
 
@@ -2102,6 +2118,8 @@ fun FinanceNoteApp(
                                             onPersonClick = { selectedPersonDetail = it },
                                             onDeletePerson = { showDeletePersonConfirmId = it },
                                             onMovePerson = { personActionChoice = it },
+                                            onDeletePersons = { viewModel.deletePersons(it) },
+                                            onMovePersons = { personsToMoveIds = it },
                                             filter = debtFilter,
                                             onFilterChange = { debtFilter = it },
                                             timeFilter = timeFilter,
@@ -4523,6 +4541,8 @@ fun DebtsScreen(
     onPersonClick: (PersonDebt) -> Unit,
     onDeletePerson: (Int) -> Unit,
     onMovePerson: (Person) -> Unit = {},
+    onDeletePersons: (List<Int>) -> Unit = {},
+    onMovePersons: (List<Int>) -> Unit = {},
     filter: String = "ALL",
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
@@ -4532,6 +4552,9 @@ fun DebtsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("NAME_ASC") }
     var showSortMenu by remember { mutableStateOf(false) }
+
+    var selectedPersonIds by remember { mutableStateOf(setOf<Int>()) }
+    val isSelectionMode = selectedPersonIds.isNotEmpty()
 
     val filteredDebts = remember(personDebts, filter) {
         when (filter) {
@@ -4571,6 +4594,52 @@ fun DebtsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Multi-Select Header Toolbar
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FintechBlue)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selectedPersonIds = emptySet() }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                        Text(
+                            text = "${selectedPersonIds.size} ${if (language == AppLanguage.BN) "জন নির্বাচিত" else "selected"}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    
+                    TextButton(
+                        onClick = {
+                            if (selectedPersonIds.size == sortedDebts.size) {
+                                selectedPersonIds = emptySet()
+                            } else {
+                                selectedPersonIds = sortedDebts.map { it.person.id }.toSet()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (selectedPersonIds.size == sortedDebts.size) 
+                                (if (language == AppLanguage.BN) "সব আনমার্ক" else "Deselect All")
+                            else (if (language == AppLanguage.BN) "সব মার্ক" else "Select All"),
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
             // Modern Search Bar
             OutlinedTextField(
                 value = searchQuery,
@@ -4811,16 +4880,32 @@ fun DebtsScreen(
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     items(sortedDebts) { item ->
+                        val isSelected = selectedPersonIds.contains(item.person.id)
                         Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                             PersonDebtRowItem(
                                 item = item,
                                 language = language,
                                 isDark = isDark,
-                                onClick = onPersonClick,
+                                onClick = { debt ->
+                                    if (isSelectionMode) {
+                                        selectedPersonIds = if (isSelected) {
+                                            selectedPersonIds - debt.person.id
+                                        } else {
+                                            selectedPersonIds + debt.person.id
+                                        }
+                                    } else {
+                                        onPersonClick(debt)
+                                    }
+                                },
                                 onDelete = onDeletePerson,
                                 onMove = onMovePerson,
                                 isHighlighted = (item.person.id == highlightedPersonId),
-                                searchQuery = searchQuery
+                                searchQuery = searchQuery,
+                                isSelected = isSelected,
+                                isSelectionMode = isSelectionMode,
+                                onLongClick = {
+                                    selectedPersonIds = selectedPersonIds + item.person.id
+                                }
                             )
                         }
                     }
@@ -4831,17 +4916,85 @@ fun DebtsScreen(
             }
         }
 
+        // Bulk Actions Floating Buttons
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isSelectionMode,
+            enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 110.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (isDark) Color(0xFF1E222F) else Color.White)
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Bulk Move Button
+                Button(
+                    onClick = { 
+                        onMovePersons(selectedPersonIds.toList())
+                        selectedPersonIds = emptySet()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Icon(Icons.Rounded.SwapHoriz, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (language == AppLanguage.BN) "মুভ" else "Move", color = FintechBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                
+                // Bulk Delete Button
+                var showBulkDeleteConfirm by remember { mutableStateOf(false) }
+                Button(
+                    onClick = { showBulkDeleteConfirm = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null, tint = FintechRed, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (language == AppLanguage.BN) "ডিলিট" else "Delete", color = FintechRed, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                
+                if (showBulkDeleteConfirm) {
+                    DeleteVerificationDialog(
+                        language = language,
+                        onConfirm = {
+                            onDeletePersons(selectedPersonIds.toList())
+                            selectedPersonIds = emptySet()
+                            showBulkDeleteConfirm = false
+                        },
+                        onDismiss = { showBulkDeleteConfirm = false }
+                    )
+                }
+            }
+        }
+
         // Floating Action Button to Add Person
-        FloatingActionButton(
-            onClick = onAddPersonClick,
-            containerColor = FintechBlue,
-            shape = RoundedCornerShape(16.dp),
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !isSelectionMode,
+            enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 110.dp, end = 16.dp)
-                .testTag("fab_add_person")
         ) {
-            Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
+            FloatingActionButton(
+                onClick = onAddPersonClick,
+                containerColor = FintechBlue,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.testTag("fab_add_person")
+            ) {
+                Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
+            }
         }
     }
 }
@@ -5016,7 +5169,10 @@ fun PersonDebtRowItem(
     onDelete: (Int) -> Unit,
     onMove: (Person) -> Unit = {},
     isHighlighted: Boolean = false,
-    searchQuery: String = ""
+    searchQuery: String = "",
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onLongClick: () -> Unit = {}
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -5031,16 +5187,33 @@ fun PersonDebtRowItem(
         )
     }
 
-    val bgColor by androidx.compose.animation.animateColorAsState(if (isHighlighted) (if (isDark) Color(0xFF453A1E) else Color(0xFFFEF3C7)) else (if (isDark) Color(0xFF141724) else Color.White))
+    val bgColor by androidx.compose.animation.animateColorAsState(
+        if (isSelected) {
+            if (isDark) FintechBlue.copy(alpha = 0.2f) else FintechBlue.copy(alpha = 0.1f)
+        } else if (isHighlighted) {
+            if (isDark) Color(0xFF453A1E) else Color(0xFFFEF3C7)
+        } else {
+            if (isDark) Color(0xFF141724) else Color.White
+        }
+    )
+    
+    val borderColor = if (isSelected) {
+        FintechBlue
+    } else if (isDark) {
+        Color.White.copy(alpha = 0.05f)
+    } else {
+        Color.Black.copy(alpha = 0.05f)
+    }
+
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { onClick(item) },
-                onLongClick = { onMove(item.person) }
+                onLongClick = onLongClick
             )
             .testTag("person_item_${item.person.id}")
     ) {
@@ -5052,6 +5225,22 @@ fun PersonDebtRowItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                if (isSelectionMode) {
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.2f))
+                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.5f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+
                 // Avatar representation
                 Box(
                     modifier = Modifier

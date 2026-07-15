@@ -500,6 +500,45 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun deletePersons(ids: List<Int>) {
+        viewModelScope.launch {
+            ids.forEach { id ->
+                val p = repository.getPersonById(id)
+                if (p != null) {
+                    val txs = repository.getTransactionsByPersonList(id)
+                    val pWithTx = com.example.data.PersonWithTransactions(p, txs)
+                    repository.insertTrashItem(com.example.data.TrashItem(
+                        originalId = id, 
+                        itemType = "PERSON_WITH_TXS", 
+                        itemJson = personWithTxAdapter.toJson(pWithTx)
+                    ))
+                }
+                repository.deletePerson(id)
+            }
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "নির্বাচিত ব্যক্তিদের মুছে ফেলা হয়েছে" else "Selected persons deleted", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    fun movePersons(personIds: List<Int>, targetWorkspaceId: String) {
+        viewModelScope.launch {
+            personIds.forEach { personId ->
+                val person = repository.getPersonById(personId)
+                if (person != null) {
+                    repository.updatePerson(person.copy(workspaceId = targetWorkspaceId))
+                    val transactions = repository.getTransactionsByPersonList(personId)
+                    transactions.forEach { tx ->
+                        repository.updateTransaction(tx.copy(workspaceId = targetWorkspaceId))
+                    }
+                }
+            }
+            onLocalDatabaseChanged()
+            com.example.widget.updateAllWidgets(getApplication())
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "নির্বাচিত ব্যক্তিদের অন্য ওয়ার্কস্পেসে মুভ করা হয়েছে" else "Selected persons moved to another workspace", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
     fun deletePerson(id: Int) {
         viewModelScope.launch {
             val p = repository.getPersonById(id)
