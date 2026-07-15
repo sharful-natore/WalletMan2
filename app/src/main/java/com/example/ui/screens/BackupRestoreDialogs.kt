@@ -19,6 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import com.example.ui.AppLanguage
 import com.example.ui.viewmodel.BackupStats
 
@@ -30,12 +34,39 @@ fun BackupStatsDialog(
     isDark: Boolean,
     isRestoreMode: Boolean = false,
     initialFileName: String = "",
+    workspaces: List<com.example.data.WorkspaceStats> = emptyList(),
     onBackupRequested: (() -> Unit)? = null,
-    onConfirm: (fileName: String, comment: String) -> Unit,
+    onConfirm: (fileName: String, comment: String, selectedWorkspaceIds: List<String>?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var fileName by remember { mutableStateOf(initialFileName) }
     var comment by remember { mutableStateOf(stats.comment) }
+    
+    val availableWorkspaces = remember(isRestoreMode, workspaces, stats.workspaces) {
+        if (isRestoreMode) {
+            stats.workspaces
+        } else {
+            workspaces.map { it.workspace }
+        }
+    }
+    
+    val allWorkspaceIds = remember(availableWorkspaces) { availableWorkspaces.map { it.id }.toSet() }
+    var selectedWorkspaces by remember { mutableStateOf(allWorkspaceIds) }
+    
+    val timestampStr = remember { java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date()) }
+    
+    LaunchedEffect(selectedWorkspaces) {
+        if (!isRestoreMode && allWorkspaceIds.isNotEmpty()) {
+            val prefix = if (selectedWorkspaces.size == allWorkspaceIds.size) {
+                "All"
+            } else {
+                availableWorkspaces.filter { selectedWorkspaces.contains(it.id) }
+                          .joinToString("_") { it.name.replace(" ", "") }
+            }
+            val sanitizedPrefix = if (prefix.isEmpty()) "Empty" else prefix.take(20)
+            fileName = "financenote_${sanitizedPrefix}_$timestampStr.json"
+        }
+    }
 
     // Captcha variables (only used if isRestoreMode is true)
     val captchaCode = remember {
@@ -213,6 +244,62 @@ fun BackupStatsDialog(
                 }
 
                 // File Name Field
+                if (availableWorkspaces.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = if (isRestoreMode) {
+                                if (language == AppLanguage.BN) "কোন ওয়ার্কস্পেস রিস্টোর করবেন?" else "Which Workspaces to Restore?"
+                            } else {
+                                if (language == AppLanguage.BN) "কোন ওয়ার্কস্পেস ব্যাকআপ করবেন?" else "Which Workspaces to Backup?"
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                        
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 160.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(availableWorkspaces) { ws ->
+                                val isSelected = selectedWorkspaces.contains(ws.id)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.1f) else Color.Transparent)
+                                        .clickable {
+                                            selectedWorkspaces = if (isSelected) {
+                                                selectedWorkspaces - ws.id
+                                            } else {
+                                                selectedWorkspaces + ws.id
+                                            }
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = null,
+                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    val isNewWorkspace = isRestoreMode && workspaces.none { it.workspace.id == ws.id }
+                                    Text(
+                                        text = if (isNewWorkspace) {
+                                            "${ws.name} ${if (language == AppLanguage.BN) "(নতুন)" else "(New)"}"
+                                        } else {
+                                            ws.name
+                                        },
+                                        fontSize = 13.sp,
+                                        color = if (isDark) Color.White else Color.Black
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (isRestoreMode) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -352,7 +439,7 @@ fun BackupStatsDialog(
                     }
 
                     Button(
-                        onClick = { onConfirm(fileName, comment) },
+                        onClick = { onConfirm(fileName, comment, selectedWorkspaces.toList()) },
                         enabled = isCorrect,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(

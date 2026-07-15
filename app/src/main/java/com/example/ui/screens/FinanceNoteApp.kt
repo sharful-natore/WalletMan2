@@ -717,7 +717,9 @@ fun WorkspaceManagementDialog(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(56.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = FintechBlue,
@@ -733,9 +735,17 @@ fun WorkspaceManagementDialog(
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(56.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "তৈরি" else "Create",
                             fontSize = 13.sp,
@@ -2194,6 +2204,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
 
                 if (showBackupConfirm && cloudBackupStats != null) {
+                    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
                     val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
                     val defaultName = "finance_note_backup_$timestamp.json"
 
@@ -2204,12 +2215,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                         isDark = isDarkTheme,
                         isRestoreMode = false,
                         initialFileName = defaultName,
-                        onConfirm = { finalFileName, comment ->
+                        workspaces = workspaceStatsList,
+                        onConfirm = { finalFileName, comment, selectedWorkspaceIds ->
                             showBackupConfirm = false
                             viewModel.backupToGoogleDrive(
                                 context = context,
                                 customFileName = finalFileName,
                                 comment = comment,
+                                workspaceIds = selectedWorkspaceIds,
                                 onSuccess = {
                                     viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", isSuccess = true, type = "SUCCESS")
                                     viewModel.listGoogleDriveFiles(context)
@@ -3041,18 +3054,19 @@ fun DashboardScreen(
                                 modifier = Modifier.weight(1f, fill = false)
                             )
                             
-                            IconButton(
-                                onClick = { showWorkspaceDialog = true },
+                            Box(
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(24.dp)
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.15f))
+                                    .clickable { showWorkspaceDialog = true },
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowDropDown,
                                     contentDescription = "Switch Workspace",
                                     tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -3119,104 +3133,6 @@ fun DashboardScreen(
                                 )
                             }
                         }
-                    }
-                }
-            }
-        }
-
-        // Workspace Switcher Section
-        item {
-            if (showWorkspaceDialog && viewModel != null) {
-                WorkspaceManagementDialog(
-                    language = language,
-                    isDark = isDark,
-                    workspaces = workspaceStatsList,
-                    currentWorkspace = currentWorkspace,
-                    onSelect = { workspaceId ->
-                        viewModel.selectWorkspace(workspaceId)
-                        showWorkspaceDialog = false
-                    },
-                    onCreate = { name ->
-                        viewModel.createWorkspace(name)
-                    },
-                    onEdit = { id, name ->
-                        viewModel.editWorkspace(id, name)
-                    },
-                    onDelete = { workspaceId ->
-                        viewModel.deleteWorkspace(workspaceId)
-                    },
-                    onDismiss = { showWorkspaceDialog = false }
-                )
-            }
-
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF141724) else Color.White
-                ),
-                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showWorkspaceDialog = true }
-                    .testTag("workspace_selector_card")
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(FintechBlue.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.SpaceDashboard,
-                                contentDescription = null,
-                                tint = FintechBlue,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = if (language == AppLanguage.BN) "অ্যাক্টিভ ওয়ার্কস্পেস" else "Active Workspace",
-                                fontSize = 11.sp,
-                                color = Color.Gray,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = currentWorkspace.name,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color(0xFF1E222F)
-                            )
-                        }
-                    }
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = if (language == AppLanguage.BN) "পরিবর্তন করুন" else "Change",
-                            fontSize = 12.sp,
-                            color = FintechBlue,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            imageVector = Icons.Rounded.ChevronRight,
-                            contentDescription = null,
-                            tint = FintechBlue,
-                            modifier = Modifier.size(16.dp)
-                        )
                     }
                 }
             }
@@ -4272,7 +4188,7 @@ fun TransactionsScreen(
                         Icon(
                             imageVector = Icons.Rounded.Sort,
                             contentDescription = "Sort",
-                            tint = if (isDark) Color.White else Color.Black
+                            tint = FintechBlue
                         )
                     }
 
@@ -4637,7 +4553,7 @@ fun DebtsScreen(
                         Icon(
                             imageVector = Icons.Rounded.Sort,
                             contentDescription = "Sort",
-                            tint = if (isDark) Color.White else Color.Black
+                            tint = FintechBlue
                         )
                     }
 
@@ -5179,7 +5095,7 @@ fun SavingsScreen(
                         Icon(
                             imageVector = Icons.Rounded.Sort,
                             contentDescription = "Sort",
-                            tint = if (isDark) Color.White else Color.Black
+                            tint = FintechBlue
                         )
                     }
 
@@ -7683,13 +7599,15 @@ fun SettingsScreen(
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var isSignoutBackupActive by remember { mutableStateOf(false) }
     var pendingLocalBackupComment by remember { mutableStateOf("") }
+    var pendingLocalWorkspaceIds by remember { mutableStateOf<List<String>?>(null) }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
             context.contentResolver.openOutputStream(uri)?.let { outputStream ->
-                viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, null, {
+                viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, pendingLocalWorkspaceIds, {
                     viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", isSuccess = true, type = "SUCCESS")
                     pendingLocalBackupComment = ""
+                    pendingLocalWorkspaceIds = null
                     if (isSignoutBackupActive) {
                         viewModel.performAutoBackupAndSignOut(context, profileName) {
                             isSignoutBackupActive = false
@@ -7749,6 +7667,33 @@ fun SettingsScreen(
     val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
     val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
 
+    val currentWorkspace by viewModel.currentWorkspace.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত"))
+    var showWorkspaceDialog by remember { mutableStateOf(false) }
+    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
+
+    if (showWorkspaceDialog) {
+        WorkspaceManagementDialog(
+            language = language,
+            isDark = isDark,
+            workspaces = workspaceStatsList,
+            currentWorkspace = currentWorkspace,
+            onSelect = { workspaceId ->
+                viewModel.selectWorkspace(workspaceId)
+                showWorkspaceDialog = false
+            },
+            onCreate = { name ->
+                viewModel.createWorkspace(name)
+            },
+            onEdit = { id, name ->
+                viewModel.editWorkspace(id, name)
+            },
+            onDelete = { workspaceId ->
+                viewModel.deleteWorkspace(workspaceId)
+            },
+            onDismiss = { showWorkspaceDialog = false }
+        )
+    }
+
     LaunchedEffect(Unit) {
         viewModel.initGoogleDrive(context)
     }
@@ -7781,6 +7726,78 @@ fun SettingsScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // --- 0. WORKSPACE SELECTOR CARD ---
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDark) Color(0xFF141724) else Color.White
+            ),
+            border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showWorkspaceDialog = true }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(FintechBlue.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SpaceDashboard,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "অ্যাক্টিভ ওয়ার্কস্পেস" else "Active Workspace",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = currentWorkspace.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF1E222F)
+                        )
+                    }
+                }
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "পরিবর্তন করুন" else "Change",
+                        fontSize = 12.sp,
+                        color = FintechBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
         // --- 1. USER PROFILE EDIT CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
@@ -8071,9 +8088,15 @@ fun SettingsScreen(
                 isDark = isDark,
                 isRestoreMode = false,
                 initialFileName = defaultName,
-                onConfirm = { finalFileName, comment ->
+                workspaces = workspaceStatsList,
+                onConfirm = { finalFileName, comment, selectedWorkspaceIds ->
                     showLocalBackupStatsDialog = false
                     pendingLocalBackupComment = comment
+                    // We also need to pass workspaceIds for local backup
+                    // Create a flow that captures selectedWorkspaceIds and then uses it in the export
+                    // But exportBackupToUri is called later in createDocumentLauncher.
+                    // Wait, createDocumentLauncher is an ActivityResultLauncher!
+                    pendingLocalWorkspaceIds = selectedWorkspaceIds
                     createDocumentLauncher.launch(finalFileName)
                 },
                 onDismiss = { showLocalBackupStatsDialog = false }
@@ -8088,6 +8111,7 @@ fun SettingsScreen(
                 isDark = isDark,
                 isRestoreMode = true,
                 initialFileName = pendingLocalRestoreFileName,
+                workspaces = workspaceStatsList,
                 onBackupRequested = {
                     localCoroutineScope.launch {
                         val backupData = viewModel.getCurrentDatabaseBackup()
@@ -8096,11 +8120,12 @@ fun SettingsScreen(
                         showLocalBackupStatsDialog = true
                     }
                 },
-                onConfirm = { _, _ ->
+                onConfirm = { _, _, selectedWorkspaceIds ->
                     viewModel.importBackup(
                         context = context,
                         json = pendingLocalRestoreJson,
                         fromLocalFile = false,
+                        workspaceIds = selectedWorkspaceIds,
                         onSuccess = {
                             pendingLocalRestoreStats = null
                             pendingLocalRestoreData = null
@@ -11423,6 +11448,7 @@ fun GoogleDriveRestoreListDialog(
     var pendingCloudRestoreStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
     var pendingCloudRestoreFileName by remember { mutableStateOf("") }
     var pendingCloudRestoreJson by remember { mutableStateOf("") }
+    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
     var isDownloadingByFileId by remember { mutableStateOf<String?>(null) }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -11641,15 +11667,17 @@ fun GoogleDriveRestoreListDialog(
             isDark = isDark,
             isRestoreMode = true,
             initialFileName = pendingCloudRestoreFileName,
+            workspaces = workspaceStatsList,
             onBackupRequested = {
                 val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
                 createDocumentLauncher.launch("financenote_backup_before_restore_$timestamp.json")
             },
-            onConfirm = { _, _ ->
+            onConfirm = { _, _, selectedWorkspaceIds ->
                 viewModel.importBackup(
                     context = context,
                     json = pendingCloudRestoreJson,
                     fromLocalFile = false,
+                    workspaceIds = selectedWorkspaceIds,
                     onSuccess = {
                         pendingCloudRestoreStats = null
                         pendingCloudRestoreData = null

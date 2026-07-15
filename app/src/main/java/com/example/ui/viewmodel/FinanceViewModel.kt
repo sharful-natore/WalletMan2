@@ -68,7 +68,8 @@ data class BackupStats(
     val totalPersons: Int,
     val totalCards: Int,
     val comment: String = "",
-    val createdAt: Long? = null
+    val createdAt: Long? = null,
+    val workspaces: List<com.example.data.Workspace> = emptyList()
 )
 
 class FinanceViewModel(private val repository: FinanceRepository, application: Application) : AndroidViewModel(application) {
@@ -152,6 +153,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
                 "SAVINGS_TRANSACTION" -> {
                     savingsTransactionAdapter.fromJson(item.itemJson)?.let { repository.insertSavingsTransaction(it) }
+                }
+                "WORKSPACE" -> {
+                    backupAdapter.fromJson(item.itemJson)?.let { backup ->
+                        backup.workspaces.forEach { repository.insertWorkspace(it) }
+                        backup.persons.forEach { repository.insertPerson(it) }
+                        backup.transactions.forEach { repository.insertTransaction(it) }
+                        backup.savingsGoals.forEach { repository.insertSavingsGoal(it) }
+                        backup.savingsTransactions.forEach { repository.insertSavingsTransaction(it) }
+                    }
                 }
                 "GDRIVE_BACKUP" -> {
                     deletedBackupAdapter.fromJson(item.itemJson)?.let { deletedBackup ->
@@ -288,6 +298,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun deleteWorkspace(workspaceId: String) {
         viewModelScope.launch {
+            val workspace = repository.allWorkspaces.first().find { it.id == workspaceId }
+            if (workspace != null) {
+                val fullBackup = repository.getBackupData()
+                
+                val backupData = com.example.data.FinanceBackup(
+                    persons = fullBackup.persons.filter { it.workspaceId == workspaceId },
+                    transactions = fullBackup.transactions.filter { it.workspaceId == workspaceId },
+                    savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId == workspaceId },
+                    savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId == workspaceId },
+                    workspaces = listOf(workspace)
+                )
+                
+                val json = backupAdapter.toJson(backupData)
+                repository.insertTrashItem(com.example.data.TrashItem(
+                    originalId = workspaceId.hashCode(),
+                    itemType = "WORKSPACE",
+                    itemJson = json,
+                    deletedAt = System.currentTimeMillis()
+                ))
+            }
+            
             repository.deleteWorkspace(workspaceId)
             if (_currentWorkspaceId.value == workspaceId) {
                 selectWorkspace("default")
@@ -1259,7 +1290,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             totalPersons = personsList.size,
             totalCards = savingsGoals.size,
             comment = backup.comment ?: "",
-            createdAt = backup.createdAt
+            createdAt = backup.createdAt,
+            workspaces = backup.workspaces
         )
     }
 
@@ -1349,7 +1381,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    fun importBackup(context: Context, json: String?, fromLocalFile: Boolean, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun importBackup(context: Context, json: String?, fromLocalFile: Boolean, workspaceIds: List<String>? = null, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
@@ -1367,7 +1399,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val decryptedJson = BackupEncryptionHelper.decrypt(jsonContent)
                 val backupData = backupAdapter.fromJson(decryptedJson)
                 if (backupData != null) {
-                    restoreFullBackup(backupData)
+                    if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                        restoreSelectiveBackup(backupData, workspaceIds)
+                    } else {
+                        restoreFullBackup(backupData)
+                    }
                     com.example.widget.updateAllWidgets(getApplication())
                     val isBn = _language.value == AppLanguage.BN
                     val msg = if (isBn) "ব্যাকআপ ডাটা সফলভাবে রিস্টোর করা হয়েছে!" else "Backup data successfully restored!"
@@ -1512,6 +1548,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             val txText = if (language == com.example.ui.AppLanguage.BN) "লেনদেন" else "transactions"
                             val gText = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য" else "goals"
                             "$txText: $txCount, $pText: $pCount, $gText: $gCount"
+                        }
+                    } ?: item.itemJson
+                }
+                "WORKSPACE" -> {
+                    backupAdapter.fromJson(item.itemJson)?.let { backup ->
+                        val ws = backup.workspaces.firstOrNull()
+                        if (language == com.example.ui.AppLanguage.BN) {
+                            "ওয়ার্কস্পেস: ${ws?.name ?: "অজানা"}"
+                        } else {
+                            "Workspace: ${ws?.name ?: "Unknown"}"
                         }
                     } ?: item.itemJson
                 }
