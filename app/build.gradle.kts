@@ -70,8 +70,8 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      isMinifyEnabled = false
-      isShrinkResources = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
@@ -116,15 +116,15 @@ dependencies {
   // implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
-  implementation(libs.androidx.compose.ui.text.google.fonts)
+  // implementation(libs.androidx.compose.ui.text.google.fonts)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.core.ktx)
-  implementation(libs.androidx.core)
+  // implementation(libs.androidx.core)
   // implementation(libs.androidx.datastore.preferences)
-  implementation(libs.androidx.lifecycle.runtime.compose)
+  // implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
   // implementation(libs.androidx.navigation.compose)
@@ -132,7 +132,7 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.ucrop)
-  implementation(libs.converter.moshi)
+  // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
   // implementation(libs.firebase.appcheck.recaptcha)
   implementation(libs.kotlinx.coroutines.android)
@@ -142,7 +142,7 @@ dependencies {
   implementation(libs.okhttp)
   implementation(libs.play.services.auth)
   // implementation(libs.play.services.location)
-  implementation(libs.retrofit)
+  // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.test.core)
   testImplementation(libs.androidx.junit)
