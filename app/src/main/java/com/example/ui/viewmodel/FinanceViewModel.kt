@@ -274,6 +274,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         prefs.edit().putString("active_workspace_id", workspaceId).apply()
         loadProfile(getApplication())
         onLocalDatabaseChanged()
+        com.example.widget.updateAllWidgets(getApplication())
         
         if (oldId != workspaceId) {
             triggerCustomNotification(

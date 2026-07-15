@@ -21,8 +21,8 @@
         <!-- Avatar Container -->
         <RelativeLayout
             android:id="@+id/avatar_container"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:layout_alignParentLeft="true"
             android:layout_centerVertical="true"
             android:background="@drawable/widget_avatar_bg"
@@ -33,7 +33,7 @@
                 android:id="@+id/iv_avatar"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
+                android:scaleType="fitCenter"
                 android:visibility="gone" />
             
             <ImageView

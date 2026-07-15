@@ -325,7 +325,9 @@ private fun getCircledBitmap(bitmap: android.graphics.Bitmap): android.graphics.
     
     paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
     // Draw cropped original bitmap
-    val srcRect = android.graphics.Rect(0, 0, bitmap.width, bitmap.height)
+    val x = (bitmap.width - size) / 2
+    val y = (bitmap.height - size) / 2
+    val srcRect = android.graphics.Rect(x, y, x + size, y + size)
     val dstRect = android.graphics.RectF(borderSize.toFloat(), borderSize.toFloat(), (size - borderSize).toFloat(), (size - borderSize).toFloat())
     canvas.drawBitmap(bitmap, srcRect, dstRect, paint)
     

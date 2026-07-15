@@ -445,6 +445,7 @@ fun WorkspaceManagementDialog(
     onDismiss: () -> Unit
 ) {
     var newWorkspaceName by remember { mutableStateOf("") }
+    var showAddInput by remember { mutableStateOf(false) }
     var editingWorkspaceId by remember { mutableStateOf<String?>(null) }
     var editWorkspaceName by remember { mutableStateOf("") }
     var deletingWorkspaceId by remember { mutableStateOf<String?>(null) }
@@ -580,15 +581,19 @@ fun WorkspaceManagementDialog(
                                         }
                                         if (ws.workspace.id != "default") {
                                             Text(
-                                                text = if (language == AppLanguage.BN) "কাস্টম ওয়ার্কস্পেস" else "Custom Workspace",
+                                                text = ws.workspace.name,
                                                 fontSize = 11.sp,
-                                                color = subtitleColor
+                                                color = subtitleColor,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         } else {
                                             Text(
                                                 text = if (language == AppLanguage.BN) "মূল ওয়ার্কস্পেস" else "Main Workspace",
                                                 fontSize = 11.sp,
-                                                color = subtitleColor
+                                                color = subtitleColor,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
@@ -727,51 +732,67 @@ fun WorkspaceManagementDialog(
                 )
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
-                        value = newWorkspaceName,
-                        onValueChange = { newWorkspaceName = it },
-                        placeholder = {
-                            Text(
-                                text = if (language == AppLanguage.BN) "যেমন: দোকানের হিসাব" else "e.g., Shop Accounts",
-                                fontSize = 13.sp
+                    AnimatedVisibility(
+                        visible = showAddInput,
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        OutlinedTextField(
+                            value = newWorkspaceName,
+                            onValueChange = { newWorkspaceName = it },
+                            placeholder = {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "যেমন: দোকানের হিসাব" else "e.g., Shop Accounts",
+                                    fontSize = 13.sp
+                                )
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxHeight(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FintechBlue,
+                                unfocusedBorderColor = borderCol
                             )
-                        },
-                        singleLine = true,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = FintechBlue,
-                            unfocusedBorderColor = borderCol
                         )
-                    )
+                    }
                     
                     Button(
                         onClick = {
-                            if (newWorkspaceName.isNotBlank()) {
-                                onCreate(newWorkspaceName.trim())
-                                newWorkspaceName = ""
+                            if (!showAddInput) {
+                                showAddInput = true
+                            } else {
+                                if (newWorkspaceName.isNotBlank()) {
+                                    onCreate(newWorkspaceName.trim())
+                                    newWorkspaceName = ""
+                                    showAddInput = false
+                                } else {
+                                    showAddInput = false
+                                }
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.height(56.dp),
+                        modifier = if (showAddInput) Modifier.height(56.dp) else Modifier.fillMaxWidth().height(56.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
                         contentPadding = PaddingValues(horizontal = 16.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.Add,
+                            imageVector = if (showAddInput) Icons.Rounded.Check else Icons.Rounded.Add,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (language == AppLanguage.BN) "তৈরি" else "Create",
+                            text = if (!showAddInput) {
+                                (if (language == AppLanguage.BN) "নতুন ওয়ার্কস্পেস যোগ করুন" else "Add New Workspace")
+                            } else {
+                                (if (language == AppLanguage.BN) "যোগ করুন" else "Add")
+                            },
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -1688,7 +1709,7 @@ fun FinanceNoteApp(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.NightsStay,
+                                    imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.DarkMode,
                                     contentDescription = "Theme Toggle",
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp)
@@ -3121,7 +3142,7 @@ fun DashboardScreen(
                     var verticalDragAmount by remember { mutableStateOf(0f) }
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(42.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.2f))
                             .border(2.5.dp, Color.White, CircleShape)
@@ -3582,7 +3603,7 @@ fun DashboardScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(0.dp))
         }
 
         if (recentTransactions.isEmpty()) {
@@ -3626,7 +3647,7 @@ fun DashboardScreen(
                         color = Color.Gray,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 0.dp, bottom = 4.dp)
                     )
                 }
                 items(txs) { tx ->
@@ -6852,12 +6873,6 @@ fun SavingsGoalDetailOverlay(
                 ) {
                     IconButton(onClick = { onEditGoal(goal) }) {
                         Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
-                    }
-                    IconButton(onClick = { 
-                        onDismiss()
-                        onMoveGoal(goal)
-                    }) {
-                        Icon(Icons.Rounded.SwapHoriz, contentDescription = "Move", tint = Color(0xFF3B82F6))
                     }
                     IconButton(onClick = { showDeleteConfirm = true }) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
