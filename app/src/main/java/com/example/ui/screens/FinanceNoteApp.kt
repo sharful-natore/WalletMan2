@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.layout.*
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.input.*
@@ -1085,6 +1087,9 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
     
+    val currentWorkspace by viewModel.currentWorkspace.collectAsState()
+    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
+    
     val profileName = rawProfileName.ifBlank { (if (isGoogleSignedIn) googleName else null) ?: "" }
     val profileEmail = rawProfileEmail.ifBlank { (if (isGoogleSignedIn) googleEmail else null) ?: "" }
     val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
@@ -1289,6 +1294,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     var showDeletePersonConfirmId by remember { mutableStateOf<Int?>(null) }
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
+    var personToMove by remember { mutableStateOf<Person?>(null) }
+    var goalToMove by remember { mutableStateOf<SavingsGoal?>(null) }
 
     var showExitConfirm by remember { mutableStateOf(false) }
     var highlightedTxId by remember { mutableStateOf<Int?>(null) }
@@ -1394,6 +1401,36 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
             }
         }
     }
+    if (personToMove != null) {
+        MoveToWorkspaceDialog(
+            itemName = personToMove!!.name,
+            language = language,
+            isDark = isDarkTheme,
+            workspaces = workspaceStatsList,
+            currentWorkspaceId = currentWorkspace.id,
+            onConfirm = { targetWorkspaceId ->
+                viewModel.movePerson(personToMove!!.id, targetWorkspaceId)
+                personToMove = null
+            },
+            onDismiss = { personToMove = null }
+        )
+    }
+
+    if (goalToMove != null) {
+        MoveToWorkspaceDialog(
+            itemName = goalToMove!!.title,
+            language = language,
+            isDark = isDarkTheme,
+            workspaces = workspaceStatsList,
+            currentWorkspaceId = currentWorkspace.id,
+            onConfirm = { targetWorkspaceId ->
+                viewModel.moveSavingsGoal(goalToMove!!.id, targetWorkspaceId)
+                goalToMove = null
+            },
+            onDismiss = { goalToMove = null }
+        )
+    }
+
     if (showExitConfirm) {
         AlertDialog(
             onDismissRequest = { showExitConfirm = false },
@@ -1451,8 +1488,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     }
 
     var showWorkspaceDialog by remember { mutableStateOf(false) }
-    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
-    val currentWorkspace by viewModel.currentWorkspace.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত"))
 
     if (showWorkspaceDialog) {
         WorkspaceManagementDialog(
@@ -1975,6 +2010,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             onAddPersonClick = { showAddPersonDialog = true },
                                             onPersonClick = { selectedPersonDetail = it },
                                             onDeletePerson = { viewModel.deletePerson(it) },
+                                            onMovePerson = { personToMove = it },
                                             filter = debtFilter,
                                             onFilterChange = { debtFilter = it },
                                             timeFilter = timeFilter,
@@ -1993,6 +2029,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                 isWithdrawMode = isWithdraw
                                             },
                                             onEditGoal = { goalToEdit = it },
+                                            onMoveGoal = { goalToMove = it },
                                             highlightedGoalId = highlightedGoalId
                                         )
                                     }
@@ -2168,7 +2205,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                 isWithdrawMode = isWithdraw
                             },
                             onDeleteTx = { viewModel.deleteSavingsTransaction(it) },
-                            onEditTx = { savingsTxToEdit = it }
+                            onEditTx = { savingsTxToEdit = it },
+                            onMoveGoal = { goalToMove = it }
                         )
                     }
                 }
@@ -2232,7 +2270,6 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
 
 
                 if (showBackupConfirm && cloudBackupStats != null) {
-                    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
                     val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
                     val defaultName = "finance_note_backup_$timestamp.json"
 
@@ -3011,12 +3048,39 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Profile Avatar Circle with initials or photo
+                    var verticalDragAmount by remember { mutableStateOf(0f) }
                     Box(
                         modifier = Modifier
                             .size(52.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.2f))
-                            .border(2.5.dp, Color.White, CircleShape),
+                            .border(2.5.dp, Color.White, CircleShape)
+                            .pointerInput(workspaces) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        verticalDragAmount += dragAmount
+                                    },
+                                    onDragEnd = {
+                                        if (verticalDragAmount > 40) {
+                                            // Swipe Down: Next workspace
+                                            val currentIndex = workspaces.indexOfFirst { it.id == currentWorkspace.id }
+                                            if (currentIndex != -1 && workspaces.size > 1) {
+                                                val nextIndex = (currentIndex + 1) % workspaces.size
+                                                viewModel?.selectWorkspace(workspaces[nextIndex].id)
+                                            }
+                                        } else if (verticalDragAmount < -40) {
+                                            // Swipe Up: Previous workspace
+                                            val currentIndex = workspaces.indexOfFirst { it.id == currentWorkspace.id }
+                                            if (currentIndex != -1 && workspaces.size > 1) {
+                                                val prevIndex = (currentIndex - 1 + workspaces.size) % workspaces.size
+                                                viewModel?.selectWorkspace(workspaces[prevIndex].id)
+                                            }
+                                        }
+                                        verticalDragAmount = 0f
+                                    }
+                                )
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         if (profilePhotoUri != null) {
@@ -4365,6 +4429,7 @@ fun DebtsScreen(
     onAddPersonClick: () -> Unit,
     onPersonClick: (PersonDebt) -> Unit,
     onDeletePerson: (Int) -> Unit,
+    onMovePerson: (Person) -> Unit = {},
     filter: String = "ALL",
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
@@ -4660,6 +4725,7 @@ fun DebtsScreen(
                                 isDark = isDark,
                                 onClick = onPersonClick,
                                 onDelete = onDeletePerson,
+                                onMove = onMovePerson,
                                 isHighlighted = (item.person.id == highlightedPersonId),
                                 searchQuery = searchQuery
                             )
@@ -4855,6 +4921,7 @@ fun PersonDebtRowItem(
     isDark: Boolean,
     onClick: (PersonDebt) -> Unit,
     onDelete: (Int) -> Unit,
+    onMove: (Person) -> Unit = {},
     isHighlighted: Boolean = false,
     searchQuery: String = ""
 ) {
@@ -4880,7 +4947,7 @@ fun PersonDebtRowItem(
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { onClick(item) },
-                onLongClick = { showDeleteConfirm = true }
+                onLongClick = { onMove(item.person) }
             )
             .testTag("person_item_${item.person.id}")
     ) {
@@ -4993,6 +5060,7 @@ fun SavingsScreen(
     onGoalClick: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
+    onMoveGoal: (SavingsGoal) -> Unit = {},
     highlightedGoalId: Int? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -5208,6 +5276,7 @@ fun SavingsScreen(
                             onGoalClick = onGoalClick,
                             onContributeClick = onContributeClick,
                             onEditGoal = onEditGoal,
+                            onMove = onMoveGoal,
                             isHighlighted = (goal.id == highlightedGoalId),
                             searchQuery = searchQuery
                         )
@@ -5244,6 +5313,7 @@ fun SavingsGoalCardItem(
     onGoalClick: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
+    onMove: (SavingsGoal) -> Unit = {},
     isHighlighted: Boolean = false,
     maskBalance: Boolean = true,
     searchQuery: String = ""
@@ -5261,7 +5331,7 @@ fun SavingsGoalCardItem(
             )
             .combinedClickable(
                 onClick = { onGoalClick(goal) },
-                onLongClick = { onEditGoal(goal) }
+                onLongClick = { onMove(goal) }
             )
             .testTag("savings_item_${goal.id}")
     ) {
@@ -6645,7 +6715,8 @@ fun SavingsGoalDetailOverlay(
     onEditGoal: (SavingsGoal) -> Unit,
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onDeleteTx: (SavingsTransaction) -> Unit,
-    onEditTx: (SavingsTransaction) -> Unit
+    onEditTx: (SavingsTransaction) -> Unit,
+    onMoveGoal: (SavingsGoal) -> Unit = {}
 ) {
     val context = LocalContext.current
     val txList by transactionsFlow.collectAsState(initial = emptyList())
@@ -6704,6 +6775,12 @@ fun SavingsGoalDetailOverlay(
                 ) {
                     IconButton(onClick = { onEditGoal(goal) }) {
                         Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
+                    }
+                    IconButton(onClick = { 
+                        onDismiss()
+                        onMoveGoal(goal)
+                    }) {
+                        Icon(Icons.Rounded.SwapHoriz, contentDescription = "Move", tint = Color(0xFF3B82F6))
                     }
                     IconButton(onClick = { showDeleteConfirm = true }) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)

@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -891,6 +892,187 @@ fun TrashDialog(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MoveToWorkspaceDialog(
+    itemName: String,
+    language: AppLanguage,
+    isDark: Boolean,
+    workspaces: List<com.example.data.WorkspaceStats>,
+    currentWorkspaceId: String,
+    onConfirm: (targetWorkspaceId: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedWorkspaceId by remember { mutableStateOf<String?>(null) }
+    val availableWorkspaces = remember(workspaces, currentWorkspaceId) {
+        workspaces.filter { it.workspace.id != currentWorkspaceId }
+    }
+
+    // Captcha variables
+    val captchaCode = remember {
+        val chars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+        (1..4).map { chars.random() }.joinToString("")
+    }
+    var userInput by remember { mutableStateOf("") }
+    val isCorrect = userInput.trim().equals(captchaCode, ignoreCase = true)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.SwapHoriz,
+                        contentDescription = null,
+                        tint = Color(0xFF3B82F6),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "ওয়ার্কস্পেস পরিবর্তন করুন" else "Move to Workspace",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0))
+
+                Text(
+                    text = if (language == AppLanguage.BN) 
+                        "'$itemName' এবং এর সকল লেনদেন ডেটা অন্য ওয়ার্কস্পেসে মুভ করতে চান? নিচের ওয়ার্কস্পেসগুলো থেকে একটি নির্বাচন করুন।" 
+                        else "Do you want to move '$itemName' and all its transaction data to another workspace? Select one from below.",
+                    fontSize = 14.sp,
+                    color = if (isDark) Color.LightGray else Color(0xFF475569)
+                )
+
+                // Workspace list
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    availableWorkspaces.forEach { ws ->
+                        val isSelected = selectedWorkspaceId == ws.workspace.id
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.1f) else Color.Transparent)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) Color(0xFF3B82F6) else (if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable { selectedWorkspaceId = ws.workspace.id }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { selectedWorkspaceId = ws.workspace.id },
+                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF3B82F6))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = ws.workspace.name,
+                                color = if (isDark) Color.White else Color.Black,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                // Captcha Input Field
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (isDark) Color(0xFF282E47) else Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "নিশ্চিত করতে ক্যাপচা কোডটি টাইপ করুন" else "To confirm, type the captcha code",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = captchaCode,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 6.sp,
+                        color = Color(0xFF3B82F6),
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                    OutlinedTextField(
+                        value = userInput,
+                        onValueChange = { userInput = it },
+                        placeholder = { Text(if (language == AppLanguage.BN) "ক্যাপচা কোড" else "Captcha Code") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = if (isCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                            unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                    )
+                }
+
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                            color = if (isDark) Color.LightGray else Color(0xFF475569)
+                        )
+                    }
+
+                    Button(
+                        onClick = { selectedWorkspaceId?.let { onConfirm(it) } },
+                        enabled = isCorrect && selectedWorkspaceId != null,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF3B82F6),
+                            disabledContainerColor = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "মুভ করুন" else "Move Now",
+                            color = if (isCorrect && selectedWorkspaceId != null) Color.White else (if (isDark) Color.Gray else Color(0xFF94A3B8)),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

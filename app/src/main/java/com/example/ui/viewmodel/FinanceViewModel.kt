@@ -472,6 +472,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun movePerson(personId: Int, targetWorkspaceId: String) {
+        viewModelScope.launch {
+            val person = repository.getPersonById(personId)
+            if (person != null) {
+                repository.updatePerson(person.copy(workspaceId = targetWorkspaceId))
+                val transactions = repository.getTransactionsByPersonList(personId)
+                transactions.forEach { tx ->
+                    repository.updateTransaction(tx.copy(workspaceId = targetWorkspaceId))
+                }
+                onLocalDatabaseChanged()
+                com.example.widget.updateAllWidgets(getApplication())
+                triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি অন্য ওয়ার্কস্পেসে মুভ করা হয়েছে" else "Person moved to another workspace", isSuccess = true, type = "SUCCESS")
+            }
+        }
+    }
+
     fun deletePerson(id: Int) {
         viewModelScope.launch {
             val p = repository.getPersonById(id)
@@ -648,6 +664,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.insertSavingsGoal(goal)
             onLocalDatabaseChanged()
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লক্ষ্য আপডেট করা হয়েছে" else "Savings goal updated", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    fun moveSavingsGoal(goalId: Int, targetWorkspaceId: String) {
+        viewModelScope.launch {
+            val goal = repository.getSavingsGoalById(goalId)
+            if (goal != null) {
+                repository.insertSavingsGoal(goal.copy(workspaceId = targetWorkspaceId))
+                val transactions = repository.getSavingsTransactionsByGoalList(goalId)
+                transactions.forEach { tx ->
+                    repository.updateSavingsTransaction(tx.copy(workspaceId = targetWorkspaceId))
+                }
+                onLocalDatabaseChanged()
+                triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় কার্ড অন্য ওয়ার্কস্পেসে মুভ করা হয়েছে" else "Savings card moved to another workspace", isSuccess = true, type = "SUCCESS")
+            }
         }
     }
 
