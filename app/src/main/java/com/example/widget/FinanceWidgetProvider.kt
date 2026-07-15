@@ -19,6 +19,38 @@ class FinanceWidgetProvider : AppWidgetProvider() {
             updateAppWidget(context, appWidgetManager, appWidgetId)
         }
     }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action == "ACTION_WIDGET_SWITCH_WORKSPACE") {
+            val appWidgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+            if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val dao = AppDatabase.getDatabase(context).financeDao()
+                        val workspaces = dao.getAllWorkspacesList()
+                        if (workspaces.isNotEmpty()) {
+                            val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                            val currentWidgetWsId = prefs.getString("widget_workspace_$appWidgetId", null)
+                                ?: prefs.getString("active_workspace_id", "default")
+                                ?: "default"
+
+                            val currentIndex = workspaces.indexOfFirst { it.id == currentWidgetWsId }
+                            val nextIndex = if (currentIndex == -1) 0 else (currentIndex + 1) % workspaces.size
+                            val nextWorkspaceId = workspaces[nextIndex].id
+
+                            prefs.edit().putString("widget_workspace_$appWidgetId", nextWorkspaceId).apply()
+
+                            val appWidgetManager = AppWidgetManager.getInstance(context)
+                            updateAppWidget(context, appWidgetManager, appWidgetId)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+    }
 }
 
 fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
@@ -76,15 +108,33 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
     // Background logic to load data
+    val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+    val widgetWorkspaceId = prefs.getString("widget_workspace_$appWidgetId", null) 
+        ?: prefs.getString("active_workspace_id", "default") 
+        ?: "default"
+
+    val switchIntent = Intent(context, FinanceWidgetProvider::class.java).apply {
+        action = "ACTION_WIDGET_SWITCH_WORKSPACE"
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+    }
+    views.setOnClickPendingIntent(R.id.btn_widget_switch_workspace, PendingIntent.getBroadcast(
+        context, 
+        appWidgetId, 
+        switchIntent, 
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    ))
+
     CoroutineScope(Dispatchers.IO).launch {
         try {
             val dao = AppDatabase.getDatabase(context).financeDao()
-            val allTxs = dao.getAllTransactionsList()
+            
+            // Filter by active widgetWorkspaceId
+            val allTxs = dao.getAllTransactionsList().filter { it.workspaceId == widgetWorkspaceId }
             val income = allTxs.filter { it.type == "INCOME" }.sumOf { it.amount }
             val expense = allTxs.filter { it.type == "EXPENSE" }.sumOf { it.amount }
             val balance = income - expense
 
-            val persons = dao.getAllPersonsList()
+            val persons = dao.getAllPersonsList().filter { it.workspaceId == widgetWorkspaceId }
             var totalDena = 0.0
             var totalPaona = 0.0
             for (p in persons) {
@@ -98,13 +148,13 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 if (net < 0) totalDena += -net
             }
 
-            // Load user settings and profile details
-            val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            // Load user settings and profile details for the selected workspace
             val langStr = prefs.getString("app_language", "BN") ?: "BN"
             val isBn = langStr == "BN"
 
-            val rawName = prefs.getString("user_name", "Shariful Islam") ?: "Shariful Islam"
-            val rawEmail = prefs.getString("user_email", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
+            val keySuffix = if (widgetWorkspaceId == "default") "" else "_$widgetWorkspaceId"
+            val rawName = prefs.getString("user_name$keySuffix", "Shariful Islam") ?: "Shariful Islam"
+            val rawEmail = prefs.getString("user_email$keySuffix", "connect.shariful@gmail.com") ?: "connect.shariful@gmail.com"
 
             val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
             val isGoogleSignedIn = !gPrefs.getString("google_email", null).isNullOrEmpty()
@@ -118,10 +168,10 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             }
             views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
-            val profileName = if (isGoogleSignedIn) (googleName ?: rawName) else rawName
+            val profileName = if (isGoogleSignedIn && widgetWorkspaceId == "default") (googleName ?: rawName) else rawName
 
-            // Load profile photo if available
-            val photoUri = prefs.getString("user_photo", null) ?: gPrefs.getString("google_photo_url", null)
+            // Load profile photo if available for this workspace
+            val photoUri = prefs.getString("user_photo$keySuffix", null) ?: (if (widgetWorkspaceId == "default") gPrefs.getString("google_photo_url", null) else null)
             
             if (!photoUri.isNullOrEmpty()) {
                 try {
@@ -158,29 +208,34 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 showInitials(views, profileName)
             }
 
+            // Get workspace name
+            val workspacesList = dao.getAllWorkspacesList()
+            val workspaceName = workspacesList.find { it.id == widgetWorkspaceId }?.name ?: (if (isBn) "ব্যক্তিগত" else "Personal")
+
             val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-            val welcomeText = if (isBn) {
+            val welcomePrefix = if (isBn) {
                 when (hour) {
-                    in 5..11 -> "শুভ সকাল,"
-                    in 12..15 -> "শুভ দুপুর,"
-                    in 16..17 -> "শুভ বিকাল,"
-                    in 18..19 -> "শুভ সন্ধ্যা,"
-                    else -> "শুভ রাত্রি,"
+                    in 5..11 -> "শুভ সকাল"
+                    in 12..15 -> "শুভ দুপুর"
+                    in 16..17 -> "শুভ বিকাল"
+                    in 18..19 -> "শুভ সন্ধ্যা"
+                    else -> "শুভ রাত্রি"
                 }
             } else {
                 when (hour) {
-                    in 5..11 -> "Good morning,"
-                    in 12..16 -> "Good afternoon,"
-                    in 17..20 -> "Good evening,"
-                    else -> "Good night,"
+                    in 5..11 -> "Good morning"
+                    in 12..16 -> "Good afternoon"
+                    in 17..20 -> "Good evening"
+                    else -> "Good night"
                 }
             }
+            val welcomeText = "$welcomePrefix | $workspaceName"
             views.setTextViewText(R.id.tv_welcome_label, welcomeText)
 
-            val displayName = if (isGoogleSignedIn) {
+            val displayName = if (isGoogleSignedIn && widgetWorkspaceId == "default") {
                 if (profileName.isNotBlank()) profileName else (if (isBn) "ব্যবহারকারী" else "User")
             } else {
-                if (isBn) "সাইন-ইন করুন" else "Sign In"
+                if (profileName.isNotBlank()) profileName else (if (isBn) "ব্যবহারকারী" else "User")
             }
             views.setTextViewText(R.id.tv_profile_name, displayName)
 

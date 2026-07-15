@@ -4,6 +4,14 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.squareup.moshi.JsonClass
 
+@Entity(tableName = "workspaces")
+@JsonClass(generateAdapter = true)
+data class Workspace(
+    @PrimaryKey val id: String,
+    val name: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 @Entity(tableName = "persons")
 @JsonClass(generateAdapter = true)
 data class Person(
@@ -12,7 +20,8 @@ data class Person(
     val phone: String = "",
     val address: String = "",
     val photoUri: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val workspaceId: String = "default"
 )
 
 @Entity(tableName = "transactions")
@@ -24,7 +33,8 @@ data class Transaction(
     val category: String, // e.g. "Salary", "Food", "Shopping", "Lending", "Borrowing", "Repayment"
     val timestamp: Long = System.currentTimeMillis(),
     val note: String = "",
-    val personId: Int? = null // Linked person if it's a debt/credit related transaction
+    val personId: Int? = null, // Linked person if it's a debt/credit related transaction
+    val workspaceId: String = "default"
 )
 
 @Entity(tableName = "savings_goals")
@@ -37,7 +47,8 @@ data class SavingsGoal(
     val category: String = "General",
     val colorIndex: Int = 0, // Index for choosing distinct fintech gradient card themes
     val cardholderName: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val workspaceId: String = "default"
 )
 
 @Entity(tableName = "savings_transactions")
@@ -48,7 +59,8 @@ data class SavingsTransaction(
     val amount: Double,
     val isDeposit: Boolean,
     val timestamp: Long = System.currentTimeMillis(),
-    val note: String = ""
+    val note: String = "",
+    val workspaceId: String = "default"
 )
 
 @JsonClass(generateAdapter = true)
@@ -57,6 +69,7 @@ data class FinanceBackup(
     val transactions: List<Transaction>,
     val savingsGoals: List<SavingsGoal>,
     val savingsTransactions: List<SavingsTransaction> = emptyList(),
+    val workspaces: List<Workspace> = emptyList(),
     val comment: String? = "",
     val createdAt: Long? = null,
     val profileName: String = "",
@@ -124,3 +137,16 @@ data class DeletedGDriveBackup(
     val fileName: String,
     val backupJson: String
 )
+
+data class WorkspaceStats(
+    val workspace: Workspace,
+    val profileName: String,
+    val profilePhoto: String?,
+    val income: Double,
+    val expense: Double,
+    val netOwedToMe: Double,
+    val netIOwe: Double,
+    val personCount: Int,
+    val cardCount: Int
+)
+

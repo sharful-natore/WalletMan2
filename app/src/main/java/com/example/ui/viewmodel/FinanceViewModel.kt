@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -187,14 +188,125 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
 
     // Database Streams
-    val persons: StateFlow<List<Person>> = repository.allPersons
+    private val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+
+    // Workspaces List
+    val workspaces: StateFlow<List<com.example.data.Workspace>> = repository.allWorkspaces
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val transactions: StateFlow<List<Transaction>> = repository.allTransactions
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _currentWorkspaceId = MutableStateFlow(
+        prefs.getString("active_workspace_id", "default") ?: "default"
+    )
+    val currentWorkspaceId: StateFlow<String> = _currentWorkspaceId.asStateFlow()
 
-    val savingsGoals: StateFlow<List<SavingsGoal>> = repository.allSavingsGoals
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val currentWorkspace: StateFlow<com.example.data.Workspace> = combine(workspaces, currentWorkspaceId) { list, activeId ->
+        list.find { it.id == activeId } ?: list.firstOrNull() ?: com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.data.Workspace(id = "default", name = "ব্যক্তিগত"))
+
+    val workspaceStatsList: StateFlow<List<com.example.data.WorkspaceStats>> = combine(
+        workspaces,
+        repository.allPersons,
+        repository.allTransactions,
+        repository.allSavingsGoals,
+        _currentWorkspaceId
+    ) { workspaceList, allPersons, allTransactions, allSavingsGoals, _ ->
+        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        workspaceList.map { workspace ->
+            val wsId = workspace.id
+            val pName = prefs.getString(getProfileKey("user_name", wsId), "") ?: ""
+            val pPhoto = prefs.getString(getProfileKey("user_photo", wsId), null)
+            
+            val wsTransactions = allTransactions.filter { it.workspaceId == wsId }
+            val wsPersons = allPersons.filter { it.workspaceId == wsId }
+            val wsGoals = allSavingsGoals.filter { it.workspaceId == wsId }
+            
+            val income = wsTransactions.filter { it.type == "INCOME" }.sumOf { it.amount }
+            val expense = wsTransactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+            
+            var owedToMe = 0.0
+            var iOwe = 0.0
+            wsPersons.forEach { person ->
+                val personTx = wsTransactions.filter { it.personId == person.id }
+                val lent = personTx.filter { it.type == "LEND" }.sumOf { it.amount }
+                val borrowed = personTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+                val repaidPaid = personTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+                val repaidReceived = personTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+                
+                val net = (lent + repaidPaid) - (borrowed + repaidReceived)
+                if (net > 0) {
+                    owedToMe += net
+                } else if (net < 0) {
+                    iOwe += -net
+                }
+            }
+            
+            com.example.data.WorkspaceStats(
+                workspace = workspace,
+                profileName = pName.ifBlank { workspace.name },
+                profilePhoto = pPhoto,
+                income = income,
+                expense = expense,
+                netOwedToMe = owedToMe,
+                netIOwe = iOwe,
+                personCount = wsPersons.size,
+                cardCount = wsGoals.size
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun getProfileKey(baseKey: String, workspaceId: String): String {
+        return if (workspaceId == "default") baseKey else "${baseKey}_${workspaceId}"
+    }
+
+    fun selectWorkspace(workspaceId: String) {
+        _currentWorkspaceId.value = workspaceId
+        prefs.edit().putString("active_workspace_id", workspaceId).apply()
+        loadProfile(getApplication())
+        onLocalDatabaseChanged()
+    }
+
+    fun createWorkspace(name: String) {
+        viewModelScope.launch {
+            val id = "ws_${System.currentTimeMillis()}"
+            repository.insertWorkspace(com.example.data.Workspace(id = id, name = name))
+            selectWorkspace(id)
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস তৈরি করা হয়েছে" else "Workspace created", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    fun editWorkspace(workspaceId: String, name: String) {
+        viewModelScope.launch {
+            val existing = workspaces.value.find { it.id == workspaceId }
+            if (existing != null) {
+                repository.insertWorkspace(existing.copy(name = name))
+                // trigger refresh by updating flow slightly
+                _currentWorkspaceId.value = _currentWorkspaceId.value
+                triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস নাম পরিবর্তন করা হয়েছে" else "Workspace updated", isSuccess = true, type = "SUCCESS")
+            }
+        }
+    }
+
+    fun deleteWorkspace(workspaceId: String) {
+        viewModelScope.launch {
+            repository.deleteWorkspace(workspaceId)
+            if (_currentWorkspaceId.value == workspaceId) {
+                selectWorkspace("default")
+            }
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস মুছে ফেলা হয়েছে" else "Workspace deleted", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    val persons: StateFlow<List<Person>> = combine(repository.allPersons, currentWorkspaceId) { list, activeId ->
+        list.filter { it.workspaceId == activeId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val transactions: StateFlow<List<Transaction>> = combine(repository.allTransactions, currentWorkspaceId) { list, activeId ->
+        list.filter { it.workspaceId == activeId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val savingsGoals: StateFlow<List<SavingsGoal>> = combine(repository.allSavingsGoals, currentWorkspaceId) { list, activeId ->
+        list.filter { it.workspaceId == activeId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val personDebts: StateFlow<List<PersonDebt>> = combine(persons, transactions) { personList, txList ->
         personList.map { person ->
@@ -313,7 +425,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun addPerson(name: String, phone: String, address: String, photoUri: String) {
         viewModelScope.launch {
-            repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri))
+            repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri, workspaceId = _currentWorkspaceId.value))
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি সফলভাবে যুক্ত করা হয়েছে" else "Person added successfully", isSuccess = true, type = "SUCCESS")
@@ -364,7 +476,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     category = category,
                     note = note,
                     personId = personId,
-                    timestamp = timestamp
+                    timestamp = timestamp,
+                    workspaceId = _currentWorkspaceId.value
                 )
             )
             com.example.widget.updateAllWidgets(getApplication())
@@ -408,7 +521,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     savedAmount = 0.0,
                     category = category,
                     colorIndex = colorIndex,
-                    cardholderName = cardholderName
+                    cardholderName = cardholderName,
+                    workspaceId = _currentWorkspaceId.value
                 )
             )
             onLocalDatabaseChanged()
@@ -437,7 +551,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         goalId = id,
                         amount = absoluteAmount,
                         isDeposit = isDeposit,
-                        note = note
+                        note = note,
+                        workspaceId = _currentWorkspaceId.value
                     )
                 )
                 onLocalDatabaseChanged()
@@ -520,6 +635,42 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         com.example.widget.updateAllWidgets(getApplication())
     }
 
+    suspend fun restoreSelectiveBackup(backup: FinanceBackup, workspaceIds: List<String>) {
+        val currentData = repository.getBackupData()
+        
+        val preservedPersons = currentData.persons.filter { it.workspaceId !in workspaceIds }
+        val preservedTransactions = currentData.transactions.filter { it.workspaceId !in workspaceIds }
+        val preservedGoals = currentData.savingsGoals.filter { it.workspaceId !in workspaceIds }
+        val preservedSavingsTxs = currentData.savingsTransactions.filter { it.workspaceId !in workspaceIds }
+        val preservedWorkspaces = currentData.workspaces.filter { it.id !in workspaceIds }
+        
+        val incomingPersons = backup.persons.filter { it.workspaceId in workspaceIds }
+        val incomingTransactions = backup.transactions.filter { it.workspaceId in workspaceIds }
+        val incomingGoals = backup.savingsGoals.filter { it.workspaceId in workspaceIds }
+        val incomingSavingsTxs = backup.savingsTransactions.filter { it.workspaceId in workspaceIds }
+        val incomingWorkspaces = backup.workspaces.filter { it.id in workspaceIds }
+        
+        val combinedBackup = FinanceBackup(
+            persons = preservedPersons + incomingPersons,
+            transactions = preservedTransactions + incomingTransactions,
+            savingsGoals = preservedGoals + incomingGoals,
+            savingsTransactions = preservedSavingsTxs + incomingSavingsTxs,
+            workspaces = preservedWorkspaces + incomingWorkspaces,
+            comment = backup.comment,
+            createdAt = backup.createdAt,
+            profileName = currentData.profileName,
+            profileEmail = currentData.profileEmail,
+            profilePhone = currentData.profilePhone,
+            profileSocial = currentData.profileSocial,
+            profileAddress = currentData.profileAddress,
+            profilePhotoUri = currentData.profilePhotoUri
+        )
+        
+        repository.restoreBackupData(combinedBackup)
+        com.example.widget.updateAllWidgets(getApplication())
+        onLocalDatabaseChanged()
+    }
+
     private fun saveImageToInternalStorage(context: Context, uriString: String): String? {
         return try {
             if (!uriString.startsWith("content://")) return uriString
@@ -577,12 +728,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     // Profile Settings Helpers
     fun loadProfile(context: Context) {
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-        _profileName.value = prefs.getString("user_name", "") ?: ""
-        _profileEmail.value = prefs.getString("user_email", "") ?: ""
-        _profilePhotoUri.value = prefs.getString("user_photo", null)
-        _profilePhone.value = prefs.getString("user_phone", "") ?: ""
-        _profileSocial.value = prefs.getString("user_social", "") ?: ""
-        _profileAddress.value = prefs.getString("user_address", "") ?: ""
+        val wsId = _currentWorkspaceId.value
+        _profileName.value = prefs.getString(getProfileKey("user_name", wsId), "") ?: ""
+        _profileEmail.value = prefs.getString(getProfileKey("user_email", wsId), "") ?: ""
+        _profilePhotoUri.value = prefs.getString(getProfileKey("user_photo", wsId), null)
+        _profilePhone.value = prefs.getString(getProfileKey("user_phone", wsId), "") ?: ""
+        _profileSocial.value = prefs.getString(getProfileKey("user_social", wsId), "") ?: ""
+        _profileAddress.value = prefs.getString(getProfileKey("user_address", wsId), "") ?: ""
         
         val lastSync = prefs.getLong("last_firestore_sync_time", 0L)
         _lastSyncTime.value = if (lastSync == 0L) null else lastSync
@@ -627,13 +779,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun saveProfile(context: Context, name: String, email: String, photoUri: String? = null, phone: String = "", social: String = "", address: String = "") {
         val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it) } ?: photoUri
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val wsId = _currentWorkspaceId.value
         prefs.edit()
-            .putString("user_name", name)
-            .putString("user_email", email)
-            .putString("user_photo", finalPhotoUri)
-            .putString("user_phone", phone)
-            .putString("user_social", social)
-            .putString("user_address", address)
+            .putString(getProfileKey("user_name", wsId), name)
+            .putString(getProfileKey("user_email", wsId), email)
+            .putString(getProfileKey("user_photo", wsId), finalPhotoUri)
+            .putString(getProfileKey("user_phone", wsId), phone)
+            .putString(getProfileKey("user_social", wsId), social)
+            .putString(getProfileKey("user_address", wsId), address)
             .apply()
         _profileName.value = name
         _profileEmail.value = email
@@ -670,6 +823,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     init {
         registerNetworkCallback()
+        viewModelScope.launch {
+            try {
+                val list = repository.allWorkspaces.first()
+                if (list.isEmpty()) {
+                    repository.insertWorkspace(com.example.data.Workspace(id = "default", name = "ব্যক্তিগত"))
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun registerNetworkCallback() {
@@ -1100,10 +1263,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         )
     }
 
-    fun exportBackupToUri(context: Context, outputStream: java.io.OutputStream, comment: String = "", onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun exportBackupToUri(context: Context, outputStream: java.io.OutputStream, comment: String = "", workspaceIds: List<String>? = null, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
+                val fullBackup = repository.getBackupData()
+                val backupData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                    fullBackup.copy(
+                        persons = fullBackup.persons.filter { it.workspaceId in workspaceIds },
+                        transactions = fullBackup.transactions.filter { it.workspaceId in workspaceIds },
+                        savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId in workspaceIds },
+                        savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId in workspaceIds },
+                        workspaces = fullBackup.workspaces.filter { it.id in workspaceIds },
+                        comment = comment,
+                        createdAt = System.currentTimeMillis()
+                    )
+                } else {
+                    fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
+                }
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 outputStream.use { it.write(encryptedJson.toByteArray()) }
@@ -1139,10 +1315,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    fun exportBackup(context: Context, comment: String = "", onSuccess: (String) -> Unit, onError: (String) -> Unit) {
+    fun exportBackup(context: Context, comment: String = "", workspaceIds: List<String>? = null, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
-                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
+                val fullBackup = repository.getBackupData()
+                val backupData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                    fullBackup.copy(
+                        persons = fullBackup.persons.filter { it.workspaceId in workspaceIds },
+                        transactions = fullBackup.transactions.filter { it.workspaceId in workspaceIds },
+                        savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId in workspaceIds },
+                        savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId in workspaceIds },
+                        workspaces = fullBackup.workspaces.filter { it.id in workspaceIds },
+                        comment = comment,
+                        createdAt = System.currentTimeMillis()
+                    )
+                } else {
+                    fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
+                }
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 
@@ -1426,6 +1615,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (email == null) {
                     throw Exception("Google account email not found")
                 }
+                
+                // Select "default" workspace on Google Sign-In as requested
+                selectWorkspace("default")
+
                 val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 prefs.edit()
                     .putString("google_email", email)
@@ -1507,7 +1700,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    fun backupToGoogleDrive(context: Context, customFileName: String? = null, comment: String = "", onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun backupToGoogleDrive(context: Context, customFileName: String? = null, comment: String = "", workspaceIds: List<String>? = null, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
@@ -1519,7 +1712,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
 
                 // 1. Get database data JSON string with comment and createdAt metadata
-                val backupData = repository.getBackupData().copy(comment = comment, createdAt = System.currentTimeMillis())
+                val fullBackup = repository.getBackupData()
+                val backupData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                    fullBackup.copy(
+                        persons = fullBackup.persons.filter { it.workspaceId in workspaceIds },
+                        transactions = fullBackup.transactions.filter { it.workspaceId in workspaceIds },
+                        savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId in workspaceIds },
+                        savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId in workspaceIds },
+                        workspaces = fullBackup.workspaces.filter { it.id in workspaceIds },
+                        comment = comment,
+                        createdAt = System.currentTimeMillis()
+                    )
+                } else {
+                    fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
+                }
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
 

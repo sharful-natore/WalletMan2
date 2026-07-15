@@ -99,6 +99,47 @@ fun getCustomTimeFilterLabel(timeFilter: String, lang: AppLanguage): String {
     return timeFilter
 }
 
+@Composable
+fun HighlightedText(
+    text: String,
+    query: String,
+    color: Color = MaterialTheme.colorScheme.primary,
+    style: TextStyle = TextStyle.Default,
+    modifier: Modifier = Modifier
+) {
+    if (query.isEmpty() || !text.contains(query, ignoreCase = true)) {
+        Text(text = text, style = style, modifier = modifier)
+        return
+    }
+
+    val isDark = isSystemInDarkTheme()
+    val highlightBg = if (isDark) Color(0xFFFFD54F).copy(alpha = 0.25f) else Color(0xFFFDE047).copy(alpha = 0.5f)
+    val highlightFg = if (isDark) Color(0xFFFFD54F) else Color(0xFFB45309)
+
+    val annotatedString = buildAnnotatedString {
+        var startIdx = 0
+        val queryLower = query.lowercase()
+        val textLower = text.lowercase()
+
+        while (true) {
+            val idx = textLower.indexOf(queryLower, startIdx)
+            if (idx == -1) {
+                append(text.substring(startIdx))
+                break
+            }
+
+            append(text.substring(startIdx, idx))
+            
+            withStyle(style = SpanStyle(background = highlightBg, color = highlightFg, fontWeight = FontWeight.ExtraBold)) {
+                append(text.substring(idx, idx + query.length))
+            }
+            startIdx = idx + query.length
+        }
+    }
+
+    Text(text = annotatedString, style = style, modifier = modifier)
+}
+
 fun formatNumberString(str: String, lang: AppLanguage): String {
     if (lang == AppLanguage.EN) return str
     return str
@@ -365,6 +406,436 @@ fun SpecificDatePickerDialog(
             }
         }
     )
+}
+
+@Composable
+fun WorkspaceManagementDialog(
+    language: AppLanguage,
+    isDark: Boolean,
+    workspaces: List<com.example.data.WorkspaceStats>,
+    currentWorkspace: com.example.data.Workspace,
+    onSelect: (String) -> Unit,
+    onCreate: (String) -> Unit,
+    onEdit: (String, String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var newWorkspaceName by remember { mutableStateOf("") }
+    var editingWorkspaceId by remember { mutableStateOf<String?>(null) }
+    var editWorkspaceName by remember { mutableStateOf("") }
+    var deletingWorkspaceId by remember { mutableStateOf<String?>(null) }
+
+    val textColor = if (isDark) Color.White else Color(0xFF0F1724)
+    val subtitleColor = if (isDark) Color.LightGray else Color.Gray
+    val borderCol = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SpaceDashboard,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "ওয়ার্কস্পেস ও তথ্য বিবরণী" else "Workspaces & Stats",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = textColor
+                )
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "বিদ্যমান ওয়ার্কস্পেসসমূহ:" else "Existing Workspaces:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = subtitleColor
+                )
+                
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                ) {
+                    items(workspaces) { ws ->
+                        val isSelected = ws.workspace.id == currentWorkspace.id
+                        val itemBg = if (isSelected) FintechBlue.copy(alpha = 0.08f) else (if (isDark) Color(0xFF1E2235) else Color(0xFFF8FAFC))
+                        val cardBorderCol = if (isSelected) FintechBlue else borderCol
+                        
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = itemBg),
+                            border = BorderStroke(1.dp, cardBorderCol),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(ws.workspace.id) }
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    if (!ws.profilePhoto.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = ws.profilePhoto,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .border(1.5.dp, if (isSelected) FintechBlue else Color.Gray, CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        val initials = ws.profileName.take(1).uppercase()
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSelected) FintechBlue.copy(alpha = 0.2f) else (if (isDark) Color(0xFF2E344A) else Color(0xFFE2E8F0)))
+                                                .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = initials,
+                                                color = if (isSelected) FintechBlue else textColor,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = ws.profileName,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textColor,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            if (isSelected) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(FintechGreen.copy(alpha = 0.15f))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = if (language == AppLanguage.BN) "সক্রিয়" else "Active",
+                                                        color = FintechGreen,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (ws.workspace.id != "default") {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "কাস্টম ওয়ার্কস্পেস" else "Custom Workspace",
+                                                fontSize = 11.sp,
+                                                color = subtitleColor
+                                            )
+                                        } else {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "মূল ওয়ার্কস্পেস" else "Main Workspace",
+                                                fontSize = 11.sp,
+                                                color = subtitleColor
+                                            )
+                                        }
+                                    }
+                                    
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        IconButton(
+                                            onClick = {
+                                                editingWorkspaceId = ws.workspace.id
+                                                editWorkspaceName = ws.workspace.name
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Edit,
+                                                contentDescription = "Edit name",
+                                                tint = FintechBlue,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        
+                                        if (ws.workspace.id != "default") {
+                                            IconButton(
+                                                onClick = {
+                                                    deletingWorkspaceId = ws.workspace.id
+                                                },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Delete,
+                                                    contentDescription = "Delete",
+                                                    tint = FintechRed.copy(alpha = 0.8f),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                HorizontalDivider(color = borderCol.copy(alpha = 0.5f))
+                                
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "আয়: ৳${String.format("%.2f", ws.income)}" else "Income: ৳${String.format("%.2f", ws.income)}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = FintechGreen
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "ব্যয়: ৳${String.format("%.2f", ws.expense)}" else "Expense: ৳${String.format("%.2f", ws.expense)}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = FintechRed
+                                        )
+                                    }
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "পাওনা: ৳${String.format("%.2f", ws.netOwedToMe)}" else "Receivables: ৳${String.format("%.2f", ws.netOwedToMe)}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = FintechBlue
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "দেনা: ৳${String.format("%.2f", ws.netIOwe)}" else "Payables: ৳${String.format("%.2f", ws.netIOwe)}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFFF97316)
+                                        )
+                                    }
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.People,
+                                                contentDescription = "Persons",
+                                                tint = subtitleColor,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "ব্যক্তি: ${ws.personCount} জন" else "Persons: ${ws.personCount}",
+                                                fontSize = 11.sp,
+                                                color = subtitleColor
+                                            )
+                                        }
+                                        
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Savings,
+                                                contentDescription = "Savings Cards",
+                                                tint = subtitleColor,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "সেভিংস কার্ড: ${ws.cardCount}টি" else "Savings Goals: ${ws.cardCount}",
+                                                fontSize = 11.sp,
+                                                color = subtitleColor
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                HorizontalDivider(color = borderCol)
+                
+                Text(
+                    text = if (language == AppLanguage.BN) "নতুন ওয়ার্কস্পেস তৈরি করুন:" else "Create New Workspace:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = subtitleColor
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newWorkspaceName,
+                        onValueChange = { newWorkspaceName = it },
+                        placeholder = {
+                            Text(
+                                text = if (language == AppLanguage.BN) "যেমন: দোকানের হিসাব" else "e.g., Shop Accounts",
+                                fontSize = 13.sp
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = borderCol
+                        )
+                    )
+                    
+                    Button(
+                        onClick = {
+                            if (newWorkspaceName.isNotBlank()) {
+                                onCreate(newWorkspaceName.trim())
+                                newWorkspaceName = ""
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "তৈরি" else "Create",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (language == AppLanguage.BN) "বন্ধ করুন" else "Close",
+                    color = FintechBlue,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    )
+
+    if (editingWorkspaceId != null) {
+        AlertDialog(
+            onDismissRequest = { editingWorkspaceId = null },
+            title = {
+                Text(
+                    text = if (language == AppLanguage.BN) "ওয়ার্কস্পেস নাম পরিবর্তন" else "Rename Workspace",
+                    fontWeight = FontWeight.Bold,
+                    color = textColor
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = editWorkspaceName,
+                    onValueChange = { editWorkspaceName = it },
+                    label = {
+                        Text(if (language == AppLanguage.BN) "নাম" else "Name")
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (editWorkspaceName.isNotBlank()) {
+                            onEdit(editingWorkspaceId!!, editWorkspaceName.trim())
+                            editingWorkspaceId = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                ) {
+                    Text(if (language == AppLanguage.BN) "দাখিল করুন" else "Save", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingWorkspaceId = null }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechBlue)
+                }
+            }
+        )
+    }
+
+    if (deletingWorkspaceId != null) {
+        AlertDialog(
+            onDismissRequest = { deletingWorkspaceId = null },
+            title = {
+                Text(
+                    text = if (language == AppLanguage.BN) "ওয়ার্কস্পেস মুছে ফেলুন?" else "Delete Workspace?",
+                    fontWeight = FontWeight.Bold,
+                    color = FintechRed
+                )
+            },
+            text = {
+                Text(
+                    text = if (language == AppLanguage.BN) 
+                        "আপনি কি সত্যিই এই ওয়ার্কস্পেসটি মুছে ফেলতে চান? এর সকল হিসাবনিকাশ ও ব্যক্তি ডেটা স্থায়ীভাবে মুছে যাবে এবং তা আর পুনরুদ্ধার করা যাবে না।" 
+                    else 
+                        "Are you sure you want to delete this workspace? All associated transactions, accounts, and person data will be permanently removed. This action cannot be undone.",
+                    color = textColor
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDelete(deletingWorkspaceId!!)
+                        deletingWorkspaceId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
+                ) {
+                    Text(if (language == AppLanguage.BN) "হ্যাঁ, মুছে ফেলুন" else "Yes, Delete", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingWorkspaceId = null }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechBlue)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -2429,6 +2900,10 @@ fun DashboardScreen(
     onPersonClick: ((Person) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val currentWorkspace by viewModel?.currentWorkspace?.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) ?: remember { mutableStateOf(com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) }
+    var showWorkspaceDialog by remember { mutableStateOf(false) }
+    val workspaceStatsList by viewModel?.workspaceStatsList?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -2552,18 +3027,35 @@ fun DashboardScreen(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
-                        Text(
-                            text = if (isGoogleSignedIn) {
-                                if (profileName.isNotBlank()) profileName else (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")
-                            } else {
-                                if (language == AppLanguage.BN) "সাইন-ইন করুন" else "Sign In"
-                            },
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = profileName.ifBlank { currentWorkspace.name },
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            
+                            IconButton(
+                                onClick = { showWorkspaceDialog = true },
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDropDown,
+                                    contentDescription = "Switch Workspace",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                         if (isGoogleSignedIn) {
                             if (profileEmail.isNotBlank()) {
                                 Text(
@@ -2627,6 +3119,104 @@ fun DashboardScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Workspace Switcher Section
+        item {
+            if (showWorkspaceDialog && viewModel != null) {
+                WorkspaceManagementDialog(
+                    language = language,
+                    isDark = isDark,
+                    workspaces = workspaceStatsList,
+                    currentWorkspace = currentWorkspace,
+                    onSelect = { workspaceId ->
+                        viewModel.selectWorkspace(workspaceId)
+                        showWorkspaceDialog = false
+                    },
+                    onCreate = { name ->
+                        viewModel.createWorkspace(name)
+                    },
+                    onEdit = { id, name ->
+                        viewModel.editWorkspace(id, name)
+                    },
+                    onDelete = { workspaceId ->
+                        viewModel.deleteWorkspace(workspaceId)
+                    },
+                    onDismiss = { showWorkspaceDialog = false }
+                )
+            }
+
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDark) Color(0xFF141724) else Color.White
+                ),
+                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showWorkspaceDialog = true }
+                    .testTag("workspace_selector_card")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(FintechBlue.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.SpaceDashboard,
+                                contentDescription = null,
+                                tint = FintechBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = if (language == AppLanguage.BN) "অ্যাক্টিভ ওয়ার্কস্পেস" else "Active Workspace",
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = currentWorkspace.name,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color(0xFF1E222F)
+                            )
+                        }
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "পরিবর্তন করুন" else "Change",
+                            fontSize = 12.sp,
+                            color = FintechBlue,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
@@ -2993,7 +3583,8 @@ fun TransactionRowItem(
     onEdit: (Transaction) -> Unit,
     isHighlighted: Boolean = false,
     onNavigateToTab: ((String, String) -> Unit)? = null,
-    onPersonClick: ((Person) -> Unit)? = null
+    onPersonClick: ((Person) -> Unit)? = null,
+    searchQuery: String = ""
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
@@ -3164,21 +3755,25 @@ fun TransactionRowItem(
                         }
                     }
 
-                    Text(
+                    HighlightedText(
                         text = titleText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color(0xFF1E222F),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        query = searchQuery,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF1E222F)
+                        )
                     )
                     if (tx.note.isNotEmpty()) {
-                        Text(
+                        HighlightedText(
                             text = tx.note,
-                            fontSize = 11.sp,
-                            color = Color.Gray,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            query = searchQuery,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = TextStyle(
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
                         )
                     }
                     Text(
@@ -3450,6 +4045,10 @@ fun TransactionsScreen(
     onNavigateToTab: ((String, String) -> Unit)? = null,
     onPersonClick: ((Person) -> Unit)? = null
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var currentSortBy by remember { mutableStateOf("DATE_DESC") }
+    var showSortMenu by remember { mutableStateOf(false) }
+
     val timeFilteredTransactions = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
     }
@@ -3466,11 +4065,84 @@ fun TransactionsScreen(
         }
     }
 
+    val searchQueryLower = searchQuery.lowercase().trim()
+    val searchedTransactions = remember(filteredTransactions, searchQuery, persons) {
+        if (searchQueryLower.isEmpty()) {
+            filteredTransactions
+        } else {
+            filteredTransactions.filter { tx ->
+                val personName = persons.find { it.id == tx.personId }?.name?.lowercase() ?: ""
+                tx.note.lowercase().contains(searchQueryLower) || 
+                tx.amount.toString().contains(searchQueryLower) ||
+                personName.contains(searchQueryLower)
+            }
+        }
+    }
+
+    val sortedTransactions = remember(searchedTransactions, currentSortBy, persons) {
+        val list = searchedTransactions.toMutableList()
+        when (currentSortBy) {
+            "DATE_DESC" -> list.sortByDescending { it.timestamp }
+            "DATE_ASC" -> list.sortBy { it.timestamp }
+            "AMOUNT_DESC" -> list.sortByDescending { it.amount }
+            "AMOUNT_ASC" -> list.sortBy { it.amount }
+            "NAME_ASC" -> list.sortBy { tx ->
+                persons.find { it.id == tx.personId }?.name?.lowercase() ?: tx.note.lowercase()
+            }
+            "NAME_DESC" -> list.sortByDescending { tx ->
+                persons.find { it.id == tx.personId }?.name?.lowercase() ?: tx.note.lowercase()
+            }
+        }
+        list
+    }
+
     val totalIncome = timeFilteredTransactions.filter { it.type == "INCOME" }.sumOf { it.amount }
     val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Modern Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = {
+                    Text(
+                        text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = null,
+                                tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
+                    focusedContainerColor = if (isDark) Color(0xFF1E222F) else Color(0xFFF1F5F9),
+                    unfocusedContainerColor = if (isDark) Color(0xFF1E222F) else Color(0xFFF1F5F9)
+                )
+            )
+
             // Summary Cards (arranged horizontally in a Row)
             Row(
                 modifier = Modifier
@@ -3536,47 +4208,121 @@ fun TransactionsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
             )
 
-            // Type Filters chip row
+            // Type Filters chip row & Sort button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val filters = listOf(
-                    Pair("ALL", "all"),
-                    Pair("INCOME", "income"),
-                    Pair("EXPENSE", "expense"),
-                    Pair("DENA", "dena"),
-                    Pair("PAWN", "pawn")
-                )
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val filters = listOf(
+                        Pair("ALL", "all"),
+                        Pair("INCOME", "income"),
+                        Pair("EXPENSE", "expense"),
+                        Pair("DENA", "dena"),
+                        Pair("PAWN", "pawn")
+                    )
 
-                filters.forEach { (type, labelKey) ->
-                    val isSelected = filter == type
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primary
-                                else if (isDark) Color(0xFF1E222F) else Color.White
+                    filters.forEach { (type, labelKey) ->
+                        val isSelected = filter == type
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else if (isDark) Color(0xFF1E222F) else Color.White
+                                )
+                                .clickable { onFilterChange(type) }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = Translation.get(labelKey, language),
+                                color = if (isSelected) Color.White else Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            .clickable { onFilterChange(type) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box {
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                if (isDark) Color(0xFF1E222F) else Color.White,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
+                                RoundedCornerShape(12.dp)
+                            )
                     ) {
-                        Text(
-                            text = Translation.get(labelKey, language),
-                            color = if (isSelected) Color.White else Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                        Icon(
+                            imageVector = Icons.Rounded.Sort,
+                            contentDescription = "Sort",
+                            tint = if (isDark) Color.White else Color.Black
                         )
+                    }
+
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                        modifier = Modifier.background(if (isDark) Color(0xFF1E222F) else Color.White)
+                    ) {
+                        val sortOptions = listOf(
+                            Triple("DATE_DESC", if (language == AppLanguage.BN) "নতুন সময় আগে" else "Newest First", Icons.Rounded.ArrowDownward),
+                            Triple("DATE_ASC", if (language == AppLanguage.BN) "পুরানো সময় আগে" else "Oldest First", Icons.Rounded.ArrowUpward),
+                            Triple("AMOUNT_DESC", if (language == AppLanguage.BN) "বেশি পরিমাণ আগে" else "Highest Amount First", Icons.Rounded.TrendingUp),
+                            Triple("AMOUNT_ASC", if (language == AppLanguage.BN) "কম পরিমাণ আগে" else "Lowest Amount First", Icons.Rounded.TrendingDown),
+                            Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
+                            Triple("NAME_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Name (Z-A)", Icons.Rounded.SortByAlpha)
+                        )
+
+                        sortOptions.forEach { (option, label, icon) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = label,
+                                            color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
+                                            fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    currentSortBy = option
+                                    showSortMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             }
 
             // Transactions List
-            if (filteredTransactions.isEmpty()) {
+            if (sortedTransactions.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3596,23 +4342,51 @@ fun TransactionsScreen(
                     Text(Translation.get("no_tx", language), color = Color.Gray)
                 }
             } else {
-                val grouped = filteredTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 90.dp)
-                ) {
-                    grouped.forEach { (date, txs) ->
-                        item {
-                            Text(
-                                text = formatDateHeader(date, language),
-                                color = Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
-                            )
+                if (currentSortBy.startsWith("DATE")) {
+                    val grouped = sortedTransactions.groupBy { formatDateToDay(it.timestamp) }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 90.dp)
+                    ) {
+                        grouped.forEach { (date, txs) ->
+                            item {
+                                Text(
+                                    text = formatDateHeader(date, language),
+                                    color = Color.Gray,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
+                                )
+                            }
+                            items(txs) { tx ->
+                                Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                    TransactionRowItem(
+                                        tx = tx,
+                                        language = language,
+                                        isDark = isDark,
+                                        persons = persons,
+                                        onDelete = onDeleteTransaction,
+                                        onEdit = onEditTransaction,
+                                        isHighlighted = (tx.id == highlightedTxId),
+                                        onNavigateToTab = onNavigateToTab,
+                                        onPersonClick = onPersonClick,
+                                        searchQuery = searchQuery
+                                    )
+                                }
+                            }
                         }
-                        items(txs) { tx ->
+                        item {
+                            Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 90.dp)
+                    ) {
+                        items(sortedTransactions) { tx ->
                             Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                 TransactionRowItem(
                                     tx = tx,
@@ -3623,13 +4397,14 @@ fun TransactionsScreen(
                                     onEdit = onEditTransaction,
                                     isHighlighted = (tx.id == highlightedTxId),
                                     onNavigateToTab = onNavigateToTab,
-                                    onPersonClick = onPersonClick
+                                    onPersonClick = onPersonClick,
+                                    searchQuery = searchQuery
                                 )
                             }
                         }
-                    }
-                    item {
-                        Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                        item {
+                            Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                        }
                     }
                 }
             }
@@ -3652,6 +4427,10 @@ fun DebtsScreen(
     onTimeFilterChange: (String) -> Unit = {},
     highlightedPersonId: Int? = null
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var currentSortBy by remember { mutableStateOf("NAME_ASC") }
+    var showSortMenu by remember { mutableStateOf(false) }
+
     val filteredDebts = remember(personDebts, filter) {
         when (filter) {
             "DENA" -> personDebts.filter { it.netBalance < 0 }
@@ -3660,11 +4439,78 @@ fun DebtsScreen(
         }
     }
 
+    val searchQueryLower = searchQuery.lowercase().trim()
+    val searchedDebts = remember(filteredDebts, searchQuery) {
+        if (searchQueryLower.isEmpty()) {
+            filteredDebts
+        } else {
+            filteredDebts.filter { item ->
+                item.person.name.lowercase().contains(searchQueryLower) ||
+                item.person.phone.lowercase().contains(searchQueryLower) ||
+                item.person.address.lowercase().contains(searchQueryLower) ||
+                item.netBalance.toString().contains(searchQueryLower)
+            }
+        }
+    }
+
+    val sortedDebts = remember(searchedDebts, currentSortBy) {
+        val list = searchedDebts.toMutableList()
+        when (currentSortBy) {
+            "NAME_ASC" -> list.sortBy { it.person.name.lowercase() }
+            "NAME_DESC" -> list.sortByDescending { it.person.name.lowercase() }
+            "AMOUNT_DESC" -> list.sortByDescending { kotlin.math.abs(it.netBalance) }
+            "AMOUNT_ASC" -> list.sortBy { kotlin.math.abs(it.netBalance) }
+        }
+        list
+    }
+
     val totalDena = personDebts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
     val totalPawn = personDebts.filter { it.netBalance > 0 }.sumOf { it.netBalance }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            // Modern Search Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = {
+                    Text(
+                        text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = null,
+                                tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                            )
+                        }
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
+                    focusedContainerColor = if (isDark) Color(0xFF1E222F) else Color(0xFFF1F5F9),
+                    unfocusedContainerColor = if (isDark) Color(0xFF1E222F) else Color(0xFFF1F5F9)
+                )
+            )
+
             // Summary Cards (arranged horizontally in a Row)
             Row(
                 modifier = Modifier
@@ -3730,43 +4576,115 @@ fun DebtsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
             )
 
-            // Filter Tabs
+            // Filter Tabs & Sort Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                val filters = listOf(
-                    Pair("ALL", "all"),
-                    Pair("DENA", "dena"),
-                    Pair("PAWN", "pawn")
-                )
+                Row(
+                    modifier = Modifier
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val filters = listOf(
+                        Pair("ALL", "all"),
+                        Pair("DENA", "dena"),
+                        Pair("PAWN", "pawn")
+                    )
 
-                filters.forEach { (type, labelKey) ->
-                    val isSelected = filter == type
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primary
-                                else if (isDark) Color(0xFF1E222F) else Color.White
+                    filters.forEach { (type, labelKey) ->
+                        val isSelected = filter == type
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else if (isDark) Color(0xFF1E222F) else Color.White
+                                )
+                                .clickable { onFilterChange(type) }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = Translation.get(labelKey, language),
+                                color = if (isSelected) Color.White else Color.Gray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            .clickable { onFilterChange(type) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box {
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                if (isDark) Color(0xFF1E222F) else Color.White,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
+                                RoundedCornerShape(12.dp)
+                            )
                     ) {
-                        Text(
-                            text = Translation.get(labelKey, language),
-                            color = if (isSelected) Color.White else Color.Gray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                        Icon(
+                            imageVector = Icons.Rounded.Sort,
+                            contentDescription = "Sort",
+                            tint = if (isDark) Color.White else Color.Black
                         )
+                    }
+
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                        modifier = Modifier.background(if (isDark) Color(0xFF1E222F) else Color.White)
+                    ) {
+                        val sortOptions = listOf(
+                            Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
+                            Triple("NAME_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Name (Z-A)", Icons.Rounded.SortByAlpha),
+                            Triple("AMOUNT_DESC", if (language == AppLanguage.BN) "বেশি পরিমাণ আগে" else "Highest Amount First", Icons.Rounded.TrendingUp),
+                            Triple("AMOUNT_ASC", if (language == AppLanguage.BN) "কম পরিমাণ আগে" else "Lowest Amount First", Icons.Rounded.TrendingDown)
+                        )
+
+                        sortOptions.forEach { (option, label, icon) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = label,
+                                            color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
+                                            fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    currentSortBy = option
+                                    showSortMenu = false
+                                }
+                            )
+                        }
                     }
                 }
             }
 
-            if (filteredDebts.isEmpty()) {
+            if (sortedDebts.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -3790,9 +4708,17 @@ fun DebtsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(filteredDebts) { item ->
+                    items(sortedDebts) { item ->
                         Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                            PersonDebtRowItem(item, language, isDark, onPersonClick, onDeletePerson, isHighlighted = (item.person.id == highlightedPersonId))
+                            PersonDebtRowItem(
+                                item = item,
+                                language = language,
+                                isDark = isDark,
+                                onClick = onPersonClick,
+                                onDelete = onDeletePerson,
+                                isHighlighted = (item.person.id == highlightedPersonId),
+                                searchQuery = searchQuery
+                            )
                         }
                     }
                     item {
@@ -3985,7 +4911,8 @@ fun PersonDebtRowItem(
     isDark: Boolean,
     onClick: (PersonDebt) -> Unit,
     onDelete: (Int) -> Unit,
-    isHighlighted: Boolean = false
+    isHighlighted: Boolean = false,
+    searchQuery: String = ""
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -4049,24 +4976,38 @@ fun PersonDebtRowItem(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column {
-                    Text(
+                    HighlightedText(
                         text = item.person.name,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color(0xFF1E222F)
+                        query = searchQuery,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = TextStyle(
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF1E222F)
+                        )
                     )
                     if (item.person.phone.isNotEmpty()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = item.person.phone, fontSize = 11.sp, color = Color.Gray)
+                            HighlightedText(
+                                text = item.person.phone,
+                                query = searchQuery,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = TextStyle(fontSize = 11.sp, color = Color.Gray)
+                            )
                         }
                     }
                     if (item.person.address.isNotEmpty()) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 1.dp)) {
                             Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = item.person.address, fontSize = 11.sp, color = Color.Gray)
+                            HighlightedText(
+                                text = item.person.address,
+                                query = searchQuery,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = TextStyle(fontSize = 11.sp, color = Color.Gray)
+                            )
                         }
                     }
                 }
@@ -4110,6 +5051,36 @@ fun SavingsScreen(
     onEditGoal: (SavingsGoal) -> Unit,
     highlightedGoalId: Int? = null
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    var currentSortBy by remember { mutableStateOf("TITLE_ASC") }
+    var showSortMenu by remember { mutableStateOf(false) }
+
+    val searchQueryLower = searchQuery.lowercase().trim()
+    val searchedGoals = remember(savingsGoals, searchQuery) {
+        if (searchQueryLower.isEmpty()) {
+            savingsGoals
+        } else {
+            savingsGoals.filter { goal ->
+                goal.title.lowercase().contains(searchQueryLower) ||
+                goal.targetAmount.toString().contains(searchQueryLower) ||
+                goal.savedAmount.toString().contains(searchQueryLower)
+            }
+        }
+    }
+
+    val sortedGoals = remember(searchedGoals, currentSortBy) {
+        val list = searchedGoals.toMutableList()
+        when (currentSortBy) {
+            "TITLE_ASC" -> list.sortBy { it.title.lowercase() }
+            "TITLE_DESC" -> list.sortByDescending { it.title.lowercase() }
+            "TARGET_DESC" -> list.sortByDescending { it.targetAmount }
+            "TARGET_ASC" -> list.sortBy { it.targetAmount }
+            "SAVED_DESC" -> list.sortByDescending { it.savedAmount }
+            "SAVED_ASC" -> list.sortBy { it.savedAmount }
+        }
+        list
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -4141,7 +5112,125 @@ fun SavingsScreen(
                 }
             }
 
-            if (savingsGoals.isEmpty()) {
+            // Modern Search Bar & Sort Button Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .weight(1f),
+                    placeholder = {
+                        Text(
+                            text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = null,
+                            tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                                )
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
+                        focusedContainerColor = if (isDark) Color(0xFF1E222F) else Color(0xFFF1F5F9),
+                        unfocusedContainerColor = if (isDark) Color(0xFF1E222F) else Color(0xFFF1F5F9)
+                    )
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box {
+                    IconButton(
+                        onClick = { showSortMenu = true },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                if (isDark) Color(0xFF1E222F) else Color.White,
+                                RoundedCornerShape(16.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
+                                RoundedCornerShape(16.dp)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Sort,
+                            contentDescription = "Sort",
+                            tint = if (isDark) Color.White else Color.Black
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false },
+                        modifier = Modifier.background(if (isDark) Color(0xFF1E222F) else Color.White)
+                    ) {
+                        val sortOptions = listOf(
+                            Triple("TITLE_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Title (A-Z)", Icons.Rounded.SortByAlpha),
+                            Triple("TITLE_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Title (Z-A)", Icons.Rounded.SortByAlpha),
+                            Triple("TARGET_DESC", if (language == AppLanguage.BN) "বেশি লক্ষ্য আগে" else "Highest Target First", Icons.Rounded.TrendingUp),
+                            Triple("TARGET_ASC", if (language == AppLanguage.BN) "কম লক্ষ্য আগে" else "Lowest Target First", Icons.Rounded.TrendingDown),
+                            Triple("SAVED_DESC", if (language == AppLanguage.BN) "বেশি সঞ্চিত আগে" else "Highest Saved First", Icons.Rounded.ArrowUpward),
+                            Triple("SAVED_ASC", if (language == AppLanguage.BN) "কম সঞ্চিত আগে" else "Lowest Saved First", Icons.Rounded.ArrowDownward)
+                        )
+
+                        sortOptions.forEach { (option, label, icon) ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = label,
+                                            color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
+                                            fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    currentSortBy = option
+                                    showSortMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (sortedGoals.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -4166,8 +5255,18 @@ fun SavingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(savingsGoals) { goal ->
-                        SavingsGoalCardItem(goal, language, isDark, profileName, onGoalClick, onContributeClick, onEditGoal, isHighlighted = (goal.id == highlightedGoalId))
+                    items(sortedGoals) { goal ->
+                        SavingsGoalCardItem(
+                            goal = goal,
+                            language = language,
+                            isDark = isDark,
+                            profileName = profileName,
+                            onGoalClick = onGoalClick,
+                            onContributeClick = onContributeClick,
+                            onEditGoal = onEditGoal,
+                            isHighlighted = (goal.id == highlightedGoalId),
+                            searchQuery = searchQuery
+                        )
                     }
                     item {
                         Spacer(modifier = Modifier.height(70.dp))
@@ -4202,7 +5301,8 @@ fun SavingsGoalCardItem(
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
     isHighlighted: Boolean = false,
-    maskBalance: Boolean = true
+    maskBalance: Boolean = true,
+    searchQuery: String = ""
 ) {
     val gradient = GradientsList[goal.colorIndex % GradientsList.size]
 
@@ -4266,11 +5366,15 @@ fun SavingsGoalCardItem(
                 goal.category.uppercase()
             }
 
-            Text(
+            HighlightedText(
                 text = formattedCategory,
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+                query = searchQuery,
+                color = Color(0xFFFBBF24),
+                style = TextStyle(
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                ),
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
             )
 
@@ -4281,12 +5385,16 @@ fun SavingsGoalCardItem(
                     .padding(start = 12.dp, bottom = 0.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                Text(
+                HighlightedText(
                     text = goal.title.uppercase(),
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.sp
+                    query = searchQuery,
+                    color = Color(0xFFFBBF24),
+                    style = TextStyle(
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 1.sp
+                    )
                 )
                 
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -4351,6 +5459,242 @@ fun SavingsGoalCardItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun PersonSelectorDialog(
+    language: AppLanguage,
+    persons: List<Person>,
+    isDark: Boolean,
+    onDismiss: () -> Unit,
+    onSelect: (Person) -> Unit,
+    onAddPersonClick: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredPersons = remember(searchQuery, persons) {
+        persons.filter {
+            it.name.contains(searchQuery, ignoreCase = true) ||
+            it.phone.contains(searchQuery, ignoreCase = true) ||
+            it.address.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    val dialogBg = if (isDark) Color(0xFF141724) else Color.White
+    val textColor = if (isDark) Color.White else Color(0xFF0F1724)
+    val secondaryTextColor = if (isDark) Color.LightGray else Color(0xFF475569)
+    val cardBg = if (isDark) Color(0xFF1F2336) else Color(0xFFF8FAFC)
+    val dividerColor = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = dialogBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.75f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxSize()
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ব্যক্তি সিলেক্ট করুন" else "Select Person",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 18.sp,
+                        color = textColor
+                    )
+                    
+                    IconButton(
+                        onClick = onAddPersonClick,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PersonAdd,
+                            contentDescription = "Add Person",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { 
+                        Text(
+                            text = if (language == AppLanguage.BN) "নাম, ফোন বা ঠিকানা দিয়ে খুঁজুন..." else "Search by name, phone...",
+                            color = secondaryTextColor.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        ) 
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = "Search",
+                            tint = secondaryTextColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = dividerColor,
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // List of Persons
+                if (filteredPersons.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "কোনো ব্যক্তি পাওয়া যায়নি" else "No person found",
+                            color = secondaryTextColor,
+                            fontSize = 14.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(filteredPersons) { person ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onSelect(person)
+                                        onDismiss()
+                                    },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = cardBg)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Avatar / Photo
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (person.photoUri.isNotEmpty()) {
+                                            AsyncImage(
+                                                model = person.photoUri,
+                                                contentDescription = person.name,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Text(
+                                                text = person.name.take(1).uppercase(),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 18.sp
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    // Info
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = person.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            color = textColor
+                                        )
+
+                                        if (person.phone.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Phone,
+                                                    contentDescription = "Phone",
+                                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = person.phone,
+                                                    fontSize = 11.sp,
+                                                    color = secondaryTextColor
+                                                )
+                                            }
+                                        }
+
+                                        if (person.address.isNotEmpty()) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.LocationOn,
+                                                    contentDescription = "Address",
+                                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = person.address,
+                                                    fontSize = 11.sp,
+                                                    color = secondaryTextColor,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Cancel Button
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
     language: AppLanguage,
     persons: List<Person>,
@@ -4396,6 +5740,8 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
     var personDropdownExpanded by remember { mutableStateOf(false) }
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    var showPersonSelector by remember { mutableStateOf(false) }
+    val isPersonRequired = type != "INCOME" && type != "EXPENSE"
 
     val dialogBg = if (isDark) Color(0xFF141724) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF0F1724)
@@ -4505,7 +5851,6 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                 }
 
                 // Link with Person (Needed for Lending, Borrowing, Repayments)
-                val isPersonRequired = type != "INCOME" && type != "EXPENSE"
                 if (isPersonRequired) {
                     item {
                         Text(Translation.get("person", language) + (if (isPersonRequired) " *" else ""), color = labelColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -4515,46 +5860,30 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
-                                ExposedDropdownMenuBox(
-                                    expanded = personDropdownExpanded,
-                                    onExpandedChange = { personDropdownExpanded = !personDropdownExpanded }
-                                ) {
-                                    val selectedPersonName = persons.find { it.id == selectedPersonId }?.name ?: Translation.get("select_person", language)
-                                    OutlinedTextField(
-                                        readOnly = true,
-                                        value = selectedPersonName,
-                                        onValueChange = {},
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = personDropdownExpanded) },
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = textColor,
-                                            unfocusedTextColor = textColor,
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = labelColor
-                                        ),
-                                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
-                                    )
-                                    ExposedDropdownMenu(
-                                        expanded = personDropdownExpanded,
-                                        onDismissRequest = { personDropdownExpanded = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(Translation.get("select_person", language)) },
-                                            onClick = {
-                                                selectedPersonId = null
-                                                personDropdownExpanded = false
-                                            }
-                                        )
-                                        persons.forEach { person ->
-                                            DropdownMenuItem(
-                                                text = { Text(person.name) },
-                                                onClick = {
-                                                    selectedPersonId = person.id
-                                                    personDropdownExpanded = false
-                                                }
+                                val selectedPersonName = persons.find { it.id == selectedPersonId }?.name ?: Translation.get("select_person", language)
+                                OutlinedTextField(
+                                    readOnly = true,
+                                    value = selectedPersonName,
+                                    onValueChange = {},
+                                    trailingIcon = { 
+                                        IconButton(onClick = { showPersonSelector = true }) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ArrowDropDown,
+                                                contentDescription = "Select Person",
+                                                tint = labelColor
                                             )
                                         }
-                                    }
-                                }
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = textColor,
+                                        unfocusedTextColor = textColor,
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = labelColor
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showPersonSelector = true }
+                                )
                             }
                             IconButton(
                                 onClick = onAddPersonClick,
@@ -4777,8 +6106,21 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                 }
             }
         }
-            }
-        }
+    }
+
+    if (showPersonSelector && isPersonRequired) {
+        PersonSelectorDialog(
+            language = language,
+            persons = persons,
+            isDark = isDark,
+            onDismiss = { showPersonSelector = false },
+            onSelect = { person ->
+                selectedPersonId = person.id
+            },
+            onAddPersonClick = onAddPersonClick
+        )
+    }
+}
 
 @Composable
 fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
@@ -6345,7 +7687,7 @@ fun SettingsScreen(
     val createDocumentLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
             context.contentResolver.openOutputStream(uri)?.let { outputStream ->
-                viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, {
+                viewModel.exportBackupToUri(context, outputStream, pendingLocalBackupComment, null, {
                     viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", isSuccess = true, type = "SUCCESS")
                     pendingLocalBackupComment = ""
                     if (isSignoutBackupActive) {
@@ -10088,7 +11430,7 @@ fun GoogleDriveRestoreListDialog(
     ) { uri ->
         uri?.let {
             context.contentResolver.openOutputStream(it)?.let { outputStream ->
-                viewModel.exportBackupToUri(context, outputStream, "Auto Backup before Cloud Restore", {
+                viewModel.exportBackupToUri(context, outputStream, "Auto Backup before Cloud Restore", null, {
                     viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ব্যাকআপ সফলভাবে সেভ হয়েছে!" else "Backup successfully saved!", isSuccess = true, type = "SUCCESS")
                 }, { error ->
                     viewModel.triggerCustomNotification("Error: $error", isSuccess = false, type = "ERROR")

@@ -12,9 +12,10 @@ fun highlightMatch(text: String, query: String, highlightColor: Color): Annotate
     val matches = Regex(query, RegexOption.IGNORE_CASE).findAll(text)
     return buildAnnotatedString {
         var currentIndex = 0
+        val highlightBg = highlightColor.copy(alpha = 0.2f)
         for (match in matches) {
             append(text.substring(currentIndex, match.range.first))
-            pushStyle(SpanStyle(color = highlightColor, fontWeight = FontWeight.ExtraBold))
+            pushStyle(SpanStyle(background = highlightBg, color = highlightColor, fontWeight = FontWeight.ExtraBold))
             append(text.substring(match.range))
             pop()
             currentIndex = match.range.last + 1

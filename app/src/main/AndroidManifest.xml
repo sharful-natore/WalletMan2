@@ -32,6 +32,15 @@
             <meta-data android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+        <activity
+            android:name=".widget.WidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FinanceNote">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver android:name=".widget.FinanceWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
