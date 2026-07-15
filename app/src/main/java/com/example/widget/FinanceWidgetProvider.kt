@@ -55,44 +55,58 @@ class FinanceWidgetProvider : AppWidgetProvider() {
 
 fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
     val views = RemoteViews(context.packageName, R.layout.widget_finance)
+    
+    val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+    val widgetWorkspaceId = prefs.getString("widget_workspace_$appWidgetId", null) 
+        ?: prefs.getString("active_workspace_id", "default") 
+        ?: "default"
 
     val txIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_ADD_TRANSACTION"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val personIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_DEBT_CREDIT"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val savingIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_SAVINGS"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     val incomeViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_INCOME"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val expenseViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_EXPENSE"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val debtViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_DEBT"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val creditViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_CREDIT"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     val profileIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_REFRESH_WIDGET"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     val syncIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_SYNC_TRIGGER"
+        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
@@ -108,11 +122,6 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
     // Background logic to load data
-    val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-    val widgetWorkspaceId = prefs.getString("widget_workspace_$appWidgetId", null) 
-        ?: prefs.getString("active_workspace_id", "default") 
-        ?: "default"
-
     val switchIntent = Intent(context, FinanceWidgetProvider::class.java).apply {
         action = "ACTION_WIDGET_SWITCH_WORKSPACE"
         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -162,11 +171,12 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             val googleName = gPrefs.getString("google_name", null)
             val googleEmail = gPrefs.getString("google_email", null)
 
-            val profileIntent = Intent(context, MainActivity::class.java).apply {
+            val profileIntentInternal = Intent(context, MainActivity::class.java).apply {
                 action = "ACTION_REFRESH_WIDGET"
+                putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
-            views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+            views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntentInternal, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
             val profileName = if (isGoogleSignedIn && widgetWorkspaceId == "default") (googleName ?: rawName) else rawName
 

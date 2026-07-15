@@ -19,16 +19,19 @@ import com.example.ui.viewmodel.FinanceViewModelFactory
 
 class MainActivity : ComponentActivity() {
     private val actionState = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val targetWorkspaceState = androidx.compose.runtime.mutableStateOf<String?>(null)
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         actionState.value = intent.action
+        targetWorkspaceState.value = intent.getStringExtra("EXTRA_TARGET_WORKSPACE_ID")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         actionState.value = intent?.action
+        targetWorkspaceState.value = intent?.getStringExtra("EXTRA_TARGET_WORKSPACE_ID")
         
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -61,9 +64,14 @@ class MainActivity : ComponentActivity() {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
             val language by viewModel.language.collectAsState()
             val action by actionState
+            val targetWorkspaceId by targetWorkspaceState
             
             FinanceNoteTheme(darkTheme = isDarkTheme, language = language) {
-                FinanceNoteApp(viewModel = viewModel, initialAction = action)
+                FinanceNoteApp(
+                    viewModel = viewModel, 
+                    initialAction = action,
+                    targetWorkspaceId = targetWorkspaceId
+                )
             }
         }
     }

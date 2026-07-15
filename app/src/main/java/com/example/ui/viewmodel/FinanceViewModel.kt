@@ -269,10 +269,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun selectWorkspace(workspaceId: String) {
+        val oldId = _currentWorkspaceId.value
         _currentWorkspaceId.value = workspaceId
         prefs.edit().putString("active_workspace_id", workspaceId).apply()
         loadProfile(getApplication())
         onLocalDatabaseChanged()
+        
+        if (oldId != workspaceId) {
+            triggerCustomNotification(
+                if (_language.value == com.example.ui.AppLanguage.BN) 
+                    "ওয়ার্কস্পেস পরিবর্তন করা হয়েছে" 
+                else "Workspace changed", 
+                isSuccess = true, 
+                type = "SUCCESS"
+            )
+        }
     }
 
     fun createWorkspace(name: String) {

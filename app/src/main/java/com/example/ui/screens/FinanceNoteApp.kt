@@ -57,6 +57,28 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.app.Activity
+import androidx.activity.result.contract.ActivityResultContract
+import com.yalantis.ucrop.UCrop
+import java.io.File
+
+class UCropContract : ActivityResultContract<Pair<Uri, Uri>, Uri?>() {
+    override fun createIntent(context: Context, input: Pair<Uri, Uri>): Intent {
+        val (sourceUri, destinationUri) = input
+        return UCrop.of(sourceUri, destinationUri)
+            .withAspectRatio(1f, 1f)
+            .withMaxResultSize(1000, 1000)
+            .getIntent(context)
+    }
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? {
+        return if (resultCode == Activity.RESULT_OK && intent != null) {
+            UCrop.getOutput(intent)
+        } else {
+            null
+        }
+    }
+}
 
 
 
@@ -1068,7 +1090,11 @@ class NotchedBottomBarShape(
 }
 
 @Composable
-fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
+fun FinanceNoteApp(
+    viewModel: FinanceViewModel, 
+    initialAction: String? = null,
+    targetWorkspaceId: String? = null
+) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
@@ -1099,6 +1125,14 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
     val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
     var showUpdatePopup by remember(initialAction) { mutableStateOf(initialAction == "ACTION_SHOW_UPDATE") }
+
+    LaunchedEffect(targetWorkspaceId) {
+        targetWorkspaceId?.let { id ->
+            if (currentWorkspace.id != id) {
+                viewModel.selectWorkspace(id)
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.updateManager.checkForUpdates(context) { isAvailable ->
@@ -1292,10 +1326,13 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
     var showDeletePersonConfirmId by remember { mutableStateOf<Int?>(null) }
+    var showDeleteGoalConfirmId by remember { mutableStateOf<Int?>(null) }
     var selectedSavingsGoalDetail by remember { mutableStateOf<SavingsGoal?>(null) }
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
     var personToMove by remember { mutableStateOf<Person?>(null) }
     var goalToMove by remember { mutableStateOf<SavingsGoal?>(null) }
+    var personActionChoice by remember { mutableStateOf<Person?>(null) }
+    var goalActionChoice by remember { mutableStateOf<SavingsGoal?>(null) }
 
     var showExitConfirm by remember { mutableStateOf(false) }
     var highlightedTxId by remember { mutableStateOf<Int?>(null) }
@@ -1428,6 +1465,39 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                 goalToMove = null
             },
             onDismiss = { goalToMove = null }
+        )
+    }
+
+    if (personActionChoice != null) {
+        ItemActionChoiceDialog(
+            itemName = personActionChoice!!.name,
+            language = language,
+            isDark = isDarkTheme,
+            onMove = { personToMove = personActionChoice },
+            onDelete = { showDeletePersonConfirmId = personActionChoice!!.id },
+            onDismiss = { personActionChoice = null }
+        )
+    }
+
+    if (goalActionChoice != null) {
+        ItemActionChoiceDialog(
+            itemName = goalActionChoice!!.title,
+            language = language,
+            isDark = isDarkTheme,
+            onMove = { goalToMove = goalActionChoice },
+            onDelete = { showDeleteGoalConfirmId = goalActionChoice!!.id },
+            onDismiss = { goalActionChoice = null }
+        )
+    }
+
+    if (showDeleteGoalConfirmId != null) {
+        DeleteVerificationDialog(
+            language = language,
+            onConfirm = {
+                viewModel.deleteSavingsGoal(showDeleteGoalConfirmId!!)
+                showDeleteGoalConfirmId = null
+            },
+            onDismiss = { showDeleteGoalConfirmId = null }
         )
     }
 
@@ -1954,6 +2024,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                 if (tab == "debts") debtFilter = filter
                                                 if (tab == "settings") settingsFilter = filter
                                             },
+                                            onWorkspaceClick = { showWorkspaceDialog = true },
                                             timeFilter = timeFilter,
                                             onTimeFilterChange = handleTimeFilterChange,
                                             isGoogleSignedIn = isGoogleSignedIn,
@@ -1973,8 +2044,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                     selectedPersonDetail = foundDebt
                                                     activeTab = "debts"
                                                 }
-                                            },
-                                            onWorkspaceClick = { showWorkspaceDialog = true }
+                                            }
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -2009,8 +2079,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                             personDebts = filteredPersonDebts,
                                             onAddPersonClick = { showAddPersonDialog = true },
                                             onPersonClick = { selectedPersonDetail = it },
-                                            onDeletePerson = { viewModel.deletePerson(it) },
-                                            onMovePerson = { personToMove = it },
+                                            onDeletePerson = { showDeletePersonConfirmId = it },
+                                            onMovePerson = { personActionChoice = it },
                                             filter = debtFilter,
                                             onFilterChange = { debtFilter = it },
                                             timeFilter = timeFilter,
@@ -2029,7 +2099,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                 isWithdrawMode = isWithdraw
                                             },
                                             onEditGoal = { goalToEdit = it },
-                                            onMoveGoal = { goalToMove = it },
+                                            onMoveGoal = { goalActionChoice = it },
                                             highlightedGoalId = highlightedGoalId
                                         )
                                     }
@@ -2206,7 +2276,7 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                             },
                             onDeleteTx = { viewModel.deleteSavingsTransaction(it) },
                             onEditTx = { savingsTxToEdit = it },
-                            onMoveGoal = { goalToMove = it }
+                            onMoveGoal = { goalActionChoice = it }
                         )
                     }
                 }
@@ -2969,14 +3039,14 @@ fun DashboardScreen(
     onDeleteTransaction: (Int) -> Unit,
     onEditTransaction: (Transaction) -> Unit,
     onNavigate: (String, String) -> Unit,
+    onWorkspaceClick: () -> Unit = {},
     timeFilter: String = "ALL",
     onTimeFilterChange: (String) -> Unit = {},
     isGoogleSignedIn: Boolean = false,
     onSignInClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     viewModel: FinanceViewModel? = null,
-    onPersonClick: ((Person) -> Unit)? = null,
-    onWorkspaceClick: () -> Unit = {}
+    onPersonClick: ((Person) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -3127,9 +3197,9 @@ fun DashboardScreen(
                     // Profile text details
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = getGreeting(language),
+                            text = "${getGreeting(language)} | ${currentWorkspace?.name ?: ""}",
                             color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 14.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
                         Row(
@@ -3137,13 +3207,15 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = profileName.ifBlank { currentWorkspace.name },
+                                text = profileName.ifBlank { currentWorkspace?.name ?: "" },
                                 color = Color.White,
-                                fontSize = 18.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .clickable { onWorkspaceClick() }
                             )
                             
                             Box(
@@ -6173,11 +6245,16 @@ fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                     color = textColor
                 )
 
+                val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->
+                    uri?.let { photoUri = it.toString() }
+                }
+
                 val launcher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.GetContent()
                 ) { uri ->
                     if (uri != null) {
-                        photoUri = uri.toString()
+                        val destinationUri = Uri.fromFile(File(context.cacheDir, "person_crop_${System.currentTimeMillis()}.jpg"))
+                        cropLauncher.launch(uri to destinationUri)
                     }
                 }
 
@@ -7810,11 +7887,18 @@ fun SettingsScreen(
     var socialInput by remember(profileSocial) { mutableStateOf(profileSocial) }
     var addressInput by remember(profileAddress) { mutableStateOf(profileAddress) }
 
+    val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->
+        uri?.let {
+            photoUriInput = it.toString()
+        }
+    }
+
     val photoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            photoUriInput = it.toString()
+            val destinationUri = Uri.fromFile(File(context.cacheDir, "profile_crop_${System.currentTimeMillis()}.jpg"))
+            cropLauncher.launch(it to destinationUri)
         }
     }
 
