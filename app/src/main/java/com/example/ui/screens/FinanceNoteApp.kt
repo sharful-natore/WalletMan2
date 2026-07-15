@@ -470,7 +470,7 @@ fun WorkspaceManagementDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp)
+                        .weight(1f, fill = false)
                 ) {
                     items(workspaces) { ws ->
                         val isSelected = ws.workspace.id == currentWorkspace.id
@@ -703,7 +703,7 @@ fun WorkspaceManagementDialog(
                 )
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -1450,6 +1450,33 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
         }
     }
 
+    var showWorkspaceDialog by remember { mutableStateOf(false) }
+    val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
+    val currentWorkspace by viewModel.currentWorkspace.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত"))
+
+    if (showWorkspaceDialog) {
+        WorkspaceManagementDialog(
+            language = language,
+            isDark = isDarkTheme,
+            workspaces = workspaceStatsList,
+            currentWorkspace = currentWorkspace,
+            onSelect = { workspaceId ->
+                viewModel.selectWorkspace(workspaceId)
+                showWorkspaceDialog = false
+            },
+            onCreate = { name ->
+                viewModel.createWorkspace(name)
+            },
+            onEdit = { id, name ->
+                viewModel.editWorkspace(id, name)
+            },
+            onDelete = { workspaceId ->
+                viewModel.deleteWorkspace(workspaceId)
+            },
+            onDismiss = { showWorkspaceDialog = false }
+        )
+    }
+
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme
     ) {
@@ -1911,7 +1938,8 @@ fun FinanceNoteApp(viewModel: FinanceViewModel, initialAction: String? = null) {
                                                     selectedPersonDetail = foundDebt
                                                     activeTab = "debts"
                                                 }
-                                            }
+                                            },
+                                            onWorkspaceClick = { showWorkspaceDialog = true }
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -2910,12 +2938,12 @@ fun DashboardScreen(
     onSignInClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     viewModel: FinanceViewModel? = null,
-    onPersonClick: ((Person) -> Unit)? = null
+    onPersonClick: ((Person) -> Unit)? = null,
+    onWorkspaceClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val currentWorkspace by viewModel?.currentWorkspace?.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) ?: remember { mutableStateOf(com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) }
-    var showWorkspaceDialog by remember { mutableStateOf(false) }
     val workspaceStatsList by viewModel?.workspaceStatsList?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
@@ -3059,7 +3087,7 @@ fun DashboardScreen(
                                     .size(24.dp)
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.15f))
-                                    .clickable { showWorkspaceDialog = true },
+                                    .clickable { onWorkspaceClick() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -11533,7 +11561,30 @@ fun GoogleDriveRestoreListDialog(
                     ) {
                         items(files) { file ->
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable {
+                                        isDownloadingByFileId = file.id
+                                        viewModel.downloadGoogleDriveFile(
+                                            context = context,
+                                            fileId = file.id,
+                                            onSuccess = { jsonContent ->
+                                                isDownloadingByFileId = null
+                                                val parsed = viewModel.parseBackupJson(jsonContent)
+                                                if (parsed != null) {
+                                                    pendingCloudRestoreData = parsed
+                                                    pendingCloudRestoreStats = viewModel.calculateBackupStats(parsed)
+                                                    pendingCloudRestoreFileName = file.name
+                                                    pendingCloudRestoreJson = jsonContent
+                                                } else {
+                                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
+                                                }
+                                            },
+                                            onError = { err ->
+                                                isDownloadingByFileId = null
+                                                viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ডাউনলোড ব্যর্থ হয়েছে: " else "Download failed: "}$err", isSuccess = false, type = "ERROR")
+                                            }
+                                        )
+                                    },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9)

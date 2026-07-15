@@ -53,6 +53,10 @@ fun BackupStatsDialog(
     val allWorkspaceIds = remember(availableWorkspaces) { availableWorkspaces.map { it.id }.toSet() }
     var selectedWorkspaces by remember { mutableStateOf(allWorkspaceIds) }
     
+    LaunchedEffect(allWorkspaceIds) {
+        selectedWorkspaces = allWorkspaceIds
+    }
+    
     val timestampStr = remember { java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date()) }
     
     LaunchedEffect(selectedWorkspaces) {
@@ -261,6 +265,34 @@ fun BackupStatsDialog(
                             modifier = Modifier.heightIn(max = 160.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            item {
+                                val allSelected = selectedWorkspaces.size == allWorkspaceIds.size
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (allSelected) Color(0xFF3B82F6).copy(alpha = 0.1f) else Color.Transparent)
+                                        .clickable {
+                                            selectedWorkspaces = if (allSelected) emptySet() else allWorkspaceIds
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = allSelected,
+                                        onCheckedChange = null,
+                                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFF3B82F6))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "সবগুলো নির্বাচন করুন" else "Select All",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else Color.Black
+                                    )
+                                }
+                            }
+                            
                             items(availableWorkspaces) { ws ->
                                 val isSelected = selectedWorkspaces.contains(ws.id)
                                 Row(
@@ -440,7 +472,7 @@ fun BackupStatsDialog(
 
                     Button(
                         onClick = { onConfirm(fileName, comment, selectedWorkspaces.toList()) },
-                        enabled = isCorrect,
+                        enabled = isCorrect && selectedWorkspaces.isNotEmpty(),
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isRestoreMode) Color(0xFF10B981) else Color(0xFF3B82F6),
@@ -454,7 +486,7 @@ fun BackupStatsDialog(
                             } else {
                                 if (language == AppLanguage.BN) "ব্যাকআপ নিন" else "Backup"
                             },
-                            color = if (isCorrect) Color.White else (if (isDark) Color.Gray else Color(0xFF94A3B8)),
+                            color = if (isCorrect && selectedWorkspaces.isNotEmpty()) Color.White else (if (isDark) Color.Gray else Color(0xFF94A3B8)),
                             fontWeight = FontWeight.Bold
                         )
                     }
