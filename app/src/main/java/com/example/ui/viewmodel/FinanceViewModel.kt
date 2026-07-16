@@ -209,6 +209,40 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     )
     val currentWorkspaceId: StateFlow<String> = _currentWorkspaceId.asStateFlow()
 
+    private val _budgetIncome = MutableStateFlow(0.0)
+    val budgetIncome: StateFlow<Double> = _budgetIncome.asStateFlow()
+
+    private val _budgetExpense = MutableStateFlow(0.0)
+    val budgetExpense: StateFlow<Double> = _budgetExpense.asStateFlow()
+
+    private val _budgetSavings = MutableStateFlow(0.0)
+    val budgetSavings: StateFlow<Double> = _budgetSavings.asStateFlow()
+
+    fun loadBudgets() {
+        val workspaceId = _currentWorkspaceId.value
+        _budgetIncome.value = prefs.getFloat("budget_income_$workspaceId", 0.0f).toDouble()
+        _budgetExpense.value = prefs.getFloat("budget_expense_$workspaceId", 0.0f).toDouble()
+        _budgetSavings.value = prefs.getFloat("budget_savings_$workspaceId", 0.0f).toDouble()
+    }
+
+    fun setBudgetIncome(amount: Double) {
+        val workspaceId = _currentWorkspaceId.value
+        prefs.edit().putFloat("budget_income_$workspaceId", amount.toFloat()).apply()
+        _budgetIncome.value = amount
+    }
+
+    fun setBudgetExpense(amount: Double) {
+        val workspaceId = _currentWorkspaceId.value
+        prefs.edit().putFloat("budget_expense_$workspaceId", amount.toFloat()).apply()
+        _budgetExpense.value = amount
+    }
+
+    fun setBudgetSavings(amount: Double) {
+        val workspaceId = _currentWorkspaceId.value
+        prefs.edit().putFloat("budget_savings_$workspaceId", amount.toFloat()).apply()
+        _budgetSavings.value = amount
+    }
+
     val currentWorkspace: StateFlow<com.example.data.Workspace> = combine(workspaces, currentWorkspaceId) { list, activeId ->
         list.find { it.id == activeId } ?: list.firstOrNull() ?: com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.data.Workspace(id = "default", name = "ব্যক্তিগত"))
@@ -273,6 +307,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _currentWorkspaceId.value = workspaceId
         prefs.edit().putString("active_workspace_id", workspaceId).apply()
         loadProfile(getApplication())
+        loadBudgets()
         onLocalDatabaseChanged()
         com.example.widget.updateAllWidgets(getApplication())
         
@@ -733,6 +768,58 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun deleteTransactions(ids: List<Int>) {
+        viewModelScope.launch {
+            ids.forEach { id ->
+                val t = repository.getTransactionById(id)
+                if (t != null) {
+                    repository.insertTrashItem(com.example.data.TrashItem(originalId = id, itemType = "TRANSACTION", itemJson = transactionAdapter.toJson(t)))
+                }
+                repository.deleteTransaction(id)
+            }
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "${ids.size}টি লেনদেন মুছে ফেলা হয়েছে" else "${ids.size} transactions deleted", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    fun deleteSavingsGoals(ids: List<Int>) {
+        viewModelScope.launch {
+            ids.forEach { id ->
+                val g = repository.getSavingsGoalById(id)
+                if (g != null) {
+                    val txs = repository.getSavingsTransactionsByGoalList(id)
+                    val gWithTx = com.example.data.GoalWithTransactions(g, txs)
+                    repository.insertTrashItem(com.example.data.TrashItem(
+                        originalId = id, 
+                        itemType = "SAVINGS_GOAL_WITH_TXS", 
+                        itemJson = goalWithTxAdapter.toJson(gWithTx)
+                    ))
+                }
+                repository.deleteSavingsGoal(id)
+            }
+            onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "${ids.size}টি সঞ্চয় কার্ড মুছে ফেলা হয়েছে" else "${ids.size} savings cards deleted", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    fun moveSavingsGoals(ids: List<Int>, targetWorkspaceId: String) {
+        viewModelScope.launch {
+            ids.forEach { goalId ->
+                val goal = repository.getSavingsGoalById(goalId)
+                if (goal != null) {
+                    repository.insertSavingsGoal(goal.copy(workspaceId = targetWorkspaceId))
+                    val transactions = repository.getSavingsTransactionsByGoalList(goalId)
+                    transactions.forEach { tx ->
+                        repository.updateSavingsTransaction(tx.copy(workspaceId = targetWorkspaceId))
+                    }
+                }
+            }
+            onLocalDatabaseChanged()
+            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "${ids.size}টি সঞ্চয় কার্ড অন্য ওয়ার্কস্পেসে মুভ করা হয়েছে" else "${ids.size} savings cards moved", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
     private suspend fun restoreFullBackup(backup: FinanceBackup) {
         repository.restoreBackupData(backup)
         if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
@@ -936,6 +1023,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     init {
         registerNetworkCallback()
+        loadBudgets()
         viewModelScope.launch {
             try {
                 val list = repository.allWorkspaces.first()

@@ -124,6 +124,218 @@ fun getCustomTimeFilterLabel(timeFilter: String, lang: AppLanguage): String {
 }
 
 @Composable
+fun CategorySegmentedDonutChart(
+    targetAmount: Double,
+    totalFilledAmount: Double,
+    segments: List<Pair<String, Double>>,
+    isDark: Boolean,
+    language: AppLanguage,
+    modifier: Modifier = Modifier,
+    strokeWidthDp: Dp = 10.dp,
+    centerTextSize: TextUnit = 14.sp
+) {
+    val progress = if (targetAmount > 0.0) {
+        (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
+    } else {
+        0.0
+    }
+
+    val percentageText = if (targetAmount > 0.0) {
+        "${(progress * 100).toInt()}%"
+    } else {
+        if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+    }
+
+    // Unfilled base color (white/light gray)
+    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.15f) else Color(0xFFE2E8F0)
+
+    val colors = listOf(
+        Color(0xFF10B981), // Emerald
+        Color(0xFF3B82F6), // Blue
+        Color(0xFFF59E0B), // Amber
+        Color(0xFFEF4444), // Red
+        Color(0xFF8B5CF6), // Purple
+        Color(0xFFEC4899), // Pink
+        Color(0xFF14B8A6), // Teal
+        Color(0xFFF97316), // Orange
+        Color(0xFF06B6D4), // Cyan
+        Color(0xFF6366F1), // Indigo
+    )
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val sizeMin = size.minDimension
+            val strokeWidthPx = strokeWidthDp.toPx()
+            val radius = (sizeMin - strokeWidthPx) / 2f
+
+            // 1. Draw background full circle (unfilled base)
+            drawCircle(
+                color = unfilledColor,
+                radius = radius,
+                style = Stroke(width = strokeWidthPx)
+            )
+
+            // 2. Draw active segments as arcs
+            if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
+                var startAngle = -90f
+                val gapAngle = 4.5f // clean tiny gap between segments for beautiful visual separation
+
+                val validSegments = segments.filter { it.second > 0.0 }
+                val segmentsSum = validSegments.sumOf { it.second }
+
+                if (segmentsSum > 0.0) {
+                    validSegments.forEachIndexed { index, segment ->
+                        val segmentAmount = segment.second
+                        // Scale the segment's arc proportionally to the filled progress
+                        val segmentProgress = (segmentAmount / targetAmount).coerceIn(0.0, 1.0)
+                        val sweepAngle = (segmentProgress * 360f).toFloat()
+                        val color = colors[index % colors.size]
+
+                        if (sweepAngle > 0f) {
+                            val isOnlySegment = validSegments.size == 1 && segmentProgress >= 0.99
+                            if (isOnlySegment) {
+                                drawArc(
+                                    color = color,
+                                    startAngle = startAngle,
+                                    sweepAngle = sweepAngle,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                )
+                            } else {
+                                val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(1f)
+                                val adjustedStart = startAngle + (gapAngle / 2f)
+                                drawArc(
+                                    color = color,
+                                    startAngle = adjustedStart,
+                                    sweepAngle = adjustedSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                )
+                            }
+                        }
+                        startAngle += sweepAngle
+                    }
+                }
+            }
+        }
+
+        // Center percentage text (no Filled label)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = formatNumberString(percentageText, language),
+                fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (targetAmount > 0.0) (if (isDark) Color.White else Color.Black) else Color.Gray,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun SegmentedDonutChart(
+    incomeProgress: Double,
+    expenseProgress: Double,
+    savingsProgress: Double,
+    activeCount: Int,
+    isDark: Boolean,
+    language: AppLanguage,
+    modifier: Modifier = Modifier,
+    strokeWidthDp: Dp = 16.dp,
+    centerTextSize: TextUnit = 24.sp
+) {
+    val totalProgress = if (activeCount > 0) {
+        (incomeProgress + expenseProgress + savingsProgress) / activeCount
+    } else {
+        0.0
+    }
+
+    val percentageText = "${(totalProgress * 100).toInt()}%"
+
+    val incomeColor = Color(0xFF22C55E) // Modern emerald green
+    val expenseColor = Color(0xFFEF4444) // Modern coral red
+    val savingsColor = Color(0xFF3B82F6) // Modern bright blue
+    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.15f) else Color(0xFFE2E8F0)
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val sizeMin = size.minDimension
+            val strokeWidthPx = strokeWidthDp.toPx()
+            val radius = (sizeMin - strokeWidthPx) / 2f
+
+            // 1. Draw background full circle
+            drawCircle(
+                color = unfilledColor,
+                radius = radius,
+                style = Stroke(width = strokeWidthPx)
+            )
+
+            // 2. Draw active segments
+            if (activeCount > 0 && totalProgress > 0.0) {
+                var startAngle = -90f
+                val gapAngle = 4.5f
+
+                val activeSegments = mutableListOf<Pair<Double, Color>>()
+                if (incomeProgress > 0.0) activeSegments.add(Pair(incomeProgress, incomeColor))
+                if (expenseProgress > 0.0) activeSegments.add(Pair(expenseProgress, expenseColor))
+                if (savingsProgress > 0.0) activeSegments.add(Pair(savingsProgress, savingsColor))
+
+                activeSegments.forEachIndexed { index, segment ->
+                    val progressVal = segment.first
+                    val sweepAngle = ((progressVal / activeCount) * 360f).toFloat()
+
+                    if (sweepAngle > 0f) {
+                        val isOnlySegment = activeSegments.size == 1 && (progressVal / activeCount) >= 0.99
+                        if (isOnlySegment) {
+                            drawArc(
+                                color = segment.second,
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                            )
+                        } else {
+                            val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(1f)
+                            val adjustedStart = startAngle + (gapAngle / 2f)
+                            drawArc(
+                                color = segment.second,
+                                startAngle = adjustedStart,
+                                sweepAngle = adjustedSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                            )
+                        }
+                    }
+                    startAngle += sweepAngle
+                }
+            }
+        }
+
+        // 3. Center percentage text (no Filled label)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = percentageText,
+                fontSize = centerTextSize,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isDark) Color.White else Color.Black
+            )
+        }
+    }
+}
+
+@Composable
 fun HighlightedText(
     text: String,
     query: String,
@@ -1352,6 +1564,7 @@ fun FinanceNoteApp(
     var goalToEdit by remember { mutableStateOf<SavingsGoal?>(null) }
     var personToMove by remember { mutableStateOf<Person?>(null) }
     var personsToMoveIds by remember { mutableStateOf<List<Int>?>(null) }
+    var goalsToMoveIds by remember { mutableStateOf<List<Int>?>(null) }
     var goalToMove by remember { mutableStateOf<SavingsGoal?>(null) }
     var personActionChoice by remember { mutableStateOf<Person?>(null) }
     var goalActionChoice by remember { mutableStateOf<SavingsGoal?>(null) }
@@ -1487,6 +1700,21 @@ fun FinanceNoteApp(
                 personsToMoveIds = null
             },
             onDismiss = { personsToMoveIds = null }
+        )
+    }
+
+    if (goalsToMoveIds != null) {
+        MoveToWorkspaceDialog(
+            itemName = if (language == AppLanguage.BN) "${goalsToMoveIds!!.size}টি সঞ্চয় কার্ড" else "${goalsToMoveIds!!.size} savings cards",
+            language = language,
+            isDark = isDarkTheme,
+            workspaces = workspaceStatsList,
+            currentWorkspaceId = currentWorkspace.id,
+            onConfirm = { targetWorkspaceId ->
+                viewModel.moveSavingsGoals(goalsToMoveIds!!, targetWorkspaceId)
+                goalsToMoveIds = null
+            },
+            onDismiss = { goalsToMoveIds = null }
         )
     }
 
@@ -1796,7 +2024,7 @@ fun FinanceNoteApp(
                                 modifier = Modifier
                                     .clip(CircleShape)
                                     .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .padding(horizontal = 18.dp, vertical = 8.dp)
                              ) {
                                 if (icon is ImageVector) {
                                     Icon(
@@ -1822,19 +2050,19 @@ fun FinanceNoteApp(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 0.dp) // Removed 16dp space to avoid "fixed card" look
-                            .height(52.dp + navBarPadding)
-                            .clip(NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp))
+                            .height(55.dp + navBarPadding)
+                            .clip(NotchedBottomBarShape(notchRadiusDp = 38.dp, cornerRadiusDp = 12.dp))
                             .background(bottomBarGradient)
                             .border(
                                 width = 1.dp,
                                 color = glassBorderColor,
-                                shape = NotchedBottomBarShape(notchRadiusDp = 36.dp, cornerRadiusDp = 12.dp)
+                                shape = NotchedBottomBarShape(notchRadiusDp = 38.dp, cornerRadiusDp = 12.dp)
                             )
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp)
+                                .height(55.dp)
                                 .align(Alignment.TopCenter),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -1859,7 +2087,7 @@ fun FinanceNoteApp(
                             }
 
                             // Spacer in the middle for the notch cutout
-                            Spacer(modifier = Modifier.width(68.dp))
+                            Spacer(modifier = Modifier.width(72.dp))
 
                             // Right-side items
                             Row(
@@ -1887,9 +2115,9 @@ fun FinanceNoteApp(
                     // 2. Floating Add Button sits beautifully centered in the notch cutout
                     Box(
                         modifier = Modifier
-                            .padding(bottom = 8.dp + navBarPadding) // Lowered to nestle perfectly in the notch
+                            .padding(bottom = 9.dp + navBarPadding) // Lowered to nestle perfectly in the notch
                             .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0xFF6F7BF7), ambientColor = Color(0xFF38BDF8))
-                            .size(64.dp)
+                            .size(68.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
@@ -1904,7 +2132,7 @@ fun FinanceNoteApp(
                             imageVector = Icons.Rounded.Add,
                             contentDescription = "Add Transaction",
                             tint = Color.White,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                 }
@@ -2090,6 +2318,7 @@ fun FinanceNoteApp(
                                             persons = persons,
                                             onAddTransactionClick = { showAddTransactionDialog = true },
                                             onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                            onDeleteTransactions = { viewModel.deleteTransactions(it) },
                                             onEditTransaction = { transactionToEdit = it },
                                             filter = transactionFilter,
                                             onFilterChange = { transactionFilter = it },
@@ -2139,6 +2368,8 @@ fun FinanceNoteApp(
                                             },
                                             onEditGoal = { goalToEdit = it },
                                             onMoveGoal = { goalActionChoice = it },
+                                            onDeleteGoals = { viewModel.deleteSavingsGoals(it) },
+                                            onMoveGoals = { goalsToMoveIds = it },
                                             highlightedGoalId = highlightedGoalId
                                         )
                                     }
@@ -3058,6 +3289,43 @@ fun getGreeting(language: AppLanguage): String {
     }
 }
 
+data class BudgetAlertData(
+    val title: String,
+    val message: String,
+    val isWarning: Boolean
+)
+
+private fun showLocalSystemNotification(context: Context, title: String, message: String, notificationId: Int) {
+    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+    if (notificationManager != null) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "finance_budget_alerts",
+                "Finance Budget Alerts",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Alerts for monthly budget progress"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+        
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return
+            }
+        }
+
+        val builder = androidx.core.app.NotificationCompat.Builder(context, "finance_budget_alerts")
+            .setSmallIcon(com.example.R.drawable.ic_pie_chart)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        notificationManager.notify(notificationId, builder.build())
+    }
+}
+
 @Composable
 fun DashboardScreen(
     language: AppLanguage,
@@ -3091,6 +3359,31 @@ fun DashboardScreen(
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val currentWorkspace by viewModel?.currentWorkspace?.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) ?: remember { mutableStateOf(com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) }
     val workspaceStatsList by viewModel?.workspaceStatsList?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val savingsGoals by viewModel?.savingsGoals?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    var showBudgetDialogType by remember { mutableStateOf<String?>(null) }
+    var showBudgetDetailsType by remember { mutableStateOf<String?>(null) }
+    var activeAlertPopup by remember { mutableStateOf<BudgetAlertData?>(null) }
+    val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val incomeByCategory = remember(transactions) {
+        transactions.filter { it.type == "INCOME" }
+            .groupBy { it.category }
+            .map { Pair(it.key, it.value.sumOf { tx -> tx.amount }) }
+            .sortedByDescending { it.second }
+    }
+    val expenseByCategory = remember(transactions) {
+        transactions.filter { it.type == "EXPENSE" }
+            .groupBy { it.category }
+            .map { Pair(it.key, it.value.sumOf { tx -> tx.amount }) }
+            .sortedByDescending { it.second }
+    }
+    val savingsByGoal = remember(savingsGoals) {
+        savingsGoals.map { Pair(it.title, it.savedAmount) }
+            .sortedByDescending { it.second }
+    }
+    val budgetIncomeAmount by viewModel?.budgetIncome?.collectAsState() ?: remember { mutableStateOf(0.0) }
+    val budgetExpenseAmount by viewModel?.budgetExpense?.collectAsState() ?: remember { mutableStateOf(0.0) }
+    val budgetSavingsAmount by viewModel?.budgetSavings?.collectAsState() ?: remember { mutableStateOf(0.0) }
+    val totalSavingsAmount = savingsGoals.sumOf { it.savedAmount }
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -3116,6 +3409,124 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    val budgetPrefs = remember { context.getSharedPreferences("budget_alerts_prefs", Context.MODE_PRIVATE) }
+    val currentYearMonth = remember(transactions) {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
+        sdf.format(java.util.Date())
+    }
+
+    LaunchedEffect(
+        income, expense, totalSavingsAmount,
+        budgetIncomeAmount, budgetExpenseAmount, budgetSavingsAmount,
+        currentYearMonth
+    ) {
+        // Check Income 80%
+        if (budgetIncomeAmount > 0.0) {
+            val key = "${currentYearMonth}_income_80_alert"
+            val wasAlerted = budgetPrefs.getBoolean(key, false)
+            val ratio = income / budgetIncomeAmount
+            if (ratio >= 0.8 && !wasAlerted) {
+                val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
+                val msg = if (language == AppLanguage.BN) {
+                    "আপনি আপনার আয় বাজেটের ৮০% (${formatCurrency(income, language)}) অর্জন করেছেন!"
+                } else {
+                    "You have achieved 80% of your Income Budget (${formatCurrency(income, language)})!"
+                }
+                showLocalSystemNotification(context, title, msg, 8001)
+                activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
+                budgetPrefs.edit().putBoolean(key, true).apply()
+            } else if (ratio < 0.8 && wasAlerted) {
+                budgetPrefs.edit().remove(key).apply()
+            }
+        }
+
+        // Check Expense 80%
+        if (budgetExpenseAmount > 0.0) {
+            val key = "${currentYearMonth}_expense_80_alert"
+            val wasAlerted = budgetPrefs.getBoolean(key, false)
+            val ratio = expense / budgetExpenseAmount
+            if (ratio >= 0.8 && !wasAlerted) {
+                val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
+                val msg = if (language == AppLanguage.BN) {
+                    "সাবধান! আপনার ব্যয় বাজেটের ৮০% (${formatCurrency(expense, language)}) খরচ হয়ে গেছে!"
+                } else {
+                    "Warning! You have spent 80% of your Expense Budget limit (${formatCurrency(expense, language)})!"
+                }
+                showLocalSystemNotification(context, title, msg, 8002)
+                activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
+                budgetPrefs.edit().putBoolean(key, true).apply()
+            } else if (ratio < 0.8 && wasAlerted) {
+                budgetPrefs.edit().remove(key).apply()
+            }
+        }
+
+        // Check Savings 80%
+        if (budgetSavingsAmount > 0.0) {
+            val key = "${currentYearMonth}_savings_80_alert"
+            val wasAlerted = budgetPrefs.getBoolean(key, false)
+            val ratio = totalSavingsAmount / budgetSavingsAmount
+            if (ratio >= 0.8 && !wasAlerted) {
+                val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
+                val msg = if (language == AppLanguage.BN) {
+                    "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের ৮০% (${formatCurrency(totalSavingsAmount, language)}) পূরণ করেছেন!"
+                } else {
+                    "Amazing! You have fulfilled 80% of your Savings Goal (${formatCurrency(totalSavingsAmount, language)})!"
+                }
+                showLocalSystemNotification(context, title, msg, 8003)
+                activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
+                budgetPrefs.edit().putBoolean(key, true).apply()
+            } else if (ratio < 0.8 && wasAlerted) {
+                budgetPrefs.edit().remove(key).apply()
+            }
+        }
+    }
+
+    if (activeAlertPopup != null) {
+        val alert = activeAlertPopup!!
+        AlertDialog(
+            onDismissRequest = { activeAlertPopup = null },
+            icon = {
+                Icon(
+                    imageVector = if (alert.isWarning) Icons.Rounded.Warning else Icons.Rounded.Savings,
+                    contentDescription = null,
+                    tint = if (alert.isWarning) Color(0xFFEF4444) else Color(0xFF10B981),
+                    modifier = Modifier.size(40.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = alert.title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = if (alert.isWarning) Color(0xFFEF4444) else Color(0xFF10B981)
+                )
+            },
+            text = {
+                Text(
+                    text = alert.message,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    color = if (isDark) Color.White.copy(alpha = 0.9f) else Color.DarkGray
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { activeAlertPopup = null },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (alert.isWarning) Color(0xFFEF4444) else Color(0xFF10B981)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ঠিক আছে" else "OK",
+                        color = Color.White
+                    )
+                }
+            },
+            modifier = Modifier.testTag("budget_threshold_alert_dialog")
+        )
     }
 
     LaunchedEffect(Unit) {
@@ -3586,6 +3997,132 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
+            // Monthly Budget Control Card (সাদা রং এর)
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E222F) else Color.White),
+                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("budget_control_card")
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "মাসিক বাজেট কন্ট্রোল" else "Monthly Budget Control",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FintechBlue
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 1. Income Donut Chart
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color.White.copy(alpha = 0.02f) else Color(0xFFF8FAFC))
+                                .clickable { showBudgetDetailsType = "INCOME" }
+                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "আয়" else "Income",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color.Black,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            CategorySegmentedDonutChart(
+                                targetAmount = budgetIncomeAmount,
+                                totalFilledAmount = income,
+                                segments = incomeByCategory,
+                                isDark = isDark,
+                                language = language,
+                                modifier = Modifier.size(72.dp),
+                                strokeWidthDp = 9.dp,
+                                centerTextSize = 13.sp
+                            )
+                        }
+
+                        // 2. Expense Donut Chart
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color.White.copy(alpha = 0.02f) else Color(0xFFF8FAFC))
+                                .clickable { showBudgetDetailsType = "EXPENSE" }
+                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color.Black,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            CategorySegmentedDonutChart(
+                                targetAmount = budgetExpenseAmount,
+                                totalFilledAmount = expense,
+                                segments = expenseByCategory,
+                                isDark = isDark,
+                                language = language,
+                                modifier = Modifier.size(72.dp),
+                                strokeWidthDp = 9.dp,
+                                centerTextSize = 13.sp
+                            )
+                        }
+
+                        // 3. Savings Donut Chart
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isDark) Color.White.copy(alpha = 0.02f) else Color(0xFFF8FAFC))
+                                .clickable { showBudgetDetailsType = "SAVINGS" }
+                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "সঞ্চয়" else "Savings",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color.Black,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            CategorySegmentedDonutChart(
+                                targetAmount = budgetSavingsAmount,
+                                totalFilledAmount = totalSavingsAmount,
+                                segments = savingsByGoal,
+                                isDark = isDark,
+                                language = language,
+                                modifier = Modifier.size(72.dp),
+                                strokeWidthDp = 9.dp,
+                                centerTextSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             // Recent Transactions Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -3688,6 +4225,510 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(110.dp))
         }
     }
+
+    if (showBudgetDetailsType != null) {
+        val categoryType = showBudgetDetailsType!!
+        val targetAmount = when (categoryType) {
+            "INCOME" -> budgetIncomeAmount
+            "EXPENSE" -> budgetExpenseAmount
+            "SAVINGS" -> budgetSavingsAmount
+            else -> 0.0
+        }
+        val totalFilledAmount = when (categoryType) {
+            "INCOME" -> income
+            "EXPENSE" -> expense
+            "SAVINGS" -> totalSavingsAmount
+            else -> 0.0
+        }
+        val segments = when (categoryType) {
+            "INCOME" -> incomeByCategory
+            "EXPENSE" -> expenseByCategory
+            "SAVINGS" -> savingsByGoal
+            else -> emptyList()
+        }
+        val titleText = when (categoryType) {
+            "INCOME" -> if (language == AppLanguage.BN) "আয় বাজেটের বিস্তারিত" else "Income Budget Details"
+            "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয় বাজেটের বিস্তারিত" else "Expense Budget Details"
+            "SAVINGS" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্যের বিস্তারিত" else "Savings Goal Details"
+            else -> ""
+        }
+        
+        val subtitleText = when (categoryType) {
+            "INCOME" -> if (language == AppLanguage.BN) "আয় খাতের অবদান ও অর্জনের অগ্রগতির চিত্র" else "Contribution breakdown and achieved income budget progress."
+            "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয় খাতের অবদান ও বাজেটের অগ্রগতির চিত্র" else "Contribution breakdown and spent expense budget progress."
+            "SAVINGS" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্যভিত্তিক জমার অগ্রগতির চিত্র" else "Contribution breakdown and saved savings goal progress."
+            else -> ""
+        }
+
+        var isEditingBudget by remember { mutableStateOf(false) }
+        var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
+
+        val colors = listOf(
+            Color(0xFF10B981), // Emerald
+            Color(0xFF3B82F6), // Blue
+            Color(0xFFF59E0B), // Amber
+            Color(0xFFEF4444), // Red
+            Color(0xFF8B5CF6), // Purple
+            Color(0xFFEC4899), // Pink
+            Color(0xFF14B8A6), // Teal
+            Color(0xFFF97316), // Orange
+            Color(0xFF06B6D4), // Cyan
+            Color(0xFF6366F1), // Indigo
+        )
+
+        AlertDialog(
+            onDismissRequest = { showBudgetDetailsType = null },
+            modifier = Modifier.testTag("budget_progress_details_dialog"),
+            title = {
+                Text(
+                    text = titleText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = FintechBlue
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = subtitleText,
+                        fontSize = 13.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    // Large Segmented Donut Chart
+                    CategorySegmentedDonutChart(
+                        targetAmount = targetAmount,
+                        totalFilledAmount = totalFilledAmount,
+                        segments = segments,
+                        isDark = isDark,
+                        language = language,
+                        modifier = Modifier.size(160.dp),
+                        strokeWidthDp = 18.dp,
+                        centerTextSize = 28.sp
+                    )
+
+                    // In-place Budget Edit card
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color.White.copy(alpha = 0.04f) else Color(0xFFF1F5F9)
+                        ),
+                        border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.06f) else Color.LightGray.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            if (!isEditingBudget) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "বাজেট সীমা" else "Budget Limit",
+                                            fontSize = 12.sp,
+                                            color = Color.Gray
+                                        )
+                                        Text(
+                                            text = if (targetAmount > 0.0) formatCurrency(targetAmount, language) else (if (language == AppLanguage.BN) "সেট করা নেই" else "Not Set"),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (targetAmount > 0.0) FintechBlue else Color.Gray
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { isEditingBudget = true }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Edit,
+                                            contentDescription = "Edit Budget",
+                                            tint = FintechBlue,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    OutlinedTextField(
+                                        value = localBudgetInput,
+                                        onValueChange = { input -> 
+                                            if (input.all { it.isDigit() }) localBudgetInput = input
+                                        },
+                                        label = {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "বাজেটের পরিমাণ (টাকা)" else "Budget Amount (BDT)",
+                                                fontSize = 12.sp
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        singleLine = true,
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                        ),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = FintechBlue,
+                                            unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.4f),
+                                            focusedLabelColor = FintechBlue
+                                        ),
+                                        modifier = Modifier.fillMaxWidth().testTag("inplace_budget_input")
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        TextButton(
+                                            onClick = { isEditingBudget = false }
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                                                color = Color.Gray
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Button(
+                                            onClick = {
+                                                val newAmount = localBudgetInput.toDoubleOrNull() ?: 0.0
+                                                when (categoryType) {
+                                                    "INCOME" -> viewModel?.setBudgetIncome(newAmount)
+                                                    "EXPENSE" -> viewModel?.setBudgetExpense(newAmount)
+                                                    "SAVINGS" -> viewModel?.setBudgetSavings(newAmount)
+                                                }
+                                                isEditingBudget = false
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "সংরক্ষণ" else "Save",
+                                                color = Color.White,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Detail category progress percentages
+                    if (segments.isEmpty()) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "কোন তথ্য নেই" else "No data available",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            segments.forEachIndexed { index, segment ->
+                                val name = segment.first
+                                val amount = segment.second
+                                val color = colors[index % colors.size]
+                                
+                                val percentOfTotal = if (totalFilledAmount > 0.0) {
+                                    (amount / totalFilledAmount) * 100
+                                } else {
+                                    0.0
+                                }
+
+                                val percentOfBudget = if (targetAmount > 0.0) {
+                                    (amount / targetAmount) * 100
+                                } else {
+                                    0.0
+                                }
+
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isDark) Color.White.copy(alpha = 0.04f) else Color(0xFFF8FAFC)
+                                    ),
+                                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.06f) else Color.LightGray.copy(alpha = 0.3f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(10.dp)
+                                                        .clip(CircleShape)
+                                                        .background(color)
+                                                )
+                                                Text(
+                                                    text = name,
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isDark) Color.White else Color.Black
+                                                )
+                                            }
+                                            Text(
+                                                text = formatCurrency(amount, language),
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = FintechBlue
+                                            )
+                                        }
+                                        
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) {
+                                                    "মোট অর্জনের: ${formatNumberString("%.1f".format(percentOfTotal), language)}%"
+                                                } else {
+                                                    "Of total: %.1f%%".format(percentOfTotal)
+                                                },
+                                                fontSize = 12.sp,
+                                                color = Color.Gray
+                                            )
+                                            if (targetAmount > 0.0) {
+                                                Text(
+                                                    text = if (language == AppLanguage.BN) {
+                                                        "বাজেট সীমার: ${formatNumberString("%.1f".format(percentOfBudget), language)}%"
+                                                    } else {
+                                                        "Of budget: %.1f%%".format(percentOfBudget)
+                                                    },
+                                                    fontSize = 12.sp,
+                                                    color = Color.Gray,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showBudgetDialogType = categoryType
+                        showBudgetDetailsType = null
+                    }
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "বাজেট পরিবর্তন" else "Set Budget",
+                        color = FintechBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showBudgetDetailsType = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ঠিক আছে" else "Close",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
+    }
+
+    if (showBudgetDialogType != null) {
+        val category = showBudgetDialogType!!
+        val currentLimit = when (category) {
+            "INCOME" -> budgetIncomeAmount
+            "EXPENSE" -> budgetExpenseAmount
+            "SAVINGS" -> budgetSavingsAmount
+            else -> 0.0
+        }
+        val currentValue = when (category) {
+            "INCOME" -> income
+            "EXPENSE" -> expense
+            "SAVINGS" -> totalSavingsAmount
+            else -> 0.0
+        }
+        val title = when (category) {
+            "INCOME" -> if (language == AppLanguage.BN) "আয় বাজেট" else "Income Budget"
+            "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয় বাজেট" else "Expense Budget"
+            "SAVINGS" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্য" else "Savings Goal"
+            else -> ""
+        }
+
+        var tempAmount by remember { mutableStateOf(if (currentLimit > 0) currentLimit.toInt().toString() else "") }
+
+        AlertDialog(
+            onDismissRequest = { showBudgetDialogType = null },
+            modifier = Modifier.testTag("budget_setting_dialog"),
+            title = {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = FintechBlue
+                )
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "বর্তমান খাতের বিস্তারিত ও বাজেট সেট করুন। বাজেট সেট করা থাকলে তা প্রগ্রেস ট্র্যাক করতে সাহায্য করবে।"
+                            else "Set your monthly budget for this category. Setting a budget helps track your financial goals.",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color(0xFFF1F5F9)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "বর্তমান অর্জন: " else "Current Status: ",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                            )
+                            Text(
+                                text = formatCurrency(currentValue, language),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = FintechBlue,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                            if (currentLimit > 0) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) 
+                                        "বাজেট লক্ষ্য: ${formatCurrency(currentLimit, language)}" 
+                                        else "Budget Limit: ${formatCurrency(currentLimit, language)}",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = tempAmount,
+                        onValueChange = { input -> 
+                            if (input.all { it.isDigit() }) tempAmount = input
+                        },
+                        label = {
+                            Text(
+                                text = if (language == AppLanguage.BN) "বাজেটের পরিমাণ (টাকা)" else "Budget Amount (BDT)",
+                                fontSize = 13.sp
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                text = "e.g. 5000",
+                                fontSize = 13.sp,
+                                color = Color.Gray
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.4f),
+                            focusedLabelColor = FintechBlue
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("budget_input_field")
+                    )
+                }
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (currentLimit > 0) {
+                        TextButton(
+                            onClick = {
+                                when (category) {
+                                    "INCOME" -> viewModel?.setBudgetIncome(0.0)
+                                    "EXPENSE" -> viewModel?.setBudgetExpense(0.0)
+                                    "SAVINGS" -> viewModel?.setBudgetSavings(0.0)
+                                }
+                                showBudgetDialogType = null
+                            }
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "মুছে ফেলুন" else "Clear",
+                                color = FintechRed,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val finalVal = tempAmount.toDoubleOrNull() ?: 0.0
+                            when (category) {
+                                "INCOME" -> viewModel?.setBudgetIncome(finalVal)
+                                "EXPENSE" -> viewModel?.setBudgetExpense(finalVal)
+                                "SAVINGS" -> viewModel?.setBudgetSavings(finalVal)
+                            }
+                            showBudgetDialogType = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "সংরক্ষণ" else "Save",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBudgetDialogType = null }) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                        color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                    )
+                }
+            }
+        )
+    }
 }
 
 // ---------------- TRANSACTION ROW COMPONENT ----------------
@@ -3703,7 +4744,10 @@ fun TransactionRowItem(
     isHighlighted: Boolean = false,
     onNavigateToTab: ((String, String) -> Unit)? = null,
     onPersonClick: ((Person) -> Unit)? = null,
-    searchQuery: String = ""
+    searchQuery: String = "",
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onLongClick: () -> Unit = {}
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
@@ -3771,12 +4815,18 @@ fun TransactionRowItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) FintechBlue else (if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))),
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { showDetails = true },
-                onLongClick = { showDeleteConfirm = true }
+                onClick = {
+                    if (isSelectionMode) {
+                        onLongClick()
+                    } else {
+                        showDetails = true
+                    }
+                },
+                onLongClick = onLongClick
             )
             .testTag("tx_item_${tx.id}")
     ) {
@@ -3805,6 +4855,21 @@ fun TransactionRowItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                if (isSelectionMode) {
+                    Box(
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.2f))
+                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.5f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
 
                 Box(
                     modifier = Modifier
@@ -4155,6 +5220,7 @@ fun TransactionsScreen(
     persons: List<Person>,
     onAddTransactionClick: () -> Unit,
     onDeleteTransaction: (Int) -> Unit,
+    onDeleteTransactions: (List<Int>) -> Unit = {},
     onEditTransaction: (Transaction) -> Unit,
     filter: String = "ALL",
     onFilterChange: (String) -> Unit = {},
@@ -4167,6 +5233,9 @@ fun TransactionsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("DATE_DESC") }
     var showSortMenu by remember { mutableStateOf(false) }
+
+    var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
+    val isSelectionMode = selectedTxIds.isNotEmpty()
 
     val timeFilteredTransactions = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
@@ -4220,6 +5289,51 @@ fun TransactionsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FintechBlue)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selectedTxIds = emptySet() }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                        Text(
+                            text = "${selectedTxIds.size} ${if (language == AppLanguage.BN) "টি নির্বাচিত" else "selected"}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    
+                    TextButton(
+                        onClick = {
+                            if (selectedTxIds.size == sortedTransactions.size) {
+                                selectedTxIds = emptySet()
+                            } else {
+                                selectedTxIds = sortedTransactions.map { it.id }.toSet()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (selectedTxIds.size == sortedTransactions.size) 
+                                (if (language == AppLanguage.BN) "সব আনমার্ক" else "Deselect All")
+                            else (if (language == AppLanguage.BN) "সব মার্ক" else "Select All"),
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
             // Modern Search Bar
             OutlinedTextField(
                 value = searchQuery,
@@ -4479,6 +5593,7 @@ fun TransactionsScreen(
                                 )
                             }
                             items(txs) { tx ->
+                                val isSelected = selectedTxIds.contains(tx.id)
                                 Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                     TransactionRowItem(
                                         tx = tx,
@@ -4490,7 +5605,12 @@ fun TransactionsScreen(
                                         isHighlighted = (tx.id == highlightedTxId),
                                         onNavigateToTab = onNavigateToTab,
                                         onPersonClick = onPersonClick,
-                                        searchQuery = searchQuery
+                                        searchQuery = searchQuery,
+                                        isSelected = isSelected,
+                                        isSelectionMode = isSelectionMode,
+                                        onLongClick = {
+                                            selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                                        }
                                     )
                                 }
                             }
@@ -4506,6 +5626,7 @@ fun TransactionsScreen(
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
                         items(sortedTransactions) { tx ->
+                            val isSelected = selectedTxIds.contains(tx.id)
                             Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                 TransactionRowItem(
                                     tx = tx,
@@ -4517,7 +5638,12 @@ fun TransactionsScreen(
                                     isHighlighted = (tx.id == highlightedTxId),
                                     onNavigateToTab = onNavigateToTab,
                                     onPersonClick = onPersonClick,
-                                    searchQuery = searchQuery
+                                    searchQuery = searchQuery,
+                                    isSelected = isSelected,
+                                    isSelectionMode = isSelectionMode,
+                                    onLongClick = {
+                                        selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                                    }
                                 )
                             }
                         }
@@ -4525,6 +5651,42 @@ fun TransactionsScreen(
                             Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                         }
                     }
+                }
+            }
+        }
+
+        if (isSelectionMode) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 110.dp)
+                    .background(if (isDark) Color(0xFF1E2235) else Color.White, RoundedCornerShape(28.dp))
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(28.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Delete Button (মুছে ফেলুন) - Only delete button for transactions!
+                Button(
+                    onClick = {
+                        onDeleteTransactions(selectedTxIds.toList())
+                        selectedTxIds = emptySet()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -4991,9 +6153,16 @@ fun DebtsScreen(
                 onClick = onAddPersonClick,
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.testTag("fab_add_person")
+                modifier = Modifier
+                    .size(60.dp)
+                    .testTag("fab_add_person")
             ) {
-                Icon(painter = painterResource(id = R.drawable.ic_add_debt_credit), contentDescription = "Add Person", tint = Color.White)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_add_debt_credit), 
+                    contentDescription = "Add Person", 
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
             }
         }
     }
@@ -5343,11 +6512,16 @@ fun SavingsScreen(
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
     onMoveGoal: (SavingsGoal) -> Unit = {},
+    onDeleteGoals: (List<Int>) -> Unit = {},
+    onMoveGoals: (List<Int>) -> Unit = {},
     highlightedGoalId: Int? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("TITLE_ASC") }
     var showSortMenu by remember { mutableStateOf(false) }
+
+    var selectedGoalIds by remember { mutableStateOf(setOf<Int>()) }
+    val isSelectionMode = selectedGoalIds.isNotEmpty()
 
     val searchQueryLower = searchQuery.lowercase().trim()
     val searchedGoals = remember(savingsGoals, searchQuery) {
@@ -5377,32 +6551,83 @@ fun SavingsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isSelectionMode,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
             ) {
-                Text(
-                    text = if (language == AppLanguage.BN) "আপনার সঞ্চয় কার্ডসমূহ" else "Your Savings Cards",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FintechBlue
-                )
-                
-                IconButton(
-                    onClick = onAddSavingsGoalClick,
+                Row(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(FintechBlue.copy(alpha = 0.1f))
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_add_savings),
-                        contentDescription = "Add",
-                        tint = FintechBlue
+                    Text(
+                        text = if (language == AppLanguage.BN) "আপনার সঞ্চয় কার্ডসমূহ" else "Your Savings Cards",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FintechBlue
                     )
+                    
+                    IconButton(
+                        onClick = onAddSavingsGoalClick,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(FintechBlue.copy(alpha = 0.1f))
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_add_savings),
+                            contentDescription = "Add",
+                            tint = FintechBlue
+                        )
+                    }
+                }
+            }
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FintechBlue)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selectedGoalIds = emptySet() }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                        Text(
+                            text = "${selectedGoalIds.size} ${if (language == AppLanguage.BN) "টি নির্বাচিত" else "selected"}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    
+                    TextButton(
+                        onClick = {
+                            if (selectedGoalIds.size == sortedGoals.size) {
+                                selectedGoalIds = emptySet()
+                            } else {
+                                selectedGoalIds = sortedGoals.map { it.id }.toSet()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (selectedGoalIds.size == sortedGoals.size) 
+                                (if (language == AppLanguage.BN) "সব আনমার্ক" else "Deselect All")
+                            else (if (language == AppLanguage.BN) "সব মার্ক" else "Select All"),
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
@@ -5550,17 +6775,29 @@ fun SavingsScreen(
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
                     items(sortedGoals) { goal ->
+                        val isSelected = selectedGoalIds.contains(goal.id)
                         SavingsGoalCardItem(
                             goal = goal,
                             language = language,
                             isDark = isDark,
                             profileName = profileName,
-                            onGoalClick = onGoalClick,
+                            onGoalClick = { item ->
+                                if (isSelectionMode) {
+                                    selectedGoalIds = if (isSelected) selectedGoalIds - item.id else selectedGoalIds + item.id
+                                } else {
+                                    onGoalClick(item)
+                                }
+                            },
                             onContributeClick = onContributeClick,
                             onEditGoal = onEditGoal,
                             onMove = onMoveGoal,
                             isHighlighted = (goal.id == highlightedGoalId),
-                            searchQuery = searchQuery
+                            searchQuery = searchQuery,
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onLongClick = {
+                                selectedGoalIds = if (isSelected) selectedGoalIds - goal.id else selectedGoalIds + goal.id
+                            }
                         )
                     }
                     item {
@@ -5570,17 +6807,82 @@ fun SavingsScreen(
             }
         }
 
-        // Floating Action Button to Add Savings Goal
-        FloatingActionButton(
-            onClick = onAddSavingsGoalClick,
-            containerColor = FintechBlue,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 110.dp, end = 16.dp)
-                .testTag("fab_add_savings_goal")
-        ) {
-            Icon(painter = painterResource(id = R.drawable.ic_add_savings), contentDescription = "Add Goal", tint = Color.White)
+        if (isSelectionMode) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 110.dp)
+                    .background(if (isDark) Color(0xFF1E2235) else Color.White, RoundedCornerShape(28.dp))
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(28.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Move Button (মুভ)
+                Button(
+                    onClick = {
+                        onMoveGoals(selectedGoalIds.toList())
+                        selectedGoalIds = emptySet()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoveToInbox,
+                        contentDescription = "Move",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "মুভ করুন" else "Move",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Delete Button (মুছে ফেলুন)
+                Button(
+                    onClick = {
+                        onDeleteGoals(selectedGoalIds.toList())
+                        selectedGoalIds = emptySet()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
+                    shape = RoundedCornerShape(20.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            // Floating Action Button to Add Savings Goal
+            FloatingActionButton(
+                onClick = onAddSavingsGoalClick,
+                containerColor = FintechBlue,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 110.dp, end = 16.dp)
+                    .size(60.dp)
+                    .testTag("fab_add_savings_goal")
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_add_savings), 
+                    contentDescription = "Add Goal", 
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
         }
     }
 }
@@ -5598,7 +6900,10 @@ fun SavingsGoalCardItem(
     onMove: (SavingsGoal) -> Unit = {},
     isHighlighted: Boolean = false,
     maskBalance: Boolean = true,
-    searchQuery: String = ""
+    searchQuery: String = "",
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onLongClick: () -> Unit = {}
 ) {
     val gradient = GradientsList[goal.colorIndex % GradientsList.size]
 
@@ -5609,11 +6914,12 @@ fun SavingsGoalCardItem(
             .height(170.dp)
             .then(
                 if (isHighlighted) Modifier.border(4.dp, Color(0xFFFBBF24), RoundedCornerShape(24.dp))
+                else if (isSelected) Modifier.border(3.dp, Color.White, RoundedCornerShape(24.dp))
                 else Modifier
             )
             .combinedClickable(
                 onClick = { onGoalClick(goal) },
-                onLongClick = { onMove(goal) }
+                onLongClick = onLongClick
             )
             .testTag("savings_item_${goal.id}")
     ) {
@@ -5662,17 +6968,34 @@ fun SavingsGoalCardItem(
                 goal.category.uppercase()
             }
 
-            HighlightedText(
-                text = formattedCategory,
-                query = searchQuery,
-                color = Color(0xFFFBBF24),
-                style = TextStyle(
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
-            )
+            if (isSelectionMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 12.dp, end = 12.dp)
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f))
+                        .border(2.dp, Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                    }
+                }
+            } else {
+                HighlightedText(
+                    text = formattedCategory,
+                    query = searchQuery,
+                    color = Color(0xFFFBBF24),
+                    style = TextStyle(
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
+                )
+            }
 
             // Goal Title and Balance in the bottom-left
             Column(
