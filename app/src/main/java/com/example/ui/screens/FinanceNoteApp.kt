@@ -140,7 +140,8 @@ fun CategorySegmentedDonutChart(
     modifier: Modifier = Modifier,
     strokeWidthDp: Dp = 10.dp,
     centerTextSize: TextUnit = 14.sp,
-    categoryType: String? = null
+    categoryType: String? = null,
+    onCenterClick: () -> Unit = {}
 ) {
     var animationPlayed by remember { mutableStateOf(false) }
     var hoveredSegment by remember { mutableStateOf<Pair<String, Double>?>(null) }
@@ -198,8 +199,12 @@ fun CategorySegmentedDonutChart(
         Color.Gray
     }
 
-    // Unfilled base color (white/light gray)
-    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.15f) else Color.White
+    // Unfilled base color
+    val unfilledColor = if (targetAmount > 0.0) {
+        percentageColor.copy(alpha = 0.1f)
+    } else {
+        if (isDark) Color.White.copy(alpha = 0.15f) else Color.White
+    }
 
     val colors = listOf(
         Color(0xFF10B981), // Emerald
@@ -232,10 +237,11 @@ fun CategorySegmentedDonutChart(
                     val dy = offset.y - center.y
                     val distance = kotlin.math.sqrt(dx * dx + dy * dy)
                     
-                    // Add 16dp touch padding
-                    val touchPadding = 16.dp.toPx()
+                    // Limit inward touch padding so the center hole remains easily clickable
+                    val maxInwardPadding = minOf(12.dp.toPx(), innerRadius * 0.4f)
+                    val outwardPadding = 16.dp.toPx()
                     
-                    if (distance in (innerRadius - touchPadding)..(outerRadius + touchPadding)) {
+                    if (distance in (innerRadius - maxInwardPadding)..(outerRadius + outwardPadding)) {
                         var angle = (kotlin.math.atan2(dy, dx) * 180f / kotlin.math.PI).toFloat()
                         if (angle < 0) angle += 360f // 0 is 3 o'clock, clockwise
                         
@@ -256,9 +262,15 @@ fun CategorySegmentedDonutChart(
                             currentAngle += sweep
                         }
                         
-                        hoveredSegment = found
+                        if (found != null) {
+                            hoveredSegment = found
+                        } else {
+                            hoveredSegment = null
+                            onCenterClick()
+                        }
                     } else {
                         hoveredSegment = null
+                        onCenterClick()
                     }
                 }
             }
@@ -269,17 +281,16 @@ fun CategorySegmentedDonutChart(
             val radiusOuter = radius + strokeWidthPx / 2f
             val radiusInner = radius - strokeWidthPx / 2f
 
-            // 1. Draw background full circle (unfilled base)
+            // 1. Draw background full circle (unfilled base and inner gap)
             drawCircle(
                 color = unfilledColor,
-                radius = radius,
-                style = Stroke(width = strokeWidthPx)
+                radius = radiusOuter
             )
 
             // 2. Draw active segments as arcs with perfectly uniform thickness
             if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
                 var startAngle = -90f
-                val gapAngle = 1.5f // Clean gap between segments
+                val gapAngle = 0.8f // Clean gap between segments
                 
                 // capAngle is the angle taken up by one rounded cap
                 val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
@@ -3702,6 +3713,7 @@ fun DashboardScreen(
                             .size(42.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.2f))
+                            .clickable { onWorkspaceClick() }
                             .border(2.5.dp, Color.White, CircleShape)
                             .pointerInput(workspaces) {
                                 detectVerticalDragGestures(
@@ -4137,7 +4149,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp)
+                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 22.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4184,7 +4196,8 @@ fun DashboardScreen(
                                 modifier = Modifier.size(72.dp),
                                 strokeWidthDp = 10.dp,
                                 centerTextSize = 13.sp,
-                                categoryType = "INCOME"
+                                categoryType = "INCOME",
+                                onCenterClick = { showBudgetDetailsType = "INCOME" }
                             )
                         }
 
@@ -4213,7 +4226,8 @@ fun DashboardScreen(
                                 modifier = Modifier.size(72.dp),
                                 strokeWidthDp = 10.dp,
                                 centerTextSize = 13.sp,
-                                categoryType = "EXPENSE"
+                                categoryType = "EXPENSE",
+                                onCenterClick = { showBudgetDetailsType = "EXPENSE" }
                             )
                         }
 
@@ -4242,7 +4256,8 @@ fun DashboardScreen(
                                 modifier = Modifier.size(72.dp),
                                 strokeWidthDp = 10.dp,
                                 centerTextSize = 13.sp,
-                                categoryType = "SAVINGS"
+                                categoryType = "SAVINGS",
+                                onCenterClick = { showBudgetDetailsType = "SAVINGS" }
                             )
                         }
                     }
