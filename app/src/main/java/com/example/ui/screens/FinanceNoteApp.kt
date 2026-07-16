@@ -200,11 +200,7 @@ fun CategorySegmentedDonutChart(
     }
 
     // Unfilled base color
-    val unfilledColor = if (targetAmount > 0.0) {
-        percentageColor.copy(alpha = 0.1f)
-    } else {
-        if (isDark) Color.White.copy(alpha = 0.15f) else Color.White
-    }
+    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color(0xFFF1F5F9)
 
     val colors = listOf(
         Color(0xFF10B981), // Emerald
@@ -280,20 +276,31 @@ fun CategorySegmentedDonutChart(
             val radius = (sizeMin - strokeWidthPx) / 2f
             val radiusOuter = radius + strokeWidthPx / 2f
             val radiusInner = radius - strokeWidthPx / 2f
-
-            // 1. Draw background full circle (unfilled base and inner gap)
+            
+            // 1. Draw background full circle (unfilled base)
             drawCircle(
                 color = unfilledColor,
-                radius = radiusOuter
+                radius = radius,
+                style = Stroke(width = strokeWidthPx)
+            )
+            
+            // Subtle inner and outer borders to match the image's depth effect
+            val borderColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0)
+            drawCircle(
+                color = borderColor,
+                radius = radiusInner,
+                style = Stroke(width = 1.dp.toPx())
+            )
+            drawCircle(
+                color = borderColor,
+                radius = radiusOuter,
+                style = Stroke(width = 1.dp.toPx())
             )
 
             // 2. Draw active segments as arcs with perfectly uniform thickness
             if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
                 var startAngle = -90f
-                val gapAngle = 0.8f // Clean gap between segments
-                
-                // capAngle is the angle taken up by one rounded cap
-                val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
+                val gapAngle = 1.5f // Clean gap between segments for flat caps
                 
                 val validSegments = segments.filter { it.second > 0.0 }
                 val segmentsSum = validSegments.sumOf { it.second }
@@ -316,19 +323,18 @@ fun CategorySegmentedDonutChart(
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                                 )
                             } else {
-                                // Rounded segments with proper gaps
-                                val adjustedSweep = (sweepAngle - gapAngle - (2 * capAngle)).coerceAtLeast(0.1f)
-                                val adjustedStart = startAngle + (gapAngle / 2f) + capAngle
-
+                                // Butt segments with proper gaps
+                                val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(0.1f)
+                                val adjustedStart = startAngle + (gapAngle / 2f)
                                 drawArc(
                                     color = color,
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                                 )
                             }
                         }
@@ -3564,60 +3570,84 @@ fun DashboardScreen(
         // Check Income 80%
         if (budgetIncomeAmount > 0.0) {
             val key = "${currentYearMonth}_income_80_alert"
-            val wasAlerted = budgetPrefs.getBoolean(key, false)
+            val lastTime = budgetPrefs.getLong("${key}_time", 0L)
+            val lastRatio = budgetPrefs.getFloat("${key}_ratio", 0f)
+            val now = System.currentTimeMillis()
+            val fiveHours = 5 * 60 * 60 * 1000L
             val ratio = income / budgetIncomeAmount
-            if (ratio >= 0.8 && !wasAlerted) {
-                val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
-                val msg = if (language == AppLanguage.BN) {
-                    "আপনি আপনার আয় বাজেটের ৮০% (${formatCurrency(income, language)}) অর্জন করেছেন!"
-                } else {
-                    "You have achieved 80% of your Income Budget (${formatCurrency(income, language)})!"
+            if (ratio >= 0.8) {
+                if (now - lastTime >= fiveHours || ratio > lastRatio + 0.005f) {
+                    val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
+                    val msg = if (language == AppLanguage.BN) {
+                        "আপনি আপনার আয় বাজেটের ৮০% (${formatCurrency(income, language)}) অর্জন করেছেন!"
+                    } else {
+                        "You have achieved 80% of your Income Budget (${formatCurrency(income, language)})!"
+                    }
+                    showLocalSystemNotification(context, title, msg, 8001)
+                    activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
+                    budgetPrefs.edit()
+                        .putLong("${key}_time", now)
+                        .putFloat("${key}_ratio", ratio.toFloat())
+                        .apply()
                 }
-                showLocalSystemNotification(context, title, msg, 8001)
-                activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                budgetPrefs.edit().putBoolean(key, true).apply()
-            } else if (ratio < 0.8 && wasAlerted) {
-                budgetPrefs.edit().remove(key).apply()
+            } else if (ratio < 0.8 && lastTime > 0L) {
+                budgetPrefs.edit().remove("${key}_time").remove("${key}_ratio").apply()
             }
         }
 
         // Check Expense 80%
         if (budgetExpenseAmount > 0.0) {
             val key = "${currentYearMonth}_expense_80_alert"
-            val wasAlerted = budgetPrefs.getBoolean(key, false)
+            val lastTime = budgetPrefs.getLong("${key}_time", 0L)
+            val lastRatio = budgetPrefs.getFloat("${key}_ratio", 0f)
+            val now = System.currentTimeMillis()
+            val fiveHours = 5 * 60 * 60 * 1000L
             val ratio = expense / budgetExpenseAmount
-            if (ratio >= 0.8 && !wasAlerted) {
-                val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
-                val msg = if (language == AppLanguage.BN) {
-                    "সাবধান! আপনার ব্যয় বাজেটের ৮০% (${formatCurrency(expense, language)}) খরচ হয়ে গেছে!"
-                } else {
-                    "Warning! You have spent 80% of your Expense Budget limit (${formatCurrency(expense, language)})!"
+            if (ratio >= 0.8) {
+                if (now - lastTime >= fiveHours || ratio > lastRatio + 0.005f) {
+                    val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
+                    val msg = if (language == AppLanguage.BN) {
+                        "সাবধান! আপনার ব্যয় বাজেটের ৮০% (${formatCurrency(expense, language)}) খরচ হয়ে গেছে!"
+                    } else {
+                        "Warning! You have spent 80% of your Expense Budget limit (${formatCurrency(expense, language)})!"
+                    }
+                    showLocalSystemNotification(context, title, msg, 8002)
+                    activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
+                    budgetPrefs.edit()
+                        .putLong("${key}_time", now)
+                        .putFloat("${key}_ratio", ratio.toFloat())
+                        .apply()
                 }
-                showLocalSystemNotification(context, title, msg, 8002)
-                activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
-                budgetPrefs.edit().putBoolean(key, true).apply()
-            } else if (ratio < 0.8 && wasAlerted) {
-                budgetPrefs.edit().remove(key).apply()
+            } else if (ratio < 0.8 && lastTime > 0L) {
+                budgetPrefs.edit().remove("${key}_time").remove("${key}_ratio").apply()
             }
         }
 
         // Check Savings 80%
         if (budgetSavingsAmount > 0.0) {
             val key = "${currentYearMonth}_savings_80_alert"
-            val wasAlerted = budgetPrefs.getBoolean(key, false)
+            val lastTime = budgetPrefs.getLong("${key}_time", 0L)
+            val lastRatio = budgetPrefs.getFloat("${key}_ratio", 0f)
+            val now = System.currentTimeMillis()
+            val fiveHours = 5 * 60 * 60 * 1000L
             val ratio = totalSavingsAmount / budgetSavingsAmount
-            if (ratio >= 0.8 && !wasAlerted) {
-                val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
-                val msg = if (language == AppLanguage.BN) {
-                    "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের ৮০% (${formatCurrency(totalSavingsAmount, language)}) পূরণ করেছেন!"
-                } else {
-                    "Amazing! You have fulfilled 80% of your Savings Goal (${formatCurrency(totalSavingsAmount, language)})!"
+            if (ratio >= 0.8) {
+                if (now - lastTime >= fiveHours || ratio > lastRatio + 0.005f) {
+                    val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
+                    val msg = if (language == AppLanguage.BN) {
+                        "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের ৮০% (${formatCurrency(totalSavingsAmount, language)}) পূরণ করেছেন!"
+                    } else {
+                        "Amazing! You have fulfilled 80% of your Savings Goal (${formatCurrency(totalSavingsAmount, language)})!"
+                    }
+                    showLocalSystemNotification(context, title, msg, 8003)
+                    activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
+                    budgetPrefs.edit()
+                        .putLong("${key}_time", now)
+                        .putFloat("${key}_ratio", ratio.toFloat())
+                        .apply()
                 }
-                showLocalSystemNotification(context, title, msg, 8003)
-                activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                budgetPrefs.edit().putBoolean(key, true).apply()
-            } else if (ratio < 0.8 && wasAlerted) {
-                budgetPrefs.edit().remove(key).apply()
+            } else if (ratio < 0.8 && lastTime > 0L) {
+                budgetPrefs.edit().remove("${key}_time").remove("${key}_ratio").apply()
             }
         }
     }
@@ -3694,12 +3724,10 @@ fun DashboardScreen(
                 gradientColors = GradientsList[0],
                 cornerRadius = 24.dp,
                 padding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                onClick = { onWorkspaceClick() },
                 modifier = Modifier
                     .testTag("dashboard_profile_card")
                     .padding(top = 8.dp)
-                    .clickable { 
-                        onNavigate("settings", "expand_profile")
-                    }
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -4149,7 +4177,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 22.dp)
+                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 6.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4177,7 +4205,7 @@ fun DashboardScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { showBudgetDetailsType = "INCOME" }
-                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                                .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -4185,7 +4213,7 @@ fun DashboardScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color.Black,
-                                modifier = Modifier.padding(bottom = 2.dp)
+                                modifier = Modifier.padding(bottom = 6.dp)
                             )
                             CategorySegmentedDonutChart(
                                 targetAmount = budgetIncomeAmount,
@@ -4194,7 +4222,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 10.dp,
+                                strokeWidthDp = 14.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "INCOME",
                                 onCenterClick = { showBudgetDetailsType = "INCOME" }
@@ -4207,7 +4235,7 @@ fun DashboardScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { showBudgetDetailsType = "EXPENSE" }
-                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                                .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -4215,7 +4243,7 @@ fun DashboardScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color.Black,
-                                modifier = Modifier.padding(bottom = 2.dp)
+                                modifier = Modifier.padding(bottom = 6.dp)
                             )
                             CategorySegmentedDonutChart(
                                 targetAmount = budgetExpenseAmount,
@@ -4224,7 +4252,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 10.dp,
+                                strokeWidthDp = 14.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "EXPENSE",
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" }
@@ -4237,7 +4265,7 @@ fun DashboardScreen(
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { showBudgetDetailsType = "SAVINGS" }
-                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                                .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -4245,7 +4273,7 @@ fun DashboardScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color.Black,
-                                modifier = Modifier.padding(bottom = 2.dp)
+                                modifier = Modifier.padding(bottom = 6.dp)
                             )
                             CategorySegmentedDonutChart(
                                 targetAmount = budgetSavingsAmount,
@@ -4254,7 +4282,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 10.dp,
+                                strokeWidthDp = 14.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "SAVINGS",
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" }
@@ -4443,7 +4471,7 @@ fun DashboardScreen(
                         fontSize = 13.sp,
                         color = Color.Gray,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
 
                     // Large Segmented Donut Chart without Card (centered in a Box with padding)
@@ -4460,7 +4488,7 @@ fun DashboardScreen(
                             isDark = isDark, // Pass actual isDark state for adaptive color and contrast
                             language = language,
                             modifier = Modifier.size(160.dp),
-                            strokeWidthDp = 22.dp, // Thicker stroke for bold premium look
+                            strokeWidthDp = 28.dp, // Thicker stroke for bold premium look
                             centerTextSize = 28.sp,
                             categoryType = categoryType
                         )
@@ -7525,7 +7553,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         color = textColor,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
 
@@ -9865,6 +9893,57 @@ fun SettingsScreen(
                 Switch(
                     checked = isDark,
                     onCheckedChange = { viewModel.toggleTheme(context) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = FintechBlue,
+                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                    )
+                )
+            }
+        }
+
+        // --- 3. LANGUAGE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "ভাষা" else "Language",
+            isDark = isDark,
+            icon = Icons.Rounded.Translate,
+            initiallyExpanded = false
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Translate,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ভাষা পরিবর্তন করুন" else "Change Language",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "বাংলা এবং ইংরেজি মধ্যে পরিবর্তন করুন" else "Switch between Bengali and English",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                    )
+                }
+                Switch(
+                    checked = language == AppLanguage.BN,
+                    onCheckedChange = { viewModel.toggleLanguage(context) },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = Color.White,
                         checkedTrackColor = FintechBlue,
