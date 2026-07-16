@@ -205,10 +205,13 @@ fun CategorySegmentedDonutChart(
                 style = Stroke(width = strokeWidthPx)
             )
 
-            // 2. Draw active segments as arcs with custom corner radius and tiny gaps
+            // 2. Draw active segments as arcs with perfectly uniform thickness
             if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
                 var startAngle = -90f
-                val gapAngle = 2.0f // very tiny clean gap between segments, like the image
+                val gapAngle = 4.0f // Clean gap between segments
+                
+                // capAngle is the angle taken up by one rounded cap
+                val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
                 
                 val validSegments = segments.filter { it.second > 0.0 }
                 val segmentsSum = validSegments.sumOf { it.second }
@@ -223,53 +226,28 @@ fun CategorySegmentedDonutChart(
 
                         if (sweepAngle > 0f) {
                             val isOnlySegment = validSegments.size == 1 && segmentProgress >= 0.99
-                            val adjustedSweep = if (isOnlySegment) {
-                                (360f - gapAngle).coerceAtLeast(10f)
+                            
+                            if (isOnlySegment) {
+                                // Perfect unbroken circle
+                                drawArc(
+                                    color = color,
+                                    startAngle = startAngle,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidthPx)
+                                )
                             } else {
-                                (sweepAngle - gapAngle).coerceAtLeast(2f)
-                            }
-                            val adjustedStart = startAngle + (gapAngle / 2f)
+                                // Rounded segments with proper gaps
+                                val adjustedSweep = (sweepAngle - gapAngle - (2 * capAngle)).coerceAtLeast(0.1f)
+                                val adjustedStart = startAngle + (gapAngle / 2f) + capAngle
 
-                            val path = Path().apply {
-                                val startAngleRad = Math.toRadians(adjustedStart.toDouble()).toFloat()
-                                val startX = center.x + radiusOuter * kotlin.math.cos(startAngleRad)
-                                val startY = center.y + radiusOuter * kotlin.math.sin(startAngleRad)
-                                moveTo(startX, startY)
-
-                                arcTo(
-                                    rect = Rect(
-                                        center.x - radiusOuter,
-                                        center.y - radiusOuter,
-                                        center.x + radiusOuter,
-                                        center.y + radiusOuter
-                                    ),
-                                    startAngleDegrees = adjustedStart,
-                                    sweepAngleDegrees = adjustedSweep,
-                                    forceMoveTo = false
+                                drawArc(
+                                    color = color,
+                                    startAngle = adjustedStart,
+                                    sweepAngle = adjustedSweep,
+                                    useCenter = false,
+                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
                                 )
-
-                                arcTo(
-                                    rect = Rect(
-                                        center.x - radiusInner,
-                                        center.y - radiusInner,
-                                        center.x + radiusInner,
-                                        center.y + radiusInner
-                                    ),
-                                    startAngleDegrees = adjustedStart + adjustedSweep,
-                                    sweepAngleDegrees = -adjustedSweep,
-                                    forceMoveTo = false
-                                )
-
-                                close()
-                            }
-
-                            drawIntoCanvas { canvas ->
-                                val paint = Paint().apply {
-                                    this.color = color
-                                    this.style = PaintingStyle.Fill
-                                    this.pathEffect = PathEffect.cornerPathEffect(3.dp.toPx())
-                                }
-                                canvas.drawPath(path, paint)
                             }
                         }
                         startAngle += sweepAngle
@@ -4110,7 +4088,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 12.dp,
+                                strokeWidthDp = 14.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "INCOME"
                             )
@@ -4139,7 +4117,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 12.dp,
+                                strokeWidthDp = 14.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "EXPENSE"
                             )
@@ -4168,7 +4146,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 12.dp,
+                                strokeWidthDp = 14.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "SAVINGS"
                             )
@@ -4373,7 +4351,7 @@ fun DashboardScreen(
                             isDark = isDark, // Pass actual isDark state for adaptive color and contrast
                             language = language,
                             modifier = Modifier.size(160.dp),
-                            strokeWidthDp = 24.dp, // Thicker stroke for bold premium look
+                            strokeWidthDp = 28.dp, // Thicker stroke for bold premium look
                             centerTextSize = 28.sp,
                             categoryType = categoryType
                         )
