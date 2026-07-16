@@ -1,5 +1,12 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.window.Popup
+import kotlinx.coroutines.delay
 import com.example.BuildConfig
 import com.example.R
 import android.content.Context
@@ -135,6 +142,26 @@ fun CategorySegmentedDonutChart(
     centerTextSize: TextUnit = 14.sp,
     categoryType: String? = null
 ) {
+    var animationPlayed by remember { mutableStateOf(false) }
+    var hoveredSegment by remember { mutableStateOf<Pair<String, Double>?>(null) }
+
+    LaunchedEffect(Unit) {
+        animationPlayed = true
+    }
+
+    LaunchedEffect(hoveredSegment) {
+        if (hoveredSegment != null) {
+            delay(3000) // Auto-hide tooltip after 3 seconds
+            hoveredSegment = null
+        }
+    }
+
+    val animatedProgressMultiplier by animateFloatAsState(
+        targetValue = if (animationPlayed) 1f else 0f,
+        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+        label = "donut_chart_animation"
+    )
+
     val progress = if (targetAmount > 0.0) {
         (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
     } else {
@@ -142,7 +169,7 @@ fun CategorySegmentedDonutChart(
     }
 
     val percentageText = if (targetAmount > 0.0) {
-        "${(progress * 100).toInt()}%"
+        "${(progress * animatedProgressMultiplier * 100).toInt()}%"
     } else {
         if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
     }
@@ -191,7 +218,51 @@ fun CategorySegmentedDonutChart(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(segments, targetAmount) {
+                detectTapGestures { offset ->
+                    val strokePx = strokeWidthDp.toPx()
+                    val chartRadius = (minOf(size.width, size.height) - strokePx) / 2f
+                    val innerRadius = chartRadius - strokePx / 2f
+                    val outerRadius = chartRadius + strokePx / 2f
+                    
+                    val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                    val dx = offset.x - center.x
+                    val dy = offset.y - center.y
+                    val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+                    
+                    // Add 16dp touch padding
+                    val touchPadding = 16.dp.toPx()
+                    
+                    if (distance in (innerRadius - touchPadding)..(outerRadius + touchPadding)) {
+                        var angle = (kotlin.math.atan2(dy, dx) * 180f / kotlin.math.PI).toFloat()
+                        if (angle < 0) angle += 360f // 0 is 3 o'clock, clockwise
+                        
+                        // Map angle so that 0 is top (12 o'clock)
+                        var angleFromTop = angle + 90f
+                        if (angleFromTop >= 360f) angleFromTop -= 360f
+                        
+                        var currentAngle = 0f
+                        var found: Pair<String, Double>? = null
+                        val validSegments = segments.filter { it.second > 0.0 }
+                        for (segment in validSegments) {
+                            val segmentProgress = (segment.second / targetAmount).coerceIn(0.0, 1.0)
+                            val sweep = (segmentProgress * 360f).toFloat()
+                            if (angleFromTop >= currentAngle && angleFromTop <= (currentAngle + sweep)) {
+                                found = segment
+                                break
+                            }
+                            currentAngle += sweep
+                        }
+                        
+                        hoveredSegment = found
+                    } else {
+                        hoveredSegment = null
+                    }
+                }
+            }
+        ) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
             val radius = (sizeMin - strokeWidthPx) / 2f
@@ -208,7 +279,7 @@ fun CategorySegmentedDonutChart(
             // 2. Draw active segments as arcs with perfectly uniform thickness
             if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
                 var startAngle = -90f
-                val gapAngle = 4.0f // Clean gap between segments
+                val gapAngle = 1.5f // Clean gap between segments
                 
                 // capAngle is the angle taken up by one rounded cap
                 val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
@@ -221,7 +292,7 @@ fun CategorySegmentedDonutChart(
                         val segmentAmount = segment.second
                         // Scale the segment's arc proportionally to the filled progress
                         val segmentProgress = (segmentAmount / targetAmount).coerceIn(0.0, 1.0)
-                        val sweepAngle = (segmentProgress * 360f).toFloat()
+                        val sweepAngle = (segmentProgress * 360f * animatedProgressMultiplier).toFloat()
                         val color = colors[index % colors.size]
 
                         if (sweepAngle > 0f) {
@@ -232,9 +303,9 @@ fun CategorySegmentedDonutChart(
                                 drawArc(
                                     color = color,
                                     startAngle = startAngle,
-                                    sweepAngle = 360f,
+                                    sweepAngle = sweepAngle,
                                     useCenter = false,
-                                    style = Stroke(width = strokeWidthPx)
+                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
                                 )
                             } else {
                                 // Rounded segments with proper gaps
@@ -250,24 +321,47 @@ fun CategorySegmentedDonutChart(
                                 )
                             }
                         }
-                        startAngle += sweepAngle
+                        startAngle += (segmentProgress * 360f).toFloat() // advance by full un-animated sweep so segments don't overlap during animation
                     }
                 }
             }
         }
 
-        // Center percentage text (no Filled label)
+
+        // Center percentage text or hovered segment info
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
         ) {
-            Text(
-                text = formatNumberString(percentageText, language),
-                fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = percentageColor,
-                textAlign = TextAlign.Center
-            )
+            if (hoveredSegment != null) {
+                Text(
+                    text = hoveredSegment!!.first,
+                    fontSize = maxOf(9f, centerTextSize.value * 0.45f).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.LightGray else Color.DarkGray,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "৳ ${formatCurrency(hoveredSegment!!.second, language)}",
+                    fontSize = maxOf(10f, centerTextSize.value * 0.6f).sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isDark) Color.White else Color.Black,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                Text(
+                    text = formatNumberString(percentageText, language),
+                    fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = percentageColor,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
@@ -4088,7 +4182,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 14.dp,
+                                strokeWidthDp = 10.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "INCOME"
                             )
@@ -4117,7 +4211,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 14.dp,
+                                strokeWidthDp = 10.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "EXPENSE"
                             )
@@ -4146,7 +4240,7 @@ fun DashboardScreen(
                                 isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(72.dp),
-                                strokeWidthDp = 14.dp,
+                                strokeWidthDp = 10.dp,
                                 centerTextSize = 13.sp,
                                 categoryType = "SAVINGS"
                             )
@@ -4351,7 +4445,7 @@ fun DashboardScreen(
                             isDark = isDark, // Pass actual isDark state for adaptive color and contrast
                             language = language,
                             modifier = Modifier.size(160.dp),
-                            strokeWidthDp = 28.dp, // Thicker stroke for bold premium look
+                            strokeWidthDp = 22.dp, // Thicker stroke for bold premium look
                             centerTextSize = 28.sp,
                             categoryType = categoryType
                         )
