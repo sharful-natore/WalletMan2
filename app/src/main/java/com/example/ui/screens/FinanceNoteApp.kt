@@ -132,7 +132,8 @@ fun CategorySegmentedDonutChart(
     language: AppLanguage,
     modifier: Modifier = Modifier,
     strokeWidthDp: Dp = 10.dp,
-    centerTextSize: TextUnit = 14.sp
+    centerTextSize: TextUnit = 14.sp,
+    categoryType: String? = null
 ) {
     val progress = if (targetAmount > 0.0) {
         (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
@@ -144,6 +145,30 @@ fun CategorySegmentedDonutChart(
         "${(progress * 100).toInt()}%"
     } else {
         if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+    }
+
+    // Dynamic color logic: default theme blue, income/savings >= 80% is green, expense >= 80% is red
+    val percentageColor = if (targetAmount > 0.0) {
+        val progressPercent = progress * 100
+        when (categoryType) {
+            "INCOME", "SAVINGS" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFF10B981) // Green
+                } else {
+                    FintechBlue
+                }
+            }
+            "EXPENSE" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFFEF4444) // Red
+                } else {
+                    FintechBlue
+                }
+            }
+            else -> FintechBlue
+        }
+    } else {
+        Color.Gray
     }
 
     // Unfilled base color (white/light gray)
@@ -181,7 +206,8 @@ fun CategorySegmentedDonutChart(
             // 2. Draw active segments as arcs
             if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
                 var startAngle = -90f
-                val gapAngle = 4.5f // clean tiny gap between segments for beautiful visual separation
+                val gapAngle = 8.0f // clean gap between rounded caps, like the image
+                val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
 
                 val validSegments = segments.filter { it.second > 0.0 }
                 val segmentsSum = validSegments.sumOf { it.second }
@@ -196,25 +222,20 @@ fun CategorySegmentedDonutChart(
 
                         if (sweepAngle > 0f) {
                             val isOnlySegment = validSegments.size == 1 && segmentProgress >= 0.99
-                            if (isOnlySegment) {
-                                drawArc(
-                                    color = color,
-                                    startAngle = startAngle,
-                                    sweepAngle = sweepAngle,
-                                    useCenter = false,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                                )
+                            val adjustedSweep = if (isOnlySegment) {
+                                (360f - gapAngle - 2 * capAngle).coerceAtLeast(10f)
                             } else {
-                                val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(1f)
-                                val adjustedStart = startAngle + (gapAngle / 2f)
-                                drawArc(
-                                    color = color,
-                                    startAngle = adjustedStart,
-                                    sweepAngle = adjustedSweep,
-                                    useCenter = false,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                                )
+                                (sweepAngle - gapAngle - 2 * capAngle).coerceAtLeast(2f)
                             }
+                            val adjustedStart = startAngle + (gapAngle / 2f) + capAngle
+
+                            drawArc(
+                                color = color,
+                                startAngle = adjustedStart,
+                                sweepAngle = adjustedSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                            )
                         }
                         startAngle += sweepAngle
                     }
@@ -231,7 +252,7 @@ fun CategorySegmentedDonutChart(
                 text = formatNumberString(percentageText, language),
                 fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (targetAmount > 0.0) (if (isDark) Color.White else Color.Black) else Color.Gray,
+                color = percentageColor,
                 textAlign = TextAlign.Center
             )
         }
@@ -3995,7 +4016,7 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Monthly Budget Control Card (সাদা রং এর)
             Card(
@@ -4009,7 +4030,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp)
+                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4024,7 +4045,7 @@ fun DashboardScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4036,7 +4057,6 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDark) Color.White.copy(alpha = 0.02f) else Color(0xFFF8FAFC))
                                 .clickable { showBudgetDetailsType = "INCOME" }
                                 .padding(vertical = 4.dp, horizontal = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -4056,7 +4076,8 @@ fun DashboardScreen(
                                 language = language,
                                 modifier = Modifier.size(72.dp),
                                 strokeWidthDp = 9.dp,
-                                centerTextSize = 13.sp
+                                centerTextSize = 13.sp,
+                                categoryType = "INCOME"
                             )
                         }
 
@@ -4065,7 +4086,6 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDark) Color.White.copy(alpha = 0.02f) else Color(0xFFF8FAFC))
                                 .clickable { showBudgetDetailsType = "EXPENSE" }
                                 .padding(vertical = 4.dp, horizontal = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -4085,7 +4105,8 @@ fun DashboardScreen(
                                 language = language,
                                 modifier = Modifier.size(72.dp),
                                 strokeWidthDp = 9.dp,
-                                centerTextSize = 13.sp
+                                centerTextSize = 13.sp,
+                                categoryType = "EXPENSE"
                             )
                         }
 
@@ -4094,7 +4115,6 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDark) Color.White.copy(alpha = 0.02f) else Color(0xFFF8FAFC))
                                 .clickable { showBudgetDetailsType = "SAVINGS" }
                                 .padding(vertical = 4.dp, horizontal = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -4114,7 +4134,8 @@ fun DashboardScreen(
                                 language = language,
                                 modifier = Modifier.size(72.dp),
                                 strokeWidthDp = 9.dp,
-                                centerTextSize = 13.sp
+                                centerTextSize = 13.sp,
+                                categoryType = "SAVINGS"
                             )
                         }
                     }
@@ -4303,17 +4324,33 @@ fun DashboardScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    // Large Segmented Donut Chart
-                    CategorySegmentedDonutChart(
-                        targetAmount = targetAmount,
-                        totalFilledAmount = totalFilledAmount,
-                        segments = segments,
-                        isDark = isDark,
-                        language = language,
-                        modifier = Modifier.size(160.dp),
-                        strokeWidthDp = 18.dp,
-                        centerTextSize = 28.sp
-                    )
+                    // Large Segmented Donut Chart inside a white Card
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.White
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CategorySegmentedDonutChart(
+                                targetAmount = targetAmount,
+                                totalFilledAmount = totalFilledAmount,
+                                segments = segments,
+                                isDark = false, // White card container, so use false for proper contrast
+                                language = language,
+                                modifier = Modifier.size(160.dp),
+                                strokeWidthDp = 18.dp,
+                                centerTextSize = 28.sp,
+                                categoryType = categoryType
+                            )
+                        }
+                    }
 
                     // In-place Budget Edit card
                     Card(
@@ -4532,20 +4569,6 @@ fun DashboardScreen(
                             }
                         }
                     }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showBudgetDialogType = categoryType
-                        showBudgetDetailsType = null
-                    }
-                ) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "বাজেট পরিবর্তন" else "Set Budget",
-                        color = FintechBlue,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             },
             confirmButton = {
@@ -13017,35 +13040,81 @@ fun ChartSection(
                      verticalAlignment = Alignment.CenterVertically,
                      horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            var startAngle = -90f
-                            values.forEachIndexed { index, value ->
-                                if (value > 0) {
-                                    val sweepAngle = (value / totalFloat) * 360f
-                                    drawArc(
-                                        color = palette[index % palette.size],
-                                        startAngle = startAngle,
-                                        sweepAngle = sweepAngle,
-                                        useCenter = true
-                                    )
-                                    startAngle += sweepAngle
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val sizeMin = size.minDimension
+                                val strokeWidthPx = 16.dp.toPx()
+                                val radius = (sizeMin - strokeWidthPx) / 2f
+
+                                // Draw background unfilled circle
+                                drawCircle(
+                                    color = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f),
+                                    radius = radius,
+                                    style = Stroke(width = strokeWidthPx)
+                                )
+
+                                // Draw active segments with rounded caps and gap mathematics
+                                if (totalFloat > 0f) {
+                                    var startAngle = -90f
+                                    val gapAngle = 8.0f // clean visible gap between rounded caps
+                                    val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
+
+                                    val validValues = values.filter { it > 0f }
+                                    validValues.forEachIndexed { index, value ->
+                                        val sweepAngle = (value / totalFloat) * 360f
+                                        val isOnlySegment = validValues.size == 1
+
+                                        val adjustedSweep = if (isOnlySegment) {
+                                            (360f - gapAngle - 2 * capAngle).coerceAtLeast(10f)
+                                        } else {
+                                            (sweepAngle - gapAngle - 2 * capAngle).coerceAtLeast(2f)
+                                        }
+                                        val adjustedStart = startAngle + (gapAngle / 2f) + capAngle
+
+                                        drawArc(
+                                            color = palette[index % palette.size],
+                                            startAngle = adjustedStart,
+                                            sweepAngle = adjustedSweep,
+                                            useCenter = false,
+                                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                        )
+
+                                        startAngle += sweepAngle
+                                    }
                                 }
                             }
+
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "মোট" else "Total",
+                                    color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.DarkGray.copy(alpha = 0.6f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = formatCurrency(total, language),
+                                    color = if (isDark) Color.White else Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                            }
                         }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "Total",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                text = formatCurrency(total, language),
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Visibly white/dark line matching the size of the graph (140.dp) exactly
+                        HorizontalDivider(
+                            modifier = Modifier.width(140.dp),
+                            thickness = 2.5.dp,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
                     }
 
                     Column(
