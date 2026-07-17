@@ -256,17 +256,47 @@ fun CalculatorDialog(
                     }
                 }
                 
+                val canInsert = try {
+                    val currentVal = if (hasResult) display else {
+                        if (display.isEmpty() || display == "Error") "0"
+                        else evaluateExpression(display.replace("×", "*").replace("÷", "/")).toString()
+                    }
+                    currentVal.toDouble() > 0.0 && display != "Error"
+                } catch (e: Exception) {
+                    false
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 1. Cross Button (Small Red)
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .weight(0.35f)
                             .height(56.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF10B981))
-                            .clickable {
+                            .background(Color(0xFFEF4444))
+                            .clickable { onDismiss() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "বন্ধ" else "Close",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    // 2. Insert Button (Green)
+                    Box(
+                        modifier = Modifier
+                            .weight(0.65f)
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (canInsert) Color(0xFF10B981) else Color.Gray.copy(alpha = 0.3f))
+                            .clickable(enabled = canInsert) {
                                 if (hasResult && display != "Error") {
                                     onInsert(display)
                                     onDismiss()
@@ -289,7 +319,7 @@ fun CalculatorDialog(
                             text = if (language == AppLanguage.BN) "ইনসার্ট" else "Insert",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = if (canInsert) Color.White else Color.White.copy(alpha = 0.5f)
                         )
                     }
                 }

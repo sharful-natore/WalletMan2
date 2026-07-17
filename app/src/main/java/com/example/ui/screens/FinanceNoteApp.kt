@@ -206,29 +206,7 @@ fun CategorySegmentedDonutChart(
         Color.Gray
     }
 
-    val centerBgColor = if (targetAmount > 0.0) {
-        val progressPercent = progress * 100
-        when (categoryType) {
-            "INCOME", "SAVINGS" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFF10B981).copy(alpha = 0.1f)
-                } else {
-                    if (isDark) Color(0xFF1E2235) else Color.White
-                }
-            }
-            "EXPENSE" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFFEF4444).copy(alpha = 0.1f)
-                } else {
-                    if (isDark) Color(0xFF1E2235) else Color.White
-                }
-            }
-            else -> if (isDark) Color(0xFF1E2235) else Color.White
-        }
-    } else {
-        if (isDark) Color(0xFF1E2235) else Color.White
-    }
-
+    val centerBgColor = if (isDark) Color(0xFF333333).copy(alpha = 0.5f) else Color.LightGray.copy(alpha = 0.3f)
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
@@ -357,34 +335,23 @@ fun CategorySegmentedDonutChart(
                 
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
-                    drawContext.canvas.save()
-
-                    val innerClipRadius = radius - strokeWidthPx / 2f
-                    val innerClipPath = androidx.compose.ui.graphics.Path().apply {
-                        addOval(androidx.compose.ui.geometry.Rect(
-                            center.x - innerClipRadius, center.y - innerClipRadius,
-                            center.x + innerClipRadius, center.y + innerClipRadius
-                        ))
+                    // Android 8.1 compatible natural outward glow
+                    val glowLayers = 20
+                    val glowSize = 8.dp.toPx()
+                    for (i in glowLayers downTo 1) {
+                        val fraction = i.toFloat() / glowLayers
+                        val currentGlowWidth = glowSize * fraction
+                        val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                        drawArc(
+                            color = color.copy(alpha = 0.035f),
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                            size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
+                        )
                     }
-                    drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
-                    val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                        this.color = color.copy(alpha = 0.65f)
-                        this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                        this.strokeWidth = strokeWidthPx
-                        this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
-                    }
-                    drawContext.canvas.drawArc(
-                        rect = androidx.compose.ui.geometry.Rect(
-                            center.x - radius, center.y - radius,
-                            center.x + radius, center.y + radius
-                        ),
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        paint = shadowPaint
-                    )
-                    drawContext.canvas.restore()
                 }
 
                 drawArc(
@@ -407,34 +374,23 @@ fun CategorySegmentedDonutChart(
 
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
-                        drawContext.canvas.save()
-
-                        val innerClipRadius = radius - strokeWidthPx / 2f
-                        val innerClipPath = androidx.compose.ui.graphics.Path().apply {
-                            addOval(androidx.compose.ui.geometry.Rect(
-                                center.x - innerClipRadius, center.y - innerClipRadius,
-                                center.x + innerClipRadius, center.y + innerClipRadius
-                            ))
+                        // Android 8.1 compatible natural outward glow
+                        val glowLayers = 20
+                        val glowSize = 8.dp.toPx()
+                        for (i in glowLayers downTo 1) {
+                            val fraction = i.toFloat() / glowLayers
+                            val currentGlowWidth = glowSize * fraction
+                            val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                            drawArc(
+                                color = color.copy(alpha = 0.035f),
+                                startAngle = startAngle,
+                                sweepAngle = allocatedSweep + 0.8f,
+                                useCenter = false,
+                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
+                            )
                         }
-                        drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
-                        val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                            this.color = color.copy(alpha = 0.65f)
-                            this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                            this.strokeWidth = strokeWidthPx
-                            this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
-                        }
-                        drawContext.canvas.drawArc(
-                            rect = androidx.compose.ui.geometry.Rect(
-                                center.x - radius, center.y - radius,
-                                center.x + radius, center.y + radius
-                            ),
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep + 0.8f,
-                            useCenter = false,
-                            paint = shadowPaint
-                        )
-                        drawContext.canvas.restore()
                     }
 
                     drawArc(
@@ -551,34 +507,23 @@ fun SegmentedDonutChart(
                         val isOnlySegment = activeSegments.size == 1 && (progressVal / activeCount) >= 0.99
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
-                            drawContext.canvas.save()
-
-                            val innerClipRadius = radius - strokeWidthPx / 2f
-                            val innerClipPath = androidx.compose.ui.graphics.Path().apply {
-                                addOval(androidx.compose.ui.geometry.Rect(
-                                    center.x - innerClipRadius, center.y - innerClipRadius,
-                                    center.x + innerClipRadius, center.y + innerClipRadius
-                                ))
+                            // Android 8.1 compatible natural outward glow
+                            val glowLayers = 20
+                            val glowSize = 8.dp.toPx()
+                            for (i in glowLayers downTo 1) {
+                                val fraction = i.toFloat() / glowLayers
+                                val currentGlowWidth = glowSize * fraction
+                                val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                                drawArc(
+                                    color = segment.second.copy(alpha = 0.035f),
+                                    startAngle = startAngle,
+                                    sweepAngle = sweepAngle,
+                                    useCenter = false,
+                                    topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                    size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
+                                )
                             }
-                            drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
-                            val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                this.color = segment.second.copy(alpha = 0.65f)
-                                this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                                this.strokeWidth = strokeWidthPx
-                                this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
-                            }
-                            drawContext.canvas.drawArc(
-                                rect = androidx.compose.ui.geometry.Rect(
-                                    center.x - radius, center.y - radius,
-                                    center.x + radius, center.y + radius
-                                ),
-                                startAngle = startAngle,
-                                sweepAngle = sweepAngle,
-                                useCenter = false,
-                                paint = shadowPaint
-                            )
-                            drawContext.canvas.restore()
 
                             drawArc(
                                 color = segment.second,
@@ -592,34 +537,23 @@ fun SegmentedDonutChart(
                             val adjustedStart = startAngle + (gapAngle / 2f)
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
-                            drawContext.canvas.save()
-
-                            val innerClipRadius = radius - strokeWidthPx / 2f
-                            val innerClipPath = androidx.compose.ui.graphics.Path().apply {
-                                addOval(androidx.compose.ui.geometry.Rect(
-                                    center.x - innerClipRadius, center.y - innerClipRadius,
-                                    center.x + innerClipRadius, center.y + innerClipRadius
-                                ))
+                            // Android 8.1 compatible natural outward glow
+                            val glowLayers = 20
+                            val glowSize = 8.dp.toPx()
+                            for (i in glowLayers downTo 1) {
+                                val fraction = i.toFloat() / glowLayers
+                                val currentGlowWidth = glowSize * fraction
+                                val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                                drawArc(
+                                    color = segment.second.copy(alpha = 0.035f),
+                                    startAngle = adjustedStart,
+                                    sweepAngle = adjustedSweep,
+                                    useCenter = false,
+                                    topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                    size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
+                                )
                             }
-                            drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
-                            val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                this.color = segment.second.copy(alpha = 0.65f)
-                                this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                                this.strokeWidth = strokeWidthPx
-                                this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
-                            }
-                            drawContext.canvas.drawArc(
-                                rect = androidx.compose.ui.geometry.Rect(
-                                    center.x - radius, center.y - radius,
-                                    center.x + radius, center.y + radius
-                                ),
-                                startAngle = adjustedStart,
-                                sweepAngle = adjustedSweep,
-                                useCenter = false,
-                                paint = shadowPaint
-                            )
-                            drawContext.canvas.restore()
 
                             drawArc(
                                 color = segment.second,
@@ -13912,34 +13846,23 @@ fun ChartSection(
                                         val color = palette[index % palette.size]
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
-                                        drawContext.canvas.save()
-                                        val innerClipRadius = radius - strokeWidthPx / 2f
-                                        val innerClipPath = androidx.compose.ui.graphics.Path().apply {
-                                            addOval(androidx.compose.ui.geometry.Rect(
-                                                center.x - innerClipRadius, center.y - innerClipRadius,
-                                                center.x + innerClipRadius, center.y + innerClipRadius
-                                            ))
+                                        // Android 8.1 compatible natural outward glow
+                                        val glowLayers = 20
+                                        val glowSize = 8.dp.toPx()
+                                        for (i in glowLayers downTo 1) {
+                                            val fraction = i.toFloat() / glowLayers
+                                            val currentGlowWidth = glowSize * fraction
+                                            val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                                            drawArc(
+                                                color = color.copy(alpha = 0.035f),
+                                                startAngle = startAngle,
+                                                sweepAngle = sweepAngle + 0.8f,
+                                                useCenter = false,
+                                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
+                                            )
                                         }
-                                        drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
-                                        
-                                        val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                            this.color = color.copy(alpha = 0.65f)
-                                            this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                                            this.strokeWidth = strokeWidthPx
-                                            this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
-                                        }
-                                        drawContext.canvas.drawArc(
-                                            rect = androidx.compose.ui.geometry.Rect(
-                                                center.x - radius, center.y - radius,
-                                                center.x + radius, center.y + radius
-                                            ),
-                                            startAngle = startAngle,
-                                            sweepAngle = sweepAngle + 0.8f,
-                                            useCenter = false,
-                                            paint = shadowPaint
-                                        )
-                                        drawContext.canvas.restore()
 
                                         drawArc(
                                             color = color,
