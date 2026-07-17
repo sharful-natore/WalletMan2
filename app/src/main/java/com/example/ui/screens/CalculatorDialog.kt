@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -11,9 +13,77 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.AppLanguage
+
+fun evaluateExpression(expr: String): Double {
+    return object : Any() {
+        var pos = -1
+        var ch = 0
+
+        fun nextChar() {
+            ch = if (++pos < expr.length) expr[pos].code else -1
+        }
+
+        fun eat(charToEat: Int): Boolean {
+            while (ch == ' '.code) nextChar()
+            if (ch == charToEat) {
+                nextChar()
+                return true
+            }
+            return false
+        }
+
+        fun parse(): Double {
+            nextChar()
+            val x = parseExpression()
+            if (pos < expr.length) throw RuntimeException("Unexpected: " + ch.toChar())
+            return x
+        }
+
+        fun parseExpression(): Double {
+            var x = parseTerm()
+            while (true) {
+                if (eat('+'.code)) x += parseTerm() // addition
+                else if (eat('-'.code)) x -= parseTerm() // subtraction
+                else return x
+            }
+        }
+
+        fun parseTerm(): Double {
+            var x = parseFactor()
+            while (true) {
+                if (eat('*'.code) || eat('×'.code)) x *= parseFactor() // multiplication
+                else if (eat('/'.code) || eat('÷'.code)) x /= parseFactor() // division
+                else return x
+            }
+        }
+
+        fun parseFactor(): Double {
+            if (eat('+'.code)) return parseFactor() // unary plus
+            if (eat('-'.code)) return -parseFactor() // unary minus
+
+            var x: Double
+            val startPos = this.pos
+            if (eat('('.code)) { // parentheses
+                x = parseExpression()
+                eat(')'.code)
+            } else if (ch >= '0'.code && ch <= '9'.code || ch == '.'.code) { // numbers
+                while (ch >= '0'.code && ch <= '9'.code || ch == '.'.code) nextChar()
+                x = expr.substring(startPos, this.pos).toDouble()
+            } else {
+                throw RuntimeException("Unexpected: " + ch.toChar())
+            }
+
+            if (eat('%'.code)) x /= 100.0 // percentage
+
+            return x
+        }
+    }.parse()
+}
 
 @Composable
 fun CalculatorDialog(
@@ -23,60 +93,64 @@ fun CalculatorDialog(
     onInsert: (String) -> Unit
 ) {
     var display by remember { mutableStateOf("") }
-    var operator by remember { mutableStateOf<String?>(null) }
-    var operand1 by remember { mutableStateOf<Double?>(null) }
-    var isNewOperand by remember { mutableStateOf(false) }
+    var history by remember { mutableStateOf("") }
+    var hasResult by remember { mutableStateOf(false) }
 
     val buttons = listOf(
-        listOf("7", "8", "9", "÷"),
-        listOf("4", "5", "6", "×"),
-        listOf("1", "2", "3", "-"),
-        listOf("C", "0", ".", "+")
+        listOf("C", "(", ")", "÷"),
+        listOf("7", "8", "9", "×"),
+        listOf("4", "5", "6", "-"),
+        listOf("1", "2", "3", "+"),
+        listOf("%", "0", ".", "=")
     )
-
-    fun calculate() {
-        if (operand1 != null && operator != null && display.isNotEmpty()) {
-            val op2 = display.toDoubleOrNull() ?: 0.0
-            val result = when (operator) {
-                "+" -> operand1!! + op2
-                "-" -> operand1!! - op2
-                "×" -> operand1!! * op2
-                "÷" -> if (op2 != 0.0) operand1!! / op2 else 0.0
-                else -> op2
-            }
-            display = if (result % 1.0 == 0.0) result.toLong().toString() else result.toString()
-            operand1 = null
-            operator = null
-            isNewOperand = true
-        }
-    }
 
     fun onButtonClick(label: String) {
         when (label) {
             "C" -> {
                 display = ""
-                operand1 = null
-                operator = null
-                isNewOperand = false
+                history = ""
+                hasResult = false
             }
-            "+", "-", "×", "÷" -> {
-                if (operand1 == null) {
-                    operand1 = display.toDoubleOrNull() ?: 0.0
-                } else if (!isNewOperand) {
-                    calculate()
-                    operand1 = display.toDoubleOrNull() ?: 0.0
+            "=" -> {
+                try {
+                    if (display.isNotEmpty()) {
+                        val result = evaluateExpression(display.replace("×", "*").replace("÷", "/"))
+                        history = display + "="
+                        display = if (result % 1.0 == 0.0) result.toLong().toString() else result.toString()
+                        hasResult = true
+                    }
+                } catch (e: Exception) {
+                    history = display + "="
+                    display = "Error"
+                    hasResult = true
                 }
-                operator = label
-                isNewOperand = true
             }
-            else -> { // Numbers and dot
-                if (isNewOperand) {
-                    display = label
-                    isNewOperand = false
+            else -> {
+                if (hasResult) {
+                    if (label in listOf("+", "-", "×", "÷", "%")) {
+                        // Continue from result
+                        display += label
+                        hasResult = false
+                    } else {
+                        // Start new calculation
+                        display = label
+                        history = ""
+                        hasResult = false
+                    }
                 } else {
                     display += label
                 }
             }
+        }
+    }
+
+    fun onBackspace() {
+        if (hasResult) {
+            display = ""
+            history = ""
+            hasResult = false
+        } else if (display.isNotEmpty()) {
+            display = display.dropLast(1)
         }
     }
 
@@ -98,17 +172,44 @@ fun CalculatorDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp)
+                        .height(100.dp)
                         .background(if (isDark) Color(0xFF2D3249) else Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.CenterEnd
+                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = display.ifEmpty { "0" },
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color.Black
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = history,
+                            fontSize = 16.sp,
+                            color = if (isDark) Color.LightGray else Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = display.ifEmpty { "0" },
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (display == "Error") Color.Red else (if (isDark) Color.White else Color.Black),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.End
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(onClick = { onBackspace() }, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Backspace,
+                                    contentDescription = "Backspace",
+                                    tint = if (isDark) Color.LightGray else Color.Gray
+                                )
+                            }
+                        }
+                    }
                 }
                 
                 buttons.forEach { row ->
@@ -120,15 +221,18 @@ fun CalculatorDialog(
                             val isOp = btn in listOf("+", "-", "×", "÷")
                             val isEq = btn == "="
                             val isClear = btn == "C"
+                            val isFunc = btn in listOf("(", ")", "%")
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .aspectRatio(1f)
+                                    .aspectRatio(1.2f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(
                                         when {
                                             isOp -> Color(0xFF3B82F6).copy(alpha = 0.2f)
+                                            isEq -> Color(0xFF3B82F6)
                                             isClear -> Color(0xFFEF4444).copy(alpha = 0.2f)
+                                            isFunc -> Color(0xFF10B981).copy(alpha = 0.2f)
                                             else -> if (isDark) Color(0xFF2D3249) else Color(0xFFF8FAFC)
                                         }
                                     )
@@ -138,10 +242,12 @@ fun CalculatorDialog(
                                 Text(
                                     text = btn,
                                     fontSize = 24.sp,
-                                    fontWeight = if (isOp || isClear) FontWeight.Bold else FontWeight.Medium,
+                                    fontWeight = if (isOp || isEq || isClear || isFunc) FontWeight.Bold else FontWeight.Medium,
                                     color = when {
                                         isOp -> Color(0xFF3B82F6)
+                                        isEq -> Color.White
                                         isClear -> Color(0xFFEF4444)
+                                        isFunc -> Color(0xFF10B981)
                                         else -> if (isDark) Color.White else Color.Black
                                     }
                                 )
@@ -149,9 +255,9 @@ fun CalculatorDialog(
                         }
                     }
                 }
-
+                
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
@@ -159,29 +265,23 @@ fun CalculatorDialog(
                             .weight(1f)
                             .height(56.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF3B82F6))
-                            .clickable {
-                                calculate()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "=",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF10B981))
                             .clickable {
-                                calculate()
-                                onInsert(display)
-                                onDismiss()
+                                if (hasResult && display != "Error") {
+                                    onInsert(display)
+                                    onDismiss()
+                                } else if (display.isNotEmpty() && display != "Error") {
+                                    try {
+                                        val result = evaluateExpression(display.replace("×", "*").replace("÷", "/"))
+                                        val resultStr = if (result % 1.0 == 0.0) result.toLong().toString() else result.toString()
+                                        onInsert(resultStr)
+                                        onDismiss()
+                                    } catch (e: Exception) {
+                                        history = display + "="
+                                        display = "Error"
+                                        hasResult = true
+                                    }
+                                }
                             },
                         contentAlignment = Alignment.Center
                     ) {
