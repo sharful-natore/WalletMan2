@@ -308,7 +308,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         prefs.edit().putString("active_workspace_id", workspaceId).apply()
         loadProfile(getApplication())
         loadBudgets()
-        onLocalDatabaseChanged()
         com.example.widget.updateAllWidgets(getApplication())
         
         if (oldId != workspaceId) {
@@ -506,6 +505,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri, workspaceId = _currentWorkspaceId.value))
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            recordDatabaseMutation("ADD", name, "PERSON", 0.0)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি সফলভাবে যুক্ত করা হয়েছে" else "Person added successfully", isSuccess = true, type = "SUCCESS")
         }
     }
@@ -515,6 +515,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.updatePerson(person)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            recordDatabaseMutation("EDIT", person.name, "PERSON", 0.0)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি সফলভাবে আপডেট করা হয়েছে" else "Person updated successfully", isSuccess = true, type = "SUCCESS")
         }
     }
@@ -537,9 +538,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun deletePersons(ids: List<Int>) {
         viewModelScope.launch {
+            var lastDeletedName = ""
             ids.forEach { id ->
                 val p = repository.getPersonById(id)
                 if (p != null) {
+                    lastDeletedName = p.name
                     val txs = repository.getTransactionsByPersonList(id)
                     val pWithTx = com.example.data.PersonWithTransactions(p, txs)
                     repository.insertTrashItem(com.example.data.TrashItem(
@@ -549,6 +552,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     ))
                 }
                 repository.deletePerson(id)
+            }
+            if (lastDeletedName.isNotEmpty()) {
+                val msg = if (ids.size > 1) "$lastDeletedName + ${ids.size - 1}" else lastDeletedName
+                recordDatabaseMutation("DELETE", msg, "PERSON", 0.0)
             }
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
@@ -585,6 +592,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     itemType = "PERSON_WITH_TXS", 
                     itemJson = personWithTxAdapter.toJson(pWithTx)
                 ))
+                recordDatabaseMutation("DELETE", p.name, "PERSON", 0.0)
             }
             repository.deletePerson(id)
             com.example.widget.updateAllWidgets(getApplication())
@@ -615,6 +623,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             )
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            val finalName = if (note.isBlank()) category else note
+            val finalCategory = "${type.uppercase()} - $category"
+            recordDatabaseMutation("ADD", finalName, finalCategory, amount)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন সফলভাবে সংরক্ষণ করা হয়েছে" else "Transaction saved", isSuccess = true, type = "SUCCESS")
         }
     }
@@ -624,6 +635,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.updateTransaction(transaction)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
+            val finalName = if (transaction.note.isBlank()) transaction.category else transaction.note
+            val finalCategory = "${transaction.type.uppercase()} - ${transaction.category}"
+            recordDatabaseMutation("EDIT", finalName, finalCategory, transaction.amount)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন আপডেট করা হয়েছে" else "Transaction updated", isSuccess = true, type = "SUCCESS")
         }
     }
@@ -633,6 +647,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             val t = repository.getTransactionById(id)
             if (t != null) {
                 repository.insertTrashItem(com.example.data.TrashItem(originalId = id, itemType = "TRANSACTION", itemJson = transactionAdapter.toJson(t)))
+                val finalName = if (t.note.isBlank()) t.category else t.note
+                val finalCategory = "${t.type.uppercase()} - ${t.category}"
+                recordDatabaseMutation("DELETE", finalName, finalCategory, t.amount)
             }
             repository.deleteTransaction(id)
             com.example.widget.updateAllWidgets(getApplication())
@@ -659,6 +676,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 )
             )
             onLocalDatabaseChanged()
+            recordDatabaseMutation("ADD", title, "SAVINGS_GOAL", targetAmount)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লক্ষ্য তৈরি করা হয়েছে" else "Savings goal created", isSuccess = true, type = "SUCCESS")
         }
     }
@@ -689,6 +707,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     )
                 )
                 onLocalDatabaseChanged()
+                val finalName = if (note.isBlank()) goal.title else note
+                recordDatabaseMutation("ADD", finalName, "SAVINGS_CONTRIBUTION", absoluteAmount)
             }
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় যুক্ত করা হয়েছে" else "Contribution added", isSuccess = true, type = "SUCCESS")
         }
@@ -705,6 +725,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     itemType = "SAVINGS_GOAL_WITH_TXS", 
                     itemJson = goalWithTxAdapter.toJson(gWithTx)
                 ))
+                recordDatabaseMutation("DELETE", g.title, "SAVINGS_GOAL", g.targetAmount)
             }
             repository.deleteSavingsGoal(id)
             onLocalDatabaseChanged()
@@ -724,6 +745,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val updated = goal.copy(savedAmount = goal.savedAmount + difference)
                 repository.insertSavingsGoal(updated)
                 onLocalDatabaseChanged()
+                val finalName = if (newTx.note.isBlank()) goal.title else newTx.note
+                recordDatabaseMutation("EDIT", finalName, "SAVINGS_CONTRIBUTION", newTx.amount)
             }
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লেনদেন আপডেট করা হয়েছে" else "Savings transaction updated", isSuccess = true, type = "SUCCESS")
         }
@@ -739,6 +762,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val delta = if (tx.isDeposit) -tx.amount else tx.amount
                 val updated = goal.copy(savedAmount = goal.savedAmount + delta)
                 repository.insertSavingsGoal(updated)
+                val finalName = if (tx.note.isBlank()) goal.title else tx.note
+                recordDatabaseMutation("DELETE", finalName, "SAVINGS_CONTRIBUTION", tx.amount)
             }
             onLocalDatabaseChanged()
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লেনদেন মুছে ফেলা হয়েছে" else "Savings transaction deleted", isSuccess = true, type = "SUCCESS")
@@ -749,6 +774,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             repository.insertSavingsGoal(goal)
             onLocalDatabaseChanged()
+            recordDatabaseMutation("EDIT", goal.title, "SAVINGS_GOAL", goal.targetAmount)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "সঞ্চয় লক্ষ্য আপডেট করা হয়েছে" else "Savings goal updated", isSuccess = true, type = "SUCCESS")
         }
     }
@@ -770,12 +796,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun deleteTransactions(ids: List<Int>) {
         viewModelScope.launch {
+            var lastDeletedNote = ""
+            var lastDeletedAmount = 0.0
+            var lastDeletedCategory = "TRANSACTIONS"
             ids.forEach { id ->
                 val t = repository.getTransactionById(id)
                 if (t != null) {
+                    lastDeletedNote = if (t.note.isBlank()) t.category else t.note
+                    lastDeletedAmount = t.amount
+                    lastDeletedCategory = "${t.type.uppercase()} - ${t.category}"
                     repository.insertTrashItem(com.example.data.TrashItem(originalId = id, itemType = "TRANSACTION", itemJson = transactionAdapter.toJson(t)))
                 }
                 repository.deleteTransaction(id)
+            }
+            if (lastDeletedNote.isNotEmpty()) {
+                val msg = if (ids.size > 1) "$lastDeletedNote + ${ids.size - 1}" else lastDeletedNote
+                recordDatabaseMutation("DELETE", msg, lastDeletedCategory, lastDeletedAmount)
             }
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
@@ -785,9 +821,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun deleteSavingsGoals(ids: List<Int>) {
         viewModelScope.launch {
+            var lastDeletedTitle = ""
+            var lastDeletedTargetAmount = 0.0
             ids.forEach { id ->
                 val g = repository.getSavingsGoalById(id)
                 if (g != null) {
+                    lastDeletedTitle = g.title
+                    lastDeletedTargetAmount = g.targetAmount
                     val txs = repository.getSavingsTransactionsByGoalList(id)
                     val gWithTx = com.example.data.GoalWithTransactions(g, txs)
                     repository.insertTrashItem(com.example.data.TrashItem(
@@ -797,6 +837,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     ))
                 }
                 repository.deleteSavingsGoal(id)
+            }
+            if (lastDeletedTitle.isNotEmpty()) {
+                val msg = if (ids.size > 1) "$lastDeletedTitle + ${ids.size - 1}" else lastDeletedTitle
+                recordDatabaseMutation("DELETE", msg, "SAVINGS_GOAL", lastDeletedTargetAmount)
             }
             onLocalDatabaseChanged()
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "${ids.size}টি সঞ্চয় কার্ড মুছে ফেলা হয়েছে" else "${ids.size} savings cards deleted", isSuccess = true, type = "SUCCESS")
@@ -1019,11 +1063,44 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _lastSyncTime = MutableStateFlow<Long?>(null)
     val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
 
+    private val _lastMutationAction = MutableStateFlow<String?>(null)
+    val lastMutationAction: StateFlow<String?> = _lastMutationAction.asStateFlow()
+
+    private val _lastMutationName = MutableStateFlow<String?>(null)
+    val lastMutationName: StateFlow<String?> = _lastMutationName.asStateFlow()
+
+    private val _lastMutationCategory = MutableStateFlow<String?>(null)
+    val lastMutationCategory: StateFlow<String?> = _lastMutationCategory.asStateFlow()
+
+    private val _lastMutationAmount = MutableStateFlow<Double?>(null)
+    val lastMutationAmount: StateFlow<Double?> = _lastMutationAmount.asStateFlow()
+
+    fun recordDatabaseMutation(action: String, name: String, category: String, amount: Double) {
+        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("last_mutation_action", action)
+            .putString("last_mutation_name", name)
+            .putString("last_mutation_category", category)
+            .putFloat("last_mutation_amount", amount.toFloat())
+            .apply()
+        _lastMutationAction.value = action
+        _lastMutationName.value = name
+        _lastMutationCategory.value = category
+        _lastMutationAmount.value = amount
+    }
+
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
 
     init {
         registerNetworkCallback()
         loadBudgets()
+        
+        val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        _lastMutationAction.value = cachedPrefs.getString("last_mutation_action", null)
+        _lastMutationName.value = cachedPrefs.getString("last_mutation_name", null)
+        _lastMutationCategory.value = cachedPrefs.getString("last_mutation_category", null)
+        _lastMutationAmount.value = if (cachedPrefs.contains("last_mutation_amount")) cachedPrefs.getFloat("last_mutation_amount", 0f).toDouble() else null
+
         viewModelScope.launch {
             try {
                 val list = repository.allWorkspaces.first()

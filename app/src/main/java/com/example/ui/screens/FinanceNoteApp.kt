@@ -206,6 +206,29 @@ fun CategorySegmentedDonutChart(
         Color.Gray
     }
 
+    val centerBgColor = if (targetAmount > 0.0) {
+        val progressPercent = progress * 100
+        when (categoryType) {
+            "INCOME", "SAVINGS" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFF10B981).copy(alpha = 0.1f)
+                } else {
+                    FintechBlue.copy(alpha = 0.1f)
+                }
+            }
+            "EXPENSE" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFFEF4444).copy(alpha = 0.1f)
+                } else {
+                    FintechBlue.copy(alpha = 0.1f)
+                }
+            }
+            else -> FintechBlue.copy(alpha = 0.1f)
+        }
+    } else {
+        FintechBlue.copy(alpha = 0.1f)
+    }
+
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
@@ -282,6 +305,16 @@ fun CategorySegmentedDonutChart(
             val strokeWidthPx = strokeWidthDp.toPx()
             val radius = (sizeMin - strokeWidthPx) / 2f
 
+            // Draw central hollow background
+            val innerRadius = radius - strokeWidthPx / 2f
+            if (innerRadius > 0f) {
+                drawCircle(
+                    color = centerBgColor,
+                    radius = innerRadius,
+                    center = center
+                )
+            }
+
             val activeSegments = segments.filter { it.second > 0.0 }
             val activeSegmentsSum = activeSegments.sumOf { it.second }
 
@@ -317,10 +350,34 @@ fun CategorySegmentedDonutChart(
             // Draw the segments
             if (drawSegments.size == 1) {
                 // Single segment, draw perfect continuous circle with no gaps/caps artifacts
+                val color = drawSegments[0].second
                 val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+                
+                if (color != resolvedUnfilledColor) {
+                    // Soft glowing shadow matching segment color
+                    drawArc(
+                        color = color.copy(alpha = 0.04f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx + 12.dp.toPx())
+                    )
+                    drawArc(
+                        color = color.copy(alpha = 0.12f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx + 6.dp.toPx())
+                    )
+                }
+
                 drawArc(
-                    color = drawSegments[0].second,
+                    color = color,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -337,10 +394,32 @@ fun CategorySegmentedDonutChart(
                     val allocatedSweep = segment.first
                     val color = segment.second
 
+                    if (color != resolvedUnfilledColor) {
+                        // Soft glowing shadow matching segment color
+                        drawArc(
+                            color = color.copy(alpha = 0.04f),
+                            startAngle = startAngle,
+                            sweepAngle = allocatedSweep + 0.8f,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidthPx + 12.dp.toPx(), cap = StrokeCap.Butt)
+                        )
+                        drawArc(
+                            color = color.copy(alpha = 0.12f),
+                            startAngle = startAngle,
+                            sweepAngle = allocatedSweep + 0.8f,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidthPx + 6.dp.toPx(), cap = StrokeCap.Butt)
+                        )
+                    }
+
                     drawArc(
                         color = color,
                         startAngle = startAngle,
-                        sweepAngle = allocatedSweep,
+                        sweepAngle = allocatedSweep + 0.8f,
                         useCenter = false,
                         topLeft = arcTopLeft,
                         size = arcSize,
@@ -383,7 +462,7 @@ fun CategorySegmentedDonutChart(
                     text = formatNumberString(percentageText, language),
                     fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (isDark) Color.White else Color(0xFF1E293B),
+                    color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
                     textAlign = TextAlign.Center
                 )
             }
@@ -449,6 +528,22 @@ fun SegmentedDonutChart(
                     if (sweepAngle > 0f) {
                         val isOnlySegment = activeSegments.size == 1 && (progressVal / activeCount) >= 0.99
                         if (isOnlySegment) {
+                            // Soft glowing shadow matching segment color
+                            drawArc(
+                                color = segment.second.copy(alpha = 0.04f),
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx + 12.dp.toPx(), cap = StrokeCap.Butt)
+                            )
+                            drawArc(
+                                color = segment.second.copy(alpha = 0.12f),
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx + 6.dp.toPx(), cap = StrokeCap.Butt)
+                            )
+
                             drawArc(
                                 color = segment.second,
                                 startAngle = startAngle,
@@ -459,6 +554,23 @@ fun SegmentedDonutChart(
                         } else {
                             val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(1f)
                             val adjustedStart = startAngle + (gapAngle / 2f)
+
+                            // Soft glowing shadow matching segment color
+                            drawArc(
+                                color = segment.second.copy(alpha = 0.04f),
+                                startAngle = adjustedStart,
+                                sweepAngle = adjustedSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx + 12.dp.toPx(), cap = StrokeCap.Butt)
+                            )
+                            drawArc(
+                                color = segment.second.copy(alpha = 0.12f),
+                                startAngle = adjustedStart,
+                                sweepAngle = adjustedSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx + 6.dp.toPx(), cap = StrokeCap.Butt)
+                            )
+
                             drawArc(
                                 color = segment.second,
                                 startAngle = adjustedStart,
@@ -1751,6 +1863,17 @@ fun FinanceNoteApp(
 
     var showSearch by remember { mutableStateOf(false) }
     var showRealtimeSyncDialog by remember { mutableStateOf(false) }
+    var showNoInternetDialog by remember { mutableStateOf(false) }
+    var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val executeWithInternetCheck: (() -> Unit) -> Unit = { action ->
+        if (!viewModel.isNetworkAvailable(context)) {
+            onNoInternetRetryAction = action
+            showNoInternetDialog = true
+        } else {
+            action()
+        }
+    }
 
     val driveStatusMessage by viewModel.driveStatusMessage.collectAsState()
     val googleDriveFiles by viewModel.googleDriveFiles.collectAsState()
@@ -2370,12 +2493,15 @@ fun FinanceNoteApp(
                                         }
                                     },
                                     onRestoreClick = {
-                                        showRestoreListDialog = true
-                                        viewModel.listGoogleDriveFiles(context)
+                                        executeWithInternetCheck {
+                                            showRestoreListDialog = true
+                                            viewModel.listGoogleDriveFiles(context)
+                                        }
                                     }
                                 )
                             } else if (tabState == "charts") {
                                 ChartsScreen(
+                                    viewModel = viewModel,
                                     language = language,
                                     isDark = isDarkTheme,
                                     transactions = transactions,
@@ -2811,20 +2937,28 @@ fun FinanceNoteApp(
                         initialFileName = defaultName,
                         workspaces = workspaceStatsList,
                         onConfirm = { finalFileName, comment, selectedWorkspaceIds ->
+                            val backupAction = {
+                                viewModel.backupToGoogleDrive(
+                                    context = context,
+                                    customFileName = finalFileName,
+                                    comment = comment,
+                                    workspaceIds = selectedWorkspaceIds,
+                                    onSuccess = {
+                                        viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", isSuccess = true, type = "SUCCESS")
+                                        viewModel.listGoogleDriveFiles(context)
+                                    },
+                                    onError = { err ->
+                                        viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ব্যাকআপ ব্যর্থ হয়েছে: " else "Backup failed: "}$err", isSuccess = false, type = "ERROR")
+                                    }
+                                )
+                            }
                             showBackupConfirm = false
-                            viewModel.backupToGoogleDrive(
-                                context = context,
-                                customFileName = finalFileName,
-                                comment = comment,
-                                workspaceIds = selectedWorkspaceIds,
-                                onSuccess = {
-                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ সফল হয়েছে!" else "Drive Backup successful!", isSuccess = true, type = "SUCCESS")
-                                    viewModel.listGoogleDriveFiles(context)
-                                },
-                                onError = { err ->
-                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ব্যাকআপ ব্যর্থ হয়েছে: " else "Backup failed: "}$err", isSuccess = false, type = "ERROR")
-                                }
-                            )
+                            if (!viewModel.isNetworkAvailable(context)) {
+                                onNoInternetRetryAction = backupAction
+                                showNoInternetDialog = true
+                            } else {
+                                backupAction()
+                            }
                         },
                         onDismiss = { showBackupConfirm = false }
                     )
@@ -2843,20 +2977,25 @@ fun FinanceNoteApp(
                             showRestoreListDialog = false
                         },
                         onDelete = { fileId ->
-                            viewModel.deleteGoogleDriveFile(
-                                context = context,
-                                fileId = fileId,
-                                onSuccess = {
-                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ফাইলটি সফলভাবে ডিলিট করা হয়েছে!" else "File deleted successfully!", isSuccess = true, type = "SUCCESS")
-                                },
-                                onError = { err ->
-                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ডিলিট ব্যর্থ হয়েছে: " else "Delete failed: "}$err", isSuccess = false, type = "ERROR")
-                                }
-                            )
+                            executeWithInternetCheck {
+                                viewModel.deleteGoogleDriveFile(
+                                    context = context,
+                                    fileId = fileId,
+                                    onSuccess = {
+                                        viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ফাইলটি সফলভাবে ডিলিট করা হয়েছে!" else "File deleted successfully!", isSuccess = true, type = "SUCCESS")
+                                    },
+                                    onError = { err ->
+                                        viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ডিলিট ব্যর্থ হয়েছে: " else "Delete failed: "}$err", isSuccess = false, type = "ERROR")
+                                    }
+                                )
+                            }
                         },
                         onRefresh = {
-                            viewModel.listGoogleDriveFiles(context)
-                        }
+                            executeWithInternetCheck {
+                                viewModel.listGoogleDriveFiles(context)
+                            }
+                        },
+                        executeWithInternetCheck = executeWithInternetCheck
                     )
                 }
             }
@@ -2893,6 +3032,10 @@ fun FinanceNoteApp(
         val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
         val lastSyncTime by viewModel.lastSyncTime.collectAsState()
         val syncStatus by viewModel.firestoreSyncStatus.collectAsState()
+        val lastMutationAction by viewModel.lastMutationAction.collectAsState()
+        val lastMutationName by viewModel.lastMutationName.collectAsState()
+        val lastMutationCategory by viewModel.lastMutationCategory.collectAsState()
+        val lastMutationAmount by viewModel.lastMutationAmount.collectAsState()
 
         AlertDialog(
             onDismissRequest = { showRealtimeSyncDialog = false },
@@ -3059,24 +3202,137 @@ fun FinanceNoteApp(
                             )
                         }
                         
-                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
-                        
-                        Text(
-                            text = if (hasUnsavedChanges) {
-                                val lastTx = transactions.lastOrNull()
-                                val lastPerson = persons.lastOrNull()
-                                val lastItemName = lastTx?.note ?: lastPerson?.name ?: (if (language == AppLanguage.BN) "কোনোটিই নয়" else "None")
-                                if (language == AppLanguage.BN) "সর্বশেষ পরিবর্তন: $lastItemName" 
-                                else "Last change: $lastItemName"
-                            } else {
-                                if (language == AppLanguage.BN) "সব ডেটা সিঙ্ক হয়েছে" 
-                                else "All data synced"
-                            },
-                            fontSize = 12.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = if (isDarkTheme) Color.Gray else Color.DarkGray,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
+                        if (lastMutationAction != null) {
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isDarkTheme) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.02f))
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (hasUnsavedChanges) {
+                                        if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা (সিঙ্ক প্রয়োজন):" else "Unsaved Data (Sync Needed):"
+                                    } else {
+                                        if (language == AppLanguage.BN) "সর্বশেষ সিঙ্কড ডাটা:" else "Last Synced Data:"
+                                    },
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (hasUnsavedChanges) Color(0xFFFFB300) else Color(0xFF4CAF50)
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                val actionText = when (lastMutationAction) {
+                                    "ADD" -> if (language == AppLanguage.BN) "যোগ করা হয়েছে" else "Added"
+                                    "EDIT" -> if (language == AppLanguage.BN) "আপডেট করা হয়েছে" else "Updated"
+                                    "DELETE" -> if (language == AppLanguage.BN) "মুছে ফেলা হয়েছে" else "Deleted"
+                                    else -> lastMutationAction ?: ""
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "কাজ:" else "Action:",
+                                        fontSize = 12.sp,
+                                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = actionText,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "নাম:" else "Name:",
+                                        fontSize = 12.sp,
+                                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = lastMutationName ?: "-",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "খাত:" else "Category:",
+                                        fontSize = 12.sp,
+                                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                    )
+                                    
+                                    val categoryDisplay = when (lastMutationCategory) {
+                                        "PERSON" -> if (language == AppLanguage.BN) "ব্যক্তি/লেনদেন" else "Person/Debt"
+                                        "SAVINGS_GOAL" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্য" else "Savings Goal"
+                                        "SAVINGS_CONTRIBUTION" -> if (language == AppLanguage.BN) "সঞ্চয় লেনদেন" else "Savings Transaction"
+                                        else -> {
+                                            val cat = lastMutationCategory ?: ""
+                                            if (language == AppLanguage.BN) {
+                                                cat.replace("EXPENSE", "ব্যয়").replace("INCOME", "আয়")
+                                            } else {
+                                                cat
+                                            }
+                                        }
+                                    }
+                                    
+                                    Text(
+                                        text = categoryDisplay,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                    )
+                                }
+
+                                if (lastMutationAmount != null && lastMutationAmount!! > 0.0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "পরিমান:" else "Amount:",
+                                            fontSize = 12.sp,
+                                            color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "৳${String.format("%,.2f", lastMutationAmount)}" else "$${String.format("%,.2f", lastMutationAmount)}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+                            
+                            Text(
+                                text = if (hasUnsavedChanges) {
+                                    if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা আছে" else "Unsaved data present"
+                                } else {
+                                    if (language == AppLanguage.BN) "সব ডেটা সিঙ্ক হয়েছে" else "All data synced"
+                                },
+                                fontSize = 12.sp,
+                                fontStyle = FontStyle.Italic,
+                                color = if (isDarkTheme) Color.Gray else Color.DarkGray,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                        }
 
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
 
@@ -3097,9 +3353,7 @@ fun FinanceNoteApp(
                 if (isGoogleSignedIn) {
                     Button(
                         onClick = {
-                            if (!isNetworkAvailable) {
-                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ইন্টারনেট কানেকশন নেই! অনুগ্রহ করে কানেকশন চালু করুন।" else "No internet connection! Please check your network.", isSuccess = false, type = "ERROR")
-                            } else {
+                            val syncAction = {
                                 viewModel.uploadToFirestore(
                                     onComplete = {
                                         viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সফলভাবে সম্পন্ন হয়েছে!" else "Cloud sync completed successfully!", isSuccess = true, type = "SUCCESS")
@@ -3108,6 +3362,12 @@ fun FinanceNoteApp(
                                         viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "সিঙ্ক ব্যর্থ হয়েছে: " else "Sync failed: "}$err", isSuccess = false, type = "ERROR")
                                     }
                                 )
+                            }
+                            if (!viewModel.isNetworkAvailable(context)) {
+                                onNoInternetRetryAction = syncAction
+                                showNoInternetDialog = true
+                            } else {
+                                syncAction()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -3122,6 +3382,99 @@ fun FinanceNoteApp(
             },
             dismissButton = {
                 TextButton(onClick = { showRealtimeSyncDialog = false }) {
+                    Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close")
+                }
+            }
+        )
+    }
+
+    if (showNoInternetDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoInternetDialog = false },
+            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Wifi,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "ইন্টারনেট সংযোগ নেই" else "No Internet Connection",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = if (language == AppLanguage.BN)
+                        "আপনার অনুরোধকৃত কাজটি সম্পন্ন করার জন্য ইন্টারনেট সংযোগ প্রয়োজন। অনুগ্রহ করে ইন্টারনেট কানেকশন চালু করে আবার চেষ্টা করুন।"
+                    else
+                        "An active internet connection is required to complete this task. Please enable internet and try again.",
+                    color = if (isDarkTheme) Color.LightGray else Color.DarkGray,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Settings Button
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS)
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                try {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                                    context.startActivity(intent)
+                                } catch (ex: Exception) {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "সেটিংস খুলতে ব্যর্থ হয়েছে" else "Failed to open settings",
+                                        isSuccess = false,
+                                        type = "ERROR"
+                                    )
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Gray
+                        )
+                    ) {
+                        Text(if (language == AppLanguage.BN) "সেটিংস" else "Settings")
+                    }
+
+                    // Retry Button
+                    Button(
+                        onClick = {
+                            if (viewModel.isNetworkAvailable(context)) {
+                                showNoInternetDialog = false
+                                onNoInternetRetryAction?.invoke()
+                            } else {
+                                viewModel.triggerCustomNotification(
+                                    if (language == AppLanguage.BN) "এখনও ইন্টারনেট সংযোগ পাওয়া যায়নি! অনুগ্রহ করে কানেকশন চালু করুন।" else "Still no internet connection! Please check your network connection.",
+                                    isSuccess = false,
+                                    type = "ERROR"
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FintechBlue
+                        )
+                    ) {
+                        Text(if (language == AppLanguage.BN) "আবার চেষ্টা করুন" else "Retry")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNoInternetDialog = false }) {
                     Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close")
                 }
             }
@@ -3615,27 +3968,30 @@ fun DashboardScreen(
         if (budgetIncomeAmount > 0.0) {
             val key = "${currentYearMonth}_income_80_alert"
             val lastTime = budgetPrefs.getLong("${key}_time", 0L)
-            val lastRatio = budgetPrefs.getFloat("${key}_ratio", 0f)
+            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
             val now = System.currentTimeMillis()
-            val fiveHours = 5 * 60 * 60 * 1000L
+            val twelveHours = 12 * 60 * 60 * 1000L
             val ratio = income / budgetIncomeAmount
+            val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (now - lastTime >= fiveHours || ratio > lastRatio + 0.005f) {
+                val hasPercentChanged = (lastPercent != ratioPercent)
+                if (lastTime == 0L || hasPercentChanged || (now - lastTime >= twelveHours)) {
+                    val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
                     val msg = if (language == AppLanguage.BN) {
-                        "আপনি আপনার আয় বাজেটের ৮০% (${formatCurrency(income, language)}) অর্জন করেছেন!"
+                        "আপনি আপনার আয় বাজেটের $formattedPct (${formatCurrency(income, language)}) অর্জন করেছেন!"
                     } else {
-                        "You have achieved 80% of your Income Budget (${formatCurrency(income, language)})!"
+                        "You have achieved $ratioPercent% of your Income Budget (${formatCurrency(income, language)})!"
                     }
                     showLocalSystemNotification(context, title, msg, 8001)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
                     budgetPrefs.edit()
                         .putLong("${key}_time", now)
-                        .putFloat("${key}_ratio", ratio.toFloat())
+                        .putInt("${key}_percent", ratioPercent)
                         .apply()
                 }
             } else if (ratio < 0.8 && lastTime > 0L) {
-                budgetPrefs.edit().remove("${key}_time").remove("${key}_ratio").apply()
+                budgetPrefs.edit().remove("${key}_time").remove("${key}_percent").apply()
             }
         }
 
@@ -3643,27 +3999,30 @@ fun DashboardScreen(
         if (budgetExpenseAmount > 0.0) {
             val key = "${currentYearMonth}_expense_80_alert"
             val lastTime = budgetPrefs.getLong("${key}_time", 0L)
-            val lastRatio = budgetPrefs.getFloat("${key}_ratio", 0f)
+            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
             val now = System.currentTimeMillis()
-            val fiveHours = 5 * 60 * 60 * 1000L
+            val twelveHours = 12 * 60 * 60 * 1000L
             val ratio = expense / budgetExpenseAmount
+            val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (now - lastTime >= fiveHours || ratio > lastRatio + 0.005f) {
+                val hasPercentChanged = (lastPercent != ratioPercent)
+                if (lastTime == 0L || hasPercentChanged || (now - lastTime >= twelveHours)) {
+                    val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
                     val msg = if (language == AppLanguage.BN) {
-                        "সাবধান! আপনার ব্যয় বাজেটের ৮০% (${formatCurrency(expense, language)}) খরচ হয়ে গেছে!"
+                        "সাবধান! আপনার ব্যয় বাজেটের $formattedPct (${formatCurrency(expense, language)}) খরচ হয়ে গেছে!"
                     } else {
-                        "Warning! You have spent 80% of your Expense Budget limit (${formatCurrency(expense, language)})!"
+                        "Warning! You have spent $ratioPercent% of your Expense Budget limit (${formatCurrency(expense, language)})!"
                     }
                     showLocalSystemNotification(context, title, msg, 8002)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
                     budgetPrefs.edit()
                         .putLong("${key}_time", now)
-                        .putFloat("${key}_ratio", ratio.toFloat())
+                        .putInt("${key}_percent", ratioPercent)
                         .apply()
                 }
             } else if (ratio < 0.8 && lastTime > 0L) {
-                budgetPrefs.edit().remove("${key}_time").remove("${key}_ratio").apply()
+                budgetPrefs.edit().remove("${key}_time").remove("${key}_percent").apply()
             }
         }
 
@@ -3671,27 +4030,30 @@ fun DashboardScreen(
         if (budgetSavingsAmount > 0.0) {
             val key = "${currentYearMonth}_savings_80_alert"
             val lastTime = budgetPrefs.getLong("${key}_time", 0L)
-            val lastRatio = budgetPrefs.getFloat("${key}_ratio", 0f)
+            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
             val now = System.currentTimeMillis()
-            val fiveHours = 5 * 60 * 60 * 1000L
+            val twelveHours = 12 * 60 * 60 * 1000L
             val ratio = totalSavingsAmount / budgetSavingsAmount
+            val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (now - lastTime >= fiveHours || ratio > lastRatio + 0.005f) {
+                val hasPercentChanged = (lastPercent != ratioPercent)
+                if (lastTime == 0L || hasPercentChanged || (now - lastTime >= twelveHours)) {
+                    val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
                     val msg = if (language == AppLanguage.BN) {
-                        "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের ৮০% (${formatCurrency(totalSavingsAmount, language)}) পূরণ করেছেন!"
+                        "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের $formattedPct (${formatCurrency(totalSavingsAmount, language)}) পূরণ করেছেন!"
                     } else {
-                        "Amazing! You have fulfilled 80% of your Savings Goal (${formatCurrency(totalSavingsAmount, language)})!"
+                        "Amazing! You have fulfilled $ratioPercent% of your Savings Goal (${formatCurrency(totalSavingsAmount, language)})!"
                     }
                     showLocalSystemNotification(context, title, msg, 8003)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
                     budgetPrefs.edit()
                         .putLong("${key}_time", now)
-                        .putFloat("${key}_ratio", ratio.toFloat())
+                        .putInt("${key}_percent", ratioPercent)
                         .apply()
                 }
             } else if (ratio < 0.8 && lastTime > 0L) {
-                budgetPrefs.edit().remove("${key}_time").remove("${key}_ratio").apply()
+                budgetPrefs.edit().remove("${key}_time").remove("${key}_percent").apply()
             }
         }
     }
@@ -12233,12 +12595,16 @@ fun SegmentedFilterPicker(
 
 @Composable
 fun ChartsScreen(
+    viewModel: com.example.ui.viewmodel.FinanceViewModel? = null,
     language: AppLanguage,
     isDark: Boolean,
     transactions: List<Transaction>,
     persons: List<Person>,
     onBack: () -> Unit
 ) {
+    val budgetIncomeAmount by viewModel?.budgetIncome?.collectAsState() ?: remember { mutableStateOf(0.0) }
+    val budgetExpenseAmount by viewModel?.budgetExpense?.collectAsState() ?: remember { mutableStateOf(0.0) }
+
     var pieChartFilterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
     var timelineChartFilterMode by remember { mutableStateOf(ChartFilterMode.MONTH) }
 
@@ -12648,7 +13014,9 @@ fun ChartsScreen(
             total = totalIncome,
             palette = palette,
             language = language,
-            isDark = isDark
+            isDark = isDark,
+            targetAmount = budgetIncomeAmount,
+            categoryType = "INCOME"
         )
 
         // --- EXPENSE CHART ---
@@ -12658,7 +13026,9 @@ fun ChartsScreen(
             total = totalExpense,
             palette = palette.reversed(), // slightly different colors
             language = language,
-            isDark = isDark
+            isDark = isDark,
+            targetAmount = budgetExpenseAmount,
+            categoryType = "EXPENSE"
         )
 
 
@@ -13284,11 +13654,88 @@ fun ChartSection(
     total: Double,
     palette: List<Color>,
     language: AppLanguage,
-    isDark: Boolean = true
+    isDark: Boolean = true,
+    targetAmount: Double = 0.0,
+    categoryType: String? = null
 ) {
     val bgColor = if (isDark) listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     
+    var animationPlayed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        animationPlayed = true
+    }
+
+    val animatedProgressMultiplier by animateFloatAsState(
+        targetValue = if (animationPlayed) 1f else 0f,
+        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+        label = "chart_donut_animation"
+    )
+
+    val progress = if (targetAmount > 0.0) {
+        (total / targetAmount).coerceIn(0.0, 1.0)
+    } else {
+        0.0
+    }
+
+    val actualProgressMultiplier = if (targetAmount > 0.0) {
+        total / targetAmount
+    } else {
+        0.0
+    }
+
+    val progressPercent = progress * 100
+
+    val percentageText = if (targetAmount > 0.0) {
+        "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
+    } else {
+        if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+    }
+
+    val percentageColor = if (targetAmount > 0.0) {
+        when (categoryType) {
+            "INCOME", "SAVINGS" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFF10B981) // Green
+                } else {
+                    FintechBlue
+                }
+            }
+            "EXPENSE" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFFEF4444) // Red
+                } else {
+                    FintechBlue
+                }
+            }
+            else -> FintechBlue
+        }
+    } else {
+        FintechBlue
+    }
+
+    val centerBgColor = if (targetAmount > 0.0) {
+        when (categoryType) {
+            "INCOME", "SAVINGS" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFF10B981).copy(alpha = 0.1f)
+                } else {
+                    FintechBlue.copy(alpha = 0.1f)
+                }
+            }
+            "EXPENSE" -> {
+                if (progressPercent >= 80.0) {
+                    Color(0xFFEF4444).copy(alpha = 0.1f)
+                } else {
+                    FintechBlue.copy(alpha = 0.1f)
+                }
+            }
+            else -> FintechBlue.copy(alpha = 0.1f)
+        }
+    } else {
+        FintechBlue.copy(alpha = 0.1f)
+    }
+
     FintechGradientCard(
         gradientColors = bgColor,
         cornerRadius = 24.dp,
@@ -13329,8 +13776,18 @@ fun ChartSection(
                         Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val sizeMin = size.minDimension
-                                val strokeWidthPx = 16.dp.toPx()
+                                val strokeWidthPx = 24.dp.toPx()
                                 val radius = (sizeMin - strokeWidthPx) / 2f
+
+                                // Draw central hollow background
+                                val innerRadius = radius - strokeWidthPx / 2f
+                                if (innerRadius > 0f) {
+                                    drawCircle(
+                                        color = centerBgColor,
+                                        radius = innerRadius,
+                                        center = center
+                                    )
+                                }
 
                                 // Draw active segments with flat caps and gap-less design matching the budget graph
                                 if (totalFloat > 0f) {
@@ -13341,12 +13798,33 @@ fun ChartSection(
 
                                     val validValues = values.filter { it > 0f }
                                     validValues.forEachIndexed { index, value ->
-                                        val sweepAngle = (value / totalFloat) * 360f
+                                        val sweepAngle = ((value / totalFloat) * 360f) * animatedProgressMultiplier
+                                        val color = palette[index % palette.size]
+
+                                        // Soft glowing shadow matching segment color
+                                        drawArc(
+                                            color = color.copy(alpha = 0.04f),
+                                            startAngle = startAngle,
+                                            sweepAngle = sweepAngle + 0.8f,
+                                            useCenter = false,
+                                            topLeft = arcTopLeft,
+                                            size = arcSize,
+                                            style = Stroke(width = strokeWidthPx + 12.dp.toPx(), cap = StrokeCap.Butt)
+                                        )
+                                        drawArc(
+                                            color = color.copy(alpha = 0.12f),
+                                            startAngle = startAngle,
+                                            sweepAngle = sweepAngle + 0.8f,
+                                            useCenter = false,
+                                            topLeft = arcTopLeft,
+                                            size = arcSize,
+                                            style = Stroke(width = strokeWidthPx + 6.dp.toPx(), cap = StrokeCap.Butt)
+                                        )
 
                                         drawArc(
-                                            color = palette[index % palette.size],
+                                            color = color,
                                             startAngle = startAngle,
-                                            sweepAngle = sweepAngle,
+                                            sweepAngle = sweepAngle + 0.8f,
                                             useCenter = false,
                                             topLeft = arcTopLeft,
                                             size = arcSize,
@@ -13360,16 +13838,18 @@ fun ChartSection(
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = if (language == AppLanguage.BN) "মোট" else "Total",
-                                    color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.DarkGray.copy(alpha = 0.6f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
+                                    text = formatNumberString(percentageText, language),
+                                    color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 18.sp,
+                                    textAlign = TextAlign.Center
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = formatCurrency(total, language),
-                                    color = if (isDark) Color.White else Color.Black,
+                                    color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.DarkGray.copy(alpha = 0.7f),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
+                                    fontSize = 11.sp,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     modifier = Modifier.padding(horizontal = 4.dp)
@@ -13485,7 +13965,8 @@ fun GoogleDriveRestoreListDialog(
     onDismiss: () -> Unit,
     onRestoreSuccess: () -> Unit,
     onDelete: (String) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    executeWithInternetCheck: (((() -> Unit) -> Unit))? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var fileToDelete by remember { mutableStateOf<com.example.data.GoogleDriveFile?>(null) }
@@ -13581,27 +14062,34 @@ fun GoogleDriveRestoreListDialog(
                             Card(
                                 modifier = Modifier.fillMaxWidth()
                                     .clickable {
-                                        isDownloadingByFileId = file.id
-                                        viewModel.downloadGoogleDriveFile(
-                                            context = context,
-                                            fileId = file.id,
-                                            onSuccess = { jsonContent ->
-                                                isDownloadingByFileId = null
-                                                val parsed = viewModel.parseBackupJson(jsonContent)
-                                                if (parsed != null) {
-                                                    pendingCloudRestoreData = parsed
-                                                    pendingCloudRestoreStats = viewModel.calculateBackupStats(parsed)
-                                                    pendingCloudRestoreFileName = file.name
-                                                    pendingCloudRestoreJson = jsonContent
-                                                } else {
-                                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
+                                        val downloadAction = {
+                                            isDownloadingByFileId = file.id
+                                            viewModel.downloadGoogleDriveFile(
+                                                context = context,
+                                                fileId = file.id,
+                                                onSuccess = { jsonContent ->
+                                                    isDownloadingByFileId = null
+                                                    val parsed = viewModel.parseBackupJson(jsonContent)
+                                                    if (parsed != null) {
+                                                        pendingCloudRestoreData = parsed
+                                                        pendingCloudRestoreStats = viewModel.calculateBackupStats(parsed)
+                                                        pendingCloudRestoreFileName = file.name
+                                                        pendingCloudRestoreJson = jsonContent
+                                                    } else {
+                                                        viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
+                                                    }
+                                                },
+                                                onError = { err ->
+                                                    isDownloadingByFileId = null
+                                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ডাউনলোড ব্যর্থ হয়েছে: " else "Download failed: "}$err", isSuccess = false, type = "ERROR")
                                                 }
-                                            },
-                                            onError = { err ->
-                                                isDownloadingByFileId = null
-                                                viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "ডাউনলোড ব্যর্থ হয়েছে: " else "Download failed: "}$err", isSuccess = false, type = "ERROR")
-                                            }
-                                        )
+                                            )
+                                        }
+                                        if (executeWithInternetCheck != null) {
+                                            executeWithInternetCheck(downloadAction)
+                                        } else {
+                                            downloadAction()
+                                        }
                                     },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
@@ -13672,27 +14160,34 @@ fun GoogleDriveRestoreListDialog(
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         IconButton(
                                             onClick = {
-                                                isDownloadingByFileId = file.id
-                                                viewModel.downloadGoogleDriveFile(
-                                                    context = context,
-                                                    fileId = file.id,
-                                                    onSuccess = { jsonContent ->
-                                                        isDownloadingByFileId = null
-                                                        val parsed = viewModel.parseBackupJson(jsonContent)
-                                                        if (parsed != null) {
-                                                            pendingCloudRestoreData = parsed
-                                                            pendingCloudRestoreStats = viewModel.calculateBackupStats(parsed)
-                                                            pendingCloudRestoreFileName = file.name
-                                                            pendingCloudRestoreJson = jsonContent
-                                                        } else {
-                                                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
+                                                val downloadAction = {
+                                                    isDownloadingByFileId = file.id
+                                                    viewModel.downloadGoogleDriveFile(
+                                                        context = context,
+                                                        fileId = file.id,
+                                                        onSuccess = { jsonContent ->
+                                                            isDownloadingByFileId = null
+                                                            val parsed = viewModel.parseBackupJson(jsonContent)
+                                                            if (parsed != null) {
+                                                                pendingCloudRestoreData = parsed
+                                                                pendingCloudRestoreStats = viewModel.calculateBackupStats(parsed)
+                                                                pendingCloudRestoreFileName = file.name
+                                                                pendingCloudRestoreJson = jsonContent
+                                                            } else {
+                                                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ভুল ব্যাকআপ ফরম্যাট" else "Invalid backup format", isSuccess = false, type = "ERROR")
+                                                            }
+                                                        },
+                                                        onError = { err ->
+                                                            isDownloadingByFileId = null
+                                                            viewModel.triggerCustomNotification("Download failed: $err", isSuccess = false, type = "ERROR")
                                                         }
-                                                    },
-                                                    onError = { err ->
-                                                        isDownloadingByFileId = null
-                                                        viewModel.triggerCustomNotification("Download failed: $err", isSuccess = false, type = "ERROR")
-                                                    }
-                                                )
+                                                    )
+                                                }
+                                                if (executeWithInternetCheck != null) {
+                                                    executeWithInternetCheck(downloadAction)
+                                                } else {
+                                                    downloadAction()
+                                                }
                                             },
                                             enabled = isDownloadingByFileId == null
                                         ) {
