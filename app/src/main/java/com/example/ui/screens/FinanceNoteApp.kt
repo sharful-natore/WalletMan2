@@ -367,11 +367,11 @@ fun CategorySegmentedDonutChart(
                     }
                     drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                     val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                        this.color = color.copy(alpha = 0.85f)
+                        this.color = color.copy(alpha = 0.5f)
                         this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                        this.strokeWidth = strokeWidthPx + 8.dp.toPx()
+                        this.strokeWidth = strokeWidthPx
                         this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(20.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                     }
                     drawContext.canvas.drawArc(
                         rect = androidx.compose.ui.geometry.Rect(
@@ -416,11 +416,11 @@ fun CategorySegmentedDonutChart(
                         }
                         drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                         val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                            this.color = color.copy(alpha = 0.85f)
+                            this.color = color.copy(alpha = 0.5f)
                             this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                            this.strokeWidth = strokeWidthPx + 8.dp.toPx()
+                            this.strokeWidth = strokeWidthPx
                             this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(20.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                         }
                         drawContext.canvas.drawArc(
                             rect = androidx.compose.ui.geometry.Rect(
@@ -521,7 +521,8 @@ fun SegmentedDonutChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
-            val radius = (sizeMin - strokeWidthPx) / 2f
+            // Subtract 8.dp to leave 4.dp space for glowing shadow
+            val radius = (sizeMin - strokeWidthPx - 8.dp.toPx()) / 2f
 
             // 1. Draw background full circle
             drawCircle(
@@ -558,11 +559,11 @@ fun SegmentedDonutChart(
                             }
                             drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                             val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                this.color = segment.second.copy(alpha = 0.85f)
+                                this.color = segment.second.copy(alpha = 0.5f)
                                 this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                                this.strokeWidth = strokeWidthPx + 8.dp.toPx()
+                                this.strokeWidth = strokeWidthPx
                                 this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(20.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                             }
                             drawContext.canvas.drawArc(
                                 rect = androidx.compose.ui.geometry.Rect(
@@ -598,11 +599,11 @@ fun SegmentedDonutChart(
                             }
                             drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                             val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                this.color = segment.second.copy(alpha = 0.85f)
+                                this.color = segment.second.copy(alpha = 0.5f)
                                 this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                                this.strokeWidth = strokeWidthPx + 8.dp.toPx()
+                                this.strokeWidth = strokeWidthPx
                                 this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(20.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                             }
                             drawContext.canvas.drawArc(
                                 rect = androidx.compose.ui.geometry.Rect(
@@ -4694,9 +4695,9 @@ fun DashboardScreen(
                                 segments = incomeByCategory,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(96.dp),
-                                strokeWidthDp = 18.dp,
-                                centerTextSize = 16.sp,
+                                modifier = Modifier.size(100.dp),
+                                strokeWidthDp = 14.dp,
+                                centerTextSize = 14.sp,
                                 categoryType = "INCOME",
                                 onCenterClick = { showBudgetDetailsType = "INCOME" }
                             )
@@ -4724,9 +4725,9 @@ fun DashboardScreen(
                                 segments = expenseByCategory,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(96.dp),
-                                strokeWidthDp = 18.dp,
-                                centerTextSize = 16.sp,
+                                modifier = Modifier.size(100.dp),
+                                strokeWidthDp = 14.dp,
+                                centerTextSize = 14.sp,
                                 categoryType = "EXPENSE",
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" }
                             )
@@ -4754,9 +4755,9 @@ fun DashboardScreen(
                                 segments = savingsByGoal,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(96.dp),
-                                strokeWidthDp = 18.dp,
-                                centerTextSize = 16.sp,
+                                modifier = Modifier.size(100.dp),
+                                strokeWidthDp = 14.dp,
+                                centerTextSize = 14.sp,
                                 categoryType = "SAVINGS",
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" }
                             )
@@ -13952,7 +13953,8 @@ fun ChartSection(
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val sizeMin = size.minDimension
                                 val strokeWidthPx = 24.dp.toPx()
-                                val radius = (sizeMin - strokeWidthPx) / 2f
+                                // Subtract 12.dp to leave 6.dp space for glowing shadow
+                                val radius = (sizeMin - strokeWidthPx - 12.dp.toPx()) / 2f
 
                                 // Draw central hollow background
                                 val innerRadius = radius - strokeWidthPx / 2f
@@ -13987,11 +13989,11 @@ fun ChartSection(
                                         }
                                         drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                                         val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                            this.color = color.copy(alpha = 0.85f)
+                                            this.color = color.copy(alpha = 0.5f)
                                             this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
-                                            this.strokeWidth = strokeWidthPx + 8.dp.toPx()
+                                            this.strokeWidth = strokeWidthPx
                                             this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(20.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                                         }
                                         drawContext.canvas.drawArc(
                                             rect = androidx.compose.ui.geometry.Rect(
