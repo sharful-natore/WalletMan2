@@ -213,20 +213,20 @@ fun CategorySegmentedDonutChart(
                 if (progressPercent >= 80.0) {
                     Color(0xFF10B981).copy(alpha = 0.1f)
                 } else {
-                    FintechBlue.copy(alpha = 0.1f)
+                    if (isDark) Color(0xFF1E2235) else Color.White
                 }
             }
             "EXPENSE" -> {
                 if (progressPercent >= 80.0) {
                     Color(0xFFEF4444).copy(alpha = 0.1f)
                 } else {
-                    FintechBlue.copy(alpha = 0.1f)
+                    if (isDark) Color(0xFF1E2235) else Color.White
                 }
             }
-            else -> FintechBlue.copy(alpha = 0.1f)
+            else -> if (isDark) Color(0xFF1E2235) else Color.White
         }
     } else {
-        FintechBlue.copy(alpha = 0.1f)
+        if (isDark) Color(0xFF1E2235) else Color.White
     }
 
     // Unfilled base color
@@ -303,7 +303,8 @@ fun CategorySegmentedDonutChart(
         ) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
-            val radius = (sizeMin - strokeWidthPx) / 2f
+            // Subtract 16.dp to leave 8.dp of space on the outside for the glowing shadow to fade out nicely
+            val radius = (sizeMin - strokeWidthPx - 16.dp.toPx()) / 2f
 
             // Draw central hollow background
             val innerRadius = radius - strokeWidthPx / 2f
@@ -355,25 +356,26 @@ fun CategorySegmentedDonutChart(
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
                 
                 if (color != resolvedUnfilledColor) {
-                    // Soft glowing shadow matching segment color
-                    drawArc(
-                        color = color.copy(alpha = 0.04f),
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx + 12.dp.toPx())
-                    )
-                    drawArc(
-                        color = color.copy(alpha = 0.12f),
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx + 6.dp.toPx())
-                    )
+                    // Soft glowing shadow matching segment color extending ONLY outwards (blurred)
+                    val shadowSteps = 10
+                    val maxShadowWidthPx = 8.dp.toPx()
+                    val stepPx = maxShadowWidthPx / shadowSteps
+                    for (i in 1..shadowSteps) {
+                        val shadowRadius = radius + strokeWidthPx / 2f + (i - 0.5f) * stepPx
+                        val shadowTopLeft = androidx.compose.ui.geometry.Offset(center.x - shadowRadius, center.y - shadowRadius)
+                        val shadowSize = androidx.compose.ui.geometry.Size(shadowRadius * 2f, shadowRadius * 2f)
+                        val fraction = i.toFloat() / shadowSteps
+                        val alpha = 0.16f * (1f - fraction) * (1f - fraction)
+                        drawArc(
+                            color = color.copy(alpha = alpha),
+                            startAngle = -90f,
+                            sweepAngle = 360f,
+                            useCenter = false,
+                            topLeft = shadowTopLeft,
+                            size = shadowSize,
+                            style = Stroke(width = stepPx)
+                        )
+                    }
                 }
 
                 drawArc(
@@ -395,25 +397,26 @@ fun CategorySegmentedDonutChart(
                     val color = segment.second
 
                     if (color != resolvedUnfilledColor) {
-                        // Soft glowing shadow matching segment color
-                        drawArc(
-                            color = color.copy(alpha = 0.04f),
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep + 0.8f,
-                            useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx + 12.dp.toPx(), cap = StrokeCap.Butt)
-                        )
-                        drawArc(
-                            color = color.copy(alpha = 0.12f),
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep + 0.8f,
-                            useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx + 6.dp.toPx(), cap = StrokeCap.Butt)
-                        )
+                        // Soft glowing shadow matching segment color extending ONLY outwards (blurred)
+                        val shadowSteps = 10
+                        val maxShadowWidthPx = 8.dp.toPx()
+                        val stepPx = maxShadowWidthPx / shadowSteps
+                        for (i in 1..shadowSteps) {
+                            val shadowRadius = radius + strokeWidthPx / 2f + (i - 0.5f) * stepPx
+                            val shadowTopLeft = androidx.compose.ui.geometry.Offset(center.x - shadowRadius, center.y - shadowRadius)
+                            val shadowSize = androidx.compose.ui.geometry.Size(shadowRadius * 2f, shadowRadius * 2f)
+                            val fraction = i.toFloat() / shadowSteps
+                            val alpha = 0.16f * (1f - fraction) * (1f - fraction)
+                            drawArc(
+                                color = color.copy(alpha = alpha),
+                                startAngle = startAngle,
+                                sweepAngle = allocatedSweep + 0.8f,
+                                useCenter = false,
+                                topLeft = shadowTopLeft,
+                                size = shadowSize,
+                                style = Stroke(width = stepPx, cap = StrokeCap.Butt)
+                            )
+                        }
                     }
 
                     drawArc(
@@ -3925,6 +3928,8 @@ fun DashboardScreen(
     val budgetIncomeAmount by viewModel?.budgetIncome?.collectAsState() ?: remember { mutableStateOf(0.0) }
     val budgetExpenseAmount by viewModel?.budgetExpense?.collectAsState() ?: remember { mutableStateOf(0.0) }
     val budgetSavingsAmount by viewModel?.budgetSavings?.collectAsState() ?: remember { mutableStateOf(0.0) }
+    val savingsTransactions by viewModel?.savingsTransactions?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
+    var showBudgetHistoryDialog by remember { mutableStateOf(false) }
     val totalSavingsAmount = savingsGoals.sumOf { it.savedAmount }
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
@@ -3959,23 +3964,26 @@ fun DashboardScreen(
         sdf.format(java.util.Date())
     }
 
+    var isAlertSystemReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(2000) // Wait 2 seconds for all database flows to warm up and emit their real values
+        isAlertSystemReady = true
+    }
+
     LaunchedEffect(
         income, expense, totalSavingsAmount,
         budgetIncomeAmount, budgetExpenseAmount, budgetSavingsAmount,
-        currentYearMonth
+        currentYearMonth, isAlertSystemReady
     ) {
+        if (!isAlertSystemReady) return@LaunchedEffect
         // Check Income 80%
         if (budgetIncomeAmount > 0.0) {
             val key = "${currentYearMonth}_income_80_alert"
-            val lastTime = budgetPrefs.getLong("${key}_time", 0L)
             val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
-            val now = System.currentTimeMillis()
-            val twelveHours = 12 * 60 * 60 * 1000L
             val ratio = income / budgetIncomeAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                val hasPercentChanged = (lastPercent != ratioPercent)
-                if (lastTime == 0L || hasPercentChanged || (now - lastTime >= twelveHours)) {
+                if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
                     val msg = if (language == AppLanguage.BN) {
@@ -3985,28 +3993,21 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8001)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit()
-                        .putLong("${key}_time", now)
-                        .putInt("${key}_percent", ratioPercent)
-                        .apply()
+                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
                 }
-            } else if (ratio < 0.8 && lastTime > 0L) {
-                budgetPrefs.edit().remove("${key}_time").remove("${key}_percent").apply()
+            } else if (ratio < 0.8 && lastPercent > 0) {
+                budgetPrefs.edit().remove("${key}_percent").apply()
             }
         }
 
         // Check Expense 80%
         if (budgetExpenseAmount > 0.0) {
             val key = "${currentYearMonth}_expense_80_alert"
-            val lastTime = budgetPrefs.getLong("${key}_time", 0L)
             val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
-            val now = System.currentTimeMillis()
-            val twelveHours = 12 * 60 * 60 * 1000L
             val ratio = expense / budgetExpenseAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                val hasPercentChanged = (lastPercent != ratioPercent)
-                if (lastTime == 0L || hasPercentChanged || (now - lastTime >= twelveHours)) {
+                if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
                     val msg = if (language == AppLanguage.BN) {
@@ -4016,28 +4017,21 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8002)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
-                    budgetPrefs.edit()
-                        .putLong("${key}_time", now)
-                        .putInt("${key}_percent", ratioPercent)
-                        .apply()
+                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
                 }
-            } else if (ratio < 0.8 && lastTime > 0L) {
-                budgetPrefs.edit().remove("${key}_time").remove("${key}_percent").apply()
+            } else if (ratio < 0.8 && lastPercent > 0) {
+                budgetPrefs.edit().remove("${key}_percent").apply()
             }
         }
 
         // Check Savings 80%
         if (budgetSavingsAmount > 0.0) {
             val key = "${currentYearMonth}_savings_80_alert"
-            val lastTime = budgetPrefs.getLong("${key}_time", 0L)
             val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
-            val now = System.currentTimeMillis()
-            val twelveHours = 12 * 60 * 60 * 1000L
             val ratio = totalSavingsAmount / budgetSavingsAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                val hasPercentChanged = (lastPercent != ratioPercent)
-                if (lastTime == 0L || hasPercentChanged || (now - lastTime >= twelveHours)) {
+                if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
                     val msg = if (language == AppLanguage.BN) {
@@ -4047,13 +4041,10 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8003)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit()
-                        .putLong("${key}_time", now)
-                        .putInt("${key}_percent", ratioPercent)
-                        .apply()
+                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
                 }
-            } else if (ratio < 0.8 && lastTime > 0L) {
-                budgetPrefs.edit().remove("${key}_time").remove("${key}_percent").apply()
+            } else if (ratio < 0.8 && lastPercent > 0) {
+                budgetPrefs.edit().remove("${key}_percent").apply()
             }
         }
     }
@@ -4101,6 +4092,19 @@ fun DashboardScreen(
                 }
             },
             modifier = Modifier.testTag("budget_threshold_alert_dialog")
+        )
+    }
+
+    if (showBudgetHistoryDialog) {
+        BudgetHistoryDialog(
+            language = language,
+            isDark = isDark,
+            transactions = transactions,
+            savingsTransactions = savingsTransactions,
+            budgetIncome = budgetIncomeAmount,
+            budgetExpense = budgetExpenseAmount,
+            budgetSavings = budgetSavingsAmount,
+            onDismiss = { showBudgetHistoryDialog = false }
         )
     }
 
@@ -4596,6 +4600,27 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Bold,
                             color = FintechBlue
                         )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showBudgetHistoryDialog = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Rounded.History,
+                                contentDescription = null,
+                                tint = FintechBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (language == AppLanguage.BN) "ইতিহাস" else "History",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = FintechBlue
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -4839,6 +4864,7 @@ fun DashboardScreen(
 
         var isEditingBudget by remember { mutableStateOf(false) }
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
+        var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
         val colors = listOf(
             Color(0xFF10B981), // Emerald
@@ -4962,6 +4988,15 @@ fun DashboardScreen(
                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                                         ),
+                                        trailingIcon = {
+                                            IconButton(onClick = { showInplaceBudgetCalculator = true }) {
+                                                Icon(
+                                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                                                    contentDescription = "Calculator",
+                                                    tint = FintechBlue
+                                                )
+                                            }
+                                        },
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedBorderColor = FintechBlue,
                                             unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.4f),
@@ -4969,6 +5004,14 @@ fun DashboardScreen(
                                         ),
                                         modifier = Modifier.fillMaxWidth().testTag("inplace_budget_input")
                                     )
+                                    if (showInplaceBudgetCalculator) {
+                                        CalculatorDialog(
+                                            language = language,
+                                            isDark = isDark,
+                                            onDismiss = { showInplaceBudgetCalculator = false },
+                                            onInsert = { localBudgetInput = it }
+                                        )
+                                    }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.End,
@@ -5158,6 +5201,7 @@ fun DashboardScreen(
         }
 
         var tempAmount by remember { mutableStateOf(if (currentLimit > 0) currentLimit.toInt().toString() else "") }
+        var showTempAmountCalculator by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { showBudgetDialogType = null },
@@ -5237,6 +5281,15 @@ fun DashboardScreen(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                         ),
+                        trailingIcon = {
+                            IconButton(onClick = { showTempAmountCalculator = true }) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                                    contentDescription = "Calculator",
+                                    tint = FintechBlue
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = FintechBlue,
                             unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.4f),
@@ -5244,6 +5297,14 @@ fun DashboardScreen(
                         ),
                         modifier = Modifier.fillMaxWidth().testTag("budget_input_field")
                     )
+                    if (showTempAmountCalculator) {
+                        CalculatorDialog(
+                            language = language,
+                            isDark = isDark,
+                            onDismiss = { showTempAmountCalculator = false },
+                            onInsert = { tempAmount = it }
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -7940,6 +8001,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     val chipBg = if (isDark) Color(0xFF1F2336) else Color(0xFFF1F5F9)
 
     var amountInputState by remember { mutableStateOf(editTransaction?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
+    var showTxCalculator by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Dialog(onDismissRequest = onDismiss) {
@@ -8027,6 +8089,15 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         onValueChange = { amountInputState = it },
                         label = { Text(Translation.get("amount", language)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        trailingIcon = {
+                            IconButton(onClick = { showTxCalculator = true }) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                                    contentDescription = "Calculator",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = labelColor,
@@ -8039,6 +8110,14 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             .fillMaxWidth()
                             .testTag("input_tx_amount")
                     )
+                    if (showTxCalculator) {
+                        CalculatorDialog(
+                            language = language,
+                            isDark = isDark,
+                            onDismiss = { showTxCalculator = false },
+                            onInsert = { amountInputState = it }
+                        )
+                    }
                 }
 
                 // Link with Person (Needed for Lending, Borrowing, Repayments)
@@ -8503,6 +8582,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var title by remember { mutableStateOf(initialGoal?.title ?: "") }
     var cardholderName by remember { mutableStateOf(initialGoal?.cardholderName ?: "") }
     var targetStr by remember { mutableStateOf(if (initialGoal != null) initialGoal.targetAmount.toString() else "") }
+    var showTargetCalculator by remember { mutableStateOf(false) }
     var sector by remember { mutableStateOf(initialGoal?.category ?: "Emergency") }
     var colorIndex by remember { mutableStateOf(initialGoal?.colorIndex ?: 0) }
 
@@ -8582,6 +8662,15 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         onValueChange = { targetStr = it },
                         label = { Text(Translation.get("target", language)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        trailingIcon = {
+                            IconButton(onClick = { showTargetCalculator = true }) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                                    contentDescription = "Calculator",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = labelColor,
@@ -8594,6 +8683,14 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             .fillMaxWidth()
                             .testTag("input_saving_target")
                     )
+                    if (showTargetCalculator) {
+                        CalculatorDialog(
+                            language = language,
+                            isDark = isDark,
+                            onDismiss = { showTargetCalculator = false },
+                            onInsert = { targetStr = it }
+                        )
+                    }
                 }
 
                 item {
@@ -8756,6 +8853,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
     onConfirm: (Double, Boolean, String) -> Unit
 ) {
     var amountStr by remember { mutableStateOf(if (txToEdit != null) txToEdit.amount.toString() else "") }
+    var showSavTxCalculator by remember { mutableStateOf(false) }
     var noteStr by remember { mutableStateOf(txToEdit?.note ?: "") }
     var isWithdraw by remember { mutableStateOf(txToEdit?.let { !it.isDeposit } ?: initialIsWithdraw) }
     val context = LocalContext.current
@@ -8819,6 +8917,15 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                     onValueChange = { amountStr = it },
                     label = { Text(Translation.get("amount", language)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    trailingIcon = {
+                        IconButton(onClick = { showSavTxCalculator = true }) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                                contentDescription = "Calculator",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = labelColor,
@@ -8831,6 +8938,14 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                         .fillMaxWidth()
                         .testTag("input_contribution_amount")
                 )
+                if (showSavTxCalculator) {
+                    CalculatorDialog(
+                        language = language,
+                        isDark = isDark,
+                        onDismiss = { showSavTxCalculator = false },
+                        onInsert = { amountStr = it }
+                    )
+                }
 
                 OutlinedTextField(
                     value = noteStr,
@@ -9303,6 +9418,7 @@ fun PersonDetailOverlay(
     val txList by transactionsFlow.collectAsState(initial = emptyList())
     var showActionSheet by remember { mutableStateOf<String?>(null) } // "LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED"
     var actionAmountStr by remember { mutableStateOf("") }
+    var showActionCalculator by remember { mutableStateOf(false) }
     var actionNoteStr by remember { mutableStateOf("") }
 
     Surface(
@@ -9554,6 +9670,15 @@ fun PersonDetailOverlay(
                                 onValueChange = { actionAmountStr = it },
                                 label = { Text(Translation.get("amount", language)) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                trailingIcon = {
+                                    IconButton(onClick = { showActionCalculator = true }) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Rounded.Calculate,
+                                            contentDescription = "Calculator",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                },
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                                     unfocusedBorderColor = overlayLabelColor,
@@ -9564,6 +9689,14 @@ fun PersonDetailOverlay(
                                 ),
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            if (showActionCalculator) {
+                                CalculatorDialog(
+                                    language = language,
+                                    isDark = isDark,
+                                    onDismiss = { showActionCalculator = false },
+                                    onInsert = { actionAmountStr = it }
+                                )
+                            }
 
                             OutlinedTextField(
                                 value = actionNoteStr,
@@ -14359,4 +14492,229 @@ fun CustomNotificationOverlay(
             )
         }
     }
+}
+
+@Composable
+fun BudgetHistoryDialog(
+    language: AppLanguage,
+    isDark: Boolean,
+    transactions: List<Transaction>,
+    savingsTransactions: List<com.example.data.SavingsTransaction>,
+    budgetIncome: Double,
+    budgetExpense: Double,
+    budgetSavings: Double,
+    onDismiss: () -> Unit
+) {
+    // Grouping helper
+    val getYearMonthString: (Long) -> String = { timestamp ->
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = timestamp
+        val year = cal.get(java.util.Calendar.YEAR)
+        val month = cal.get(java.util.Calendar.MONTH) + 1
+        String.format("%04d-%02d", year, month)
+    }
+
+    val allMonthKeys = remember(transactions, savingsTransactions) {
+        val keys = mutableSetOf<String>()
+        transactions.forEach { keys.add(getYearMonthString(it.timestamp)) }
+        savingsTransactions.forEach { keys.add(getYearMonthString(it.timestamp)) }
+        keys.add(getYearMonthString(System.currentTimeMillis()))
+        keys.toList().sortedDescending()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (language == AppLanguage.BN) "বন্ধ করুন" else "Close",
+                    color = FintechBlue,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Rounded.History,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "বাজেট পূরণের ইতিহাস" else "Budget Fulfillment History",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.White else Color.Black
+                )
+            }
+        },
+        text = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 400.dp)
+            ) {
+                if (allMonthKeys.isEmpty()) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "কোন তথ্য পাওয়া যায়নি" else "No data available",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color.Gray
+                    )
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(allMonthKeys) { monthKey ->
+                            val displayMonth = getCustomTimeFilterLabel("CUSTOM_MONTH:$monthKey", language)
+                            
+                            val monthlyIncome = remember(transactions, monthKey) {
+                                transactions.filter { it.type == "INCOME" && getYearMonthString(it.timestamp) == monthKey }
+                                    .sumOf { it.amount }
+                            }
+                            val monthlyExpense = remember(transactions, monthKey) {
+                                transactions.filter { it.type == "EXPENSE" && getYearMonthString(it.timestamp) == monthKey }
+                                    .sumOf { it.amount }
+                            }
+                            val monthlySavings = remember(savingsTransactions, monthKey) {
+                                savingsTransactions.filter { getYearMonthString(it.timestamp) == monthKey }
+                                    .sumOf { if (it.isDeposit) it.amount else -it.amount }
+                            }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isDark) Color(0xFF25293C) else Color(0xFFF8FAFC)
+                                ),
+                                border = BorderStroke(
+                                    width = 1.dp,
+                                    color = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    // Month Header
+                                    Text(
+                                        text = displayMonth,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = FintechBlue
+                                    )
+
+                                    // 1. Income Progress
+                                    val incProgress = if (budgetIncome > 0) (monthlyIncome / budgetIncome).coerceIn(0.0, 1.0).toFloat() else 0f
+                                    val incPercentText = if (budgetIncome > 0) "${(monthlyIncome / budgetIncome * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+                                    
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "আয়" else "Income",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
+                                            )
+                                            Text(
+                                                text = "${formatNumber(monthlyIncome.toInt(), language)} ৳ / ${if (budgetIncome > 0) formatNumber(budgetIncome.toInt(), language) + " ৳" else ""} ($incPercentText)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (budgetIncome > 0 && monthlyIncome >= budgetIncome * 0.8) Color(0xFF10B981) else if (isDark) Color.White else Color.Black
+                                            )
+                                        }
+                                        if (budgetIncome > 0) {
+                                            LinearProgressIndicator(
+                                                progress = { incProgress },
+                                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                                color = Color(0xFF10B981),
+                                                trackColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0)
+                                            )
+                                        }
+                                    }
+
+                                    // 2. Expense Progress
+                                    val expProgress = if (budgetExpense > 0) (monthlyExpense / budgetExpense).coerceIn(0.0, 1.0).toFloat() else 0f
+                                    val expPercentText = if (budgetExpense > 0) "${(monthlyExpense / budgetExpense * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+                                    val isExpOverLimit = budgetExpense > 0 && monthlyExpense >= budgetExpense * 0.8
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
+                                            )
+                                            Text(
+                                                text = "${formatNumber(monthlyExpense.toInt(), language)} ৳ / ${if (budgetExpense > 0) formatNumber(budgetExpense.toInt(), language) + " ৳" else ""} ($expPercentText)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isExpOverLimit) Color(0xFFEF4444) else if (isDark) Color.White else Color.Black
+                                            )
+                                        }
+                                        if (budgetExpense > 0) {
+                                            LinearProgressIndicator(
+                                                progress = { expProgress },
+                                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                                color = if (isExpOverLimit) Color(0xFFEF4444) else FintechBlue,
+                                                trackColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0)
+                                            )
+                                        }
+                                    }
+
+                                    // 3. Savings Progress
+                                    val savProgress = if (budgetSavings > 0) (monthlySavings / budgetSavings).coerceIn(0.0, 1.0).toFloat() else 0f
+                                    val savPercentText = if (budgetSavings > 0) "${(monthlySavings / budgetSavings * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "সঞ্চয়" else "Savings",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
+                                            )
+                                            Text(
+                                                text = "${formatNumber(monthlySavings.toInt(), language)} ৳ / ${if (budgetSavings > 0) formatNumber(budgetSavings.toInt(), language) + " ৳" else ""} ($savPercentText)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (budgetSavings > 0 && monthlySavings >= budgetSavings * 0.8) Color(0xFF10B981) else if (isDark) Color.White else Color.Black
+                                            )
+                                        }
+                                        if (budgetSavings > 0) {
+                                            LinearProgressIndicator(
+                                                progress = { savProgress },
+                                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                                color = Color(0xFF3B82F6),
+                                                trackColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        shape = RoundedCornerShape(16.dp),
+        containerColor = if (isDark) Color(0xFF1E2235) else Color.White,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = true)
+    )
 }

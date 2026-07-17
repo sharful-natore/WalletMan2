@@ -6,6 +6,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     val allPersons: Flow<List<Person>> = financeDao.getAllPersons()
     val allTransactions: Flow<List<Transaction>> = financeDao.getAllTransactions()
     val allSavingsGoals: Flow<List<SavingsGoal>> = financeDao.getAllSavingsGoals()
+    val allSavingsTransactions: Flow<List<SavingsTransaction>> = financeDao.getAllSavingsTransactions()
 
     fun getTransactionsByPerson(personId: Int): Flow<List<Transaction>> {
         return financeDao.getTransactionsByPerson(personId)

@@ -385,6 +385,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         list.filter { it.workspaceId == activeId }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val savingsTransactions: StateFlow<List<com.example.data.SavingsTransaction>> = combine(repository.allSavingsTransactions, currentWorkspaceId) { list, activeId ->
+        list.filter { it.workspaceId == activeId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val personDebts: StateFlow<List<PersonDebt>> = combine(persons, transactions) { personList, txList ->
         personList.map { person ->
             val personTx = txList.filter { it.personId == person.id }

@@ -89,6 +89,9 @@ interface FinanceDao {
     suspend fun deleteAllSavingsGoals()
 
     // Savings Transactions
+    @Query("SELECT * FROM savings_transactions ORDER BY timestamp DESC")
+    fun getAllSavingsTransactions(): Flow<List<SavingsTransaction>>
+
     @Query("SELECT * FROM savings_transactions WHERE goalId = :goalId ORDER BY timestamp DESC")
     fun getSavingsTransactionsByGoal(goalId: Int): Flow<List<SavingsTransaction>>
 
