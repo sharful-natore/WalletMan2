@@ -142,6 +142,7 @@ fun CategorySegmentedDonutChart(
     centerTextSize: TextUnit = 14.sp,
     categoryType: String? = null,
     unfilledColorOverride: Color? = null,
+    centerColorOverride: Color? = null,
     onCenterClick: () -> Unit = {}
 ) {
     var animationPlayed by remember { mutableStateOf(false) }
@@ -206,21 +207,21 @@ fun CategorySegmentedDonutChart(
         Color.Gray
     }
 
-    val centerBgColor = if (isDark) Color(0xFF333333).copy(alpha = 0.5f) else Color.LightGray.copy(alpha = 0.3f)
+    val centerBgColor = centerColorOverride ?: (if (isDark) Color(0xFF333333).copy(alpha = 0.5f) else Color.LightGray.copy(alpha = 0.3f))
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
     val colors = listOf(
-        Color(0xFF10B981), // Emerald green
-        Color(0xFF6366F1), // Indigo purple
-        Color(0xFFEF4444), // Coral red
-        Color(0xFF3B82F6), // Blue
+        Color(0xFF10B981), // Green
         Color(0xFFF59E0B), // Amber
-        Color(0xFF8B5CF6), // Purple
-        Color(0xFFEC4899), // Pink
-        Color(0xFF14B8A6), // Teal
-        Color(0xFFF97316), // Orange
+        Color(0xFF6366F1), // Indigo
+        Color(0xFFF43F5E), // Rose
         Color(0xFF06B6D4), // Cyan
+        Color(0xFFF97316), // Orange
+        Color(0xFF8B5CF6), // Violet
+        Color(0xFF14B8A6), // Teal
+        Color(0xFFEC4899), // Pink
+        Color(0xFF3B82F6), // Blue
     )
 
     Box(
@@ -336,14 +337,14 @@ fun CategorySegmentedDonutChart(
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow
-                    val glowLayers = 20
-                    val glowSize = 8.dp.toPx()
+                    val glowLayers = 30
+                    val glowSize = 4.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                         drawArc(
-                            color = color.copy(alpha = 0.035f),
+                            color = color.copy(alpha = 0.025f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -375,14 +376,14 @@ fun CategorySegmentedDonutChart(
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow
-                        val glowLayers = 20
-                        val glowSize = 8.dp.toPx()
+                        val glowLayers = 30
+                        val glowSize = 4.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                             drawArc(
-                                color = color.copy(alpha = 0.035f),
+                                color = color.copy(alpha = 0.025f),
                                 startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
@@ -508,14 +509,14 @@ fun SegmentedDonutChart(
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 20
-                            val glowSize = 8.dp.toPx()
+                            val glowLayers = 30
+                            val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.035f),
+                                    color = segment.second.copy(alpha = 0.025f),
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
@@ -538,14 +539,14 @@ fun SegmentedDonutChart(
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 20
-                            val glowSize = 8.dp.toPx()
+                            val glowLayers = 30
+                            val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.035f),
+                                    color = segment.second.copy(alpha = 0.025f),
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
@@ -4568,7 +4569,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 16.dp, bottom = 14.dp)
+                        .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 8.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4637,6 +4638,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "INCOME",
+                                centerColorOverride = Color.White,
                                 onCenterClick = { showBudgetDetailsType = "INCOME" }
                             )
                         }
@@ -4667,6 +4669,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "EXPENSE",
+                                centerColorOverride = Color.White,
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" }
                             )
                         }
@@ -4697,6 +4700,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "SAVINGS",
+                                centerColorOverride = Color.White,
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" }
                             )
                         }
@@ -4901,7 +4905,7 @@ fun DashboardScreen(
                             isDark = isDark, // Pass actual isDark state for adaptive color and contrast
                             language = language,
                             modifier = Modifier.size(160.dp),
-                            strokeWidthDp = 28.dp, // Thicker stroke for bold premium look
+                            strokeWidthDp = 20.dp, // Reduced thickness
                             centerTextSize = 28.sp,
                             categoryType = categoryType,
                             unfilledColorOverride = Color.White
@@ -13847,14 +13851,14 @@ fun ChartSection(
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
                                         // Android 8.1 compatible natural outward glow
-                                        val glowLayers = 20
-                                        val glowSize = 8.dp.toPx()
+                                        val glowLayers = 30
+                                        val glowSize = 4.dp.toPx()
                                         for (i in glowLayers downTo 1) {
                                             val fraction = i.toFloat() / glowLayers
                                             val currentGlowWidth = glowSize * fraction
                                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                             drawArc(
-                                                color = color.copy(alpha = 0.035f),
+                                                color = color.copy(alpha = 0.025f),
                                                 startAngle = startAngle,
                                                 sweepAngle = sweepAngle + 0.8f,
                                                 useCenter = false,
