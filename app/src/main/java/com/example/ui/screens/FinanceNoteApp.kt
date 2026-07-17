@@ -315,6 +315,8 @@ fun CategorySegmentedDonutChart(
 
                         if (sweepAngle > 0f) {
                             val isOnlySegment = validSegments.size == 1 && segmentProgress >= 0.99
+                            val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+                            val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
                             
                             if (isOnlySegment) {
                                 // Perfect unbroken circle
@@ -323,6 +325,8 @@ fun CategorySegmentedDonutChart(
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
+                                    topLeft = arcTopLeft,
+                                    size = arcSize,
                                     style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                                 )
                             } else {
@@ -334,6 +338,8 @@ fun CategorySegmentedDonutChart(
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
+                                    topLeft = arcTopLeft,
+                                    size = arcSize,
                                     style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                                 )
                             }
@@ -579,7 +585,7 @@ fun MonthYearPickerDialog(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
                         items(12) { index ->
                             val m = index + 1
@@ -600,7 +606,7 @@ fun MonthYearPickerDialog(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
                     val years = (currentYear - 3..currentYear + 2).toList()
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
@@ -4177,7 +4183,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 6.dp)
+                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4192,7 +4198,7 @@ fun DashboardScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -6912,7 +6918,7 @@ fun SavingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             if (sortedGoals.isEmpty()) {
                 Box(
@@ -13100,7 +13106,7 @@ fun ChartsScreen(
                         fontSize = 18.sp,
                         color = if (isDark) Color.White else Color(0xFF1E293B)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -13496,7 +13502,7 @@ fun GoogleDriveRestoreListDialog(
                                 modifier = Modifier.size(64.dp),
                                 tint = if (isDark) Color.DarkGray else Color.LightGray
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = if (language == AppLanguage.BN) "কোনো ব্যাকআপ ফাইল পাওয়া যায়নি" else "No backup files found",
                                 color = if (isDark) Color.Gray else Color(0xFF64748B),
