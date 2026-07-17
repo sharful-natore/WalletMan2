@@ -141,6 +141,7 @@ fun CategorySegmentedDonutChart(
     strokeWidthDp: Dp = 10.dp,
     centerTextSize: TextUnit = 14.sp,
     categoryType: String? = null,
+    unfilledColorOverride: Color? = null,
     onCenterClick: () -> Unit = {}
 ) {
     var animationPlayed by remember { mutableStateOf(false) }
@@ -169,8 +170,14 @@ fun CategorySegmentedDonutChart(
         0.0
     }
 
+    val actualProgressMultiplier = if (targetAmount > 0.0) {
+        totalFilledAmount / targetAmount
+    } else {
+        0.0
+    }
+
     val percentageText = if (targetAmount > 0.0) {
-        "${(progress * animatedProgressMultiplier * 100).toInt()}%"
+        "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
     } else {
         if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
     }
@@ -280,6 +287,8 @@ fun CategorySegmentedDonutChart(
 
             val drawSegments = mutableListOf<Pair<Float, Color>>()
 
+            val resolvedUnfilledColor = unfilledColorOverride ?: unfilledColor
+
             if (targetAmount > 0.0 && activeSegmentsSum > 0.0) {
                 // Determine progress of active segments capped at 1.0
                 val progress = (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
@@ -298,11 +307,11 @@ fun CategorySegmentedDonutChart(
                 val totalActiveSweep = drawSegments.sumOf { it.first.toDouble() }.toFloat()
                 val remainingSweep = (360f - totalActiveSweep).coerceAtLeast(0f)
                 if (remainingSweep > 0f) {
-                    drawSegments.add(Pair(remainingSweep, unfilledColor))
+                    drawSegments.add(Pair(remainingSweep, resolvedUnfilledColor))
                 }
             } else {
                 // If there's no budget set or no active spending, show 100% unfilled gray
-                drawSegments.add(Pair(360f, unfilledColor))
+                drawSegments.add(Pair(360f, resolvedUnfilledColor))
             }
 
             // Draw the segments
@@ -321,8 +330,6 @@ fun CategorySegmentedDonutChart(
                 )
             } else if (drawSegments.size > 1) {
                 var startAngle = -90f
-                val gapAngle = 6.0f // Gorgeous, clean visual gaps between segments matching the image
-
                 val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
 
@@ -330,14 +337,10 @@ fun CategorySegmentedDonutChart(
                     val allocatedSweep = segment.first
                     val color = segment.second
 
-                    val visualStart = startAngle + (gapAngle / 2f)
-                    val visualSweep = allocatedSweep - gapAngle
-
-                    // Draw segment with flat caps (no border radius)
                     drawArc(
                         color = color,
-                        startAngle = visualStart,
-                        sweepAngle = visualSweep.coerceAtLeast(0.1f),
+                        startAngle = startAngle,
+                        sweepAngle = allocatedSweep,
                         useCenter = false,
                         topLeft = arcTopLeft,
                         size = arcSize,
@@ -4531,7 +4534,8 @@ fun DashboardScreen(
                             modifier = Modifier.size(160.dp),
                             strokeWidthDp = 28.dp, // Thicker stroke for bold premium look
                             centerTextSize = 28.sp,
-                            categoryType = categoryType
+                            categoryType = categoryType,
+                            unfilledColorOverride = Color.White
                         )
                     }
 
@@ -13328,10 +13332,9 @@ fun ChartSection(
                                 val strokeWidthPx = 16.dp.toPx()
                                 val radius = (sizeMin - strokeWidthPx) / 2f
 
-                                // Draw active segments with flat caps and gap mathematics
+                                // Draw active segments with flat caps and gap-less design matching the budget graph
                                 if (totalFloat > 0f) {
                                     var startAngle = -90f
-                                    val gapAngle = 6.0f // clean visible gap between segments
 
                                     val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
                                     val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
@@ -13339,19 +13342,11 @@ fun ChartSection(
                                     val validValues = values.filter { it > 0f }
                                     validValues.forEachIndexed { index, value ->
                                         val sweepAngle = (value / totalFloat) * 360f
-                                        val isOnlySegment = validValues.size == 1
-
-                                        val adjustedSweep = if (isOnlySegment) {
-                                            (360f - gapAngle).coerceAtLeast(10f)
-                                        } else {
-                                            (sweepAngle - gapAngle).coerceAtLeast(2f)
-                                        }
-                                        val adjustedStart = startAngle + (gapAngle / 2f)
 
                                         drawArc(
                                             color = palette[index % palette.size],
-                                            startAngle = adjustedStart,
-                                            sweepAngle = adjustedSweep,
+                                            startAngle = startAngle,
+                                            sweepAngle = sweepAngle,
                                             useCenter = false,
                                             topLeft = arcTopLeft,
                                             size = arcSize,
@@ -13381,15 +13376,6 @@ fun ChartSection(
                                 )
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Visibly white/dark line matching the size of the graph (140.dp) exactly
-                        HorizontalDivider(
-                            modifier = Modifier.width(140.dp),
-                            thickness = 2.5.dp,
-                            color = if (isDark) Color.White else Color(0xFF1E293B)
-                        )
                     }
 
                     Column(
