@@ -358,7 +358,8 @@ fun CategorySegmentedDonutChart(
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     drawContext.canvas.save()
-                    val innerClipRadius = radius + strokeWidthPx / 2f - 1f
+
+                    val innerClipRadius = radius - strokeWidthPx / 2f
                     val innerClipPath = androidx.compose.ui.graphics.Path().apply {
                         addOval(androidx.compose.ui.geometry.Rect(
                             center.x - innerClipRadius, center.y - innerClipRadius,
@@ -367,11 +368,11 @@ fun CategorySegmentedDonutChart(
                     }
                     drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                     val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                        this.color = color.copy(alpha = 0.5f)
+                        this.color = color.copy(alpha = 0.65f)
                         this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
                         this.strokeWidth = strokeWidthPx
                         this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                        asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                     }
                     drawContext.canvas.drawArc(
                         rect = androidx.compose.ui.geometry.Rect(
@@ -407,7 +408,8 @@ fun CategorySegmentedDonutChart(
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         drawContext.canvas.save()
-                        val innerClipRadius = radius + strokeWidthPx / 2f - 1f
+
+                        val innerClipRadius = radius - strokeWidthPx / 2f
                         val innerClipPath = androidx.compose.ui.graphics.Path().apply {
                             addOval(androidx.compose.ui.geometry.Rect(
                                 center.x - innerClipRadius, center.y - innerClipRadius,
@@ -416,11 +418,11 @@ fun CategorySegmentedDonutChart(
                         }
                         drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                         val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                            this.color = color.copy(alpha = 0.5f)
+                            this.color = color.copy(alpha = 0.65f)
                             this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
                             this.strokeWidth = strokeWidthPx
                             this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                         }
                         drawContext.canvas.drawArc(
                             rect = androidx.compose.ui.geometry.Rect(
@@ -521,8 +523,8 @@ fun SegmentedDonutChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
-            // Subtract 8.dp to leave 4.dp space for glowing shadow
-            val radius = (sizeMin - strokeWidthPx - 8.dp.toPx()) / 2f
+            // Subtract 24.dp to leave 12.dp space for glowing shadow to avoid clipping
+            val radius = (sizeMin - strokeWidthPx - 24.dp.toPx()) / 2f
 
             // 1. Draw background full circle
             drawCircle(
@@ -550,7 +552,8 @@ fun SegmentedDonutChart(
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             drawContext.canvas.save()
-                            val innerClipRadius = radius + strokeWidthPx / 2f - 1f
+
+                            val innerClipRadius = radius - strokeWidthPx / 2f
                             val innerClipPath = androidx.compose.ui.graphics.Path().apply {
                                 addOval(androidx.compose.ui.geometry.Rect(
                                     center.x - innerClipRadius, center.y - innerClipRadius,
@@ -559,11 +562,11 @@ fun SegmentedDonutChart(
                             }
                             drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                             val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                this.color = segment.second.copy(alpha = 0.5f)
+                                this.color = segment.second.copy(alpha = 0.65f)
                                 this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
                                 this.strokeWidth = strokeWidthPx
                                 this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                             }
                             drawContext.canvas.drawArc(
                                 rect = androidx.compose.ui.geometry.Rect(
@@ -590,7 +593,8 @@ fun SegmentedDonutChart(
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             drawContext.canvas.save()
-                            val innerClipRadius = radius + strokeWidthPx / 2f - 1f
+
+                            val innerClipRadius = radius - strokeWidthPx / 2f
                             val innerClipPath = androidx.compose.ui.graphics.Path().apply {
                                 addOval(androidx.compose.ui.geometry.Rect(
                                     center.x - innerClipRadius, center.y - innerClipRadius,
@@ -599,11 +603,11 @@ fun SegmentedDonutChart(
                             }
                             drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
                             val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                this.color = segment.second.copy(alpha = 0.5f)
+                                this.color = segment.second.copy(alpha = 0.65f)
                                 this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
                                 this.strokeWidth = strokeWidthPx
                                 this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                             }
                             drawContext.canvas.drawArc(
                                 rect = androidx.compose.ui.geometry.Rect(
@@ -660,7 +664,7 @@ fun HighlightedText(
     }
 
     val isDark = isSystemInDarkTheme()
-    val highlightBg = if (isDark) Color(0xFFFFD54F).copy(alpha = 0.25f) else Color(0xFFFDE047).copy(alpha = 0.5f)
+    val highlightBg = if (isDark) Color(0xFFFFD54F).copy(alpha = 0.25f) else Color(0xFFFDE047).copy(alpha = 0.6f)
     val highlightFg = if (isDark) Color(0xFFFFD54F) else Color(0xFFB45309)
 
     val annotatedString = buildAnnotatedString {
@@ -1158,7 +1162,7 @@ fun WorkspaceManagementDialog(
                                     }
                                 }
                                 
-                                HorizontalDivider(color = borderCol.copy(alpha = 0.5f))
+                                HorizontalDivider(color = borderCol.copy(alpha = 0.6f))
                                 
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -3051,7 +3055,7 @@ fun FinanceNoteApp(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .background(Color.Black.copy(alpha = 0.6f))
                     .clickable(enabled = false) {}, // Intercept clicks
                 contentAlignment = Alignment.Center
             ) {
@@ -3632,7 +3636,7 @@ fun FinanceNoteApp(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = FintechBlue,
-                            disabledContainerColor = FintechBlue.copy(alpha = 0.5f)
+                            disabledContainerColor = FintechBlue.copy(alpha = 0.6f)
                         )
                     ) {
                         Text(if (language == AppLanguage.BN) "ব্যাকআপ নিয়ে রিস্টোর করুন" else "Backup & Restore", color = Color.White)
@@ -3649,7 +3653,7 @@ fun FinanceNoteApp(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isDarkTheme) Color.DarkGray else Color.LightGray,
-                            disabledContainerColor = (if (isDarkTheme) Color.DarkGray else Color.LightGray).copy(alpha = 0.5f)
+                            disabledContainerColor = (if (isDarkTheme) Color.DarkGray else Color.LightGray).copy(alpha = 0.6f)
                         )
                     ) {
                         Text(if (language == AppLanguage.BN) "সরাসরি রিস্টোর (ব্যাকআপ ছাড়া)" else "Restore (No Backup)", color = if (isDarkTheme) Color.White else Color.Black)
@@ -4117,7 +4121,7 @@ fun DashboardScreen(
                     text = alert.message,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
-                    color = if (isDark) Color.White.copy(alpha = 0.9f) else Color.DarkGray
+                    color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.DarkGray
                 )
             },
             confirmButton = {
@@ -4630,7 +4634,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)
+                        .padding(start = 10.dp, end = 10.dp, top = 16.dp, bottom = 14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4670,7 +4674,7 @@ fun DashboardScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // 1. Income Donut Chart
@@ -4695,7 +4699,7 @@ fun DashboardScreen(
                                 segments = incomeByCategory,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(100.dp),
+                                modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "INCOME",
@@ -4725,7 +4729,7 @@ fun DashboardScreen(
                                 segments = expenseByCategory,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(100.dp),
+                                modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "EXPENSE",
@@ -4755,7 +4759,7 @@ fun DashboardScreen(
                                 segments = savingsByGoal,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(100.dp),
+                                modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "SAVINGS",
@@ -5538,7 +5542,7 @@ fun TransactionRowItem(
                             .size(22.dp)
                             .clip(CircleShape)
                             .background(if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.2f))
-                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.5f), CircleShape),
+                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.6f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (isSelected) {
@@ -6337,7 +6341,7 @@ fun TransactionsScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 110.dp)
                     .background(if (isDark) Color(0xFF1E2235) else Color.White, RoundedCornerShape(28.dp))
-                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(28.dp))
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(28.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -6704,7 +6708,7 @@ fun DebtsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ReceiptLong,
                             contentDescription = null,
-                            tint = Color.Gray.copy(alpha = 0.5f),
+                            tint = Color.Gray.copy(alpha = 0.6f),
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -7077,7 +7081,7 @@ fun PersonDebtRowItem(
                             .size(22.dp)
                             .clip(CircleShape)
                             .background(if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.2f))
-                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.5f), CircleShape),
+                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.6f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (isSelected) {
@@ -7436,7 +7440,7 @@ fun SavingsScreen(
                         Icon(
                             imageVector = Icons.Rounded.AccountBalance,
                             contentDescription = null,
-                            tint = Color.Gray.copy(alpha = 0.5f),
+                            tint = Color.Gray.copy(alpha = 0.6f),
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -7489,7 +7493,7 @@ fun SavingsScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 110.dp)
                     .background(if (isDark) Color(0xFF1E2235) else Color.White, RoundedCornerShape(28.dp))
-                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(28.dp))
+                    .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(28.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -8934,7 +8938,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
                             .background(if (!isWithdraw) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .border(1.dp, if (!isWithdraw) Color.Transparent else labelColor.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .border(1.dp, if (!isWithdraw) Color.Transparent else labelColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                             .clickable { isWithdraw = false }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -8946,7 +8950,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
                             .background(if (isWithdraw) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .border(1.dp, if (isWithdraw) Color.Transparent else labelColor.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                            .border(1.dp, if (isWithdraw) Color.Transparent else labelColor.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                             .clickable { isWithdraw = true }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -9187,7 +9191,7 @@ fun SavingsGoalDetailOverlay(
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ReceiptLong,
                             contentDescription = null,
-                            tint = Color.Gray.copy(alpha = 0.5f),
+                            tint = Color.Gray.copy(alpha = 0.6f),
                             modifier = Modifier.size(64.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -11250,7 +11254,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF1E293B).copy(alpha = 0.5f) else Color(0xFFF1F5F9)
+                    containerColor = if (isDark) Color(0xFF1E293B).copy(alpha = 0.6f) else Color(0xFFF1F5F9)
                 ),
                 border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
             ) {
@@ -11335,7 +11339,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowForwardIos,
                                     contentDescription = null,
-                                    tint = com.example.ui.theme.FintechBlue.copy(alpha = 0.5f),
+                                    tint = com.example.ui.theme.FintechBlue.copy(alpha = 0.6f),
                                     modifier = Modifier.size(10.dp)
                                 )
                             }
@@ -11701,7 +11705,7 @@ fun SettingsScreen(
                     Button(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = FintechBlue,
-                            disabledContainerColor = FintechBlue.copy(alpha = 0.5f)
+                            disabledContainerColor = FintechBlue.copy(alpha = 0.6f)
                         ),
                         enabled = isLogoutCaptchaCorrect,
                         onClick = {
@@ -11720,7 +11724,7 @@ fun SettingsScreen(
                     Button(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = FintechRed,
-                            disabledContainerColor = FintechRed.copy(alpha = 0.5f)
+                            disabledContainerColor = FintechRed.copy(alpha = 0.6f)
                         ),
                         enabled = isLogoutCaptchaCorrect,
                         onClick = {
@@ -13190,9 +13194,7 @@ fun ChartsScreen(
             total = totalIncome,
             palette = palette,
             language = language,
-            isDark = isDark,
-            targetAmount = budgetIncomeAmount,
-            categoryType = "INCOME"
+            isDark = isDark
         )
 
         // --- EXPENSE CHART ---
@@ -13202,9 +13204,7 @@ fun ChartsScreen(
             total = totalExpense,
             palette = palette.reversed(), // slightly different colors
             language = language,
-            isDark = isDark,
-            targetAmount = budgetExpenseAmount,
-            categoryType = "EXPENSE"
+            isDark = isDark
         )
 
 
@@ -13830,9 +13830,7 @@ fun ChartSection(
     total: Double,
     palette: List<Color>,
     language: AppLanguage,
-    isDark: Boolean = true,
-    targetAmount: Double = 0.0,
-    categoryType: String? = null
+    isDark: Boolean = true
 ) {
     val bgColor = if (isDark) listOf(Color(0xFF1E222F), Color(0xFF2A2E3D)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -13841,76 +13839,13 @@ fun ChartSection(
     LaunchedEffect(Unit) {
         animationPlayed = true
     }
-
     val animatedProgressMultiplier by animateFloatAsState(
         targetValue = if (animationPlayed) 1f else 0f,
         animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
         label = "chart_donut_animation"
     )
 
-    val progress = if (targetAmount > 0.0) {
-        (total / targetAmount).coerceIn(0.0, 1.0)
-    } else {
-        0.0
-    }
-
-    val actualProgressMultiplier = if (targetAmount > 0.0) {
-        total / targetAmount
-    } else {
-        0.0
-    }
-
-    val progressPercent = progress * 100
-
-    val percentageText = if (targetAmount > 0.0) {
-        "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
-    } else {
-        if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
-    }
-
-    val percentageColor = if (targetAmount > 0.0) {
-        when (categoryType) {
-            "INCOME", "SAVINGS" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFF10B981) // Green
-                } else {
-                    FintechBlue
-                }
-            }
-            "EXPENSE" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFFEF4444) // Red
-                } else {
-                    FintechBlue
-                }
-            }
-            else -> FintechBlue
-        }
-    } else {
-        FintechBlue
-    }
-
-    val centerBgColor = if (targetAmount > 0.0) {
-        when (categoryType) {
-            "INCOME", "SAVINGS" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFF10B981).copy(alpha = 0.1f)
-                } else {
-                    FintechBlue.copy(alpha = 0.1f)
-                }
-            }
-            "EXPENSE" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFFEF4444).copy(alpha = 0.1f)
-                } else {
-                    FintechBlue.copy(alpha = 0.1f)
-                }
-            }
-            else -> FintechBlue.copy(alpha = 0.1f)
-        }
-    } else {
-        FintechBlue.copy(alpha = 0.1f)
-    }
+    val centerBgColor = FintechBlue.copy(alpha = 0.1f)
 
     FintechGradientCard(
         gradientColors = bgColor,
@@ -13927,12 +13862,11 @@ fun ChartSection(
                 fontSize = 18.sp
             )
             Spacer(modifier = Modifier.height(24.dp))
-
             if (total == 0.0) {
                 Box(modifier = Modifier.height(150.dp), contentAlignment = Alignment.Center) {
                     Text(
                         text = if (language == AppLanguage.BN) "কোন তথ্য নেই" else "No Data Available",
-                        color = textColor.copy(alpha = 0.5f)
+                        color = textColor.copy(alpha = 0.6f)
                     )
                 }
             } else {
@@ -13952,9 +13886,9 @@ fun ChartSection(
                         Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val sizeMin = size.minDimension
-                                val strokeWidthPx = 24.dp.toPx()
-                                // Subtract 12.dp to leave 6.dp space for glowing shadow
-                                val radius = (sizeMin - strokeWidthPx - 12.dp.toPx()) / 2f
+                                val strokeWidthPx = 16.dp.toPx()
+                                // Subtract 16.dp to leave 8.dp space for glowing shadow
+                                val radius = (sizeMin - strokeWidthPx - 16.dp.toPx()) / 2f
 
                                 // Draw central hollow background
                                 val innerRadius = radius - strokeWidthPx / 2f
@@ -13966,10 +13900,9 @@ fun ChartSection(
                                     )
                                 }
 
-                                // Draw active segments with flat caps and gap-less design matching the budget graph
+                                // Draw active segments with flat caps and gap-less design
                                 if (totalFloat > 0f) {
                                     var startAngle = -90f
-
                                     val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
                                     val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
 
@@ -13980,7 +13913,7 @@ fun ChartSection(
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
                                         drawContext.canvas.save()
-                                        val innerClipRadius = radius + strokeWidthPx / 2f - 1f
+                                        val innerClipRadius = radius - strokeWidthPx / 2f
                                         val innerClipPath = androidx.compose.ui.graphics.Path().apply {
                                             addOval(androidx.compose.ui.geometry.Rect(
                                                 center.x - innerClipRadius, center.y - innerClipRadius,
@@ -13988,12 +13921,13 @@ fun ChartSection(
                                             ))
                                         }
                                         drawContext.canvas.clipPath(innerClipPath, androidx.compose.ui.graphics.ClipOp.Difference)
+                                        
                                         val shadowPaint = androidx.compose.ui.graphics.Paint().apply {
-                                            this.color = color.copy(alpha = 0.5f)
+                                            this.color = color.copy(alpha = 0.65f)
                                             this.style = androidx.compose.ui.graphics.PaintingStyle.Stroke
                                             this.strokeWidth = strokeWidthPx
                                             this.strokeCap = androidx.compose.ui.graphics.StrokeCap.Butt
-                                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(16.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
+                                            asFrameworkPaint().maskFilter = android.graphics.BlurMaskFilter(12.dp.toPx(), android.graphics.BlurMaskFilter.Blur.NORMAL)
                                         }
                                         drawContext.canvas.drawArc(
                                             rect = androidx.compose.ui.geometry.Rect(
@@ -14016,31 +13950,22 @@ fun ChartSection(
                                             size = arcSize,
                                             style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                                         )
-
+                                        
                                         startAngle += sweepAngle
                                     }
                                 }
                             }
-
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = formatNumberString(percentageText, language),
-                                    color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 18.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = formatCurrency(total, language),
-                                    color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.DarkGray.copy(alpha = 0.7f),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(horizontal = 4.dp)
-                                )
-                            }
+                            
+                            // Center Amount Text
+                            Text(
+                                text = formatCurrency(total, language),
+                                color = if (isDark) Color.White else Color(0xFF1E293B),
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
                         }
                     }
 
@@ -14078,9 +14003,9 @@ fun ChartSection(
                     }
                 }
             }
-        }
-            }
-        }
+        }    
+    }
+}
 
 @Composable
 fun SplashScreen(isDark: Boolean) {
