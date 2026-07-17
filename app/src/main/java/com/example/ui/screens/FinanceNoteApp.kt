@@ -200,19 +200,19 @@ fun CategorySegmentedDonutChart(
     }
 
     // Unfilled base color
-    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color(0xFFF1F5F9)
+    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
     val colors = listOf(
-        Color(0xFF10B981), // Emerald
+        Color(0xFF10B981), // Emerald green
+        Color(0xFF6366F1), // Indigo purple
+        Color(0xFFEF4444), // Coral red
         Color(0xFF3B82F6), // Blue
         Color(0xFFF59E0B), // Amber
-        Color(0xFFEF4444), // Red
         Color(0xFF8B5CF6), // Purple
         Color(0xFFEC4899), // Pink
         Color(0xFF14B8A6), // Teal
         Color(0xFFF97316), // Orange
         Color(0xFF06B6D4), // Cyan
-        Color(0xFF6366F1), // Indigo
     )
 
     Box(
@@ -274,78 +274,77 @@ fun CategorySegmentedDonutChart(
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
             val radius = (sizeMin - strokeWidthPx) / 2f
-            val radiusOuter = radius + strokeWidthPx / 2f
-            val radiusInner = radius - strokeWidthPx / 2f
-            
-            // 1. Draw background full circle (unfilled base)
-            drawCircle(
-                color = unfilledColor,
-                radius = radius,
-                style = Stroke(width = strokeWidthPx)
-            )
-            
-            // Subtle inner and outer borders to match the image's depth effect
-            val borderColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFE2E8F0)
-            drawCircle(
-                color = borderColor,
-                radius = radiusInner,
-                style = Stroke(width = 1.dp.toPx())
-            )
-            drawCircle(
-                color = borderColor,
-                radius = radiusOuter,
-                style = Stroke(width = 1.dp.toPx())
-            )
 
-            // 2. Draw active segments as arcs with perfectly uniform thickness
-            if (targetAmount > 0.0 && totalFilledAmount > 0.0) {
-                var startAngle = -90f
-                val gapAngle = 1.5f // Clean gap between segments for flat caps
+            val activeSegments = segments.filter { it.second > 0.0 }
+            val activeSegmentsSum = activeSegments.sumOf { it.second }
+
+            val drawSegments = mutableListOf<Pair<Float, Color>>()
+
+            if (targetAmount > 0.0 && activeSegmentsSum > 0.0) {
+                // Determine progress of active segments capped at 1.0
+                val progress = (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
                 
-                val validSegments = segments.filter { it.second > 0.0 }
-                val segmentsSum = validSegments.sumOf { it.second }
-
-                if (segmentsSum > 0.0) {
-                    validSegments.forEachIndexed { index, segment ->
-                        val segmentAmount = segment.second
-                        // Scale the segment's arc proportionally to the filled progress
-                        val segmentProgress = (segmentAmount / targetAmount).coerceIn(0.0, 1.0)
-                        val sweepAngle = (segmentProgress * 360f * animatedProgressMultiplier).toFloat()
-                        val color = colors[index % colors.size]
-
-                        if (sweepAngle > 0f) {
-                            val isOnlySegment = validSegments.size == 1 && segmentProgress >= 0.99
-                            val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
-                            val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
-                            
-                            if (isOnlySegment) {
-                                // Perfect unbroken circle
-                                drawArc(
-                                    color = color,
-                                    startAngle = startAngle,
-                                    sweepAngle = sweepAngle,
-                                    useCenter = false,
-                                    topLeft = arcTopLeft,
-                                    size = arcSize,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                                )
-                            } else {
-                                // Butt segments with proper gaps
-                                val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(0.1f)
-                                val adjustedStart = startAngle + (gapAngle / 2f)
-                                drawArc(
-                                    color = color,
-                                    startAngle = adjustedStart,
-                                    sweepAngle = adjustedSweep,
-                                    useCenter = false,
-                                    topLeft = arcTopLeft,
-                                    size = arcSize,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                                )
-                            }
-                        }
-                        startAngle += (segmentProgress * 360f).toFloat() // advance by full un-animated sweep so segments don't overlap during animation
+                // Add active segments
+                activeSegments.forEachIndexed { index, segment ->
+                    val segmentAmount = segment.second
+                    val proportionOfActive = segmentAmount / totalFilledAmount
+                    val allocatedSweep = (proportionOfActive * progress * 360f).toFloat() * animatedProgressMultiplier
+                    if (allocatedSweep > 0f) {
+                        drawSegments.add(Pair(allocatedSweep, colors[index % colors.size]))
                     }
+                }
+                
+                // Add remaining gray segment
+                val totalActiveSweep = drawSegments.sumOf { it.first.toDouble() }.toFloat()
+                val remainingSweep = (360f - totalActiveSweep).coerceAtLeast(0f)
+                if (remainingSweep > 0f) {
+                    drawSegments.add(Pair(remainingSweep, unfilledColor))
+                }
+            } else {
+                // If there's no budget set or no active spending, show 100% unfilled gray
+                drawSegments.add(Pair(360f, unfilledColor))
+            }
+
+            // Draw the segments
+            if (drawSegments.size == 1) {
+                // Single segment, draw perfect continuous circle with no gaps/caps artifacts
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+                drawArc(
+                    color = drawSegments[0].second,
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx)
+                )
+            } else if (drawSegments.size > 1) {
+                var startAngle = -90f
+                val gapAngle = 6.0f // Gorgeous, clean visual gaps between segments matching the image
+
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+
+                drawSegments.forEach { segment ->
+                    val allocatedSweep = segment.first
+                    val color = segment.second
+
+                    val visualStart = startAngle + (gapAngle / 2f)
+                    val visualSweep = allocatedSweep - gapAngle
+
+                    // Draw segment with flat caps (no border radius)
+                    drawArc(
+                        color = color,
+                        startAngle = visualStart,
+                        sweepAngle = visualSweep.coerceAtLeast(0.1f),
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                    )
+
+                    startAngle += allocatedSweep
                 }
             }
         }
@@ -381,7 +380,7 @@ fun CategorySegmentedDonutChart(
                     text = formatNumberString(percentageText, language),
                     fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = percentageColor,
+                    color = if (isDark) Color.White else Color(0xFF1E293B),
                     textAlign = TextAlign.Center
                 )
             }
@@ -452,7 +451,7 @@ fun SegmentedDonutChart(
                                 startAngle = startAngle,
                                 sweepAngle = sweepAngle,
                                 useCenter = false,
-                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                             )
                         } else {
                             val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(1f)
@@ -462,7 +461,7 @@ fun SegmentedDonutChart(
                                 startAngle = adjustedStart,
                                 sweepAngle = adjustedSweep,
                                 useCenter = false,
-                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                             )
                         }
                     }
@@ -1704,6 +1703,9 @@ fun FinanceNoteApp(
     var editingPerson by remember { mutableStateOf<Person?>(null) }
     var showAddPersonDialog by remember { mutableStateOf(false) }
     var showAddSavingsGoalDialog by remember { mutableStateOf(false) }
+    var pendingDeleteTransactions by remember { mutableStateOf<List<Int>?>(null) }
+    var pendingDeletePersons by remember { mutableStateOf<List<Int>?>(null) }
+    var pendingDeleteGoals by remember { mutableStateOf<List<Int>?>(null) }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
     var savingsTxToEdit by remember { mutableStateOf<SavingsTransaction?>(null) }
@@ -2469,7 +2471,7 @@ fun FinanceNoteApp(
                                             persons = persons,
                                             onAddTransactionClick = { showAddTransactionDialog = true },
                                             onDeleteTransaction = { viewModel.deleteTransaction(it) },
-                                            onDeleteTransactions = { viewModel.deleteTransactions(it) },
+                                            onDeleteTransactions = { pendingDeleteTransactions = it },
                                             onEditTransaction = { transactionToEdit = it },
                                             filter = transactionFilter,
                                             onFilterChange = { transactionFilter = it },
@@ -2498,7 +2500,7 @@ fun FinanceNoteApp(
                                             onPersonClick = { selectedPersonDetail = it },
                                             onDeletePerson = { showDeletePersonConfirmId = it },
                                             onMovePerson = { personActionChoice = it },
-                                            onDeletePersons = { viewModel.deletePersons(it) },
+                                            onDeletePersons = { pendingDeletePersons = it },
                                             onMovePersons = { personsToMoveIds = it },
                                             filter = debtFilter,
                                             onFilterChange = { debtFilter = it },
@@ -2519,7 +2521,7 @@ fun FinanceNoteApp(
                                             },
                                             onEditGoal = { goalToEdit = it },
                                             onMoveGoal = { goalActionChoice = it },
-                                            onDeleteGoals = { viewModel.deleteSavingsGoals(it) },
+                                            onDeleteGoals = { pendingDeleteGoals = it },
                                             onMoveGoals = { goalsToMoveIds = it },
                                             highlightedGoalId = highlightedGoalId
                                         )
@@ -2531,6 +2533,39 @@ fun FinanceNoteApp(
                 }
 
                 // Dynamic Overlays & Dialogs
+                if (pendingDeleteTransactions != null) {
+                    DeleteVerificationDialog(
+                        language = language,
+                        onConfirm = {
+                            viewModel.deleteTransactions(pendingDeleteTransactions!!)
+                            pendingDeleteTransactions = null
+                        },
+                        onDismiss = { pendingDeleteTransactions = null }
+                    )
+                }
+
+                if (pendingDeletePersons != null) {
+                    DeleteVerificationDialog(
+                        language = language,
+                        onConfirm = {
+                            viewModel.deletePersons(pendingDeletePersons!!)
+                            pendingDeletePersons = null
+                        },
+                        onDismiss = { pendingDeletePersons = null }
+                    )
+                }
+
+                if (pendingDeleteGoals != null) {
+                    DeleteVerificationDialog(
+                        language = language,
+                        onConfirm = {
+                            viewModel.deleteSavingsGoals(pendingDeleteGoals!!)
+                            pendingDeleteGoals = null
+                        },
+                        onDismiss = { pendingDeleteGoals = null }
+                    )
+                }
+
                 if (showAddTransactionDialog || transactionToEdit != null) {
                     AddTransactionDialog(viewModel = viewModel, 
                         language = language,
@@ -9947,16 +9982,60 @@ fun SettingsScreen(
                         color = if (isDark) Color.Gray else Color(0xFF64748B)
                     )
                 }
-                Switch(
-                    checked = language == AppLanguage.BN,
-                    onCheckedChange = { viewModel.toggleLanguage(context) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = FintechBlue,
-                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
-                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
-                    )
-                )
+                Row(
+                    modifier = Modifier
+                        .background(
+                            if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // English Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (language == AppLanguage.EN) FintechBlue else Color.Transparent
+                            )
+                            .clickable {
+                                if (language != AppLanguage.EN) {
+                                    viewModel.toggleLanguage(context)
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "English",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (language == AppLanguage.EN) Color.White else (if (isDark) Color.LightGray else Color.DarkGray)
+                        )
+                    }
+                    // Bangla Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (language == AppLanguage.BN) FintechBlue else Color.Transparent
+                            )
+                            .clickable {
+                                if (language != AppLanguage.BN) {
+                                    viewModel.toggleLanguage(context)
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "বাংলা",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (language == AppLanguage.BN) Color.White else (if (isDark) Color.LightGray else Color.DarkGray)
+                        )
+                    }
+                }
             }
         }
 
@@ -13249,18 +13328,13 @@ fun ChartSection(
                                 val strokeWidthPx = 16.dp.toPx()
                                 val radius = (sizeMin - strokeWidthPx) / 2f
 
-                                // Draw background unfilled circle
-                                drawCircle(
-                                    color = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f),
-                                    radius = radius,
-                                    style = Stroke(width = strokeWidthPx)
-                                )
-
-                                // Draw active segments with rounded caps and gap mathematics
+                                // Draw active segments with flat caps and gap mathematics
                                 if (totalFloat > 0f) {
                                     var startAngle = -90f
-                                    val gapAngle = 8.0f // clean visible gap between rounded caps
-                                    val capAngle = (strokeWidthPx / (2f * radius)) * (180f / Math.PI.toFloat())
+                                    val gapAngle = 6.0f // clean visible gap between segments
+
+                                    val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+                                    val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
 
                                     val validValues = values.filter { it > 0f }
                                     validValues.forEachIndexed { index, value ->
@@ -13268,18 +13342,20 @@ fun ChartSection(
                                         val isOnlySegment = validValues.size == 1
 
                                         val adjustedSweep = if (isOnlySegment) {
-                                            (360f - gapAngle - 2 * capAngle).coerceAtLeast(10f)
+                                            (360f - gapAngle).coerceAtLeast(10f)
                                         } else {
-                                            (sweepAngle - gapAngle - 2 * capAngle).coerceAtLeast(2f)
+                                            (sweepAngle - gapAngle).coerceAtLeast(2f)
                                         }
-                                        val adjustedStart = startAngle + (gapAngle / 2f) + capAngle
+                                        val adjustedStart = startAngle + (gapAngle / 2f)
 
                                         drawArc(
                                             color = palette[index % palette.size],
                                             startAngle = adjustedStart,
                                             sweepAngle = adjustedSweep,
                                             useCenter = false,
-                                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                                            topLeft = arcTopLeft,
+                                            size = arcSize,
+                                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                                         )
 
                                         startAngle += sweepAngle

@@ -126,12 +126,15 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         action = "ACTION_WIDGET_SWITCH_WORKSPACE"
         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
     }
-    views.setOnClickPendingIntent(R.id.btn_widget_switch_workspace, PendingIntent.getBroadcast(
+    val switchPendingIntent = PendingIntent.getBroadcast(
         context, 
         appWidgetId, 
         switchIntent, 
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    ))
+    )
+    views.setOnClickPendingIntent(R.id.btn_widget_switch_workspace, switchPendingIntent)
+    views.setOnClickPendingIntent(R.id.avatar_container, switchPendingIntent)
+    views.setOnClickPendingIntent(R.id.tv_profile_name, switchPendingIntent)
 
     CoroutineScope(Dispatchers.IO).launch {
         try {
@@ -177,6 +180,8 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
             views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntentInternal, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+            views.setOnClickPendingIntent(R.id.avatar_container, switchPendingIntent)
+            views.setOnClickPendingIntent(R.id.tv_profile_name, switchPendingIntent)
 
             val profileName = if (isGoogleSignedIn && widgetWorkspaceId == "default") (googleName ?: rawName) else rawName
 

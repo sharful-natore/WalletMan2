@@ -27,7 +27,9 @@
             android:layout_centerVertical="true"
             android:background="@drawable/widget_avatar_bg"
             android:gravity="center"
-            android:layout_marginRight="10dp">
+            android:layout_marginRight="10dp"
+            android:clickable="true"
+            android:focusable="true">
             
             <ImageView
                 android:id="@+id/iv_avatar"
@@ -88,7 +90,9 @@
                     android:textStyle="bold"
                     android:textSize="14sp"
                     android:maxLines="1"
-                    android:ellipsize="end" />
+                    android:ellipsize="end"
+                    android:clickable="true"
+                    android:focusable="true" />
 
                 <ImageView
                     android:id="@+id/btn_widget_switch_workspace"
