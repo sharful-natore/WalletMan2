@@ -142,8 +142,8 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             
             // Filter by active widgetWorkspaceId
             val allTxs = dao.getAllTransactionsList().filter { it.workspaceId == widgetWorkspaceId }
-            val income = allTxs.filter { it.type == "INCOME" }.sumOf { it.amount }
-            val expense = allTxs.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+            val income = allTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val expense = allTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
             val balance = income - expense
 
             val persons = dao.getAllPersonsList().filter { it.workspaceId == widgetWorkspaceId }
@@ -155,9 +155,12 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 val borrowed = pTxs.filter { it.type == "BORROW" }.sumOf { it.amount }
                 val repaidPaid = pTxs.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
                 val repaidReceived = pTxs.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
-                val net = (lent + repaidPaid) - (borrowed + repaidReceived)
-                if (net > 0) totalPaona += net
-                if (net < 0) totalDena += -net
+                
+                val netPaona = lent - repaidReceived
+                val netDena = borrowed - repaidPaid
+                
+                if (netPaona > 0) totalPaona += netPaona
+                if (netDena > 0) totalDena += netDena
             }
 
             // Load user settings and profile details for the selected workspace
