@@ -8,8 +8,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Person::class, Transaction::class, SavingsGoal::class, SavingsTransaction::class, TrashItem::class, Workspace::class],
-    version = 10,
+    entities = [Person::class, Transaction::class, SavingsGoal::class, SavingsTransaction::class, TrashItem::class, Workspace::class, DebtNotificationLog::class],
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,7 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "financenote_finance_db"
-                ).fallbackToDestructiveMigration().addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10).build()
+                ).fallbackToDestructiveMigration().addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11).build()
                 INSTANCE = instance
                 instance
             }
@@ -67,5 +67,11 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         database.execSQL("ALTER TABLE `workspaces` ADD COLUMN `profileSocial` TEXT NOT NULL DEFAULT ''")
         database.execSQL("ALTER TABLE `workspaces` ADD COLUMN `profileAddress` TEXT NOT NULL DEFAULT ''")
         database.execSQL("ALTER TABLE `workspaces` ADD COLUMN `profilePhotoUri` TEXT")
+    }
+}
+
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("CREATE TABLE IF NOT EXISTS `debt_notification_logs` (`personId` INTEGER NOT NULL, `lastNotifiedAt` INTEGER NOT NULL, PRIMARY KEY(`personId`))")
     }
 }

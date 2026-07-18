@@ -23,6 +23,12 @@ import com.example.data.GoogleTokenResponse
 import com.example.data.GoogleUserInfoResponse
 import com.example.data.GoogleDriveFile
 import com.example.data.GoogleDriveFilesResponse
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import androidx.core.app.NotificationCompat
+import com.example.MainActivity
+import com.example.R
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -1196,6 +1202,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            checkDebtReminders()
         }
     }
 
@@ -2587,6 +2594,99 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 e.printStackTrace()
             }
         }
+    }
+
+    fun checkDebtReminders() {
+        viewModelScope.launch {
+            val allPersons = repository.allPersons.first()
+            val allTransactions = repository.allTransactions.first()
+            val language = _language.value
+            
+            val eligiblePersons = allPersons.filter { person ->
+                val personTx = allTransactions.filter { it.personId == person.id }
+                if (personTx.isEmpty()) return@filter false
+                
+                val oldestTx = personTx.minByOrNull { it.timestamp } ?: return@filter false
+                val daysOld = (System.currentTimeMillis() - oldestTx.timestamp) / (1000L * 60 * 60 * 24)
+                
+                if (daysOld < 7) return@filter false
+                
+                val lent = personTx.filter { it.type == "LEND" }.sumOf { it.amount }
+                val borrowed = personTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+                val repaidPaid = personTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+                val repaidReceived = personTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+                val net = (lent + repaidPaid) - (borrowed + repaidReceived)
+                
+                if (kotlin.math.abs(net) < 0.01) return@filter false
+                
+                val log = repository.getDebtNotificationLog(person.id)
+                val lastNotified = log?.lastNotifiedAt ?: 0L
+                val daysSinceLastNotify = (System.currentTimeMillis() - lastNotified) / (1000L * 60 * 60 * 24)
+                
+                daysSinceLastNotify >= 3
+            }
+            
+            if (eligiblePersons.isNotEmpty()) {
+                val personToNotify = eligiblePersons.random()
+                
+                val personTx = allTransactions.filter { it.personId == personToNotify.id }
+                val lent = personTx.filter { it.type == "LEND" }.sumOf { it.amount }
+                val borrowed = personTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+                val repaidPaid = personTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+                val repaidReceived = personTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+                val net = (lent + repaidPaid) - (borrowed + repaidReceived)
+                
+                val message = if (net > 0) {
+                    if (language == AppLanguage.BN) {
+                        "${personToNotify.name} এর কাছে ${String.format("%.2f", net)} টাকা পাওনা আছে, আদায় করুন।"
+                    } else {
+                        "You have a receivable of ${String.format("%.2f", net)} from ${personToNotify.name}, please collect."
+                    }
+                } else {
+                    if (language == AppLanguage.BN) {
+                        "${personToNotify.name} এর কাছে ${String.format("%.2f", -net)} টাকা দেনা আছে, পরিশোধ করুন।"
+                    } else {
+                        "You owe ${String.format("%.2f", -net)} to ${personToNotify.name}, please pay."
+                    }
+                }
+                
+                sendDebtSystemNotification(message)
+                repository.insertDebtNotificationLog(com.example.data.DebtNotificationLog(personToNotify.id, System.currentTimeMillis()))
+            }
+        }
+    }
+
+    private fun sendDebtSystemNotification(message: String) {
+        val context = getApplication<Application>()
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        val channelId = "debt_reminders_channel"
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                if (_language.value == AppLanguage.BN) "পাওনা/দেনা রিমাইন্ডার" else "Debt Reminders",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+        
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            action = "ACTION_DEBT_CREDIT"
+        }
+        val pendingIntent = PendingIntent.getActivity(context, 100, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_pie_chart)
+            .setContentTitle(if (_language.value == AppLanguage.BN) "টাকা আদায়/পরিশোধের রিমাইন্ডার" else "Debt/Credit Reminder")
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+            
+        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
 }
 

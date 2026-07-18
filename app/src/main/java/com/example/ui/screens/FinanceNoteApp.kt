@@ -211,26 +211,23 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val cGreen = Color(0xFF00C853)
-    val cOrange = Color(0xFFFF6D00)
-    val cFintechBlue = Color(0xFF2962FF)
-    val cCyan = Color(0xFF00B8D4)
-    val cPurple = Color(0xFFAA00FF)
-    val cRed = Color(0xFFD50000)
-    val cYellow = Color(0xFFFFD600)
-    val cPinkIncome = Color(0xFFFF4081)
-    val cPinkSavings = Color(0xFFE91E63)
-    val cBrown = Color(0xFF795548)
-    val cSkyBlue = Color(0xFF00B0FF)
-    val cTeal = Color(0xFF009688)
-    val cIndigo = Color(0xFF304FFE)
-    val cPink = Color(0xFFFF1493)
+    val mEmerald = Color(0xFF10B981)
+    val mSky = Color(0xFF0EA5E9)
+    val mIndigo = Color(0xFF6366F1)
+    val mViolet = Color(0xFF8B5CF6)
+    val mRose = Color(0xFFF43F5E)
+    val mAmber = Color(0xFFF59E0B)
+    val mSlate = Color(0xFF64748B)
+    val mCyan = Color(0xFF06B6D4)
+    val mTeal = Color(0xFF14B8A6)
+    val mFuchsia = Color(0xFFD946EF)
+    val mOrange = Color(0xFFF97316)
 
-    val incomeColors = listOf(cCyan, cRed, cOrange, cYellow, cGreen, cFintechBlue, cPurple, cPinkIncome, cTeal, cSkyBlue, cIndigo)
-    val expenseColors = listOf(cRed, cOrange, cYellow, cCyan, cGreen, cPurple, cFintechBlue, cPinkIncome, cTeal, cSkyBlue, cIndigo)
-    val savingsColors = listOf(cCyan, cOrange, cRed, cYellow, cGreen, cPinkSavings, cFintechBlue, cPurple, cTeal, cSkyBlue, cIndigo)
+    val incomeColors = listOf(mEmerald, mSky, mIndigo, mTeal, mCyan, mViolet, mSlate, mRose, mAmber, mFuchsia, mOrange)
+    val expenseColors = listOf(mRose, mAmber, mOrange, mFuchsia, mSlate, mViolet, mIndigo, mSky, mEmerald, mTeal, mCyan)
+    val savingsColors = listOf(mViolet, mIndigo, mSky, mEmerald, mAmber, mTeal, mCyan, mSlate, mRose, mFuchsia, mOrange)
 
-    val defaultColors = listOf(cCyan, cRed, cOrange, cYellow, cGreen, cFintechBlue, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
+    val defaultColors = listOf(mIndigo, mEmerald, mSky, mRose, mAmber, mViolet, mCyan, mTeal, mSlate, mFuchsia, mOrange)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors

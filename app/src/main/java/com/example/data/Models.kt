@@ -133,6 +133,12 @@ data class TrashItem(
     val deletedAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "debt_notification_logs")
+data class DebtNotificationLog(
+    @PrimaryKey val personId: Int,
+    val lastNotifiedAt: Long
+)
+
 @JsonClass(generateAdapter = true)
 data class PersonWithTransactions(
     val person: Person,

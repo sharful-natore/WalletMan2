@@ -128,6 +128,8 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun getTransactionsByPersonList(personId: Int) = financeDao.getTransactionsByPersonList(personId)
     suspend fun getSavingsTransactionsByGoalList(goalId: Int) = financeDao.getSavingsTransactionsByGoalList(goalId)
 
-
+    suspend fun getDebtNotificationLog(personId: Int): DebtNotificationLog? = financeDao.getDebtNotificationLog(personId)
+    suspend fun insertDebtNotificationLog(log: DebtNotificationLog) = financeDao.insertDebtNotificationLog(log)
+    suspend fun deleteDebtNotificationLog(personId: Int) = financeDao.deleteDebtNotificationLog(personId)
 }
 

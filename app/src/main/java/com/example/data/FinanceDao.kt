@@ -184,5 +184,15 @@ interface FinanceDao {
 
     @Query("DELETE FROM savings_transactions WHERE workspaceId = :workspaceId")
     suspend fun deleteSavingsTransactionsByWorkspace(workspaceId: String)
+
+    // Debt Notification Logs
+    @Query("SELECT * FROM debt_notification_logs WHERE personId = :personId LIMIT 1")
+    suspend fun getDebtNotificationLog(personId: Int): DebtNotificationLog?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDebtNotificationLog(log: DebtNotificationLog)
+
+    @Query("DELETE FROM debt_notification_logs WHERE personId = :personId")
+    suspend fun deleteDebtNotificationLog(personId: Int)
 }
 
