@@ -142,7 +142,19 @@ interface FinanceDao {
     @Query("SELECT * FROM trash_items WHERE id = :id LIMIT 1")
     suspend fun getTrashItemById(id: Int): TrashItem?
 
+    @Query("SELECT * FROM trash_items")
+    suspend fun getAllTrashItemsList(): List<TrashItem>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrashItems(items: List<TrashItem>)
+
+    @Query("DELETE FROM trash_items")
+    suspend fun deleteAllTrashItems()
+
     // Workspaces
+    @Query("SELECT * FROM workspaces WHERE id = :id LIMIT 1")
+    suspend fun getWorkspaceById(id: String): Workspace?
+
     @Query("SELECT * FROM workspaces ORDER BY createdAt ASC")
     fun getAllWorkspaces(): Flow<List<Workspace>>
 

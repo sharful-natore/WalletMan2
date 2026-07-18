@@ -9,7 +9,16 @@ import com.squareup.moshi.JsonClass
 data class Workspace(
     @PrimaryKey val id: String,
     val name: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val budgetIncome: Double = 0.0,
+    val budgetExpense: Double = 0.0,
+    val budgetSavings: Double = 0.0,
+    val profileName: String = "",
+    val profileEmail: String = "",
+    val profilePhone: String = "",
+    val profileSocial: String = "",
+    val profileAddress: String = "",
+    val profilePhotoUri: String? = null
 )
 
 @Entity(tableName = "persons")
@@ -71,6 +80,10 @@ data class FinanceBackup(
     val savingsGoals: List<SavingsGoal>,
     val savingsTransactions: List<SavingsTransaction> = emptyList(),
     val workspaces: List<Workspace> = emptyList(),
+    val trashItems: List<TrashItem> = emptyList(),
+    val budgetIncome: Double? = 0.0,
+    val budgetExpense: Double? = 0.0,
+    val budgetSavings: Double? = 0.0,
     val comment: String? = "",
     val createdAt: Long? = null,
     val profileName: String = "",

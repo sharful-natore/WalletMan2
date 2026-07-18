@@ -219,28 +219,40 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val budgetSavings: StateFlow<Double> = _budgetSavings.asStateFlow()
 
     fun loadBudgets() {
-        val workspaceId = _currentWorkspaceId.value
-        _budgetIncome.value = prefs.getFloat("budget_income_$workspaceId", 0.0f).toDouble()
-        _budgetExpense.value = prefs.getFloat("budget_expense_$workspaceId", 0.0f).toDouble()
-        _budgetSavings.value = prefs.getFloat("budget_savings_$workspaceId", 0.0f).toDouble()
+        // No-op, now handled by collecting currentWorkspace flow
     }
 
     fun setBudgetIncome(amount: Double) {
-        val workspaceId = _currentWorkspaceId.value
-        prefs.edit().putFloat("budget_income_$workspaceId", amount.toFloat()).apply()
-        _budgetIncome.value = amount
+        viewModelScope.launch {
+            val workspaceId = _currentWorkspaceId.value
+            val existing = repository.getWorkspaceById(workspaceId) ?: com.example.data.Workspace(id = workspaceId, name = "ব্যক্তিগত")
+            repository.insertWorkspace(existing.copy(budgetIncome = amount))
+            _budgetIncome.value = amount
+            recordDatabaseMutation("UPDATE", "Budget", "Income", amount)
+            uploadToFirestore()
+        }
     }
 
     fun setBudgetExpense(amount: Double) {
-        val workspaceId = _currentWorkspaceId.value
-        prefs.edit().putFloat("budget_expense_$workspaceId", amount.toFloat()).apply()
-        _budgetExpense.value = amount
+        viewModelScope.launch {
+            val workspaceId = _currentWorkspaceId.value
+            val existing = repository.getWorkspaceById(workspaceId) ?: com.example.data.Workspace(id = workspaceId, name = "ব্যক্তিগত")
+            repository.insertWorkspace(existing.copy(budgetExpense = amount))
+            _budgetExpense.value = amount
+            recordDatabaseMutation("UPDATE", "Budget", "Expense", amount)
+            uploadToFirestore()
+        }
     }
 
     fun setBudgetSavings(amount: Double) {
-        val workspaceId = _currentWorkspaceId.value
-        prefs.edit().putFloat("budget_savings_$workspaceId", amount.toFloat()).apply()
-        _budgetSavings.value = amount
+        viewModelScope.launch {
+            val workspaceId = _currentWorkspaceId.value
+            val existing = repository.getWorkspaceById(workspaceId) ?: com.example.data.Workspace(id = workspaceId, name = "ব্যক্তিগত")
+            repository.insertWorkspace(existing.copy(budgetSavings = amount))
+            _budgetSavings.value = amount
+            recordDatabaseMutation("UPDATE", "Budget", "Savings", amount)
+            uploadToFirestore()
+        }
     }
 
     val currentWorkspace: StateFlow<com.example.data.Workspace> = combine(workspaces, currentWorkspaceId) { list, activeId ->
@@ -257,8 +269,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         workspaceList.map { workspace ->
             val wsId = workspace.id
-            val pName = prefs.getString(getProfileKey("user_name", wsId), "") ?: ""
-            val pPhoto = prefs.getString(getProfileKey("user_photo", wsId), null)
+            val pName = workspace.profileName
+            val pPhoto = workspace.profilePhotoUri
             
             val wsTransactions = allTransactions.filter { it.workspaceId == wsId }
             val wsPersons = allPersons.filter { it.workspaceId == wsId }
@@ -337,6 +349,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 repository.insertWorkspace(existing.copy(name = name))
                 // trigger refresh by updating flow slightly
                 _currentWorkspaceId.value = _currentWorkspaceId.value
+                com.example.widget.updateAllWidgets(getApplication())
                 triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস নাম পরিবর্তন করা হয়েছে" else "Workspace updated", isSuccess = true, type = "SUCCESS")
             }
         }
@@ -883,6 +896,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private suspend fun restoreFullBackup(backup: FinanceBackup) {
         repository.restoreBackupData(backup)
+        
+        // Restore budgets for each workspace if available
+        backup.workspaces.forEach { ws ->
+            // Budget is already in the workspace entity now, so repository.restoreBackupData(backup) 
+            // should have handled it via financeDao.insertWorkspaces(backup.workspaces)
+        }
+
         if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
             saveProfile(getApplication(),
                 name = backup.profileName.ifBlank { _profileName.value },
@@ -894,6 +914,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             )
         }
         com.example.widget.updateAllWidgets(getApplication())
+        onLocalDatabaseChanged()
     }
 
     suspend fun restoreSelectiveBackup(backup: FinanceBackup, workspaceIds: List<String>) {
@@ -1038,25 +1059,30 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun saveProfile(context: Context, name: String, email: String, photoUri: String? = null, phone: String = "", social: String = "", address: String = "") {
-        val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it) } ?: photoUri
-        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-        val wsId = _currentWorkspaceId.value
-        prefs.edit()
-            .putString(getProfileKey("user_name", wsId), name)
-            .putString(getProfileKey("user_email", wsId), email)
-            .putString(getProfileKey("user_photo", wsId), finalPhotoUri)
-            .putString(getProfileKey("user_phone", wsId), phone)
-            .putString(getProfileKey("user_social", wsId), social)
-            .putString(getProfileKey("user_address", wsId), address)
-            .apply()
-        _profileName.value = name
-        _profileEmail.value = email
-        _profilePhotoUri.value = finalPhotoUri
-        _profilePhone.value = phone
-        _profileSocial.value = social
-        _profileAddress.value = address
-        com.example.widget.updateAllWidgets(context)
-        startRealtimeSync()
+        viewModelScope.launch {
+            val wsId = _currentWorkspaceId.value
+            val existing = repository.getWorkspaceById(wsId) ?: com.example.data.Workspace(id = wsId, name = "ব্যক্তিগত")
+            val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it) } ?: photoUri
+            
+            repository.insertWorkspace(existing.copy(
+                profileName = name,
+                profileEmail = email,
+                profilePhone = phone,
+                profileSocial = social,
+                profileAddress = address,
+                profilePhotoUri = finalPhotoUri
+            ))
+            
+            _profileName.value = name
+            _profileEmail.value = email
+            _profilePhotoUri.value = finalPhotoUri
+            _profilePhone.value = phone
+            _profileSocial.value = social
+            _profileAddress.value = address
+            
+            com.example.widget.updateAllWidgets(context)
+            uploadToFirestore()
+        }
     }
 
     // Firestore Sync States
@@ -1110,8 +1136,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     init {
         registerNetworkCallback()
-        loadBudgets()
         
+        viewModelScope.launch {
+            currentWorkspace.collect { ws ->
+                _budgetIncome.value = ws.budgetIncome
+                _budgetExpense.value = ws.budgetExpense
+                _budgetSavings.value = ws.budgetSavings
+                
+                _profileName.value = ws.profileName
+                _profileEmail.value = ws.profileEmail
+                _profilePhone.value = ws.profilePhone
+                _profileSocial.value = ws.profileSocial
+                _profileAddress.value = ws.profileAddress
+                _profilePhotoUri.value = ws.profilePhotoUri
+            }
+        }
+
         val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         _lastMutationAction.value = cachedPrefs.getString("last_mutation_action", null)
         _lastMutationName.value = cachedPrefs.getString("last_mutation_name", null)
@@ -1297,6 +1337,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _hasUnsavedChanges.value = false
             _firestoreSyncStatus.value = null
         }
+        com.example.widget.updateAllWidgets(getApplication())
     }
 
     private var uploadJob: kotlinx.coroutines.Job? = null
@@ -1313,7 +1354,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             kotlinx.coroutines.delay(1000) // Debounce rapid edits
             _firestoreSyncStatus.value = "Syncing..."
             try {
-                val backupData = repository.getBackupData()
+                val baseBackup = repository.getBackupData()
+                val backupData = baseBackup.copy(
+                    profileName = _profileName.value,
+                    profileEmail = _profileEmail.value,
+                    profilePhone = _profilePhone.value,
+                    profileSocial = _profileSocial.value,
+                    profileAddress = _profileAddress.value,
+                    profilePhotoUri = _profilePhotoUri.value,
+                    budgetIncome = _budgetIncome.value,
+                    budgetExpense = _budgetExpense.value,
+                    budgetSavings = _budgetSavings.value
+                )
                 val json = backupAdapter.toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 val db = getFirestore(getApplication())
@@ -1448,6 +1500,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
                                     if (hasUnsaved) {
                                         _hasUnsavedChanges.value = true
+                                        
+                                        // Show dialog ONLY if we have a real conflict (local has data and remote is different)
+                                        // But only if we don't have a cached version yet (first sync after sign-in)
+                                        if (cachedJson == null) {
+                                            val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                            val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
+                                            if (remoteData != null) {
+                                                _pendingCloudData.value = remoteData
+                                                _showCloudDataFoundDialog.value = true
+                                            }
+                                        }
                                         return@launch // Do not overwrite local data if we have offline changes
                                     }
 
@@ -1563,7 +1626,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             try {
                 val fullBackup = repository.getBackupData()
-                val backupData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                val baseData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
                     fullBackup.copy(
                         persons = fullBackup.persons.filter { it.workspaceId in workspaceIds },
                         transactions = fullBackup.transactions.filter { it.workspaceId in workspaceIds },
@@ -1576,6 +1639,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 } else {
                     fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
                 }
+                
+                val backupData = baseData.copy(
+                    profileName = _profileName.value,
+                    profileEmail = _profileEmail.value,
+                    profilePhone = _profilePhone.value,
+                    profileSocial = _profileSocial.value,
+                    profileAddress = _profileAddress.value,
+                    profilePhotoUri = _profilePhotoUri.value,
+                    budgetIncome = _budgetIncome.value,
+                    budgetExpense = _budgetExpense.value,
+                    budgetSavings = _budgetSavings.value
+                )
+                
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 outputStream.use { it.write(encryptedJson.toByteArray()) }
@@ -1615,7 +1691,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             try {
                 val fullBackup = repository.getBackupData()
-                val backupData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                val baseData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
                     fullBackup.copy(
                         persons = fullBackup.persons.filter { it.workspaceId in workspaceIds },
                         transactions = fullBackup.transactions.filter { it.workspaceId in workspaceIds },
@@ -1628,6 +1704,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 } else {
                     fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
                 }
+                
+                val backupData = baseData.copy(
+                    profileName = _profileName.value,
+                    profileEmail = _profileEmail.value,
+                    profilePhone = _profilePhone.value,
+                    profileSocial = _profileSocial.value,
+                    profileAddress = _profileAddress.value,
+                    profilePhotoUri = _profilePhotoUri.value,
+                    budgetIncome = _budgetIncome.value,
+                    budgetExpense = _budgetExpense.value,
+                    budgetSavings = _budgetSavings.value
+                )
+                
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 
@@ -1952,40 +2041,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     address = _profileAddress.value
                 )
                 
-                // Check if Firestore has data before starting automatic sync
-                val db = getFirestore(context)
-                db.collection("users").document(email).get()
-                    .addOnSuccessListener { document ->
-                        if (document != null && document.exists()) {
-                            val remoteJson = document.getString("backupJson") ?: ""
-                            if (remoteJson.isNotEmpty()) {
-                                try {
-                                    val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                    val remoteData = backupAdapter.fromJson(decryptedJson)
-                                    if (remoteData != null) {
-                                        _pendingCloudData.value = remoteData
-                                        _showCloudDataFoundDialog.value = true
-                                        onSuccess()
-                                        return@addOnSuccessListener
-                                    }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                        }
-                        
-                        // If no remote data found or error parsing, proceed normally
-                        startRealtimeSync()
-                        checkAndTriggerAutoBackup(context)
-                        onSuccess()
-                    }
-                    .addOnFailureListener {
-                        // On failure, just proceed normally
-                        startRealtimeSync()
-                        checkAndTriggerAutoBackup(context)
-                        onSuccess()
-                    }
-
+                // Proceed normally with automatic realtime sync
+                startRealtimeSync()
+                checkAndTriggerAutoBackup(context)
+                onSuccess()
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
                 onError(e.localizedMessage ?: "Unknown error")
@@ -2023,7 +2082,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
                 // 1. Get database data JSON string with comment and createdAt metadata
                 val fullBackup = repository.getBackupData()
-                val backupData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
+                val baseData = if (workspaceIds != null && workspaceIds.isNotEmpty()) {
                     fullBackup.copy(
                         persons = fullBackup.persons.filter { it.workspaceId in workspaceIds },
                         transactions = fullBackup.transactions.filter { it.workspaceId in workspaceIds },
@@ -2036,6 +2095,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 } else {
                     fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
                 }
+
+                val backupData = baseData.copy(
+                    profileName = _profileName.value,
+                    profileEmail = _profileEmail.value,
+                    profilePhone = _profilePhone.value,
+                    profileSocial = _profileSocial.value,
+                    profileAddress = _profileAddress.value,
+                    profilePhotoUri = _profilePhotoUri.value,
+                    budgetIncome = _budgetIncome.value,
+                    budgetExpense = _budgetExpense.value,
+                    budgetSavings = _budgetSavings.value
+                )
+
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
 

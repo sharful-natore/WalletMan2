@@ -212,16 +212,16 @@ fun CategorySegmentedDonutChart(
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
     val colors = listOf(
-        Color(0xFF10B981), // Green
-        Color(0xFFF59E0B), // Amber
-        Color(0xFF6366F1), // Indigo
-        Color(0xFFF43F5E), // Rose
-        Color(0xFF06B6D4), // Cyan
-        Color(0xFFF97316), // Orange
-        Color(0xFF8B5CF6), // Violet
-        Color(0xFF14B8A6), // Teal
-        Color(0xFFEC4899), // Pink
-        Color(0xFF3B82F6), // Blue
+        Color(0xFF00C853), // Vivid Green
+        Color(0xFF6200EE), // Deep Purple
+        Color(0xFFFF3D00), // Bright Orange/Red
+        Color(0xFF03DAC6), // Teal
+        Color(0xFF2962FF), // Royal Blue
+        Color(0xFFFFD600), // Vibrant Yellow
+        Color(0xFFC51162), // Deep Pink
+        Color(0xFF00B8D4), // Cyan
+        Color(0xFF64DD17), // Light Green
+        Color(0xFFFF6D00), // Deep Orange
     )
 
     Box(
@@ -337,14 +337,14 @@ fun CategorySegmentedDonutChart(
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow
-                    val glowLayers = 60
+                    val glowLayers = 100
                     val glowSize = 4.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                         drawArc(
-                            color = color.copy(alpha = 0.015f),
+                            color = color.copy(alpha = 0.012f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -376,14 +376,14 @@ fun CategorySegmentedDonutChart(
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow
-                        val glowLayers = 60
+                        val glowLayers = 100
                         val glowSize = 4.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                             drawArc(
-                                color = color.copy(alpha = 0.015f),
+                                color = color.copy(alpha = 0.012f),
                                 startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
@@ -410,39 +410,54 @@ fun CategorySegmentedDonutChart(
         }
 
 
-        // Center percentage text or hovered segment info
+    // Center percentage text or hovered segment info
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(horizontal = 8.dp)
         ) {
-            if (hoveredSegment != null) {
-                Text(
-                    text = hoveredSegment!!.first,
-                    fontSize = maxOf(9f, centerTextSize.value * 0.45f).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.LightGray else Color.DarkGray,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "৳ ${formatCurrency(hoveredSegment!!.second, language)}",
-                    fontSize = maxOf(10f, centerTextSize.value * 0.6f).sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isDark) Color.White else Color.Black,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Text(
-                    text = formatNumberString(percentageText, language),
-                    fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
-                    textAlign = TextAlign.Center
-                )
+            Text(
+                text = formatNumberString(percentageText, language),
+                fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        // External Tooltip
+        if (hoveredSegment != null) {
+            val segmentIndex = segments.indexOfFirst { it.first == hoveredSegment!!.first }
+            val segmentColor = if (segmentIndex != -1) colors[segmentIndex % colors.size] else FintechBlue
+            
+            androidx.compose.ui.window.Popup(
+                alignment = Alignment.TopCenter,
+                offset = IntOffset(0, -50),
+                onDismissRequest = { hoveredSegment = null }
+            ) {
+                Card(
+                    shape = RoundedCornerShape(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = segmentColor),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = hoveredSegment!!.first,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "৳ ${formatCurrency(hoveredSegment!!.second, language)}",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
+                }
             }
         }
     }
@@ -509,14 +524,14 @@ fun SegmentedDonutChart(
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 60
+                            val glowLayers = 100
                             val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.015f),
+                                    color = segment.second.copy(alpha = 0.012f),
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
@@ -539,14 +554,14 @@ fun SegmentedDonutChart(
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 60
+                            val glowLayers = 100
                             val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.015f),
+                                    color = segment.second.copy(alpha = 0.012f),
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
@@ -1753,10 +1768,10 @@ fun FinanceNoteApp(
     }
 
     val currentTotalIncome = remember(filteredTransactionsForMetrics) {
-        filteredTransactionsForMetrics.filter { it.type == "INCOME" }.sumOf { it.amount }
+        filteredTransactionsForMetrics.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
     }
     val currentTotalExpense = remember(filteredTransactionsForMetrics) {
-        filteredTransactionsForMetrics.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+        filteredTransactionsForMetrics.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
     }
 
     // Filter personDebts by time locally for UI if needed
@@ -4641,7 +4656,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "INCOME",
-                                centerColorOverride = Color.White,
+                                centerColorOverride = Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "INCOME" }
                             )
                         }
@@ -4672,7 +4687,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "EXPENSE",
-                                centerColorOverride = Color.White,
+                                centerColorOverride = Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" }
                             )
                         }
@@ -4703,7 +4718,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
                                 categoryType = "SAVINGS",
-                                centerColorOverride = Color.White,
+                                centerColorOverride = Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" }
                             )
                         }
@@ -4894,25 +4909,34 @@ fun DashboardScreen(
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
 
-                    // Large Segmented Donut Chart without Card (centered in a Box with padding)
-                    Box(
+                    // Large Segmented Donut Chart in a white card with matching styling
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(vertical = 4.dp)
                     ) {
-                        CategorySegmentedDonutChart(
-                            targetAmount = targetAmount,
-                            totalFilledAmount = totalFilledAmount,
-                            segments = segments,
-                            isDark = isDark, // Pass actual isDark state for adaptive color and contrast
-                            language = language,
-                            modifier = Modifier.size(160.dp),
-                            strokeWidthDp = 16.dp, // Reduced thickness
-                            centerTextSize = 28.sp,
-                            categoryType = categoryType,
-                            unfilledColorOverride = Color.White
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CategorySegmentedDonutChart(
+                                targetAmount = targetAmount,
+                                totalFilledAmount = totalFilledAmount,
+                                segments = segments,
+                                isDark = false, // Always light inside the white card for consistent look
+                                language = language,
+                                modifier = Modifier.size(160.dp),
+                                strokeWidthDp = 14.dp, // Match budget section
+                                centerTextSize = 22.sp,
+                                categoryType = categoryType,
+                                centerColorOverride = Color(0xFFF8F9FA) // Match budget section
+                            )
+                        }
                     }
 
                     // In-place Budget Edit card
@@ -8021,11 +8045,23 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             types.take(3).forEach { (tValue, tLabelKey) ->
+                                val chipColor = when(tValue) {
+                                    "INCOME", "LEND", "REPAY_RECEIVED" -> FintechGreen
+                                    "EXPENSE", "BORROW", "REPAY_PAID" -> FintechRed
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                                val isSelected = type == tValue
+                                
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (type == tValue) MaterialTheme.colorScheme.primary else chipBg)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSelected) chipColor else chipColor.copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .background(if (isSelected) chipColor else Color.Transparent)
                                         .clickable {
                                             type = tValue
                                             // auto set categories
@@ -8043,18 +8079,30 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                         text = Translation.get(tLabelKey, language),
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (type == tValue) Color.White else textColor
+                                        color = if (isSelected) Color.White else chipColor
                                     )
                                 }
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             types.drop(3).forEach { (tValue, tLabelKey) ->
+                                val chipColor = when(tValue) {
+                                    "INCOME", "LEND", "REPAY_RECEIVED" -> FintechGreen
+                                    "EXPENSE", "BORROW", "REPAY_PAID" -> FintechRed
+                                    else -> MaterialTheme.colorScheme.primary
+                                }
+                                val isSelected = type == tValue
+
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .background(if (type == tValue) MaterialTheme.colorScheme.primary else chipBg)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSelected) chipColor else chipColor.copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .background(if (isSelected) chipColor else Color.Transparent)
                                         .clickable {
                                             type = tValue
                                             category = "Loan"
@@ -8067,7 +8115,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                         text = Translation.get(tLabelKey, language),
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (type == tValue) Color.White else textColor
+                                        color = if (isSelected) Color.White else chipColor
                                     )
                                 }
                             }

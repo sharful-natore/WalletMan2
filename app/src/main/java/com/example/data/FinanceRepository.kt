@@ -73,7 +73,8 @@ class FinanceRepository(private val financeDao: FinanceDao) {
             transactions = financeDao.getAllTransactionsList(),
             savingsGoals = financeDao.getAllSavingsGoalsList(),
             savingsTransactions = financeDao.getAllSavingsTransactionsList(),
-            workspaces = financeDao.getAllWorkspacesList()
+            workspaces = financeDao.getAllWorkspacesList(),
+            trashItems = financeDao.getAllTrashItemsList()
         )
     }
 
@@ -83,6 +84,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         financeDao.deleteAllSavingsGoals()
         financeDao.deleteAllSavingsTransactions()
         financeDao.deleteAllWorkspaces()
+        financeDao.deleteAllTrashItems()
 
         financeDao.insertPersons(backup.persons)
         financeDao.insertTransactions(backup.transactions)
@@ -95,10 +97,14 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         } else {
             financeDao.insertWorkspace(Workspace(id = "default", name = "ব্যক্তিগত"))
         }
+        if (backup.trashItems.isNotEmpty()) {
+            financeDao.insertTrashItems(backup.trashItems)
+        }
     }
 
     // Workspaces
     val allWorkspaces: Flow<List<Workspace>> = financeDao.getAllWorkspaces()
+    suspend fun getWorkspaceById(id: String): Workspace? = financeDao.getWorkspaceById(id)
     suspend fun insertWorkspace(workspace: Workspace) = financeDao.insertWorkspace(workspace)
     suspend fun deleteWorkspace(workspaceId: String) {
         financeDao.deleteWorkspaceById(workspaceId)
