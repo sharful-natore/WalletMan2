@@ -34,7 +34,8 @@ data class Transaction(
     val timestamp: Long = System.currentTimeMillis(),
     val note: String = "",
     val personId: Int? = null, // Linked person if it's a debt/credit related transaction
-    val workspaceId: String = "default"
+    val workspaceId: String = "default",
+    val subType: String? = "CASH" // "CASH" or "CREDIT"
 )
 
 @Entity(tableName = "savings_goals")

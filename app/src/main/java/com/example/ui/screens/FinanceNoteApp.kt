@@ -337,14 +337,14 @@ fun CategorySegmentedDonutChart(
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow
-                    val glowLayers = 30
+                    val glowLayers = 60
                     val glowSize = 4.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                         drawArc(
-                            color = color.copy(alpha = 0.025f),
+                            color = color.copy(alpha = 0.015f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -376,14 +376,14 @@ fun CategorySegmentedDonutChart(
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow
-                        val glowLayers = 30
+                        val glowLayers = 60
                         val glowSize = 4.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                             drawArc(
-                                color = color.copy(alpha = 0.025f),
+                                color = color.copy(alpha = 0.015f),
                                 startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
@@ -509,14 +509,14 @@ fun SegmentedDonutChart(
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 30
+                            val glowLayers = 60
                             val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.025f),
+                                    color = segment.second.copy(alpha = 0.015f),
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
@@ -539,14 +539,14 @@ fun SegmentedDonutChart(
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 30
+                            val glowLayers = 60
                             val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.025f),
+                                    color = segment.second.copy(alpha = 0.015f),
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
@@ -2690,7 +2690,7 @@ fun FinanceNoteApp(
                             showAddTransactionDialog = false 
                             transactionToEdit = null
                         },
-                        onConfirm = { amount, type, category, note, personId, timestamp ->
+                        onConfirm = { amount, type, category, note, personId, timestamp, subType ->
                             if (transactionToEdit != null) {
                                 viewModel.updateTransaction(transactionToEdit!!.copy(
                                     amount = amount,
@@ -2698,10 +2698,11 @@ fun FinanceNoteApp(
                                     category = category,
                                     note = note,
                                     personId = personId,
-                                    timestamp = timestamp
+                                    timestamp = timestamp,
+                                    subType = subType
                                 ))
                             } else {
-                                viewModel.addTransaction(amount, type, category, note, personId, timestamp)
+                                viewModel.addTransaction(amount, type, category, note, personId, timestamp, subType)
                             }
                             showAddTransactionDialog = false
                             transactionToEdit = null
@@ -3892,13 +3893,15 @@ fun DashboardScreen(
     var activeAlertPopup by remember { mutableStateOf<BudgetAlertData?>(null) }
     val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val incomeByCategory = remember(transactions) {
-        transactions.filter { it.type == "INCOME" }
+        // Include INCOME type AND LEND transactions that are of subtype "CREDIT" (Credit Sales)
+        transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
             .groupBy { it.category }
             .map { Pair(it.key, it.value.sumOf { tx -> tx.amount }) }
             .sortedByDescending { it.second }
     }
     val expenseByCategory = remember(transactions) {
-        transactions.filter { it.type == "EXPENSE" }
+        // Include EXPENSE type AND BORROW transactions that are of subtype "CREDIT" (Credit Purchases)
+        transactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
             .groupBy { it.category }
             .map { Pair(it.key, it.value.sumOf { tx -> tx.amount }) }
             .sortedByDescending { it.second }
@@ -4555,13 +4558,13 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Monthly Budget Control Card (সাদা রং এর)
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E222F) else Color.White),
-                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("budget_control_card")
@@ -4569,7 +4572,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 8.dp)
+                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4605,7 +4608,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4625,7 +4628,7 @@ fun DashboardScreen(
                                 text = if (language == AppLanguage.BN) "আয়" else "Income",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color.Black,
+                                color = Color.Black,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             CategorySegmentedDonutChart(
@@ -4656,7 +4659,7 @@ fun DashboardScreen(
                                 text = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color.Black,
+                                color = Color.Black,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             CategorySegmentedDonutChart(
@@ -4687,7 +4690,7 @@ fun DashboardScreen(
                                 text = if (language == AppLanguage.BN) "সঞ্চয়" else "Savings",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color.Black,
+                                color = Color.Black,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             CategorySegmentedDonutChart(
@@ -4905,7 +4908,7 @@ fun DashboardScreen(
                             isDark = isDark, // Pass actual isDark state for adaptive color and contrast
                             language = language,
                             modifier = Modifier.size(160.dp),
-                            strokeWidthDp = 20.dp, // Reduced thickness
+                            strokeWidthDp = 16.dp, // Reduced thickness
                             centerTextSize = 28.sp,
                             categoryType = categoryType,
                             unfilledColorOverride = Color.White
@@ -7938,7 +7941,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     isDark: Boolean,
     editTransaction: Transaction? = null,
     onDismiss: () -> Unit,
-    onConfirm: (Double, String, String, String, Int?, Long) -> Unit,
+    onConfirm: (Double, String, String, String, Int?, Long, String?) -> Unit,
     onAddPersonClick: () -> Unit = {}
 ) {
     var note by remember { mutableStateOf(editTransaction?.note ?: "") }
@@ -7946,6 +7949,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
     // Dropdowns / Option selectors
     var type by remember { mutableStateOf(editTransaction?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
+    var subType by remember { mutableStateOf(editTransaction?.subType ?: "CASH") } // CASH, CREDIT
     var selectedPersonId by remember { mutableStateOf<Int?>(editTransaction?.personId) }
     var category by remember { mutableStateOf(editTransaction?.category ?: "Food") }
 
@@ -8028,6 +8032,9 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                             if (tValue == "INCOME") category = "Salary"
                                             else if (tValue == "EXPENSE") category = "Food"
                                             else category = "Loan"
+                                            
+                                            // Default subtype to CASH for all
+                                            subType = "CASH"
                                         }
                                         .padding(vertical = 8.dp),
                                     contentAlignment = Alignment.Center
@@ -8051,6 +8058,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                         .clickable {
                                             type = tValue
                                             category = "Loan"
+                                            subType = "CASH"
                                         }
                                         .padding(vertical = 8.dp),
                                     contentAlignment = Alignment.Center
@@ -8060,6 +8068,54 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (type == tValue) Color.White else textColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Sub-type selector (LEND/BORROW specific)
+                if (type == "LEND" || type == "BORROW") {
+                    item {
+                        Text(
+                            if (language == AppLanguage.BN) "লেনদেনের ধরন" else "Transaction Detail",
+                            color = labelColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row(
+                            modifier = Modifier.padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val options = if (type == "LEND") {
+                                listOf(
+                                    Triple("CASH", if (language == AppLanguage.BN) "নগদ ধার" else "Cash Loan", FintechBlue),
+                                    Triple("CREDIT", if (language == AppLanguage.BN) "বাকি বিক্রয়" else "Credit Sale", FintechRed)
+                                )
+                            } else {
+                                listOf(
+                                    Triple("CASH", if (language == AppLanguage.BN) "নগদ ধার" else "Cash Loan", FintechBlue),
+                                    Triple("CREDIT", if (language == AppLanguage.BN) "বাকি ক্রয়" else "Credit Purchase", FintechRed)
+                                )
+                            }
+
+                            options.forEach { (sValue, sLabel, sColor) ->
+                                val isSelected = subType == sValue
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) sColor else chipBg)
+                                        .clickable { subType = sValue }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = sLabel,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else textColor
                                     )
                                 }
                             }
@@ -8347,7 +8403,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                 } else if (isPersonRequired && selectedPersonId == null) {
                                     viewModel.triggerCustomNotification(Translation.get("error_empty_person", language), isSuccess = false, type = "ERROR")
                                 } else {
-                                    onConfirm(amount, type, category, note, selectedPersonId, customTimestamp ?: System.currentTimeMillis())
+                                    onConfirm(amount, type, category, note, selectedPersonId, customTimestamp ?: System.currentTimeMillis(), subType)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),

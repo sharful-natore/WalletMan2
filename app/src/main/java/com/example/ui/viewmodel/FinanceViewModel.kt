@@ -413,13 +413,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val totalIncome: StateFlow<Double> = transactions
         .combine(personDebts) { txList, debts ->
             // INCOME is general cash-in.
-            txList.filter { it.type == "INCOME" }.sumOf { it.amount }
+            // + LEND with CREDIT subtype (Credit Sales) as per user request
+            txList.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalExpense: StateFlow<Double> = transactions
         .combine(personDebts) { txList, debts ->
             // EXPENSE is general cash-out.
-            txList.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+            // + BORROW with CREDIT subtype (Credit Purchases) as per user request point #2
+            txList.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalOwedToMe: StateFlow<Double> = personDebts
@@ -433,15 +435,24 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalBalance: StateFlow<Double> = combine(transactions, totalOwedToMe, totalIOwe) { txList, _, _ ->
+        // Total Balance formula: (Total Income + Loans Collected) - (Cash Expenses + Debts Repaid + Loans Given)
+        // 1. Total Income: INCOME
         val income = txList.filter { it.type == "INCOME" }.sumOf { it.amount }
-        val borrowed = txList.filter { it.type == "BORROW" }.sumOf { it.amount }
+        
+        // 2. Loans Collected: REPAY_RECEIVED
         val repaidReceived = txList.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
 
+        // 3. Cash Expenses: EXPENSE (Direct cash out)
         val expense = txList.filter { it.type == "EXPENSE" }.sumOf { it.amount }
-        val lent = txList.filter { it.type == "LEND" }.sumOf { it.amount }
+        
+        // 4. Debts Repaid: REPAY_PAID
         val repaidPaid = txList.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
 
-        (income + borrowed + repaidReceived) - (expense + lent + repaidPaid)
+        // 5. Loans Given: LEND
+        val lent = txList.filter { it.type == "LEND" }.sumOf { it.amount }
+
+        // Note: BORROW is excluded from the formula as per point #2 (Total Balance No Change for Buying on Credit/Taking Debt)
+        (income + repaidReceived) - (expense + repaidPaid + lent)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     // User Actions / Intents
@@ -611,7 +622,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         category: String,
         note: String,
         personId: Int?,
-        timestamp: Long = System.currentTimeMillis()
+        timestamp: Long = System.currentTimeMillis(),
+        subType: String? = "CASH"
     ) {
         viewModelScope.launch {
             repository.insertTransaction(
@@ -622,7 +634,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     note = note,
                     personId = personId,
                     timestamp = timestamp,
-                    workspaceId = _currentWorkspaceId.value
+                    workspaceId = _currentWorkspaceId.value,
+                    subType = subType
                 )
             )
             com.example.widget.updateAllWidgets(getApplication())

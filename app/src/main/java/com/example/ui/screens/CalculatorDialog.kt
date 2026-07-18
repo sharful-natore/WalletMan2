@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
+import androidx.compose.material.icons.rounded.Calculate
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -271,31 +273,31 @@ fun CalculatorDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 1. Cross Button (Small Red)
+                    // 1. Cross Button (Small Red) - Using Icon instead of Text for a cleaner look
                     Box(
                         modifier = Modifier
-                            .weight(0.35f)
+                            .weight(0.25f)
                             .height(56.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFEF4444))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFEF4444).copy(alpha = 0.15f))
                             .clickable { onDismiss() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (language == AppLanguage.BN) "বন্ধ" else "Close",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
                     // 2. Insert Button (Green)
                     Box(
                         modifier = Modifier
-                            .weight(0.65f)
+                            .weight(0.75f)
                             .height(56.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (canInsert) Color(0xFF10B981) else Color.Gray.copy(alpha = 0.3f))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (canInsert) Color(0xFF10B981) else Color.Gray.copy(alpha = 0.2f))
                             .clickable(enabled = canInsert) {
                                 if (hasResult && display != "Error") {
                                     onInsert(display)
@@ -316,10 +318,10 @@ fun CalculatorDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (language == AppLanguage.BN) "ইনসার্ট" else "Insert",
-                            fontSize = 18.sp,
+                            text = if (language == AppLanguage.BN) "ইনসার্ট করুন" else "Insert Amount",
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (canInsert) Color.White else Color.White.copy(alpha = 0.5f)
+                            color = if (canInsert) Color.White else (if (isDark) Color.White.copy(alpha = 0.3f) else Color.Gray)
                         )
                     }
                 }
