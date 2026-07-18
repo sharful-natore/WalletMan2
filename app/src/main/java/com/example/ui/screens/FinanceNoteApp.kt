@@ -212,18 +212,18 @@ fun CategorySegmentedDonutChart(
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
     val colors = listOf(
-        Color(0xFF0D9488), // Professional Teal
-        Color(0xFF4F46E5), // Elegant Indigo
-        Color(0xFFF97316), // Coral Orange
-        Color(0xFF10B981), // Emerald Investment Green
-        Color(0xFF06B6D4), // Modern Cyan/Turquoise
-        Color(0xFF8B5CF6), // Amethyst Violet
-        Color(0xFFF43F5E), // Rose Red
-        Color(0xFFF59E0B), // Warm Gold/Amber
-        Color(0xFF0EA5E9), // Sky Blue
-        Color(0xFFD946EF), // Soft Plum/Magenta
-        Color(0xFF84CC16), // Lime Green
-        Color(0xFF64748B)  // Steel Blue/Grey
+        Color(0xFFFF3B30), // Vibrant Red
+        Color(0xFF007AFF), // Vibrant Blue
+        Color(0xFF34C759), // Vibrant Green
+        Color(0xFFFF9500), // Vibrant Orange
+        Color(0xFFAF52DE), // Vibrant Purple
+        Color(0xFFFFCC00), // Bright Yellow
+        Color(0xFF5AC8FA), // Cyan/Light Blue
+        Color(0xFF5856D6), // Indigo
+        Color(0xFFFF2D55), // Pink
+        Color(0xFF00C7BE), // Teal
+        Color(0xFF32ADE6), // Sky Blue
+        Color(0xFFFF9F0A)  // Amber
     )
 
     Box(
