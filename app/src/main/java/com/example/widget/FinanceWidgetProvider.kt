@@ -207,7 +207,8 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                             android.graphics.BitmapFactory.decodeStream(it)
                         }
                     } else {
-                        android.graphics.BitmapFactory.decodeFile(photoUri)
+                        val finalPath = if (photoUri.startsWith("file://")) photoUri.substring(7) else photoUri
+                        android.graphics.BitmapFactory.decodeFile(finalPath)
                     }
 
                     if (bitmap != null) {

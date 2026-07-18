@@ -955,7 +955,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private fun saveImageToInternalStorage(context: Context, uriString: String): String? {
         return try {
-            if (!uriString.startsWith("content://")) return uriString
+            if (!uriString.startsWith("content://") && !uriString.startsWith("file://")) {
+                return uriString
+            }
             val uri = Uri.parse(uriString)
             val inputStream = context.contentResolver.openInputStream(uri)
             val fileName = "profile_photo_${System.currentTimeMillis()}.jpg"
@@ -969,7 +971,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             file.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
-            null
+            if (uriString.startsWith("file://")) {
+                uriString.substring(7)
+            } else {
+                null
+            }
         }
     }
 
@@ -1149,6 +1155,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _profileSocial.value = ws.profileSocial
                 _profileAddress.value = ws.profileAddress
                 _profilePhotoUri.value = ws.profilePhotoUri
+
+                // Keep SharedPreferences in perfect sync with the Workspace Database record!
+                val wsId = ws.id
+                val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                cachedPrefs.edit().apply {
+                    putString(getProfileKey("user_name", wsId), ws.profileName)
+                    putString(getProfileKey("user_email", wsId), ws.profileEmail)
+                    putString(getProfileKey("user_photo", wsId), ws.profilePhotoUri)
+                    putString(getProfileKey("user_phone", wsId), ws.profilePhone)
+                    putString(getProfileKey("user_social", wsId), ws.profileSocial)
+                    putString(getProfileKey("user_address", wsId), ws.profileAddress)
+                    apply()
+                }
+
+                // Immediately refresh all home screen widgets with the updated workspace profile!
+                com.example.widget.updateAllWidgets(getApplication())
             }
         }
 

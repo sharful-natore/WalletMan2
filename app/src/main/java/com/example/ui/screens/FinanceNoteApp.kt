@@ -257,9 +257,15 @@ fun CategorySegmentedDonutChart(
                         var currentAngle = 0f
                         var found: Pair<String, Double>? = null
                         val validSegments = segments.filter { it.second > 0.0 }
+                        val activeSegmentsSum = validSegments.sumOf { it.second }
+                        val progress = if (targetAmount > 0.0) {
+                            (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
+                        } else {
+                            0.0
+                        }
                         for (segment in validSegments) {
-                            val segmentProgress = (segment.second / targetAmount).coerceIn(0.0, 1.0)
-                            val sweep = (segmentProgress * 360f).toFloat()
+                            val proportionOfActive = if (activeSegmentsSum > 0.0) segment.second / activeSegmentsSum else 0.0
+                            val sweep = (proportionOfActive * progress * 360f).toFloat()
                             if (angleFromTop >= currentAngle && angleFromTop <= (currentAngle + sweep)) {
                                 found = segment
                                 break
@@ -309,7 +315,7 @@ fun CategorySegmentedDonutChart(
                 // Add active segments
                 activeSegments.forEachIndexed { index, segment ->
                     val segmentAmount = segment.second
-                    val proportionOfActive = segmentAmount / totalFilledAmount
+                    val proportionOfActive = if (activeSegmentsSum > 0.0) segmentAmount / activeSegmentsSum else 0.0
                     val allocatedSweep = (proportionOfActive * progress * 360f).toFloat() * animatedProgressMultiplier
                     if (allocatedSweep > 0f) {
                         drawSegments.add(Pair(allocatedSweep, colors[index % colors.size]))
@@ -338,7 +344,7 @@ fun CategorySegmentedDonutChart(
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow with smooth gradient fade
                     val glowLayers = 100
-                    val glowSize = 4.dp.toPx()
+                    val glowSize = 6.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
@@ -379,7 +385,7 @@ fun CategorySegmentedDonutChart(
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow with smooth gradient fade
                         val glowLayers = 100
-                        val glowSize = 4.dp.toPx()
+                        val glowSize = 6.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
@@ -530,7 +536,7 @@ fun SegmentedDonutChart(
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow with smooth gradient fade
                             val glowLayers = 100
-                            val glowSize = 4.dp.toPx()
+                            val glowSize = 6.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
@@ -562,7 +568,7 @@ fun SegmentedDonutChart(
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow with smooth gradient fade
                             val glowLayers = 100
-                            val glowSize = 4.dp.toPx()
+                            val glowSize = 6.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
@@ -4940,7 +4946,7 @@ fun DashboardScreen(
                                 isDark = false, // Always light inside the white card for consistent look
                                 language = language,
                                 modifier = Modifier.size(160.dp),
-                                strokeWidthDp = 14.dp, // Match budget section
+                                strokeWidthDp = 22.dp, // Match budget section with increased thickness
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
                                 centerColorOverride = Color(0xFFF8F9FA) // Match budget section
@@ -14102,7 +14108,7 @@ fun ChartSection(
                                         // Soft glowing shadow extending ONLY outwards (blurred)
                                         // Android 8.1 compatible natural outward glow with smooth gradient fade
                                         val glowLayers = 100
-                                        val glowSize = 4.dp.toPx()
+                                        val glowSize = 6.dp.toPx()
                                         for (i in glowLayers downTo 1) {
                                             val fraction = i.toFloat() / glowLayers
                                             val currentGlowWidth = glowSize * fraction
