@@ -212,16 +212,18 @@ fun CategorySegmentedDonutChart(
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
     val colors = listOf(
-        Color(0xFF00C853), // Vivid Green
-        Color(0xFF6200EE), // Deep Purple
-        Color(0xFFFF3D00), // Bright Orange/Red
-        Color(0xFF03DAC6), // Teal
-        Color(0xFF2962FF), // Royal Blue
-        Color(0xFFFFD600), // Vibrant Yellow
-        Color(0xFFC51162), // Deep Pink
-        Color(0xFF00B8D4), // Cyan
-        Color(0xFF64DD17), // Light Green
-        Color(0xFFFF6D00), // Deep Orange
+        Color(0xFF0D9488), // Professional Teal
+        Color(0xFF4F46E5), // Elegant Indigo
+        Color(0xFFF97316), // Coral Orange
+        Color(0xFF10B981), // Emerald Investment Green
+        Color(0xFF06B6D4), // Modern Cyan/Turquoise
+        Color(0xFF8B5CF6), // Amethyst Violet
+        Color(0xFFF43F5E), // Rose Red
+        Color(0xFFF59E0B), // Warm Gold/Amber
+        Color(0xFF0EA5E9), // Sky Blue
+        Color(0xFFD946EF), // Soft Plum/Magenta
+        Color(0xFF84CC16), // Lime Green
+        Color(0xFF64748B)  // Steel Blue/Grey
     )
 
     Box(
@@ -14918,9 +14920,9 @@ fun SyncStatusBadge(
     modifier: Modifier = Modifier
 ) {
     val badgeColor = when {
-        !isNetworkAvailable -> Color(0xFFF44336) // Red if offline
-        hasUnsavedChanges -> Color(0xFFFFB300)   // Yellow if unsaved changes
-        else -> Color(0xFF4CAF50)               // Light green if everything is synced
+        !isNetworkAvailable -> Color(0xFFFF3B30) // Vibrant Red if offline
+        hasUnsavedChanges -> Color(0xFFFFD600)   // Vibrant Yellow if unsaved changes
+        else -> Color(0xFF00FF66)               // Extremely bright neon green if everything is synced
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "badge_pulse")
@@ -14944,13 +14946,13 @@ fun SyncStatusBadge(
     )
 
     Box(
-        modifier = modifier.size(14.dp),
+        modifier = modifier.size(16.dp),
         contentAlignment = Alignment.Center
     ) {
         // Glowing pulse circle
         Box(
             modifier = Modifier
-                .size(6.dp)
+                .size(7.dp)
                 .graphicsLayer(
                     scaleX = pulseScale,
                     scaleY = pulseScale,
@@ -14958,11 +14960,12 @@ fun SyncStatusBadge(
                 )
                 .background(badgeColor, shape = CircleShape)
         )
-        // Solid center circle
+        // Solid center circle with crisp white border
         Box(
             modifier = Modifier
-                .size(6.dp)
+                .size(8.dp)
                 .background(badgeColor, shape = CircleShape)
+                .border(1.2.dp, Color.White, CircleShape)
         )
     }
 }

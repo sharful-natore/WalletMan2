@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Calculate
@@ -192,16 +194,25 @@ fun CalculatorDialog(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = display.ifEmpty { "0" },
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (display == "Error") Color.Red else (if (isDark) Color.White else Color.Black),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                                textAlign = TextAlign.End
-                            )
+                            val scrollState = rememberScrollState()
+                            LaunchedEffect(display) {
+                                scrollState.animateScrollTo(scrollState.maxValue)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .horizontalScroll(scrollState),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Text(
+                                    text = display.ifEmpty { "0" },
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (display == "Error") Color.Red else (if (isDark) Color.White else Color.Black),
+                                    maxLines = 1,
+                                    textAlign = TextAlign.End
+                                )
+                            }
                             Spacer(modifier = Modifier.width(8.dp))
                             IconButton(onClick = { onBackspace() }, modifier = Modifier.size(32.dp)) {
                                 Icon(
