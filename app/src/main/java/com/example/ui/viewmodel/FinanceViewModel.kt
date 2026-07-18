@@ -1377,6 +1377,64 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         com.example.widget.updateAllWidgets(getApplication())
     }
 
+    private fun mergeBackupData(local: com.example.data.FinanceBackup, remote: com.example.data.FinanceBackup): com.example.data.FinanceBackup {
+        // Persons
+        val personsMap = (local.persons + remote.persons)
+            .groupBy { it.id }
+            .mapValues { (_, list) -> list.maxByOrNull { it.createdAt } ?: list.first() }
+            .values.toList()
+
+        // Transactions
+        val transactionsMap = (local.transactions + remote.transactions)
+            .groupBy { it.id }
+            .mapValues { (_, list) -> list.maxByOrNull { it.timestamp } ?: list.first() }
+            .values.toList()
+
+        // Savings Goals
+        val savingsGoalsMap = (local.savingsGoals + remote.savingsGoals)
+            .groupBy { it.id }
+            .mapValues { (_, list) -> list.maxByOrNull { it.createdAt } ?: list.first() }
+            .values.toList()
+
+        // Savings Transactions
+        val savingsTransactionsMap = (local.savingsTransactions + remote.savingsTransactions)
+            .groupBy { it.id }
+            .mapValues { (_, list) -> list.maxByOrNull { it.timestamp } ?: list.first() }
+            .values.toList()
+
+        // Workspaces
+        val workspacesMap = (local.workspaces + remote.workspaces)
+            .groupBy { it.id }
+            .mapValues { (_, list) -> list.maxByOrNull { it.createdAt } ?: list.first() }
+            .values.toList()
+
+        // Trash Items
+        val trashItemsMap = (local.trashItems + remote.trashItems)
+            .groupBy { it.id }
+            .mapValues { (_, list) -> list.first() }
+            .values.toList()
+
+        return com.example.data.FinanceBackup(
+            persons = personsMap,
+            transactions = transactionsMap,
+            savingsGoals = savingsGoalsMap,
+            savingsTransactions = savingsTransactionsMap,
+            workspaces = workspacesMap,
+            trashItems = trashItemsMap,
+            budgetIncome = if ((local.budgetIncome ?: 0.0) >= (remote.budgetIncome ?: 0.0)) local.budgetIncome else remote.budgetIncome,
+            budgetExpense = if ((local.budgetExpense ?: 0.0) >= (remote.budgetExpense ?: 0.0)) local.budgetExpense else remote.budgetExpense,
+            budgetSavings = if ((local.budgetSavings ?: 0.0) >= (remote.budgetSavings ?: 0.0)) local.budgetSavings else remote.budgetSavings,
+            comment = local.comment ?: remote.comment ?: "",
+            createdAt = maxOf(local.createdAt ?: 0L, remote.createdAt ?: 0L),
+            profileName = if (local.profileName.isNotBlank()) local.profileName else remote.profileName,
+            profileEmail = if (local.profileEmail.isNotBlank()) local.profileEmail else remote.profileEmail,
+            profilePhone = if (local.profilePhone.isNotBlank()) local.profilePhone else remote.profilePhone,
+            profileSocial = if (local.profileSocial.isNotBlank()) local.profileSocial else remote.profileSocial,
+            profileAddress = if (local.profileAddress.isNotBlank()) local.profileAddress else remote.profileAddress,
+            profilePhotoUri = local.profilePhotoUri ?: remote.profilePhotoUri
+        )
+    }
+
     private var uploadJob: kotlinx.coroutines.Job? = null
     
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
@@ -1391,49 +1449,164 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             kotlinx.coroutines.delay(1000) // Debounce rapid edits
             
             try {
-                val backupData = getFullBackupData()
-                val json = backupAdapter.toJson(backupData)
+                val currentLocalData = getFullBackupData()
+                val currentJson = backupAdapter.toJson(currentLocalData)
                 
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                 val cachedJson = prefs.getString("firestore_cached_data_$email", null)
                 
-                if (json == cachedJson) {
+                // Compare with cached copy
+                if (currentJson == cachedJson) {
                     _hasUnsavedChanges.value = false
-                    _firestoreSyncStatus.value = null
-                    onComplete?.invoke()
+                    // Already in perfect sync with cache, but let's check Firestore just in case there are newer changes in cloud
+                    _firestoreSyncStatus.value = "Checking..."
+                    val db = getFirestore(getApplication())
+                    db.collection("users").document(email).get()
+                        .addOnSuccessListener { document ->
+                            if (document != null && document.exists()) {
+                                val remoteJson = document.getString("backupJson") ?: ""
+                                if (remoteJson.isNotEmpty()) {
+                                    viewModelScope.launch {
+                                        try {
+                                            val remoteDecryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                            if (remoteDecryptedJson != currentJson) {
+                                                // Remote has newer changes (e.g. from another device), pull and sync
+                                                val remoteData = backupAdapter.fromJson(remoteDecryptedJson)
+                                                if (remoteData != null) {
+                                                    restoreFullBackup(remoteData)
+                                                    com.example.widget.updateAllWidgets(getApplication())
+                                                    prefs.edit().putString("firestore_cached_data_$email", remoteDecryptedJson).apply()
+                                                    _firestoreSyncStatus.value = "Synced"
+                                                    onComplete?.invoke()
+                                                }
+                                            } else {
+                                                _firestoreSyncStatus.value = "Synced"
+                                                onComplete?.invoke()
+                                            }
+                                        } catch (e: Exception) {
+                                            _firestoreSyncStatus.value = "Error"
+                                            onError?.invoke(e.localizedMessage ?: "Decrypt failed")
+                                        }
+                                    }
+                                } else {
+                                    _firestoreSyncStatus.value = "Synced"
+                                    onComplete?.invoke()
+                                }
+                            } else {
+                                // Server has no data, upload our current local data
+                                uploadToFirestoreDirectly(currentJson, email, db, prefs, onComplete, onError)
+                            }
+                        }
+                        .addOnFailureListener { e ->
+                            _firestoreSyncStatus.value = "Offline"
+                            onError?.invoke(e.localizedMessage ?: "Failed to fetch cloud data")
+                        }
                     return@launch
                 }
 
+                // If local data changed compared to cached copy (currentJson != cachedJson):
                 _firestoreSyncStatus.value = "Syncing..."
-                val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 val db = getFirestore(getApplication())
-                val data = mapOf(
-                    "backupJson" to encryptedJson,
-                    "updatedAt" to System.currentTimeMillis()
-                )
-                db.collection("users").document(email).set(data)
-                    .addOnSuccessListener {
+                db.collection("users").document(email).get()
+                    .addOnSuccessListener { document ->
                         viewModelScope.launch {
                             try {
-                                val currentData = getFullBackupData()
-                                val currentJson = backupAdapter.toJson(currentData)
-                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                                prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
-                            } catch (e: Exception) { e.printStackTrace() }
-                            _hasUnsavedChanges.value = false
-                            _firestoreSyncStatus.value = "Synced"
-                            updateSyncSuccess(getApplication(), true)
-                            onComplete?.invoke()
+                                if (document != null && document.exists()) {
+                                    val remoteJson = document.getString("backupJson") ?: ""
+                                    if (remoteJson.isNotEmpty()) {
+                                        val remoteDecryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                        val remoteData = try { backupAdapter.fromJson(remoteDecryptedJson) } catch (e: Exception) { null }
+                                        
+                                        if (remoteData != null) {
+                                            // Merge local data and remote data to avoid losing any offline changes!
+                                            val mergedData = mergeBackupData(currentLocalData, remoteData)
+                                            val mergedJson = backupAdapter.toJson(mergedData)
+                                            
+                                            // Restore merged result to local DB if it changed
+                                            if (currentJson != mergedJson) {
+                                                restoreFullBackup(mergedData)
+                                                com.example.widget.updateAllWidgets(getApplication())
+                                            }
+                                            
+                                            // Upload merged JSON to Firestore
+                                            val encryptedMergedJson = BackupEncryptionHelper.encrypt(mergedJson)
+                                            val data = mapOf(
+                                                "backupJson" to encryptedMergedJson,
+                                                "updatedAt" to System.currentTimeMillis()
+                                            )
+                                            db.collection("users").document(email).set(data)
+                                                .addOnSuccessListener {
+                                                    prefs.edit().putString("firestore_cached_data_$email", mergedJson).apply()
+                                                    _firestoreSyncStatus.value = "Synced"
+                                                    _hasUnsavedChanges.value = false
+                                                    updateSyncSuccess(getApplication(), true)
+                                                    onComplete?.invoke()
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    _firestoreSyncStatus.value = "Failed"
+                                                    onError?.invoke(e.localizedMessage ?: "Upload failed")
+                                                }
+                                        } else {
+                                            // Fallback: upload local directly if remote is invalid/corrupt
+                                            uploadToFirestoreDirectly(currentJson, email, db, prefs, onComplete, onError)
+                                        }
+                                    } else {
+                                        // Empty remote document: upload local directly
+                                        uploadToFirestoreDirectly(currentJson, email, db, prefs, onComplete, onError)
+                                    }
+                                } else {
+                                    // Document doesn't exist on server yet: upload local directly
+                                    uploadToFirestoreDirectly(currentJson, email, db, prefs, onComplete, onError)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                _firestoreSyncStatus.value = "Error"
+                                onError?.invoke(e.localizedMessage ?: "Sync error")
+                            }
                         }
                     }
                     .addOnFailureListener { e ->
-                        _firestoreSyncStatus.value = "Failed"
-                        onError?.invoke(e.localizedMessage ?: "Unknown Firestore error")
+                        // If offline/failure, since there are unsaved local changes, we keep _hasUnsavedChanges true
+                        _firestoreSyncStatus.value = "Offline"
+                        onError?.invoke(e.localizedMessage ?: "Offline - sync pending")
                     }
             } catch (e: Exception) {
                 _firestoreSyncStatus.value = "Error"
                 onError?.invoke(e.localizedMessage ?: "Unknown error")
             }
+        }
+    }
+
+    private fun uploadToFirestoreDirectly(
+        currentJson: String,
+        email: String,
+        db: com.google.firebase.firestore.FirebaseFirestore,
+        prefs: android.content.SharedPreferences,
+        onComplete: (() -> Unit)?,
+        onError: ((String) -> Unit)?
+    ) {
+        try {
+            val encryptedJson = BackupEncryptionHelper.encrypt(currentJson)
+            val data = mapOf(
+                "backupJson" to encryptedJson,
+                "updatedAt" to System.currentTimeMillis()
+            )
+            db.collection("users").document(email).set(data)
+                .addOnSuccessListener {
+                    prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
+                    _firestoreSyncStatus.value = "Synced"
+                    _hasUnsavedChanges.value = false
+                    updateSyncSuccess(getApplication(), true)
+                    onComplete?.invoke()
+                }
+                .addOnFailureListener { e ->
+                    _firestoreSyncStatus.value = "Failed"
+                    onError?.invoke(e.localizedMessage ?: "Upload failed")
+                }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _firestoreSyncStatus.value = "Error"
+            onError?.invoke(e.localizedMessage ?: "Encryption failed")
         }
     }
 

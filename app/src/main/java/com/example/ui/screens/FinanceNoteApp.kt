@@ -211,18 +211,27 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val colors = listOf(
-        Color(0xFF00C853), // Vivid Green
-        Color(0xFF6200EE), // Deep Purple
-        Color(0xFFFF3D00), // Bright Orange/Red
-        Color(0xFF03DAC6), // Teal
-        Color(0xFF2962FF), // Royal Blue
-        Color(0xFFFFD600), // Vibrant Yellow
-        Color(0xFFC51162), // Deep Pink
-        Color(0xFF00B8D4), // Cyan
-        Color(0xFF64DD17), // Light Green
-        Color(0xFFFF6D00), // Deep Orange
-    )
+    val colors = if (categoryType == "EXPENSE") {
+        listOf(
+            Color(0xFFEF4444), // Red 500
+            Color(0xFFF97316), // Orange 500
+            Color(0xFFF59E0B), // Amber 500
+            Color(0xFF10B981), // Emerald 500
+            Color(0xFF3B82F6), // Blue 500
+            Color(0xFF8B5CF6), // Violet 500
+            Color(0xFFEC4899), // Pink 500
+        )
+    } else {
+        listOf(
+            Color(0xFF10B981), // Emerald 500
+            Color(0xFF3B82F6), // Blue 500
+            Color(0xFF8B5CF6), // Violet 500
+            Color(0xFFF59E0B), // Amber 500
+            Color(0xFFEC4899), // Pink 500
+            Color(0xFF06B6D4), // Cyan 500
+            Color(0xFFF97316), // Orange 500
+        )
+    }
 
     Box(
         modifier = modifier,
@@ -2222,24 +2231,78 @@ fun FinanceNoteApp(
                                 )
                             }
 
-                            IconButton(
-                                onClick = {
-                                    showRealtimeSyncDialog = true
-                                },
+                            Box(
                                 modifier = Modifier.size(36.dp)
                             ) {
-                                Icon(
-                                    imageVector = if (!isGoogleSignedIn) {
-                                        Icons.Rounded.CloudOff
-                                    } else if (hasUnsavedChanges) {
-                                        Icons.Rounded.Sync
-                                    } else {
-                                        Icons.Rounded.CloudDone
+                                IconButton(
+                                    onClick = {
+                                        showRealtimeSyncDialog = true
                                     },
-                                    contentDescription = "Cloud Sync",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    Icon(
+                                        imageVector = if (!isGoogleSignedIn) {
+                                            Icons.Rounded.CloudOff
+                                        } else if (hasUnsavedChanges) {
+                                            Icons.Rounded.Sync
+                                        } else {
+                                            Icons.Rounded.CloudDone
+                                        },
+                                        contentDescription = "Cloud Sync",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                val isOffline = !viewModel.isNetworkAvailable(context)
+                                val badgeColor = when {
+                                    isOffline -> Color(0xFFEF4444) // Red
+                                    hasUnsavedChanges -> Color(0xFFFBBF24) // Yellow/Amber
+                                    else -> Color(0xFF10B981) // Green
+                                }
+
+                                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                                val pulseScale by infiniteTransition.animateFloat(
+                                    initialValue = 1f,
+                                    targetValue = 2.2f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1200, easing = FastOutSlowInEasing),
+                                        repeatMode = RepeatMode.Restart
+                                    ),
+                                    label = "pulse_scale"
                                 )
+                                val pulseAlpha by infiniteTransition.animateFloat(
+                                    initialValue = 0.6f,
+                                    targetValue = 0f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1200, easing = FastOutSlowInEasing),
+                                        repeatMode = RepeatMode.Restart
+                                    ),
+                                    label = "pulse_alpha"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = (-2).dp, y = 2.dp)
+                                ) {
+                                    // Pulsing glow circle
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .scale(pulseScale)
+                                            .background(badgeColor.copy(alpha = pulseAlpha), CircleShape)
+                                    )
+                                    // Solid inner bullet point
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .align(Alignment.Center)
+                                            .background(badgeColor, CircleShape)
+                                            .border(1.dp, Color.White, CircleShape)
+                                    )
+                                }
                             }
 
                             IconButton(
@@ -8324,23 +8387,37 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                     val enteredAmount = amountInputState.toDoubleOrNull() ?: 0.0
                                     if (enteredAmount > 0.0 && netBalance != 0.0) {
                                         val netBalanceAbs = kotlin.math.abs(netBalance)
-                                        val remaining = netBalanceAbs - enteredAmount
-                                        val remainingText = if (language == AppLanguage.BN) {
-                                            if (remaining >= 0.0) {
-                                                "অবশিষ্ট: ${formatCurrency(remaining, language)}"
+                                        val isIncrease = if (netBalance > 0) {
+                                            type == "LEND" || type == "REPAY_PAID"
+                                        } else {
+                                            type == "BORROW" || type == "REPAY_RECEIVED"
+                                        }
+                                        val text = if (isIncrease) {
+                                            val updated = netBalanceAbs + enteredAmount
+                                            if (language == AppLanguage.BN) {
+                                                "পরিবর্তিত: ${formatCurrency(updated, language)}"
                                             } else {
-                                                "অতিরিক্ত: ${formatCurrency(-remaining, language)}"
+                                                "Updated: ${formatCurrency(updated, language)}"
                                             }
                                         } else {
-                                            if (remaining >= 0.0) {
-                                                "Remaining: ${formatCurrency(remaining, language)}"
+                                            val remaining = netBalanceAbs - enteredAmount
+                                            if (language == AppLanguage.BN) {
+                                                if (remaining >= 0.0) {
+                                                    "অবশিষ্ট: ${formatCurrency(remaining, language)}"
+                                                } else {
+                                                    "অতিরিক্ত: ${formatCurrency(-remaining, language)}"
+                                                }
                                             } else {
-                                                "Surplus: ${formatCurrency(-remaining, language)}"
+                                                if (remaining >= 0.0) {
+                                                    "Remaining: ${formatCurrency(remaining, language)}"
+                                                } else {
+                                                    "Surplus: ${formatCurrency(-remaining, language)}"
+                                                }
                                             }
                                         }
                                         Text(
-                                            text = remainingText,
-                                            color = if (remaining >= 0.0) labelColor else FintechBlue,
+                                            text = text,
+                                            color = if (!isIncrease && (netBalanceAbs - enteredAmount) < 0.0) FintechBlue else labelColor,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
                                         )
