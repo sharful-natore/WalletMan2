@@ -335,9 +335,6 @@ fun CategorySegmentedDonutChart(
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
                 
                 if (color != resolvedUnfilledColor) {
-                    val startGradientColor = color.copy(alpha = 0.35f)
-                    val endGradientColor = color
-
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow with smooth gradient fade
                     val glowLayers = 100
@@ -348,55 +345,27 @@ fun CategorySegmentedDonutChart(
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                         // Linear fade for smoother outer transition and blurrier falloff
                         val alpha = 0.0142f * (1.0f - fraction) 
-                        
-                        val shadowStartColor = startGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                        val shadowEndColor = endGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                        val shadowBrush = Brush.sweepGradient(
-                            0f to shadowStartColor,
-                            1f to shadowEndColor,
-                            center = center
-                        )
-
-                        rotate(degrees = -90f, pivot = center) {
-                            drawArc(
-                                brush = shadowBrush,
-                                startAngle = 0f,
-                                sweepAngle = 360f,
-                                useCenter = false,
-                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                            )
-                        }
-                    }
-
-                    val mainBrush = Brush.sweepGradient(
-                        0f to startGradientColor,
-                        1f to endGradientColor,
-                        center = center
-                    )
-                    rotate(degrees = -90f, pivot = center) {
                         drawArc(
-                            brush = mainBrush,
-                            startAngle = 0f,
+                            color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
+                            startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx)
+                            topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                            size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
                         )
                     }
-                } else {
-                    drawArc(
-                        color = color,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx)
-                    )
                 }
+
+                drawArc(
+                    color = color,
+                    startAngle = -90f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx)
+                )
             } else if (drawSegments.size > 1) {
                 var startAngle = -90f
                 val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
@@ -407,10 +376,6 @@ fun CategorySegmentedDonutChart(
                     val color = segment.second
 
                     if (color != resolvedUnfilledColor) {
-                        val startGradientColor = color.copy(alpha = 0.35f)
-                        val endGradientColor = color
-                        val endStop = (allocatedSweep / 360f).coerceIn(0.001f, 1f)
-
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow with smooth gradient fade
                         val glowLayers = 100
@@ -421,57 +386,27 @@ fun CategorySegmentedDonutChart(
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                             // Linear fade for smoother outer transition and blurrier falloff
                             val alpha = 0.0142f * (1.0f - fraction)
-
-                            val shadowStartColor = startGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                            val shadowEndColor = endGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                            val shadowBrush = Brush.sweepGradient(
-                                0f to shadowStartColor,
-                                endStop to shadowEndColor,
-                                1f to shadowEndColor,
-                                center = center
-                            )
-
-                            rotate(degrees = startAngle, pivot = center) {
-                                drawArc(
-                                    brush = shadowBrush,
-                                    startAngle = 0f,
-                                    sweepAngle = allocatedSweep + 0.8f,
-                                    useCenter = false,
-                                    topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                    size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                                )
-                            }
-                        }
-
-                        val mainBrush = Brush.sweepGradient(
-                            0f to startGradientColor,
-                            endStop to endGradientColor,
-                            1f to endGradientColor,
-                            center = center
-                        )
-                        rotate(degrees = startAngle, pivot = center) {
                             drawArc(
-                                brush = mainBrush,
-                                startAngle = 0f,
+                                color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
+                                startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
-                                topLeft = arcTopLeft,
-                                size = arcSize,
-                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
                             )
                         }
-                    } else {
-                        drawArc(
-                            color = color,
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep + 0.8f,
-                            useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                        )
                     }
+
+                    drawArc(
+                        color = color,
+                        startAngle = startAngle,
+                        sweepAngle = allocatedSweep + 0.8f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                    )
 
                     startAngle += allocatedSweep
                 }
@@ -520,7 +455,7 @@ fun CategorySegmentedDonutChart(
                             color = Color.White
                         )
                         Text(
-                            text = "৳ ${formatCurrency(hoveredSegment!!.second, language)}",
+                            text = formatCurrency(hoveredSegment!!.second, language),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
@@ -590,11 +525,8 @@ fun SegmentedDonutChart(
 
                     if (sweepAngle > 0f) {
                         val isOnlySegment = activeSegments.size == 1 && (progressVal / activeCount) >= 0.99
-                        val startGradientColor = segment.second.copy(alpha = 0.35f)
-                        val endGradientColor = segment.second
 
                         if (isOnlySegment) {
-                            val endStop = (sweepAngle / 360f).coerceIn(0.001f, 1f)
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow with smooth gradient fade
                             val glowLayers = 100
@@ -605,48 +537,27 @@ fun SegmentedDonutChart(
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 // Linear fade for smoother outer transition and blurrier falloff
                                 val alpha = 0.0142f * (1.0f - fraction)
-
-                                val shadowStartColor = startGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                                val shadowEndColor = endGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                                val shadowBrush = Brush.sweepGradient(
-                                    0f to shadowStartColor,
-                                    endStop to shadowEndColor,
-                                    1f to shadowEndColor,
-                                    center = center
-                                )
-
-                                rotate(degrees = startAngle, pivot = center) {
-                                    drawArc(
-                                        brush = shadowBrush,
-                                        startAngle = 0f,
-                                        sweepAngle = sweepAngle,
-                                        useCenter = false,
-                                        topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                        size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                                    )
-                                }
-                            }
-
-                            val mainBrush = Brush.sweepGradient(
-                                0f to startGradientColor,
-                                endStop to endGradientColor,
-                                1f to endGradientColor,
-                                center = center
-                            )
-                            rotate(degrees = startAngle, pivot = center) {
                                 drawArc(
-                                    brush = mainBrush,
-                                    startAngle = 0f,
+                                    color = segment.second.copy(alpha = alpha.coerceAtLeast(0.001f)),
+                                    startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                                    topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                    size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
                                 )
                             }
+
+                            drawArc(
+                                color = segment.second,
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                            )
                         } else {
                             val adjustedSweep = (sweepAngle - gapAngle).coerceAtLeast(1f)
                             val adjustedStart = startAngle + (gapAngle / 2f)
-                            val endStop = (adjustedSweep / 360f).coerceIn(0.001f, 1f)
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow with smooth gradient fade
@@ -658,44 +569,24 @@ fun SegmentedDonutChart(
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 // Linear fade for smoother outer transition and blurrier falloff
                                 val alpha = 0.0142f * (1.0f - fraction)
-
-                                val shadowStartColor = startGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                                val shadowEndColor = endGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                                val shadowBrush = Brush.sweepGradient(
-                                    0f to shadowStartColor,
-                                    endStop to shadowEndColor,
-                                    1f to shadowEndColor,
-                                    center = center
-                                )
-
-                                rotate(degrees = adjustedStart, pivot = center) {
-                                    drawArc(
-                                        brush = shadowBrush,
-                                        startAngle = 0f,
-                                        sweepAngle = adjustedSweep,
-                                        useCenter = false,
-                                        topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                        size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                                    )
-                                }
-                            }
-
-                            val mainBrush = Brush.sweepGradient(
-                                0f to startGradientColor,
-                                endStop to endGradientColor,
-                                1f to endGradientColor,
-                                center = center
-                            )
-                            rotate(degrees = adjustedStart, pivot = center) {
                                 drawArc(
-                                    brush = mainBrush,
-                                    startAngle = 0f,
+                                    color = segment.second.copy(alpha = alpha.coerceAtLeast(0.001f)),
+                                    startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
-                                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                                    topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                    size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
                                 )
                             }
+
+                            drawArc(
+                                color = segment.second,
+                                startAngle = adjustedStart,
+                                sweepAngle = adjustedSweep,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                            )
                         }
                     }
                     startAngle += sweepAngle
@@ -8390,17 +8281,17 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                 val netBalance = debtInfo.netBalance
                                 val infoText = if (language == AppLanguage.BN) {
                                     if (netBalance > 0) {
-                                        "পাওনা: ৳ ${formatCurrency(netBalance, language)}"
+                                        "পাওনা: ${formatCurrency(netBalance, language)}"
                                     } else if (netBalance < 0) {
-                                        "দেনা: ৳ ${formatCurrency(-netBalance, language)}"
+                                        "দেনা: ${formatCurrency(-netBalance, language)}"
                                     } else {
                                         "কোনো দেনা-পাওনা নেই"
                                     }
                                 } else {
                                     if (netBalance > 0) {
-                                        "Receivable: ৳ ${formatCurrency(netBalance, language)}"
+                                        "Receivable: ${formatCurrency(netBalance, language)}"
                                     } else if (netBalance < 0) {
-                                        "Payable: ৳ ${formatCurrency(-netBalance, language)}"
+                                        "Payable: ${formatCurrency(-netBalance, language)}"
                                     } else {
                                         "No outstanding balance"
                                     }
@@ -8412,13 +8303,43 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                 } else {
                                     labelColor
                                 }
-                                Text(
-                                    text = infoText,
-                                    color = infoColor,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(top = 6.dp, start = 4.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 4.dp, end = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = infoText,
+                                        color = infoColor,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+
+                                    val enteredAmount = amountInputState.toDoubleOrNull() ?: 0.0
+                                    if (enteredAmount > 0.0 && netBalance != 0.0) {
+                                        val netBalanceAbs = kotlin.math.abs(netBalance)
+                                        val remaining = netBalanceAbs - enteredAmount
+                                        val remainingText = if (language == AppLanguage.BN) {
+                                            if (remaining >= 0.0) {
+                                                "অবশিষ্ট: ${formatCurrency(remaining, language)}"
+                                            } else {
+                                                "অতিরিক্ত: ${formatCurrency(-remaining, language)}"
+                                            }
+                                        } else {
+                                            if (remaining >= 0.0) {
+                                                "Remaining: ${formatCurrency(remaining, language)}"
+                                            } else {
+                                                "Surplus: ${formatCurrency(-remaining, language)}"
+                                            }
+                                        }
+                                        Text(
+                                            text = remainingText,
+                                            color = if (remaining >= 0.0) labelColor else FintechBlue,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -13863,7 +13784,7 @@ fun ChartsScreen(
             },
             text = {
                 val years = (currentYear - 10..currentYear + 5).toList()
-                LazyVerticalGrid(
+                                    LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.height(200.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -14177,9 +14098,6 @@ fun ChartSection(
                                     validValues.forEachIndexed { index, value ->
                                         val sweepAngle = ((value / totalFloat) * 360f) * animatedProgressMultiplier
                                         val color = palette[index % palette.size]
-                                        val startGradientColor = color.copy(alpha = 0.35f)
-                                        val endGradientColor = color
-                                        val endStop = (sweepAngle / 360f).coerceIn(0.001f, 1f)
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
                                         // Android 8.1 compatible natural outward glow with smooth gradient fade
@@ -14191,46 +14109,26 @@ fun ChartSection(
                                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                             // Linear fade for smoother outer transition and blurrier falloff
                                             val alpha = 0.019f * (1.0f - fraction)
-
-                                            val shadowStartColor = startGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                                            val shadowEndColor = endGradientColor.copy(alpha = alpha.coerceAtLeast(0.001f))
-                                            val shadowBrush = Brush.sweepGradient(
-                                                0f to shadowStartColor,
-                                                endStop to shadowEndColor,
-                                                1f to shadowEndColor,
-                                                center = center
-                                            )
-
-                                            rotate(degrees = startAngle, pivot = center) {
-                                                drawArc(
-                                                    brush = shadowBrush,
-                                                    startAngle = 0f,
-                                                    sweepAngle = sweepAngle + 0.8f,
-                                                    useCenter = false,
-                                                    topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                                    size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                                                )
-                                            }
-                                        }
-
-                                        val mainBrush = Brush.sweepGradient(
-                                            0f to startGradientColor,
-                                            endStop to endGradientColor,
-                                            1f to endGradientColor,
-                                            center = center
-                                        )
-                                        rotate(degrees = startAngle, pivot = center) {
                                             drawArc(
-                                                brush = mainBrush,
-                                                startAngle = 0f,
+                                                color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
+                                                startAngle = startAngle,
                                                 sweepAngle = sweepAngle + 0.8f,
                                                 useCenter = false,
-                                                topLeft = arcTopLeft,
-                                                size = arcSize,
-                                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
+                                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
                                             )
                                         }
+
+                                        drawArc(
+                                            color = color,
+                                            startAngle = startAngle,
+                                            sweepAngle = sweepAngle + 0.8f,
+                                            useCenter = false,
+                                            topLeft = arcTopLeft,
+                                            size = arcSize,
+                                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                                        )
                                         
                                         startAngle += sweepAngle
                                     }
