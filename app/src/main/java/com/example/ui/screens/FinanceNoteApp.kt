@@ -211,20 +211,30 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val colors = listOf(
-        Color(0xFFFF3B30), // Vibrant Red
-        Color(0xFF007AFF), // Vibrant Blue
-        Color(0xFF34C759), // Vibrant Green
-        Color(0xFFFF9500), // Vibrant Orange
-        Color(0xFFAF52DE), // Vibrant Purple
-        Color(0xFFFFCC00), // Bright Yellow
-        Color(0xFF5AC8FA), // Cyan/Light Blue
-        Color(0xFF5856D6), // Indigo
-        Color(0xFFFF2D55), // Pink
-        Color(0xFF00C7BE), // Teal
-        Color(0xFF32ADE6), // Sky Blue
-        Color(0xFFFF9F0A)  // Amber
-    )
+    val cGreen = Color(0xFF34C759)
+    val cOrange = Color(0xFFFF9500)
+    val cFintechBlue = Color(0xFF007AFF)
+    val cBrown = Color(0xFFA0522D) // কাঠালি (Wood/Brown)
+    val cPurple = Color(0xFFAF52DE)
+    val cSkyBlue = Color(0xFF5AC8FA)
+    val cRed = Color(0xFFFF3B30)
+    val cYellow = Color(0xFFFFCC00)
+    val cPink = Color(0xFFFF2D55)
+    val cTeal = Color(0xFF00C7BE)
+    val cIndigo = Color(0xFF5856D6)
+
+    val incomeColors = listOf(cGreen, cOrange, cFintechBlue, cBrown, cPurple, cSkyBlue, cRed, cYellow, cTeal, cPink, cIndigo)
+    val expenseColors = listOf(cRed, cGreen, cOrange, cBrown, cFintechBlue, cYellow, cPurple, cPink, cSkyBlue, cTeal, cIndigo)
+    val savingsColors = listOf(cFintechBlue, cBrown, cOrange, cGreen, cRed, cYellow, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
+
+    val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cBrown, cPink, cTeal, cIndigo)
+
+    val colors = when (categoryType) {
+        "INCOME" -> incomeColors
+        "EXPENSE" -> expenseColors
+        "SAVINGS" -> savingsColors
+        else -> defaultColors
+    }
 
     Box(
         modifier = modifier,
@@ -4896,18 +4906,29 @@ fun DashboardScreen(
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
-        val colors = listOf(
-            Color(0xFF10B981), // Emerald
-            Color(0xFF3B82F6), // Blue
-            Color(0xFFF59E0B), // Amber
-            Color(0xFFEF4444), // Red
-            Color(0xFF8B5CF6), // Purple
-            Color(0xFFEC4899), // Pink
-            Color(0xFF14B8A6), // Teal
-            Color(0xFFF97316), // Orange
-            Color(0xFF06B6D4), // Cyan
-            Color(0xFF6366F1), // Indigo
-        )
+        val cGreen = Color(0xFF34C759)
+        val cOrange = Color(0xFFFF9500)
+        val cFintechBlue = Color(0xFF007AFF)
+        val cBrown = Color(0xFFA0522D) // কাঠালি (Wood/Brown)
+        val cPurple = Color(0xFFAF52DE)
+        val cSkyBlue = Color(0xFF5AC8FA)
+        val cRed = Color(0xFFFF3B30)
+        val cYellow = Color(0xFFFFCC00)
+        val cPink = Color(0xFFFF2D55)
+        val cTeal = Color(0xFF00C7BE)
+        val cIndigo = Color(0xFF5856D6)
+
+        val incomeColors = listOf(cGreen, cOrange, cFintechBlue, cBrown, cPurple, cSkyBlue, cRed, cYellow, cTeal, cPink, cIndigo)
+        val expenseColors = listOf(cRed, cGreen, cOrange, cBrown, cFintechBlue, cYellow, cPurple, cPink, cSkyBlue, cTeal, cIndigo)
+        val savingsColors = listOf(cFintechBlue, cBrown, cOrange, cGreen, cRed, cYellow, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
+        val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cBrown, cPink, cTeal, cIndigo)
+
+        val colors = when (categoryType) {
+            "INCOME" -> incomeColors
+            "EXPENSE" -> expenseColors
+            "SAVINGS" -> savingsColors
+            else -> defaultColors
+        }
 
         AlertDialog(
             onDismissRequest = { showBudgetDetailsType = null },
@@ -5147,9 +5168,9 @@ fun DashboardScreen(
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(10.dp)
-                                                        .clip(CircleShape)
-                                                        .background(color)
+                                                        .size(12.dp)
+                                                        .background(color, CircleShape)
+                                                        .border(1.5.dp, Color.White, CircleShape)
                                                 )
                                                 Text(
                                                     text = name,
@@ -12298,9 +12319,9 @@ fun TimelineSplineChart(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(dataset.color)
+                                    .size(10.dp)
+                                    .background(dataset.color, CircleShape)
+                                    .border(1.2.dp, Color.White, CircleShape)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
