@@ -211,23 +211,26 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val cGreen = Color(0xFF34C759)
-    val cOrange = Color(0xFFFF9500)
-    val cFintechBlue = Color(0xFF007AFF)
-    val cBrown = Color(0xFFA0522D) // কাঠালি (Wood/Brown)
-    val cPurple = Color(0xFFAF52DE)
+    val cGreen = Color(0xFF76FF03)
+    val cOrange = Color(0xFFFF9100)
+    val cFintechBlue = Color(0xFF448AFF)
+    val cCyan = Color(0xFF00E5FF)
+    val cPurple = Color(0xFFA040E5)
+    val cRed = Color(0xFFFF0000)
+    val cYellow = Color(0xFFFFEA00)
+    val cPinkIncome = Color(0xFFFF006E)
+    val cPinkSavings = Color(0xFFFF4081)
+    val cBrown = Color(0xFFA0522D)
     val cSkyBlue = Color(0xFF5AC8FA)
-    val cRed = Color(0xFFFF3B30)
-    val cYellow = Color(0xFFFFCC00)
-    val cPink = Color(0xFFFF2D55)
     val cTeal = Color(0xFF00C7BE)
     val cIndigo = Color(0xFF5856D6)
+    val cPink = Color(0xFFFF2D55)
 
-    val incomeColors = listOf(cGreen, cOrange, cFintechBlue, cBrown, cPurple, cSkyBlue, cRed, cYellow, cTeal, cPink, cIndigo)
-    val expenseColors = listOf(cRed, cGreen, cOrange, cBrown, cFintechBlue, cYellow, cPurple, cPink, cSkyBlue, cTeal, cIndigo)
-    val savingsColors = listOf(cFintechBlue, cBrown, cOrange, cGreen, cRed, cYellow, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
+    val incomeColors = listOf(cFintechBlue, cGreen, cOrange, cYellow, cPinkIncome, cCyan, cPurple, cRed, cTeal, cSkyBlue, cIndigo)
+    val expenseColors = listOf(cRed, cGreen, cPurple, cOrange, cCyan, cYellow, cFintechBlue, cPinkIncome, cTeal, cSkyBlue, cIndigo)
+    val savingsColors = listOf(cRed, cGreen, cOrange, cPinkSavings, cCyan, cYellow, cFintechBlue, cPurple, cTeal, cSkyBlue, cIndigo)
 
-    val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cBrown, cPink, cTeal, cIndigo)
+    val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cCyan, cPink, cTeal, cIndigo)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors

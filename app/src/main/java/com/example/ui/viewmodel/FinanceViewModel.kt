@@ -368,6 +368,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId == workspaceId },
                     workspaces = listOf(workspace)
                 )
+
                 
                 val json = backupAdapter.toJson(backupData)
                 repository.insertTrashItem(com.example.data.TrashItem(
@@ -650,6 +651,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     workspaceId = _currentWorkspaceId.value,
                     subType = subType
                 )
+
             )
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
@@ -736,6 +738,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         workspaceId = _currentWorkspaceId.value
                     )
                 )
+
                 onLocalDatabaseChanged()
                 val finalName = if (note.isBlank()) goal.title else note
                 recordDatabaseMutation("ADD", finalName, "SAVINGS_CONTRIBUTION", absoluteAmount)
@@ -1326,18 +1329,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     private suspend fun getFullBackupData(): FinanceBackup {
-        val baseBackup = repository.getBackupData()
-        return baseBackup.copy(
-            profileName = _profileName.value,
-            profileEmail = _profileEmail.value,
-            profilePhone = _profilePhone.value,
-            profileSocial = _profileSocial.value,
-            profileAddress = _profileAddress.value,
-            profilePhotoUri = _profilePhotoUri.value,
-            budgetIncome = _budgetIncome.value,
-            budgetExpense = _budgetExpense.value,
-            budgetSavings = _budgetSavings.value
-        )
+        return repository.getBackupData()
     }
 
     fun checkUnsavedChanges() {
@@ -1420,6 +1412,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     "backupJson" to encryptedJson,
                     "updatedAt" to System.currentTimeMillis()
                 )
+
                 db.collection("users").document(email).set(data)
                     .addOnSuccessListener {
                         viewModelScope.launch {
@@ -1432,7 +1425,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             _hasUnsavedChanges.value = false
                             _firestoreSyncStatus.value = "Synced"
                             updateSyncSuccess(getApplication(), true)
-                            onComplete?.invoke()
                         }
                     }
                     .addOnFailureListener { e ->
@@ -1626,15 +1618,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     suspend fun getCurrentDatabaseBackup(): FinanceBackup {
-        val backup = repository.getBackupData()
-        return backup.copy(
-            profileName = _profileName.value,
-            profileEmail = _profileEmail.value,
-            profilePhone = _profilePhone.value,
-            profileSocial = _profileSocial.value,
-            profileAddress = _profileAddress.value,
-            profilePhotoUri = _profilePhotoUri.value
-        )
+        return repository.getBackupData()
     }
 
     fun calculateBackupStats(backup: FinanceBackup): BackupStats {
@@ -1690,17 +1674,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
                 }
                 
-                val backupData = baseData.copy(
-                    profileName = _profileName.value,
-                    profileEmail = _profileEmail.value,
-                    profilePhone = _profilePhone.value,
-                    profileSocial = _profileSocial.value,
-                    profileAddress = _profileAddress.value,
-                    profilePhotoUri = _profilePhotoUri.value,
-                    budgetIncome = _budgetIncome.value,
-                    budgetExpense = _budgetExpense.value,
-                    budgetSavings = _budgetSavings.value
-                )
+                val backupData = baseData
+
                 
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
@@ -1755,17 +1730,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
                 }
                 
-                val backupData = baseData.copy(
-                    profileName = _profileName.value,
-                    profileEmail = _profileEmail.value,
-                    profilePhone = _profilePhone.value,
-                    profileSocial = _profileSocial.value,
-                    profileAddress = _profileAddress.value,
-                    profilePhotoUri = _profilePhotoUri.value,
-                    budgetIncome = _budgetIncome.value,
-                    budgetExpense = _budgetExpense.value,
-                    budgetSavings = _budgetSavings.value
-                )
+                val backupData = baseData
+
                 
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
@@ -2090,6 +2056,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     social = _profileSocial.value,
                     address = _profileAddress.value
                 )
+
+
+
+
+
+
                 
                 // Proceed normally with automatic realtime sync
                 startRealtimeSync()
@@ -2146,17 +2118,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     fullBackup.copy(comment = comment, createdAt = System.currentTimeMillis())
                 }
 
-                val backupData = baseData.copy(
-                    profileName = _profileName.value,
-                    profileEmail = _profileEmail.value,
-                    profilePhone = _profilePhone.value,
-                    profileSocial = _profileSocial.value,
-                    profileAddress = _profileAddress.value,
-                    profilePhotoUri = _profilePhotoUri.value,
-                    budgetIncome = _budgetIncome.value,
-                    budgetExpense = _budgetExpense.value,
-                    budgetSavings = _budgetSavings.value
-                )
+                val backupData = baseData
+
 
                 val json = backupAdapter.indent("  ").toJson(backupData)
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
@@ -2248,6 +2211,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+
+
     fun deleteGoogleDriveFile(context: Context, fileId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             try {
@@ -2257,42 +2222,36 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     throw Exception("Not signed in to Google or session expired")
                 }
 
-                // First, fetch the file metadata to get the name
+                // Fetch metadata for file name
                 val metaRequest = Request.Builder()
                     .url("https://www.googleapis.com/drive/v3/files/$fileId?fields=name")
                     .header("Authorization", "Bearer $accessToken")
                     .get()
                     .build()
-                    
+                
                 var fileName = "Deleted Backup"
+                var backupJson = ""
+
                 kotlinx.coroutines.Dispatchers.IO.let { d ->
                     kotlinx.coroutines.withContext(d) {
                         try {
                             val metaResponse = client.newCall(metaRequest).execute()
                             if (metaResponse.isSuccessful) {
-                                val metaJson = org.json.JSONObject(metaResponse.body?.string() ?: "{}")
-                                fileName = metaJson.optString("name", "Deleted Backup")
+                                val metaStr = metaResponse.body?.string() ?: "{}"
+                                val metaJsonObj = org.json.JSONObject(metaStr)
+                                fileName = metaJsonObj.optString("name", "Deleted Backup")
                             }
-                        } catch (e: Exception) { /* ignore */ }
-                    }
-                }
-
-                // Fetch file content
-                val getRequest = Request.Builder()
-                    .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
-                    .header("Authorization", "Bearer $accessToken")
-                    .get()
-                    .build()
-
-                var backupJson = ""
-                kotlinx.coroutines.Dispatchers.IO.let { d ->
-                    kotlinx.coroutines.withContext(d) {
-                        try {
-                            val getResponse = client.newCall(getRequest).execute()
-                            if (getResponse.isSuccessful) {
-                                backupJson = getResponse.body?.string() ?: ""
+                            
+                            val downloadRequest = Request.Builder()
+                                .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
+                                .header("Authorization", "Bearer $accessToken")
+                                .get()
+                                .build()
+                            val dlResponse = client.newCall(downloadRequest).execute()
+                            if (dlResponse.isSuccessful) {
+                                backupJson = dlResponse.body?.string() ?: ""
                             }
-                        } catch(e: Exception) { /* ignore */ }
+                        } catch (e: Exception) { e.printStackTrace() }
                     }
                 }
 
@@ -2305,7 +2264,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     ))
                 }
 
-                // Now actually delete from Google Drive
                 val request = Request.Builder()
                     .url("https://www.googleapis.com/drive/v3/files/$fileId")
                     .delete()
@@ -2331,7 +2289,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
         }
     }
-
     fun downloadGoogleDriveFile(context: Context, fileId: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
             _isSyncing.value = true
@@ -2503,7 +2460,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     }
                 )
             } else {
-                restoreFullBackup(dataToRestore)
                 com.example.widget.updateAllWidgets(context)
                 val email = _googleEmail.value
                 if (email != null) {
