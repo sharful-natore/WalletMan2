@@ -211,33 +211,18 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val colors = if (categoryType == "EXPENSE") {
-        listOf(
-            Color(0xFFEF3E36), // Vibrant Crimson Red
-            Color(0xFFF97316), // Vivid Orange
-            Color(0xFFFFCC00), // Bright Yellow
-            Color(0xFF22C55E), // Vivid Emerald Green
-            Color(0xFF007AFF), // Royal Blue
-            Color(0xFF5856D6), // Deep Indigo
-            Color(0xFFAF52DE), // Rich Violet
-            Color(0xFF06B6D4), // Cyan
-            Color(0xFFEC4899), // Hot Pink
-            Color(0xFFF43F5E), // Rose Coral
-        )
-    } else {
-        listOf(
-            Color(0xFF22C55E), // Vivid Emerald Green
-            Color(0xFF007AFF), // Royal Blue
-            Color(0xFF5856D6), // Deep Indigo
-            Color(0xFFAF52DE), // Rich Violet
-            Color(0xFFEF3E36), // Vibrant Crimson Red
-            Color(0xFFF97316), // Vivid Orange
-            Color(0xFFFFCC00), // Bright Yellow
-            Color(0xFF06B6D4), // Cyan
-            Color(0xFFEC4899), // Hot Pink
-            Color(0xFFF43F5E), // Rose Coral
-        )
-    }
+    val colors = listOf(
+        Color(0xFF007AFF), // Royal Blue
+        Color(0xFFF97316), // Vivid Orange
+        Color(0xFF22C55E), // Vivid Emerald Green
+        Color(0xFFAF52DE), // Rich Violet
+        Color(0xFFEF3E36), // Vibrant Crimson Red
+        Color(0xFF06B6D4), // Bright Cyan
+        Color(0xFFFFCC00), // Bright Yellow
+        Color(0xFFEC4899), // Hot Pink
+        Color(0xFF5856D6), // Deep Indigo
+        Color(0xFFF43F5E)  // Rose Coral
+    )
 
     Box(
         modifier = modifier,
@@ -2263,7 +2248,7 @@ fun FinanceNoteApp(
                                 val isOffline = !viewModel.isNetworkAvailable(context)
                                 val badgeColor = when {
                                     isOffline -> Color(0xFFEF4444) // Red
-                                    hasUnsavedChanges -> Color(0xFFF97316) // Orange
+                                    hasUnsavedChanges -> Color(0xFFFBBF24) // Yellow
                                     else -> Color(0xFFE2725B) // Jackfruit / Terracotta (Synched)
                                 }
 

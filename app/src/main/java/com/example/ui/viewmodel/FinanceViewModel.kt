@@ -907,14 +907,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
 
             if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
-                saveProfile(getApplication(),
-                    name = backup.profileName.ifBlank { _profileName.value },
-                    email = backup.profileEmail.ifBlank { _profileEmail.value },
-                    photoUri = backup.profilePhotoUri ?: _profilePhotoUri.value,
-                    phone = backup.profilePhone.ifBlank { _profilePhone.value },
-                    social = backup.profileSocial.ifBlank { _profileSocial.value },
-                    address = backup.profileAddress.ifBlank { _profileAddress.value }
-                )
+                val wsId = _currentWorkspaceId.value
+                val existing = repository.getWorkspaceById(wsId) ?: com.example.data.Workspace(id = wsId, name = "ব্যক্তিগত")
+                val finalPhotoUri = backup.profilePhotoUri?.let { saveImageToInternalStorage(getApplication(), it) } ?: backup.profilePhotoUri
+                repository.insertWorkspace(existing.copy(
+                    profileName = backup.profileName.ifBlank { _profileName.value },
+                    profileEmail = backup.profileEmail.ifBlank { _profileEmail.value },
+                    profilePhotoUri = finalPhotoUri ?: _profilePhotoUri.value,
+                    profilePhone = backup.profilePhone.ifBlank { _profilePhone.value },
+                    profileSocial = backup.profileSocial.ifBlank { _profileSocial.value },
+                    profileAddress = backup.profileAddress.ifBlank { _profileAddress.value }
+                ))
+                _profileName.value = backup.profileName.ifBlank { _profileName.value }
+                _profileEmail.value = backup.profileEmail.ifBlank { _profileEmail.value }
+                _profilePhotoUri.value = finalPhotoUri ?: _profilePhotoUri.value
+                _profilePhone.value = backup.profilePhone.ifBlank { _profilePhone.value }
+                _profileSocial.value = backup.profileSocial.ifBlank { _profileSocial.value }
+                _profileAddress.value = backup.profileAddress.ifBlank { _profileAddress.value }
             }
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
@@ -1465,6 +1474,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private var uploadJob: kotlinx.coroutines.Job? = null
     
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
+        if (isSyncingFromCloud) return
         val email = _googleEmail.value
         if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
             _firestoreSyncStatus.value = "Sign-in required"
