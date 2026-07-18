@@ -1294,6 +1294,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
     }
 
+    private suspend fun getFullBackupData(): FinanceBackup {
+        val baseBackup = repository.getBackupData()
+        return baseBackup.copy(
+            profileName = _profileName.value,
+            profileEmail = _profileEmail.value,
+            profilePhone = _profilePhone.value,
+            profileSocial = _profileSocial.value,
+            profileAddress = _profileAddress.value,
+            profilePhotoUri = _profilePhotoUri.value,
+            budgetIncome = _budgetIncome.value,
+            budgetExpense = _budgetExpense.value,
+            budgetSavings = _budgetSavings.value
+        )
+    }
+
     fun checkUnsavedChanges() {
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) {
@@ -1302,7 +1317,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
         viewModelScope.launch {
             try {
-                val currentData = repository.getBackupData()
+                val currentData = getFullBackupData()
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                 val cachedJson = prefs.getString("firestore_cached_data_$email", null)
                 if (cachedJson == null) {
@@ -1354,18 +1369,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             kotlinx.coroutines.delay(1000) // Debounce rapid edits
             
             try {
-                val baseBackup = repository.getBackupData()
-                val backupData = baseBackup.copy(
-                    profileName = _profileName.value,
-                    profileEmail = _profileEmail.value,
-                    profilePhone = _profilePhone.value,
-                    profileSocial = _profileSocial.value,
-                    profileAddress = _profileAddress.value,
-                    profilePhotoUri = _profilePhotoUri.value,
-                    budgetIncome = _budgetIncome.value,
-                    budgetExpense = _budgetExpense.value,
-                    budgetSavings = _budgetSavings.value
-                )
+                val backupData = getFullBackupData()
                 val json = backupAdapter.toJson(backupData)
                 
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -1389,7 +1393,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     .addOnSuccessListener {
                         viewModelScope.launch {
                             try {
-                                val currentData = repository.getBackupData()
+                                val currentData = getFullBackupData()
                                 val currentJson = backupAdapter.toJson(currentData)
                                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                 prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
@@ -1488,7 +1492,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         if (remoteJson.isNotEmpty()) {
                             viewModelScope.launch {
                                 try {
-                                    val currentLocalData = repository.getBackupData()
+                                    val currentLocalData = getFullBackupData()
                                     val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                     val cachedJson = prefs.getString("firestore_cached_data_$email", null)
 
