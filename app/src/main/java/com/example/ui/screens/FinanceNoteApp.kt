@@ -213,23 +213,29 @@ fun CategorySegmentedDonutChart(
 
     val colors = if (categoryType == "EXPENSE") {
         listOf(
-            Color(0xFFEF4444), // Red 500
-            Color(0xFFF97316), // Orange 500
-            Color(0xFFF59E0B), // Amber 500
-            Color(0xFF10B981), // Emerald 500
-            Color(0xFF3B82F6), // Blue 500
-            Color(0xFF8B5CF6), // Violet 500
-            Color(0xFFEC4899), // Pink 500
+            Color(0xFFEF3E36), // Vibrant Crimson Red
+            Color(0xFFF97316), // Vivid Orange
+            Color(0xFFFFCC00), // Bright Yellow
+            Color(0xFF22C55E), // Vivid Emerald Green
+            Color(0xFF007AFF), // Royal Blue
+            Color(0xFF5856D6), // Deep Indigo
+            Color(0xFFAF52DE), // Rich Violet
+            Color(0xFF06B6D4), // Cyan
+            Color(0xFFEC4899), // Hot Pink
+            Color(0xFFF43F5E), // Rose Coral
         )
     } else {
         listOf(
-            Color(0xFF10B981), // Emerald 500
-            Color(0xFF3B82F6), // Blue 500
-            Color(0xFF8B5CF6), // Violet 500
-            Color(0xFFF59E0B), // Amber 500
-            Color(0xFFEC4899), // Pink 500
-            Color(0xFF06B6D4), // Cyan 500
-            Color(0xFFF97316), // Orange 500
+            Color(0xFF22C55E), // Vivid Emerald Green
+            Color(0xFF007AFF), // Royal Blue
+            Color(0xFF5856D6), // Deep Indigo
+            Color(0xFFAF52DE), // Rich Violet
+            Color(0xFFEF3E36), // Vibrant Crimson Red
+            Color(0xFFF97316), // Vivid Orange
+            Color(0xFFFFCC00), // Bright Yellow
+            Color(0xFF06B6D4), // Cyan
+            Color(0xFFEC4899), // Hot Pink
+            Color(0xFFF43F5E), // Rose Coral
         )
     }
 
@@ -2257,8 +2263,8 @@ fun FinanceNoteApp(
                                 val isOffline = !viewModel.isNetworkAvailable(context)
                                 val badgeColor = when {
                                     isOffline -> Color(0xFFEF4444) // Red
-                                    hasUnsavedChanges -> Color(0xFFFBBF24) // Yellow/Amber
-                                    else -> Color(0xFF10B981) // Green
+                                    hasUnsavedChanges -> Color(0xFFF97316) // Orange
+                                    else -> Color(0xFFE2725B) // Jackfruit / Terracotta (Synched)
                                 }
 
                                 val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -2283,9 +2289,9 @@ fun FinanceNoteApp(
 
                                 Box(
                                     modifier = Modifier
-                                        .size(10.dp)
+                                        .size(12.dp)
                                         .align(Alignment.TopEnd)
-                                        .offset(x = (-2).dp, y = 2.dp)
+                                        .offset(x = (-5).dp, y = 5.dp)
                                 ) {
                                     // Pulsing glow circle
                                     Box(
@@ -2297,7 +2303,7 @@ fun FinanceNoteApp(
                                     // Solid inner bullet point
                                     Box(
                                         modifier = Modifier
-                                            .size(6.dp)
+                                            .size(8.dp)
                                             .align(Alignment.Center)
                                             .background(badgeColor, CircleShape)
                                             .border(1.dp, Color.White, CircleShape)

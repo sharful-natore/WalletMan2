@@ -1316,9 +1316,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
     }
 
+    private fun sortBackupData(backup: com.example.data.FinanceBackup): com.example.data.FinanceBackup {
+        return backup.copy(
+            persons = backup.persons.sortedBy { it.id },
+            transactions = backup.transactions.sortedBy { it.id },
+            savingsGoals = backup.savingsGoals.sortedBy { it.id },
+            savingsTransactions = backup.savingsTransactions.sortedBy { it.id },
+            workspaces = backup.workspaces.sortedBy { it.id },
+            trashItems = backup.trashItems.sortedBy { it.id }
+        )
+    }
+
     private suspend fun getFullBackupData(): FinanceBackup {
         val baseBackup = repository.getBackupData()
-        return baseBackup.copy(
+        val backup = baseBackup.copy(
             profileName = _profileName.value,
             profileEmail = _profileEmail.value,
             profilePhone = _profilePhone.value,
@@ -1329,6 +1340,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             budgetExpense = _budgetExpense.value,
             budgetSavings = _budgetSavings.value
         )
+        return sortBackupData(backup)
     }
 
     fun checkUnsavedChanges() {
@@ -1356,7 +1368,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                 currentData.persons.size != cachedData.persons.size ||
                                 currentData.savingsGoals.size != cachedData.savingsGoals.size ||
                                 currentData.savingsTransactions.size != cachedData.savingsTransactions.size ||
-                                backupAdapter.toJson(currentData) != backupAdapter.toJson(cachedData)
+                                backupAdapter.toJson(currentData) != backupAdapter.toJson(sortBackupData(cachedData))
                         _hasUnsavedChanges.value = isDifferent
                     }
                 }
@@ -1469,13 +1481,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     viewModelScope.launch {
                                         try {
                                             val remoteDecryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                            if (remoteDecryptedJson != currentJson) {
-                                                // Remote has newer changes (e.g. from another device), pull and sync
-                                                val remoteData = backupAdapter.fromJson(remoteDecryptedJson)
-                                                if (remoteData != null) {
+                                            val remoteData = try { backupAdapter.fromJson(remoteDecryptedJson) } catch (e: Exception) { null }
+                                            if (remoteData != null) {
+                                                val sortedRemoteJson = backupAdapter.toJson(sortBackupData(remoteData))
+                                                val sortedLocalJson = backupAdapter.toJson(currentLocalData) // currentLocalData is already sorted!
+                                                if (sortedRemoteJson != sortedLocalJson) {
+                                                    // Remote has newer changes (e.g. from another device), pull and sync
                                                     restoreFullBackup(remoteData)
                                                     com.example.widget.updateAllWidgets(getApplication())
-                                                    prefs.edit().putString("firestore_cached_data_$email", remoteDecryptedJson).apply()
+                                                    prefs.edit().putString("firestore_cached_data_$email", sortedRemoteJson).apply()
+                                                    _firestoreSyncStatus.value = "Synced"
+                                                    onComplete?.invoke()
+                                                } else {
                                                     _firestoreSyncStatus.value = "Synced"
                                                     onComplete?.invoke()
                                                 }
@@ -1705,7 +1722,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                                     currentLocalData.persons.size != cachedData.persons.size ||
                                                     currentLocalData.savingsGoals.size != cachedData.savingsGoals.size ||
                                                     currentLocalData.savingsTransactions.size != cachedData.savingsTransactions.size ||
-                                                    backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(cachedData)
+                                                    backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(sortBackupData(cachedData))
                                         }
                                     }
 
@@ -1726,31 +1743,32 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     }
 
                                     val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                    val remoteData = backupAdapter.fromJson(decryptedJson)
+                                    val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
                                     if (remoteData != null) {
-                                        val localTxCount = currentLocalData.transactions.size
-                                        val remoteTxCount = remoteData.transactions.size
+                                        val sortedRemoteData = sortBackupData(remoteData)
+                                        val sortedLocalData = sortBackupData(currentLocalData)
                                         
-                                        val currentJson = backupAdapter.toJson(currentLocalData)
-                                        if (currentJson != decryptedJson) {
-                                            // Data is different, check if remote is newer or just different
-                                            // For simplicity, if remote is different and local is same as last cached, we restore
-                                            if (cachedJson == null || cachedJson == backupAdapter.toJson(currentLocalData)) {
+                                        val sortedRemoteJson = backupAdapter.toJson(sortedRemoteData)
+                                        val sortedLocalJson = backupAdapter.toJson(sortedLocalData)
+                                        
+                                        if (sortedLocalJson != sortedRemoteJson) {
+                                            val cachedData = cachedJson?.let { try { backupAdapter.fromJson(it) } catch (e: Exception) { null } }
+                                            val sortedCachedJson = cachedData?.let { backupAdapter.toJson(sortBackupData(it)) }
+                                            
+                                            if (sortedCachedJson == null || sortedCachedJson == sortedLocalJson) {
                                                 restoreFullBackup(remoteData)
                                                 com.example.widget.updateAllWidgets(getApplication())
                                                 _firestoreSyncStatus.value = "Synced"
+                                                prefs.edit().putString("firestore_cached_data_$email", sortedRemoteJson).apply()
                                             } else {
                                                 // Local has changes that are not in cloud yet
                                                 _hasUnsavedChanges.value = true
                                             }
                                         } else {
                                             // No change needed
-                                            _firestoreSyncStatus.value = null // Hide sync status if nothing changed
+                                            _firestoreSyncStatus.value = "Synced"
+                                            prefs.edit().putString("firestore_cached_data_$email", sortedRemoteJson).apply()
                                         }
-                                        
-                                        try {
-                                            prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                        } catch (e: Exception) { e.printStackTrace() }
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
