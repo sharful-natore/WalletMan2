@@ -75,6 +75,7 @@ data class BackupStats(
 class FinanceViewModel(private val repository: FinanceRepository, application: Application) : AndroidViewModel(application) {
 
     val updateManager = UpdateManager()
+    private var isSyncingFromCloud = false
 
     // Preferences & UI State
     private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
@@ -895,62 +896,72 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     private suspend fun restoreFullBackup(backup: FinanceBackup) {
-        repository.restoreBackupData(backup)
-        
-        // Restore budgets for each workspace if available
-        backup.workspaces.forEach { ws ->
-            // Budget is already in the workspace entity now, so repository.restoreBackupData(backup) 
-            // should have handled it via financeDao.insertWorkspaces(backup.workspaces)
-        }
+        isSyncingFromCloud = true
+        try {
+            repository.restoreBackupData(backup)
+            
+            // Restore budgets for each workspace if available
+            backup.workspaces.forEach { ws ->
+                // Budget is already in the workspace entity now, so repository.restoreBackupData(backup) 
+                // should have handled it via financeDao.insertWorkspaces(backup.workspaces)
+            }
 
-        if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
-            saveProfile(getApplication(),
-                name = backup.profileName.ifBlank { _profileName.value },
-                email = backup.profileEmail.ifBlank { _profileEmail.value },
-                photoUri = backup.profilePhotoUri ?: _profilePhotoUri.value,
-                phone = backup.profilePhone.ifBlank { _profilePhone.value },
-                social = backup.profileSocial.ifBlank { _profileSocial.value },
-                address = backup.profileAddress.ifBlank { _profileAddress.value }
-            )
+            if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
+                saveProfile(getApplication(),
+                    name = backup.profileName.ifBlank { _profileName.value },
+                    email = backup.profileEmail.ifBlank { _profileEmail.value },
+                    photoUri = backup.profilePhotoUri ?: _profilePhotoUri.value,
+                    phone = backup.profilePhone.ifBlank { _profilePhone.value },
+                    social = backup.profileSocial.ifBlank { _profileSocial.value },
+                    address = backup.profileAddress.ifBlank { _profileAddress.value }
+                )
+            }
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+        } finally {
+            isSyncingFromCloud = false
         }
-        com.example.widget.updateAllWidgets(getApplication())
-        onLocalDatabaseChanged()
     }
 
     suspend fun restoreSelectiveBackup(backup: FinanceBackup, workspaceIds: List<String>) {
-        val currentData = repository.getBackupData()
-        
-        val preservedPersons = currentData.persons.filter { it.workspaceId !in workspaceIds }
-        val preservedTransactions = currentData.transactions.filter { it.workspaceId !in workspaceIds }
-        val preservedGoals = currentData.savingsGoals.filter { it.workspaceId !in workspaceIds }
-        val preservedSavingsTxs = currentData.savingsTransactions.filter { it.workspaceId !in workspaceIds }
-        val preservedWorkspaces = currentData.workspaces.filter { it.id !in workspaceIds }
-        
-        val incomingPersons = backup.persons.filter { it.workspaceId in workspaceIds }
-        val incomingTransactions = backup.transactions.filter { it.workspaceId in workspaceIds }
-        val incomingGoals = backup.savingsGoals.filter { it.workspaceId in workspaceIds }
-        val incomingSavingsTxs = backup.savingsTransactions.filter { it.workspaceId in workspaceIds }
-        val incomingWorkspaces = backup.workspaces.filter { it.id in workspaceIds }
-        
-        val combinedBackup = FinanceBackup(
-            persons = preservedPersons + incomingPersons,
-            transactions = preservedTransactions + incomingTransactions,
-            savingsGoals = preservedGoals + incomingGoals,
-            savingsTransactions = preservedSavingsTxs + incomingSavingsTxs,
-            workspaces = preservedWorkspaces + incomingWorkspaces,
-            comment = backup.comment,
-            createdAt = backup.createdAt,
-            profileName = currentData.profileName,
-            profileEmail = currentData.profileEmail,
-            profilePhone = currentData.profilePhone,
-            profileSocial = currentData.profileSocial,
-            profileAddress = currentData.profileAddress,
-            profilePhotoUri = currentData.profilePhotoUri
-        )
-        
-        repository.restoreBackupData(combinedBackup)
-        com.example.widget.updateAllWidgets(getApplication())
-        onLocalDatabaseChanged()
+        isSyncingFromCloud = true
+        try {
+            val currentData = repository.getBackupData()
+            
+            val preservedPersons = currentData.persons.filter { it.workspaceId !in workspaceIds }
+            val preservedTransactions = currentData.transactions.filter { it.workspaceId !in workspaceIds }
+            val preservedGoals = currentData.savingsGoals.filter { it.workspaceId !in workspaceIds }
+            val preservedSavingsTxs = currentData.savingsTransactions.filter { it.workspaceId !in workspaceIds }
+            val preservedWorkspaces = currentData.workspaces.filter { it.id !in workspaceIds }
+            
+            val incomingPersons = backup.persons.filter { it.workspaceId in workspaceIds }
+            val incomingTransactions = backup.transactions.filter { it.workspaceId in workspaceIds }
+            val incomingGoals = backup.savingsGoals.filter { it.workspaceId in workspaceIds }
+            val incomingSavingsTxs = backup.savingsTransactions.filter { it.workspaceId in workspaceIds }
+            val incomingWorkspaces = backup.workspaces.filter { it.id in workspaceIds }
+            
+            val combinedBackup = FinanceBackup(
+                persons = preservedPersons + incomingPersons,
+                transactions = preservedTransactions + incomingTransactions,
+                savingsGoals = preservedGoals + incomingGoals,
+                savingsTransactions = preservedSavingsTxs + incomingSavingsTxs,
+                workspaces = preservedWorkspaces + incomingWorkspaces,
+                comment = backup.comment,
+                createdAt = backup.createdAt,
+                profileName = currentData.profileName,
+                profileEmail = currentData.profileEmail,
+                profilePhone = currentData.profilePhone,
+                profileSocial = currentData.profileSocial,
+                profileAddress = currentData.profileAddress,
+                profilePhotoUri = currentData.profilePhotoUri
+            )
+            
+            repository.restoreBackupData(combinedBackup)
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+        } finally {
+            isSyncingFromCloud = false
+        }
     }
 
     private fun saveImageToInternalStorage(context: Context, uriString: String): String? {
@@ -1379,6 +1390,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     private fun onLocalDatabaseChanged() {
+        if (isSyncingFromCloud) {
+            com.example.widget.updateAllWidgets(getApplication())
+            return
+        }
         if (_isGoogleSignedIn.value && !_googleEmail.value.isNullOrBlank()) {
             checkUnsavedChanges()
             uploadToFirestore()

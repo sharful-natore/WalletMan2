@@ -4063,11 +4063,11 @@ fun DashboardScreen(
         // Check Income 80%
         if (budgetIncomeAmount > 0.0) {
             val key = "${currentYearMonth}_income_80_alert"
-            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
+            val hasAlerted = budgetPrefs.getBoolean("${key}_alerted", false)
             val ratio = income / budgetIncomeAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (lastPercent != ratioPercent) {
+                if (!hasAlerted) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
                     val msg = if (language == AppLanguage.BN) {
@@ -4077,21 +4077,21 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8001)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
+                    budgetPrefs.edit().putBoolean("${key}_alerted", true).apply()
                 }
-            } else if (ratio < 0.8 && lastPercent > 0) {
-                budgetPrefs.edit().remove("${key}_percent").apply()
+            } else if (ratio < 0.8 && hasAlerted) {
+                budgetPrefs.edit().remove("${key}_alerted").apply()
             }
         }
 
         // Check Expense 80%
         if (budgetExpenseAmount > 0.0) {
             val key = "${currentYearMonth}_expense_80_alert"
-            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
+            val hasAlerted = budgetPrefs.getBoolean("${key}_alerted", false)
             val ratio = expense / budgetExpenseAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (lastPercent != ratioPercent) {
+                if (!hasAlerted) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
                     val msg = if (language == AppLanguage.BN) {
@@ -4101,21 +4101,21 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8002)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
-                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
+                    budgetPrefs.edit().putBoolean("${key}_alerted", true).apply()
                 }
-            } else if (ratio < 0.8 && lastPercent > 0) {
-                budgetPrefs.edit().remove("${key}_percent").apply()
+            } else if (ratio < 0.8 && hasAlerted) {
+                budgetPrefs.edit().remove("${key}_alerted").apply()
             }
         }
 
         // Check Savings 80%
         if (budgetSavingsAmount > 0.0) {
             val key = "${currentYearMonth}_savings_80_alert"
-            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
+            val hasAlerted = budgetPrefs.getBoolean("${key}_alerted", false)
             val ratio = totalSavingsAmount / budgetSavingsAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (lastPercent != ratioPercent) {
+                if (!hasAlerted) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
                     val msg = if (language == AppLanguage.BN) {
@@ -4125,10 +4125,10 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8003)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
+                    budgetPrefs.edit().putBoolean("${key}_alerted", true).apply()
                 }
-            } else if (ratio < 0.8 && lastPercent > 0) {
-                budgetPrefs.edit().remove("${key}_percent").apply()
+            } else if (ratio < 0.8 && hasAlerted) {
+                budgetPrefs.edit().remove("${key}_alerted").apply()
             }
         }
     }
