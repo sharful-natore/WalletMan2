@@ -212,16 +212,16 @@ fun CategorySegmentedDonutChart(
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
     val colors = listOf(
-        Color(0xFF007AFF), // Royal Blue
-        Color(0xFFF97316), // Vivid Orange
-        Color(0xFF22C55E), // Vivid Emerald Green
-        Color(0xFFAF52DE), // Rich Violet
-        Color(0xFFEF3E36), // Vibrant Crimson Red
-        Color(0xFF06B6D4), // Bright Cyan
-        Color(0xFFFFCC00), // Bright Yellow
-        Color(0xFFEC4899), // Hot Pink
-        Color(0xFF5856D6), // Deep Indigo
-        Color(0xFFF43F5E)  // Rose Coral
+        Color(0xFF00C853), // Vivid Green
+        Color(0xFF6200EE), // Deep Purple
+        Color(0xFFFF3D00), // Bright Orange/Red
+        Color(0xFF03DAC6), // Teal
+        Color(0xFF2962FF), // Royal Blue
+        Color(0xFFFFD600), // Vibrant Yellow
+        Color(0xFFC51162), // Deep Pink
+        Color(0xFF00B8D4), // Cyan
+        Color(0xFF64DD17), // Light Green
+        Color(0xFFFF6D00), // Deep Orange
     )
 
     Box(
@@ -1611,6 +1611,7 @@ fun FinanceNoteApp(
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
+    val isNetworkActive by viewModel.isNetworkActive.collectAsState()
     val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
     val customNotifications by viewModel.customNotifications.collectAsState()
     
@@ -2222,14 +2223,12 @@ fun FinanceNoteApp(
                                 )
                             }
 
-                            Box(
-                                modifier = Modifier.size(36.dp)
-                            ) {
+                            Box(contentAlignment = Alignment.TopEnd) {
                                 IconButton(
                                     onClick = {
                                         showRealtimeSyncDialog = true
                                     },
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
                                         imageVector = if (!isGoogleSignedIn) {
@@ -2244,56 +2243,13 @@ fun FinanceNoteApp(
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
-
-                                val isOffline = !viewModel.isNetworkAvailable(context)
-                                val badgeColor = when {
-                                    isOffline -> Color(0xFFEF4444) // Red
-                                    hasUnsavedChanges -> Color(0xFFFBBF24) // Yellow
-                                    else -> Color(0xFFE2725B) // Jackfruit / Terracotta (Synched)
-                                }
-
-                                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                                val pulseScale by infiniteTransition.animateFloat(
-                                    initialValue = 1f,
-                                    targetValue = 2.2f,
-                                    animationSpec = infiniteRepeatable(
-                                        animation = tween(1200, easing = FastOutSlowInEasing),
-                                        repeatMode = RepeatMode.Restart
-                                    ),
-                                    label = "pulse_scale"
-                                )
-                                val pulseAlpha by infiniteTransition.animateFloat(
-                                    initialValue = 0.6f,
-                                    targetValue = 0f,
-                                    animationSpec = infiniteRepeatable(
-                                        animation = tween(1200, easing = FastOutSlowInEasing),
-                                        repeatMode = RepeatMode.Restart
-                                    ),
-                                    label = "pulse_alpha"
-                                )
-
-                                Box(
+                                SyncStatusBadge(
+                                    isNetworkAvailable = isNetworkActive,
+                                    hasUnsavedChanges = hasUnsavedChanges,
                                     modifier = Modifier
-                                        .size(12.dp)
                                         .align(Alignment.TopEnd)
-                                        .offset(x = (-5).dp, y = 5.dp)
-                                ) {
-                                    // Pulsing glow circle
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .scale(pulseScale)
-                                            .background(badgeColor.copy(alpha = pulseAlpha), CircleShape)
-                                    )
-                                    // Solid inner bullet point
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .align(Alignment.Center)
-                                            .background(badgeColor, CircleShape)
-                                            .border(1.dp, Color.White, CircleShape)
-                                    )
-                                }
+                                        .padding(top = 2.dp, end = 2.dp)
+                                )
                             }
 
                             IconButton(
@@ -4048,11 +4004,11 @@ fun DashboardScreen(
         // Check Income 80%
         if (budgetIncomeAmount > 0.0) {
             val key = "${currentYearMonth}_income_80_alert"
-            val hasAlerted = budgetPrefs.getBoolean("${key}_alerted", false)
+            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
             val ratio = income / budgetIncomeAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (!hasAlerted) {
+                if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
                     val msg = if (language == AppLanguage.BN) {
@@ -4062,21 +4018,21 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8001)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit().putBoolean("${key}_alerted", true).apply()
+                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
                 }
-            } else if (ratio < 0.8 && hasAlerted) {
-                budgetPrefs.edit().remove("${key}_alerted").apply()
+            } else if (ratio < 0.8 && lastPercent > 0) {
+                budgetPrefs.edit().remove("${key}_percent").apply()
             }
         }
 
         // Check Expense 80%
         if (budgetExpenseAmount > 0.0) {
             val key = "${currentYearMonth}_expense_80_alert"
-            val hasAlerted = budgetPrefs.getBoolean("${key}_alerted", false)
+            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
             val ratio = expense / budgetExpenseAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (!hasAlerted) {
+                if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
                     val msg = if (language == AppLanguage.BN) {
@@ -4086,21 +4042,21 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8002)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
-                    budgetPrefs.edit().putBoolean("${key}_alerted", true).apply()
+                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
                 }
-            } else if (ratio < 0.8 && hasAlerted) {
-                budgetPrefs.edit().remove("${key}_alerted").apply()
+            } else if (ratio < 0.8 && lastPercent > 0) {
+                budgetPrefs.edit().remove("${key}_percent").apply()
             }
         }
 
         // Check Savings 80%
         if (budgetSavingsAmount > 0.0) {
             val key = "${currentYearMonth}_savings_80_alert"
-            val hasAlerted = budgetPrefs.getBoolean("${key}_alerted", false)
+            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
             val ratio = totalSavingsAmount / budgetSavingsAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
-                if (!hasAlerted) {
+                if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
                     val msg = if (language == AppLanguage.BN) {
@@ -4110,10 +4066,10 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8003)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit().putBoolean("${key}_alerted", true).apply()
+                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
                 }
-            } else if (ratio < 0.8 && hasAlerted) {
-                budgetPrefs.edit().remove("${key}_alerted").apply()
+            } else if (ratio < 0.8 && lastPercent > 0) {
+                budgetPrefs.edit().remove("${key}_percent").apply()
             }
         }
     }
@@ -8378,37 +8334,42 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                     val enteredAmount = amountInputState.toDoubleOrNull() ?: 0.0
                                     if (enteredAmount > 0.0 && netBalance != 0.0) {
                                         val netBalanceAbs = kotlin.math.abs(netBalance)
-                                        val isIncrease = if (netBalance > 0) {
+                                        val isIncreasing = if (netBalance > 0) {
                                             type == "LEND" || type == "REPAY_PAID"
                                         } else {
                                             type == "BORROW" || type == "REPAY_RECEIVED"
                                         }
-                                        val text = if (isIncrease) {
-                                            val updated = netBalanceAbs + enteredAmount
-                                            if (language == AppLanguage.BN) {
-                                                "পরিবর্তিত: ${formatCurrency(updated, language)}"
+                                        
+                                        val finalVal = if (isIncreasing) {
+                                            netBalanceAbs + enteredAmount
+                                        } else {
+                                            netBalanceAbs - enteredAmount
+                                        }
+
+                                        val remainingText = if (language == AppLanguage.BN) {
+                                            if (isIncreasing) {
+                                                "পরিবর্তিত: ${formatCurrency(finalVal, language)}"
                                             } else {
-                                                "Updated: ${formatCurrency(updated, language)}"
+                                                if (finalVal >= 0.0) {
+                                                    "অবশিষ্ট: ${formatCurrency(finalVal, language)}"
+                                                } else {
+                                                    "অতিরিক্ত: ${formatCurrency(-finalVal, language)}"
+                                                }
                                             }
                                         } else {
-                                            val remaining = netBalanceAbs - enteredAmount
-                                            if (language == AppLanguage.BN) {
-                                                if (remaining >= 0.0) {
-                                                    "অবশিষ্ট: ${formatCurrency(remaining, language)}"
-                                                } else {
-                                                    "অতিরিক্ত: ${formatCurrency(-remaining, language)}"
-                                                }
+                                            if (isIncreasing) {
+                                                "Changed: ${formatCurrency(finalVal, language)}"
                                             } else {
-                                                if (remaining >= 0.0) {
-                                                    "Remaining: ${formatCurrency(remaining, language)}"
+                                                if (finalVal >= 0.0) {
+                                                    "Remaining: ${formatCurrency(finalVal, language)}"
                                                 } else {
-                                                    "Surplus: ${formatCurrency(-remaining, language)}"
+                                                    "Surplus: ${formatCurrency(-finalVal, language)}"
                                                 }
                                             }
                                         }
                                         Text(
-                                            text = text,
-                                            color = if (!isIncrease && (netBalanceAbs - enteredAmount) < 0.0) FintechBlue else labelColor,
+                                            text = remainingText,
+                                            color = if (isIncreasing) FintechBlue else (if (finalVal >= 0.0) labelColor else FintechBlue),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
                                         )
@@ -14948,4 +14909,60 @@ fun BudgetHistoryDialog(
         containerColor = if (isDark) Color(0xFF1E2235) else Color.White,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = true)
     )
+}
+
+@Composable
+fun SyncStatusBadge(
+    isNetworkAvailable: Boolean,
+    hasUnsavedChanges: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val badgeColor = when {
+        !isNetworkAvailable -> Color(0xFFF44336) // Red if offline
+        hasUnsavedChanges -> Color(0xFFFFB300)   // Yellow if unsaved changes
+        else -> Color(0xFF4CAF50)               // Light green if everything is synced
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "badge_pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 2.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse_scale"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "pulse_alpha"
+    )
+
+    Box(
+        modifier = modifier.size(14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // Glowing pulse circle
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .graphicsLayer(
+                    scaleX = pulseScale,
+                    scaleY = pulseScale,
+                    alpha = pulseAlpha
+                )
+                .background(badgeColor, shape = CircleShape)
+        )
+        // Solid center circle
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .background(badgeColor, shape = CircleShape)
+        )
+    }
 }
