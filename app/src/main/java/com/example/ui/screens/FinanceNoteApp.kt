@@ -336,15 +336,17 @@ fun CategorySegmentedDonutChart(
                 
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
-                    // Android 8.1 compatible natural outward glow
+                    // Android 8.1 compatible natural outward glow with smooth gradient fade
                     val glowLayers = 100
                     val glowSize = 4.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                        // Exponential fade for smoother outer transition
+                        val alpha = 0.015f * (1.0f - fraction * fraction) 
                         drawArc(
-                            color = color.copy(alpha = 0.008f),
+                            color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -375,15 +377,17 @@ fun CategorySegmentedDonutChart(
 
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
-                        // Android 8.1 compatible natural outward glow
+                        // Android 8.1 compatible natural outward glow with smooth gradient fade
                         val glowLayers = 100
                         val glowSize = 4.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                            // Exponential fade for smoother outer transition
+                            val alpha = 0.015f * (1.0f - fraction * fraction)
                             drawArc(
-                                color = color.copy(alpha = 0.008f),
+                                color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
                                 startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
@@ -523,15 +527,17 @@ fun SegmentedDonutChart(
                         val isOnlySegment = activeSegments.size == 1 && (progressVal / activeCount) >= 0.99
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
-                            // Android 8.1 compatible natural outward glow
+                            // Android 8.1 compatible natural outward glow with smooth gradient fade
                             val glowLayers = 100
                             val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                                // Exponential fade for smoother outer transition
+                                val alpha = 0.015f * (1.0f - fraction * fraction)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.008f),
+                                    color = segment.second.copy(alpha = alpha.coerceAtLeast(0.001f)),
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
@@ -553,15 +559,17 @@ fun SegmentedDonutChart(
                             val adjustedStart = startAngle + (gapAngle / 2f)
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
-                            // Android 8.1 compatible natural outward glow
+                            // Android 8.1 compatible natural outward glow with smooth gradient fade
                             val glowLayers = 100
                             val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                                // Exponential fade for smoother outer transition
+                                val alpha = 0.015f * (1.0f - fraction * fraction)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.008f),
+                                    color = segment.second.copy(alpha = alpha.coerceAtLeast(0.001f)),
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
@@ -12509,8 +12517,16 @@ fun calculateSplineChartData(
                         when (tx.type) {
                             "INCOME" -> incomesList[index] += tx.amount
                             "EXPENSE" -> expensesList[index] += tx.amount
-                            "LEND" -> lendsList[index] += tx.amount
-                            "BORROW" -> borrowsList[index] += tx.amount
+                            "LEND" -> {
+                                lendsList[index] += tx.amount
+                                if (tx.subType == "CREDIT") incomesList[index] += tx.amount
+                            }
+                            "BORROW" -> {
+                                borrowsList[index] += tx.amount
+                                if (tx.subType == "CREDIT") expensesList[index] += tx.amount
+                            }
+                            "REPAY_RECEIVED" -> lendsList[index] -= tx.amount // Repay reduces active lend
+                            "REPAY_PAID" -> borrowsList[index] -= tx.amount // Repay reduces active borrow
                         }
                     }
                 }
@@ -12538,8 +12554,16 @@ fun calculateSplineChartData(
                         when (tx.type) {
                             "INCOME" -> incomes[month] += tx.amount
                             "EXPENSE" -> expenses[month] += tx.amount
-                            "LEND" -> lends[month] += tx.amount
-                            "BORROW" -> borrows[month] += tx.amount
+                            "LEND" -> {
+                                lends[month] += tx.amount
+                                if (tx.subType == "CREDIT") incomes[month] += tx.amount
+                            }
+                            "BORROW" -> {
+                                borrows[month] += tx.amount
+                                if (tx.subType == "CREDIT") expenses[month] += tx.amount
+                            }
+                            "REPAY_RECEIVED" -> lends[month] -= tx.amount
+                            "REPAY_PAID" -> borrows[month] -= tx.amount
                         }
                     }
                 }
@@ -12597,8 +12621,16 @@ fun calculateSplineChartData(
                         when (tx.type) {
                             "INCOME" -> monthlyIncome += tx.amount
                             "EXPENSE" -> monthlyExpense += tx.amount
-                            "LEND" -> monthlyLend += tx.amount
-                            "BORROW" -> monthlyBorrow += tx.amount
+                            "LEND" -> {
+                                monthlyLend += tx.amount
+                                if (tx.subType == "CREDIT") monthlyIncome += tx.amount
+                            }
+                            "BORROW" -> {
+                                monthlyBorrow += tx.amount
+                                if (tx.subType == "CREDIT") monthlyExpense += tx.amount
+                            }
+                            "REPAY_RECEIVED" -> monthlyLend -= tx.amount
+                            "REPAY_PAID" -> monthlyBorrow -= tx.amount
                         }
                     }
                 }
@@ -12663,8 +12695,16 @@ fun calculateSplineChartData(
                         when (tx.type) {
                             "INCOME" -> yearlyIncome += tx.amount
                             "EXPENSE" -> yearlyExpense += tx.amount
-                            "LEND" -> yearlyLend += tx.amount
-                            "BORROW" -> yearlyBorrow += tx.amount
+                            "LEND" -> {
+                                yearlyLend += tx.amount
+                                if (tx.subType == "CREDIT") yearlyIncome += tx.amount
+                            }
+                            "BORROW" -> {
+                                yearlyBorrow += tx.amount
+                                if (tx.subType == "CREDIT") yearlyExpense += tx.amount
+                            }
+                            "REPAY_RECEIVED" -> yearlyLend -= tx.amount
+                            "REPAY_PAID" -> yearlyBorrow -= tx.amount
                         }
                     }
                 }
@@ -12701,8 +12741,16 @@ fun calculateSplineChartData(
                         when (tx.type) {
                             "INCOME" -> incomesList[day - 1] += tx.amount
                             "EXPENSE" -> expensesList[day - 1] += tx.amount
-                            "LEND" -> lendsList[day - 1] += tx.amount
-                            "BORROW" -> borrowsList[day - 1] += tx.amount
+                            "LEND" -> {
+                                lendsList[day - 1] += tx.amount
+                                if (tx.subType == "CREDIT") incomesList[day - 1] += tx.amount
+                            }
+                            "BORROW" -> {
+                                borrowsList[day - 1] += tx.amount
+                                if (tx.subType == "CREDIT") expensesList[day - 1] += tx.amount
+                            }
+                            "REPAY_RECEIVED" -> lendsList[day - 1] -= tx.amount
+                            "REPAY_PAID" -> borrowsList[day - 1] -= tx.amount
                         }
                     }
                 }
@@ -12909,8 +12957,8 @@ fun ChartsScreen(
         }
     }
 
-    val incomeTransactions = filteredTxsForPie.filter { it.type == "INCOME" }
-    val expenseTransactions = filteredTxsForPie.filter { it.type == "EXPENSE" }
+    val incomeTransactions = filteredTxsForPie.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+    val expenseTransactions = filteredTxsForPie.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
     
     val incomesByCategory = incomeTransactions.groupBy { it.category }.mapValues { it.value.sumOf { tx -> tx.amount } }
     val expensesByCategory = expenseTransactions.groupBy { it.category }.mapValues { it.value.sumOf { tx -> tx.amount } }
@@ -13982,15 +14030,17 @@ fun ChartSection(
                                         val color = palette[index % palette.size]
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
-                                        // Android 8.1 compatible natural outward glow
+                                        // Android 8.1 compatible natural outward glow with smooth gradient fade
                                         val glowLayers = 100
                                         val glowSize = 4.dp.toPx()
                                         for (i in glowLayers downTo 1) {
                                             val fraction = i.toFloat() / glowLayers
                                             val currentGlowWidth = glowSize * fraction
                                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
+                                            // Exponential fade for smoother outer transition
+                                            val alpha = 0.02f * (1.0f - fraction * fraction)
                                             drawArc(
-                                                color = color.copy(alpha = 0.012f),
+                                                color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
                                                 startAngle = startAngle,
                                                 sweepAngle = sweepAngle + 0.8f,
                                                 useCenter = false,
