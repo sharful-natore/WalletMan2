@@ -337,14 +337,14 @@ fun CategorySegmentedDonutChart(
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow
-                    val glowLayers = 100
-                    val glowSize = 4.dp.toPx()
+                    val glowLayers = 120
+                    val glowSize = 12.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                         drawArc(
-                            color = color.copy(alpha = 0.012f),
+                            color = color.copy(alpha = 0.006f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -376,14 +376,14 @@ fun CategorySegmentedDonutChart(
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow
-                        val glowLayers = 100
-                        val glowSize = 4.dp.toPx()
+                        val glowLayers = 120
+                        val glowSize = 12.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                             drawArc(
-                                color = color.copy(alpha = 0.012f),
+                                color = color.copy(alpha = 0.006f),
                                 startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
@@ -524,14 +524,14 @@ fun SegmentedDonutChart(
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 100
-                            val glowSize = 4.dp.toPx()
+                            val glowLayers = 120
+                            val glowSize = 12.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.012f),
+                                    color = segment.second.copy(alpha = 0.006f),
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
@@ -554,14 +554,14 @@ fun SegmentedDonutChart(
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 100
-                            val glowSize = 4.dp.toPx()
+                            val glowLayers = 120
+                            val glowSize = 12.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.012f),
+                                    color = segment.second.copy(alpha = 0.006f),
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
@@ -5594,9 +5594,19 @@ fun TransactionRowItem(
                             color = if (isDark) Color.White else Color(0xFF1E222F)
                         )
                     )
-                    if (tx.note.isNotEmpty()) {
+                    val creditLabel = if (tx.subType == "CREDIT") {
+                        if (tx.type == "LEND") (if (language == AppLanguage.BN) "(বাকি বিক্রয়)" else "(Credit Sale)")
+                        else if (tx.type == "BORROW") (if (language == AppLanguage.BN) "(বাকি ক্রয়)" else "(Credit Purchase)")
+                        else ""
+                    } else ""
+                    
+                    val descriptionText = if (tx.note.isNotEmpty()) {
+                        if (creditLabel.isNotEmpty()) "${tx.note} $creditLabel" else tx.note
+                    } else creditLabel
+
+                    if (descriptionText.isNotEmpty()) {
                         HighlightedText(
-                            text = tx.note,
+                            text = descriptionText,
                             query = searchQuery,
                             color = MaterialTheme.colorScheme.primary,
                             style = TextStyle(
@@ -5890,8 +5900,8 @@ fun TransactionsScreen(
         val list = timeFilteredTransactions
         // Type filter
         when (filter) {
-            "INCOME" -> list.filter { it.type == "INCOME" }
-            "EXPENSE" -> list.filter { it.type == "EXPENSE" }
+            "INCOME" -> list.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+            "EXPENSE" -> list.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
             "DENA" -> list.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
             "PAWN" -> list.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
             else -> list
@@ -5929,8 +5939,8 @@ fun TransactionsScreen(
         list
     }
 
-    val totalIncome = timeFilteredTransactions.filter { it.type == "INCOME" }.sumOf { it.amount }
-    val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+    val totalIncome = timeFilteredTransactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+    val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -12908,7 +12918,25 @@ fun ChartsScreen(
     val totalIncome = incomeTransactions.sumOf { it.amount }
     val totalExpense = expenseTransactions.sumOf { it.amount }
 
-    val palette = listOf(Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFF06B6D4))
+    val incomePalette = listOf(
+        Color(0xFF059669), // Emerald 600
+        Color(0xFF10B981), // Emerald 500
+        Color(0xFF34D399), // Emerald 400
+        Color(0xFF6EE7B7), // Emerald 300
+        Color(0xFFA7F3D0), // Emerald 200
+        Color(0xFF065F46), // Emerald 800
+        Color(0xFF064E3B), // Emerald 900
+    )
+    
+    val expensePalette = listOf(
+        Color(0xFFDC2626), // Red 600
+        Color(0xFFEF4444), // Red 500
+        Color(0xFFF87171), // Red 400
+        Color(0xFFFCA5A5), // Red 300
+        Color(0xFFFECACA), // Red 200
+        Color(0xFF991B1B), // Red 800
+        Color(0xFF7F1D1D), // Red 900
+    )
 
     // Calculate Spline Chart Data dynamically based on filter selection
     val splineChartData = remember(transactions, timelineChartFilterMode, timelineSelectedYear, timelineSelectedMonth, startYear, startMonth, endYear, endMonth, startYearY2Y, endYearY2Y, language) {
@@ -13234,7 +13262,7 @@ fun ChartsScreen(
             title = if (language == AppLanguage.BN) "খাত অনুযায়ী আয়" else "Income by Category",
             data = incomesByCategory,
             total = totalIncome,
-            palette = palette,
+            palette = incomePalette,
             language = language,
             isDark = isDark
         )
@@ -13244,7 +13272,7 @@ fun ChartsScreen(
             title = if (language == AppLanguage.BN) "খাত অনুযায়ী ব্যয়" else "Expense by Category",
             data = expensesByCategory,
             total = totalExpense,
-            palette = palette.reversed(), // slightly different colors
+            palette = expensePalette,
             language = language,
             isDark = isDark
         )
@@ -13955,14 +13983,14 @@ fun ChartSection(
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
                                         // Android 8.1 compatible natural outward glow
-                                        val glowLayers = 30
-                                        val glowSize = 4.dp.toPx()
+                                        val glowLayers = 120
+                                        val glowSize = 12.dp.toPx()
                                         for (i in glowLayers downTo 1) {
                                             val fraction = i.toFloat() / glowLayers
                                             val currentGlowWidth = glowSize * fraction
                                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                             drawArc(
-                                                color = color.copy(alpha = 0.025f),
+                                                color = color.copy(alpha = 0.006f),
                                                 startAngle = startAngle,
                                                 sweepAngle = sweepAngle + 0.8f,
                                                 useCenter = false,
