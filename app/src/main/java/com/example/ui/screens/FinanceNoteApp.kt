@@ -337,14 +337,14 @@ fun CategorySegmentedDonutChart(
                 if (color != resolvedUnfilledColor) {
                     // Soft glowing shadow extending ONLY outwards (blurred)
                     // Android 8.1 compatible natural outward glow
-                    val glowLayers = 120
-                    val glowSize = 12.dp.toPx()
+                    val glowLayers = 100
+                    val glowSize = 4.dp.toPx()
                     for (i in glowLayers downTo 1) {
                         val fraction = i.toFloat() / glowLayers
                         val currentGlowWidth = glowSize * fraction
                         val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                         drawArc(
-                            color = color.copy(alpha = 0.006f),
+                            color = color.copy(alpha = 0.008f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -376,14 +376,14 @@ fun CategorySegmentedDonutChart(
                     if (color != resolvedUnfilledColor) {
                         // Soft glowing shadow extending ONLY outwards (blurred)
                         // Android 8.1 compatible natural outward glow
-                        val glowLayers = 120
-                        val glowSize = 12.dp.toPx()
+                        val glowLayers = 100
+                        val glowSize = 4.dp.toPx()
                         for (i in glowLayers downTo 1) {
                             val fraction = i.toFloat() / glowLayers
                             val currentGlowWidth = glowSize * fraction
                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                             drawArc(
-                                color = color.copy(alpha = 0.006f),
+                                color = color.copy(alpha = 0.008f),
                                 startAngle = startAngle,
                                 sweepAngle = allocatedSweep + 0.8f,
                                 useCenter = false,
@@ -524,14 +524,14 @@ fun SegmentedDonutChart(
                         if (isOnlySegment) {
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 120
-                            val glowSize = 12.dp.toPx()
+                            val glowLayers = 100
+                            val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.006f),
+                                    color = segment.second.copy(alpha = 0.008f),
                                     startAngle = startAngle,
                                     sweepAngle = sweepAngle,
                                     useCenter = false,
@@ -554,14 +554,14 @@ fun SegmentedDonutChart(
 
                             // Soft glowing shadow extending ONLY outwards (blurred)
                             // Android 8.1 compatible natural outward glow
-                            val glowLayers = 120
-                            val glowSize = 12.dp.toPx()
+                            val glowLayers = 100
+                            val glowSize = 4.dp.toPx()
                             for (i in glowLayers downTo 1) {
                                 val fraction = i.toFloat() / glowLayers
                                 val currentGlowWidth = glowSize * fraction
                                 val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                 drawArc(
-                                    color = segment.second.copy(alpha = 0.006f),
+                                    color = segment.second.copy(alpha = 0.008f),
                                     startAngle = adjustedStart,
                                     sweepAngle = adjustedSweep,
                                     useCenter = false,
@@ -4913,7 +4913,7 @@ fun DashboardScreen(
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
@@ -12919,23 +12919,23 @@ fun ChartsScreen(
     val totalExpense = expenseTransactions.sumOf { it.amount }
 
     val incomePalette = listOf(
-        Color(0xFF059669), // Emerald 600
         Color(0xFF10B981), // Emerald 500
-        Color(0xFF34D399), // Emerald 400
-        Color(0xFF6EE7B7), // Emerald 300
-        Color(0xFFA7F3D0), // Emerald 200
-        Color(0xFF065F46), // Emerald 800
-        Color(0xFF064E3B), // Emerald 900
+        Color(0xFF3B82F6), // Blue 500
+        Color(0xFF8B5CF6), // Violet 500
+        Color(0xFFF59E0B), // Amber 500
+        Color(0xFFEC4899), // Pink 500
+        Color(0xFF06B6D4), // Cyan 500
+        Color(0xFFF97316), // Orange 500
     )
     
     val expensePalette = listOf(
-        Color(0xFFDC2626), // Red 600
         Color(0xFFEF4444), // Red 500
-        Color(0xFFF87171), // Red 400
-        Color(0xFFFCA5A5), // Red 300
-        Color(0xFFFECACA), // Red 200
-        Color(0xFF991B1B), // Red 800
-        Color(0xFF7F1D1D), // Red 900
+        Color(0xFFF97316), // Orange 500
+        Color(0xFFF59E0B), // Amber 500
+        Color(0xFF10B981), // Emerald 500
+        Color(0xFF3B82F6), // Blue 500
+        Color(0xFF8B5CF6), // Violet 500
+        Color(0xFFEC4899), // Pink 500
     )
 
     // Calculate Spline Chart Data dynamically based on filter selection
@@ -13983,14 +13983,14 @@ fun ChartSection(
 
                                         // Soft glowing shadow extending ONLY outwards (blurred)
                                         // Android 8.1 compatible natural outward glow
-                                        val glowLayers = 120
-                                        val glowSize = 12.dp.toPx()
+                                        val glowLayers = 100
+                                        val glowSize = 4.dp.toPx()
                                         for (i in glowLayers downTo 1) {
                                             val fraction = i.toFloat() / glowLayers
                                             val currentGlowWidth = glowSize * fraction
                                             val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
                                             drawArc(
-                                                color = color.copy(alpha = 0.006f),
+                                                color = color.copy(alpha = 0.012f),
                                                 startAngle = startAngle,
                                                 sweepAngle = sweepAngle + 0.8f,
                                                 useCenter = false,
