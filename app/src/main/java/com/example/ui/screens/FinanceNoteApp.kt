@@ -531,9 +531,9 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
-        "INCOME" -> listOf(Color(0xFFFBBC05), Color(0xFFC6E217), Color(0xFF4ADE80), Color(0xFF34A853))  // yellow -> lime -> light green -> green
-        "EXPENSE" -> listOf(Color(0xFFC6E217), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722)) // lime -> amber -> orange -> deep orange
-        "SAVINGS" -> listOf(Color(0xFF009688), Color(0xFF00BCD4), Color(0xFF0EA5E9), Color(0xFF4285F4)) // teal -> cyan -> light blue -> blue
+        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
+        "EXPENSE" -> listOf(Color(0xFF8BC34A), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722)) // light green -> amber -> orange -> deep orange
+        "SAVINGS" -> listOf(Color(0xFF00BCD4), Color(0xFF4285F4), Color(0xFF1A73E8), Color(0xFF3F51B5)) // cyan -> blue -> deep blue -> indigo
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
 
