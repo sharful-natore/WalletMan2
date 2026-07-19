@@ -531,17 +531,17 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
-        "INCOME" -> listOf(Color(0xFFC6E217), Color(0xFF10B981))      // lime to green
-        "EXPENSE" -> listOf(Color(0xFFFBBC05), Color(0xFFFF5722))     // yellow to deep orange
-        "SAVINGS" -> listOf(Color(0xFF00BCD4), Color(0xFF10B981))     // cyan to green
+        "INCOME" -> listOf(Color(0xFFFBBC05), Color(0xFFC6E217), Color(0xFF4ADE80), Color(0xFF34A853))  // yellow -> lime -> light green -> green
+        "EXPENSE" -> listOf(Color(0xFFC6E217), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722)) // lime -> amber -> orange -> deep orange
+        "SAVINGS" -> listOf(Color(0xFF009688), Color(0xFF00BCD4), Color(0xFF0EA5E9), Color(0xFF4285F4)) // teal -> cyan -> light blue -> blue
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
 
     val trackColor = when (categoryType) {
-        "INCOME" -> Color(0xFF10B981).copy(alpha = 0.40f)             // 40% green
-        "EXPENSE" -> Color(0xFFFF5722).copy(alpha = 0.40f)            // 40% deep orange
-        "SAVINGS" -> Color(0xFF4285F4).copy(alpha = 0.40f)            // 40% tech blue
-        else -> Color.LightGray.copy(alpha = 0.40f)
+        "INCOME" -> Color(0xFF34A853).copy(alpha = 0.30f)             // 30% green
+        "EXPENSE" -> Color(0xFFFF5722).copy(alpha = 0.30f)            // 30% deep orange
+        "SAVINGS" -> Color(0xFF4285F4).copy(alpha = 0.30f)            // 30% tech blue
+        else -> Color.LightGray.copy(alpha = 0.30f)
     }
 
     val percentageColor = when (categoryType) {
@@ -595,29 +595,18 @@ fun BudgetControlDonutChart(
                     end = Offset(centerOffset.x, centerOffset.y + radius)
                 )
 
-                // 1. Drop Shadow (Soft blurred shadow)
-                // Draw multiple offset layers of dark shadow to create a realistic 3D depth field.
-                val shadowColor = Color.Black.copy(alpha = 0.04f)
-                val shadowOffsetIndex = listOf(1f, 2f, 3f, 4f, 5f)
-                shadowOffsetIndex.forEach { offsetMultiplier ->
-                    val shadowRadius = radius + (offsetMultiplier * 0.4f).dp.toPx()
-                    val shadowWidth = strokeWidthPx + (offsetMultiplier * 1.5f).dp.toPx()
-                    val shadowTopLeft = Offset(
-                        centerOffset.x - shadowRadius + 1.5.dp.toPx() * offsetMultiplier,
-                        centerOffset.y - shadowRadius + 3.dp.toPx() * offsetMultiplier
-                    )
-                    drawArc(
-                        color = shadowColor,
-                        startAngle = -90f,
-                        sweepAngle = sweepAngle,
-                        useCenter = false,
-                        topLeft = shadowTopLeft,
-                        size = androidx.compose.ui.geometry.Size(shadowRadius * 2f, shadowRadius * 2f),
-                        style = Stroke(width = shadowWidth, cap = StrokeCap.Round)
-                    )
-                }
+                // 1. A single soft, clean drop shadow underneath the arc (very tight, low alpha, no wide spreading)
+                drawArc(
+                    color = Color.Black.copy(alpha = 0.12f),
+                    startAngle = -90f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = Offset(arcTopLeft.x + 1.dp.toPx(), arcTopLeft.y + 2.dp.toPx()),
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                )
 
-                // 2. Main 3D Gradient Arc
+                // 2. Main Gradient Arc
                 drawArc(
                     brush = brush,
                     startAngle = -90f,
@@ -626,41 +615,6 @@ fun BudgetControlDonutChart(
                     topLeft = arcTopLeft,
                     size = arcSize,
                     style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                )
-
-                // 3. Inner darker shading (For 3D cylindrical depth)
-                val innerShadingBrush = Brush.linearGradient(
-                    colors = listOf(Color.Black.copy(alpha = 0.15f), Color.Transparent, Color.Black.copy(alpha = 0.25f)),
-                    start = Offset(centerOffset.x - radius, centerOffset.y - radius),
-                    end = Offset(centerOffset.x + radius, centerOffset.y + radius)
-                )
-                drawArc(
-                    brush = innerShadingBrush,
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = arcTopLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidthPx * 0.9f, cap = StrokeCap.Round)
-                )
-
-                // 4. Shiny Top Highlight (For realistic 3D gloss finish)
-                val highlightRadius = radius - 1.5.dp.toPx()
-                val highlightTopLeft = Offset(centerOffset.x - highlightRadius, centerOffset.y - highlightRadius)
-                val highlightSize = androidx.compose.ui.geometry.Size(highlightRadius * 2f, highlightRadius * 2f)
-                val highlightBrush = Brush.linearGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.65f), Color.White.copy(alpha = 0.15f)),
-                    start = Offset(centerOffset.x, centerOffset.y - highlightRadius),
-                    end = Offset(centerOffset.x, centerOffset.y + highlightRadius)
-                )
-                drawArc(
-                    brush = highlightBrush,
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = highlightTopLeft,
-                    size = highlightSize,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
         }
