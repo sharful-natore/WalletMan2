@@ -132,6 +132,32 @@ fun getCustomTimeFilterLabel(timeFilter: String, lang: AppLanguage): String {
     return timeFilter
 }
 
+fun getBudgetCategoryColors(categoryType: String?): List<Color> {
+    val gBlue = Color(0xFF4285F4)
+    val gRed = Color(0xFFEA4335)
+    val gYellow = Color(0xFFFBBC05)
+    val gGreen = Color(0xFF34A853)
+    val mIndigo = Color(0xFF3F51B5)
+    val mPurple = Color(0xFF9C27B0)
+    val mCyan = Color(0xFF00BCD4)
+    val mTeal = Color(0xFF009688)
+    val mOrange = Color(0xFFFF9800)
+    val mPink = Color(0xFFE91E63)
+    val mDeepOrange = Color(0xFFFF5722)
+
+    val incomeColors = listOf(gGreen, gYellow, gBlue, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
+    val expenseColors = listOf(gRed, gGreen, gYellow, gBlue, mPurple, mOrange, mCyan, mPink, mIndigo, mTeal, mDeepOrange)
+    val savingsColors = listOf(gBlue, gYellow, gGreen, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
+    val defaultColors = listOf(gBlue, gYellow, gGreen, gRed, mIndigo, mPurple, mCyan, mTeal, mOrange, mPink, mDeepOrange)
+
+    return when (categoryType) {
+        "INCOME" -> incomeColors
+        "EXPENSE" -> expenseColors
+        "SAVINGS" -> savingsColors
+        else -> defaultColors
+    }
+}
+
 @Composable
 fun CategorySegmentedDonutChart(
     targetAmount: Double,
@@ -213,30 +239,7 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val gBlue = Color(0xFF4285F4)
-    val gRed = Color(0xFFEA4335)
-    val gYellow = Color(0xFFFBBC05)
-    val gGreen = Color(0xFF34A853)
-    val mIndigo = Color(0xFF3F51B5)
-    val mPurple = Color(0xFF9C27B0)
-    val mCyan = Color(0xFF00BCD4)
-    val mTeal = Color(0xFF009688)
-    val mOrange = Color(0xFFFF9800)
-    val mPink = Color(0xFFE91E63)
-    val mDeepOrange = Color(0xFFFF5722)
-
-    val incomeColors = listOf(gGreen, gYellow, gBlue, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
-    val expenseColors = listOf(gRed, gGreen, gYellow, gBlue, mPurple, mOrange, mCyan, mPink, mIndigo, mTeal, mDeepOrange)
-    val savingsColors = listOf(gBlue, gYellow, gGreen, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
-
-    val defaultColors = listOf(gBlue, gYellow, gGreen, gRed, mIndigo, mPurple, mCyan, mTeal, mOrange, mPink, mDeepOrange)
-
-    val colors = when (categoryType) {
-        "INCOME" -> incomeColors
-        "EXPENSE" -> expenseColors
-        "SAVINGS" -> savingsColors
-        else -> defaultColors
-    }
+    val colors = getBudgetCategoryColors(categoryType)
 
     Box(
         modifier = modifier,
@@ -3605,7 +3608,8 @@ fun FinanceNoteApp(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = FintechBlue
+                            containerColor = FintechBlue,
+                            contentColor = Color.White
                         )
                     ) {
                         Icon(imageVector = Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -4812,7 +4816,7 @@ fun DashboardScreen(
             // Monthly Budget Control Card (সাদা রং এর)
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White),
                 border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4889,7 +4893,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                centerColorOverride = Color(0xFFF8F9FA),
+                                centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "INCOME" }
                             )
                         }
@@ -4918,7 +4922,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                centerColorOverride = Color(0xFFF8F9FA),
+                                centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" }
                             )
                         }
@@ -4947,7 +4951,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                centerColorOverride = Color(0xFFF8F9FA),
+                                centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" }
                             )
                         }
@@ -5106,29 +5110,7 @@ fun DashboardScreen(
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
-        val cGreen = Color(0xFF34C759)
-        val cOrange = Color(0xFFFF9500)
-        val cFintechBlue = Color(0xFF007AFF)
-        val cBrown = Color(0xFFA0522D) // কাঠালি (Wood/Brown)
-        val cPurple = Color(0xFFAF52DE)
-        val cSkyBlue = Color(0xFF5AC8FA)
-        val cRed = Color(0xFFFF3B30)
-        val cYellow = Color(0xFFFFCC00)
-        val cPink = Color(0xFFFF2D55)
-        val cTeal = Color(0xFF00C7BE)
-        val cIndigo = Color(0xFF5856D6)
-
-        val incomeColors = listOf(cGreen, cOrange, cFintechBlue, cBrown, cPurple, cSkyBlue, cRed, cYellow, cTeal, cPink, cIndigo)
-        val expenseColors = listOf(cRed, cGreen, cOrange, cBrown, cFintechBlue, cYellow, cPurple, cPink, cSkyBlue, cTeal, cIndigo)
-        val savingsColors = listOf(cFintechBlue, cBrown, cOrange, cGreen, cRed, cYellow, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
-        val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cBrown, cPink, cTeal, cIndigo)
-
-        val colors = when (categoryType) {
-            "INCOME" -> incomeColors
-            "EXPENSE" -> expenseColors
-            "SAVINGS" -> savingsColors
-            else -> defaultColors
-        }
+        val colors = getBudgetCategoryColors(categoryType)
 
         AlertDialog(
             onDismissRequest = { showBudgetDetailsType = null },
@@ -5157,10 +5139,10 @@ fun DashboardScreen(
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
 
-                    // Large Segmented Donut Chart in a white card with matching styling
+                    // Large Segmented Donut Chart in a card with matching styling
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -5176,13 +5158,13 @@ fun DashboardScreen(
                                 targetAmount = targetAmount,
                                 totalFilledAmount = totalFilledAmount,
                                 segments = segments,
-                                isDark = false, // Always light inside the white card for consistent look
+                                isDark = isDark,
                                 language = language,
                                 modifier = Modifier.size(160.dp),
                                 strokeWidthDp = 22.dp, // Match budget section with increased thickness
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
-                                centerColorOverride = Color(0xFFF8F9FA) // Match budget section
+                                centerColorOverride = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF8F9FA) // Match budget section
                             )
                         }
                     }
@@ -9474,6 +9456,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
         }
 
 // ---------------- SAVINGS GOAL DETAIL OVERLAY ----------------
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SavingsGoalDetailOverlay(
     language: AppLanguage,
@@ -9494,6 +9477,9 @@ fun SavingsGoalDetailOverlay(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var selectedSavingsTx by remember { mutableStateOf<SavingsTransaction?>(null) }
     var txToDelete by remember { mutableStateOf<SavingsTransaction?>(null) }
+    var selectedSavingsTxIds by remember { mutableStateOf(setOf<Int>()) }
+    val isSelectionMode = selectedSavingsTxIds.isNotEmpty()
+    var showMultiDeleteConfirm by remember { mutableStateOf(false) }
     
     if (txToDelete != null) {
         DeleteVerificationDialog(
@@ -9503,6 +9489,23 @@ fun SavingsGoalDetailOverlay(
                 txToDelete = null
             },
             onDismiss = { txToDelete = null }
+        )
+    }
+
+    if (showMultiDeleteConfirm) {
+        DeleteVerificationDialog(
+            language = language,
+            onConfirm = {
+                selectedSavingsTxIds.forEach { id ->
+                    val tx = txList.find { it.id == id }
+                    if (tx != null) {
+                        onDeleteTx(tx)
+                    }
+                }
+                selectedSavingsTxIds = emptySet()
+                showMultiDeleteConfirm = false
+            },
+            onDismiss = { showMultiDeleteConfirm = false }
         )
     }
 
@@ -9533,25 +9536,50 @@ fun SavingsGoalDetailOverlay(
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = if (language == AppLanguage.BN) "সঞ্চয় কার্ডের বিস্তারিত" else "Savings Card Details",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FintechBlue,
-                    modifier = Modifier.align(Alignment.CenterStart)
-                )
+                if (isSelectionMode) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "${selectedSavingsTxIds.size}টি নির্বাচিত" else "${selectedSavingsTxIds.size} Selected",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FintechBlue
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { showMultiDeleteConfirm = true }) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "Delete Selected", tint = FintechRed)
+                            }
+                            IconButton(onClick = { selectedSavingsTxIds = emptySet() }) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Clear Selection", tint = if (isDark) Color.White else Color.Black)
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = if (language == AppLanguage.BN) "সঞ্চয় কার্ডের বিস্তারিত" else "Savings Card Details",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FintechBlue,
+                        modifier = Modifier.align(Alignment.CenterStart)
+                    )
 
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                ) {
-                    IconButton(onClick = { onEditGoal(goal) }) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
-                    }
-                    IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Close", tint = if (isDark) Color.White else Color.Black)
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    ) {
+                        IconButton(onClick = { onEditGoal(goal) }) {
+                            Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
+                        }
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
+                        }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = if (isDark) Color.White else Color.Black)
+                        }
                     }
                 }
             }
@@ -9637,20 +9665,47 @@ fun SavingsGoalDetailOverlay(
                         val txIcon = if (isDeposit) Icons.AutoMirrored.Rounded.TrendingUp else Icons.AutoMirrored.Rounded.TrendingDown
                         val txLabel = if (isDeposit) Translation.get("deposit", language) else Translation.get("withdraw", language)
 
+                        val isSelected = selectedSavingsTxIds.contains(tx.id)
                         val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF121212) else Color.White)
                         Card(
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = bgColor),
+                            border = BorderStroke(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) FintechBlue else (if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { selectedSavingsTx = tx }
+                                .combinedClickable(
+                                    onClick = {
+                                        if (isSelectionMode) {
+                                            selectedSavingsTxIds = if (isSelected) {
+                                                selectedSavingsTxIds - tx.id
+                                            } else {
+                                                selectedSavingsTxIds + tx.id
+                                            }
+                                        } else {
+                                            selectedSavingsTx = tx
+                                        }
+                                    },
+                                    onLongClick = {
+                                        selectedSavingsTxIds = if (isSelected) {
+                                            selectedSavingsTxIds - tx.id
+                                        } else {
+                                            selectedSavingsTxIds + tx.id
+                                        }
+                                    }
+                                )
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
                                     Box(
                                         modifier = Modifier
                                             .size(40.dp)
@@ -9690,12 +9745,44 @@ fun SavingsGoalDetailOverlay(
                                         }
                                     }
                                 }
-                                Text(
-                                    text = (if (isDeposit) "+" else "-") + formatCurrency(tx.amount, language),
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = amountColor,
-                                    fontSize = 15.sp
-                                )
+                                
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = (if (isDeposit) "+" else "-") + formatCurrency(tx.amount, language),
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = amountColor,
+                                        fontSize = 15.sp
+                                    )
+                                    
+                                    if (!isSelectionMode) {
+                                        IconButton(
+                                            onClick = { txToDelete = tx },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Delete,
+                                                contentDescription = "Delete",
+                                                tint = FintechRed.copy(alpha = 0.8f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Checkbox(
+                                            checked = isSelected,
+                                            onCheckedChange = { checked ->
+                                                selectedSavingsTxIds = if (checked == true) {
+                                                    selectedSavingsTxIds + tx.id
+                                                } else {
+                                                    selectedSavingsTxIds - tx.id
+                                                }
+                                            },
+                                            colors = CheckboxDefaults.colors(checkedColor = FintechBlue)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
