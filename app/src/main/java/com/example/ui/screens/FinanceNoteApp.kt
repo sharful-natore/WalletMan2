@@ -213,20 +213,23 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val cDeepOrange = Color(0xFFFF8A65)
-    val cLightGreen = Color(0xFF81C784)
-    val cLightBlue = Color(0xFF64B5F6)
-    val cYellow = Color(0xFFFFF176)
-    val cCyan = Color(0xFF4DD0E1)
-    val cIndigo = Color(0xFF7986CB)
-    val cLime = Color(0xFFDCE775)
-    val cPink = Color(0xFFF06292)
+    val gBlue = Color(0xFF4285F4)
+    val gRed = Color(0xFFEA4335)
+    val gYellow = Color(0xFFFBBC05)
+    val gGreen = Color(0xFF34A853)
+    val mIndigo = Color(0xFF3F51B5)
+    val mPurple = Color(0xFF9C27B0)
+    val mCyan = Color(0xFF00BCD4)
+    val mTeal = Color(0xFF009688)
+    val mOrange = Color(0xFFFF9800)
+    val mPink = Color(0xFFE91E63)
+    val mDeepOrange = Color(0xFFFF5722)
 
-    val incomeColors = listOf(cLightGreen, cYellow, cLightBlue, cDeepOrange, cCyan, cPink, cIndigo, cLime)
-    val expenseColors = listOf(cDeepOrange, cLightGreen, cYellow, cLightBlue, cPink, cCyan, cIndigo, cLime)
-    val savingsColors = listOf(cLightBlue, cYellow, cLightGreen, cDeepOrange, cCyan, cPink, cIndigo, cLime)
+    val incomeColors = listOf(gGreen, gYellow, gBlue, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
+    val expenseColors = listOf(gRed, gGreen, gYellow, gBlue, mPurple, mOrange, mCyan, mPink, mIndigo, mTeal, mDeepOrange)
+    val savingsColors = listOf(gBlue, gYellow, gGreen, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
 
-    val defaultColors = listOf(cLightBlue, cYellow, cLightGreen, cDeepOrange, cCyan, cPink, cIndigo, cLime)
+    val defaultColors = listOf(gBlue, gYellow, gGreen, gRed, mIndigo, mPurple, mCyan, mTeal, mOrange, mPink, mDeepOrange)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors
