@@ -488,6 +488,201 @@ fun CategorySegmentedDonutChart(
 }
 
 @Composable
+fun BudgetControlDonutChart(
+    targetAmount: Double,
+    totalFilledAmount: Double,
+    categoryType: String, // "INCOME", "EXPENSE", "SAVINGS"
+    language: AppLanguage,
+    modifier: Modifier = Modifier,
+    strokeWidthDp: Dp = 14.dp,
+    centerTextSize: TextUnit = 14.sp,
+    centerColorOverride: Color = Color(0xFFF8F9FA),
+    onCenterClick: () -> Unit = {}
+) {
+    var animationPlayed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        animationPlayed = true
+    }
+
+    val animatedProgressMultiplier by animateFloatAsState(
+        targetValue = if (animationPlayed) 1f else 0f,
+        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+        label = "budget_chart_animation"
+    )
+
+    val progress = if (targetAmount > 0.0) {
+        (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
+    } else {
+        0.0
+    }
+
+    val actualProgressMultiplier = if (targetAmount > 0.0) {
+        totalFilledAmount / targetAmount
+    } else {
+        0.0
+    }
+
+    val percentageText = if (targetAmount > 0.0) {
+        "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
+    } else {
+        if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+    }
+
+    // Colors & Gradients selection
+    val gradientColors = when (categoryType) {
+        "INCOME" -> listOf(Color(0xFFC6E217), Color(0xFF10B981))      // lime to green
+        "EXPENSE" -> listOf(Color(0xFFFBBC05), Color(0xFFFF5722))     // yellow to deep orange
+        "SAVINGS" -> listOf(Color(0xFF00BCD4), Color(0xFF10B981))     // cyan to green
+        else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
+    }
+
+    val trackColor = when (categoryType) {
+        "INCOME" -> Color(0xFF10B981).copy(alpha = 0.40f)             // 40% green
+        "EXPENSE" -> Color(0xFFFF5722).copy(alpha = 0.40f)            // 40% deep orange
+        "SAVINGS" -> Color(0xFF4285F4).copy(alpha = 0.40f)            // 40% tech blue
+        else -> Color.LightGray.copy(alpha = 0.40f)
+    }
+
+    val percentageColor = when (categoryType) {
+        "INCOME" -> Color(0xFF10B981)
+        "EXPENSE" -> Color(0xFFFF5722)
+        "SAVINGS" -> Color(0xFF009688)
+        else -> FintechBlue
+    }
+
+    Box(
+        modifier = modifier.clickable { onCenterClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val sizeMin = size.minDimension
+            val strokeWidthPx = strokeWidthDp.toPx()
+            // Subtract space for the glow shadow
+            val radius = (sizeMin - strokeWidthPx - 16.dp.toPx()) / 2f
+            val centerOffset = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+
+            // Draw central hollow background
+            val innerRadius = radius - strokeWidthPx / 2f
+            if (innerRadius > 0f) {
+                drawCircle(
+                    color = centerColorOverride,
+                    radius = innerRadius,
+                    center = centerOffset
+                )
+            }
+
+            // Draw progress track (100% circle background with trackColor)
+            val arcTopLeft = androidx.compose.ui.geometry.Offset(centerOffset.x - radius, centerOffset.y - radius)
+            val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+            drawArc(
+                color = trackColor,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidthPx)
+            )
+
+            // Draw active segment (progress arc)
+            val sweepAngle = (progress * 360f).toFloat() * animatedProgressMultiplier
+            if (sweepAngle > 0f) {
+                // Gradient brush for the segment
+                val brush = Brush.linearGradient(
+                    colors = gradientColors,
+                    start = Offset(centerOffset.x, centerOffset.y - radius),
+                    end = Offset(centerOffset.x, centerOffset.y + radius)
+                )
+
+                // 1. Drop Shadow (Soft blurred shadow)
+                // Draw multiple offset layers of dark shadow to create a realistic 3D depth field.
+                val shadowColor = Color.Black.copy(alpha = 0.04f)
+                val shadowOffsetIndex = listOf(1f, 2f, 3f, 4f, 5f)
+                shadowOffsetIndex.forEach { offsetMultiplier ->
+                    val shadowRadius = radius + (offsetMultiplier * 0.4f).dp.toPx()
+                    val shadowWidth = strokeWidthPx + (offsetMultiplier * 1.5f).dp.toPx()
+                    val shadowTopLeft = Offset(
+                        centerOffset.x - shadowRadius + 1.5.dp.toPx() * offsetMultiplier,
+                        centerOffset.y - shadowRadius + 3.dp.toPx() * offsetMultiplier
+                    )
+                    drawArc(
+                        color = shadowColor,
+                        startAngle = -90f,
+                        sweepAngle = sweepAngle,
+                        useCenter = false,
+                        topLeft = shadowTopLeft,
+                        size = androidx.compose.ui.geometry.Size(shadowRadius * 2f, shadowRadius * 2f),
+                        style = Stroke(width = shadowWidth, cap = StrokeCap.Round)
+                    )
+                }
+
+                // 2. Main 3D Gradient Arc
+                drawArc(
+                    brush = brush,
+                    startAngle = -90f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                )
+
+                // 3. Inner darker shading (For 3D cylindrical depth)
+                val innerShadingBrush = Brush.linearGradient(
+                    colors = listOf(Color.Black.copy(alpha = 0.15f), Color.Transparent, Color.Black.copy(alpha = 0.25f)),
+                    start = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                    end = Offset(centerOffset.x + radius, centerOffset.y + radius)
+                )
+                drawArc(
+                    brush = innerShadingBrush,
+                    startAngle = -90f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx * 0.9f, cap = StrokeCap.Round)
+                )
+
+                // 4. Shiny Top Highlight (For realistic 3D gloss finish)
+                val highlightRadius = radius - 1.5.dp.toPx()
+                val highlightTopLeft = Offset(centerOffset.x - highlightRadius, centerOffset.y - highlightRadius)
+                val highlightSize = androidx.compose.ui.geometry.Size(highlightRadius * 2f, highlightRadius * 2f)
+                val highlightBrush = Brush.linearGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.65f), Color.White.copy(alpha = 0.15f)),
+                    start = Offset(centerOffset.x, centerOffset.y - highlightRadius),
+                    end = Offset(centerOffset.x, centerOffset.y + highlightRadius)
+                )
+                drawArc(
+                    brush = highlightBrush,
+                    startAngle = -90f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = highlightTopLeft,
+                    size = highlightSize,
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+        }
+
+        // Center percentage text
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            Text(
+                text = formatNumberString(percentageText, language),
+                fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (targetAmount > 0.0) percentageColor else Color.Gray,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
 fun SegmentedDonutChart(
     incomeProgress: Double,
     expenseProgress: Double,
@@ -4724,16 +4919,14 @@ fun DashboardScreen(
                                 color = Color.Black,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
-                            CategorySegmentedDonutChart(
+                            BudgetControlDonutChart(
                                 targetAmount = budgetIncomeAmount,
                                 totalFilledAmount = income,
-                                segments = incomeByCategory,
-                                isDark = false,
+                                categoryType = "INCOME",
                                 language = language,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                categoryType = "INCOME",
                                 centerColorOverride = Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "INCOME" }
                             )
@@ -4755,16 +4948,14 @@ fun DashboardScreen(
                                 color = Color.Black,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
-                            CategorySegmentedDonutChart(
+                            BudgetControlDonutChart(
                                 targetAmount = budgetExpenseAmount,
                                 totalFilledAmount = expense,
-                                segments = expenseByCategory,
-                                isDark = false,
+                                categoryType = "EXPENSE",
                                 language = language,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                categoryType = "EXPENSE",
                                 centerColorOverride = Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" }
                             )
@@ -4786,16 +4977,14 @@ fun DashboardScreen(
                                 color = Color.Black,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
-                            CategorySegmentedDonutChart(
+                            BudgetControlDonutChart(
                                 targetAmount = budgetSavingsAmount,
                                 totalFilledAmount = totalSavingsAmount,
-                                segments = savingsByGoal,
-                                isDark = false,
+                                categoryType = "SAVINGS",
                                 language = language,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                categoryType = "SAVINGS",
                                 centerColorOverride = Color(0xFFF8F9FA),
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" }
                             )
