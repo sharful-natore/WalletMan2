@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -211,23 +213,23 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val mEmerald = Color(0xFF10B981)
-    val mSky = Color(0xFF0EA5E9)
-    val mIndigo = Color(0xFF6366F1)
-    val mViolet = Color(0xFF8B5CF6)
-    val mRose = Color(0xFFF43F5E)
-    val mAmber = Color(0xFFF59E0B)
-    val mSlate = Color(0xFF64748B)
-    val mCyan = Color(0xFF06B6D4)
-    val mTeal = Color(0xFF14B8A6)
-    val mFuchsia = Color(0xFFD946EF)
-    val mOrange = Color(0xFFF97316)
+    val vPurple = Color(0xFF9166E6)
+    val vRed = Color(0xFFF14D4D)
+    val vOrange = Color(0xFFFFA235)
+    val vLime = Color(0xFFC6E217)
+    val vCyan = Color(0xFF3FB9E6)
+    val vTeal = Color(0xFF26A69A)
+    val vIndigo = Color(0xFF5C6BC0)
+    val vPink = Color(0xFFEC407A)
+    val vAmber = Color(0xFFFFCA28)
+    val vDeepOrange = Color(0xFFFF7043)
+    val vBlueGrey = Color(0xFF78909C)
 
-    val incomeColors = listOf(mEmerald, mSky, mIndigo, mTeal, mCyan, mViolet, mSlate, mRose, mAmber, mFuchsia, mOrange)
-    val expenseColors = listOf(mRose, mAmber, mOrange, mFuchsia, mSlate, mViolet, mIndigo, mSky, mEmerald, mTeal, mCyan)
-    val savingsColors = listOf(mViolet, mIndigo, mSky, mEmerald, mAmber, mTeal, mCyan, mSlate, mRose, mFuchsia, mOrange)
+    val incomeColors = listOf(vCyan, vLime, vPurple, vIndigo, vTeal, vOrange, vRed, vPink, vAmber, vDeepOrange, vBlueGrey)
+    val expenseColors = listOf(vRed, vOrange, vAmber, vDeepOrange, vPink, vPurple, vIndigo, vCyan, vLime, vTeal, vBlueGrey)
+    val savingsColors = listOf(vPurple, vCyan, vTeal, vIndigo, vLime, vPink, vOrange, vRed, vAmber, vDeepOrange, vBlueGrey)
 
-    val defaultColors = listOf(mIndigo, mEmerald, mSky, mRose, mAmber, mViolet, mCyan, mTeal, mSlate, mFuchsia, mOrange)
+    val defaultColors = listOf(vIndigo, vCyan, vLime, vTeal, vPurple, vRed, vOrange, vPink, vAmber, vDeepOrange, vBlueGrey)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors
@@ -3907,6 +3909,7 @@ private fun showLocalSystemNotification(context: Context, title: String, message
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun DashboardScreen(
     language: AppLanguage,
     isDark: Boolean,
@@ -4847,17 +4850,25 @@ fun DashboardScreen(
                         modifier = Modifier.padding(top = 0.dp, bottom = 4.dp)
                     )
                 }
-                items(txs) { tx ->
-                    TransactionRowItem(
-                        tx = tx,
-                        language = language,
-                        isDark = isDark,
-                        persons = persons,
-                        onDelete = onDeleteTransaction,
-                        onEdit = onEditTransaction,
-                        onNavigateToTab = onNavigate,
-                        onPersonClick = onPersonClick
-                    )
+                items(txs, key = { it.id }) { tx ->
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = true,
+                        enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                            initialOffsetY = { 40 }
+                        ),
+                        modifier = Modifier.animateItemPlacement()
+                    ) {
+                        TransactionRowItem(
+                            tx = tx,
+                            language = language,
+                            isDark = isDark,
+                            persons = persons,
+                            onDelete = onDeleteTransaction,
+                            onEdit = onEditTransaction,
+                            onNavigateToTab = onNavigate,
+                            onPersonClick = onPersonClick
+                        )
+                    }
                 }
             }
         }
@@ -5916,6 +5927,7 @@ fun TransactionDetailsDialog(
 
 // ---------------- TRANSACTIONS TAB ----------------
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun TransactionsScreen(
     language: AppLanguage,
     isDark: Boolean,
@@ -6295,8 +6307,56 @@ fun TransactionsScreen(
                                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
                                 )
                             }
-                            items(txs) { tx ->
+                            items(txs, key = { it.id }) { tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = true,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                        initialOffsetY = { 40 }
+                                    ),
+                                    modifier = Modifier.animateItemPlacement()
+                                ) {
+                                    Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                        TransactionRowItem(
+                                            tx = tx,
+                                            language = language,
+                                            isDark = isDark,
+                                            persons = persons,
+                                            onDelete = onDeleteTransaction,
+                                            onEdit = onEditTransaction,
+                                            isHighlighted = (tx.id == highlightedTxId),
+                                            onNavigateToTab = onNavigateToTab,
+                                            onPersonClick = onPersonClick,
+                                            searchQuery = searchQuery,
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            onLongClick = {
+                                                selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        item {
+                            Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 90.dp)
+                    ) {
+                        items(sortedTransactions, key = { it.id }) { tx ->
+                            val isSelected = selectedTxIds.contains(tx.id)
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = true,
+                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                    initialOffsetY = { 40 }
+                                ),
+                                modifier = Modifier.animateItemPlacement()
+                            ) {
                                 Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                     TransactionRowItem(
                                         tx = tx,
@@ -6316,38 +6376,6 @@ fun TransactionsScreen(
                                         }
                                     )
                                 }
-                            }
-                        }
-                        item {
-                            Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        contentPadding = PaddingValues(bottom = 90.dp)
-                    ) {
-                        items(sortedTransactions) { tx ->
-                            val isSelected = selectedTxIds.contains(tx.id)
-                            Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                                TransactionRowItem(
-                                    tx = tx,
-                                    language = language,
-                                    isDark = isDark,
-                                    persons = persons,
-                                    onDelete = onDeleteTransaction,
-                                    onEdit = onEditTransaction,
-                                    isHighlighted = (tx.id == highlightedTxId),
-                                    onNavigateToTab = onNavigateToTab,
-                                    onPersonClick = onPersonClick,
-                                    searchQuery = searchQuery,
-                                    isSelected = isSelected,
-                                    isSelectionMode = isSelectionMode,
-                                    onLongClick = {
-                                        selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
-                                    }
-                                )
                             }
                         }
                         item {
@@ -6398,6 +6426,7 @@ fun TransactionsScreen(
 
 // ---------------- DEBTS & CREDITS TAB ----------------
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun DebtsScreen(
     language: AppLanguage,
     isDark: Boolean,
@@ -6744,34 +6773,42 @@ fun DebtsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(sortedDebts) { item ->
+                    items(sortedDebts, key = { it.person.id }) { item ->
                         val isSelected = selectedPersonIds.contains(item.person.id)
-                        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                            PersonDebtRowItem(
-                                item = item,
-                                language = language,
-                                isDark = isDark,
-                                onClick = { debt ->
-                                    if (isSelectionMode) {
-                                        selectedPersonIds = if (isSelected) {
-                                            selectedPersonIds - debt.person.id
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = true,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                initialOffsetY = { 40 }
+                            ),
+                            modifier = Modifier.animateItemPlacement()
+                        ) {
+                            Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                PersonDebtRowItem(
+                                    item = item,
+                                    language = language,
+                                    isDark = isDark,
+                                    onClick = { debt ->
+                                        if (isSelectionMode) {
+                                            selectedPersonIds = if (isSelected) {
+                                                selectedPersonIds - debt.person.id
+                                            } else {
+                                                selectedPersonIds + debt.person.id
+                                            }
                                         } else {
-                                            selectedPersonIds + debt.person.id
+                                            onPersonClick(debt)
                                         }
-                                    } else {
-                                        onPersonClick(debt)
+                                    },
+                                    onDelete = onDeletePerson,
+                                    onMove = onMovePerson,
+                                    isHighlighted = (item.person.id == highlightedPersonId),
+                                    searchQuery = searchQuery,
+                                    isSelected = isSelected,
+                                    isSelectionMode = isSelectionMode,
+                                    onLongClick = {
+                                        selectedPersonIds = selectedPersonIds + item.person.id
                                     }
-                                },
-                                onDelete = onDeletePerson,
-                                onMove = onMovePerson,
-                                isHighlighted = (item.person.id == highlightedPersonId),
-                                searchQuery = searchQuery,
-                                isSelected = isSelected,
-                                isSelectionMode = isSelectionMode,
-                                onLongClick = {
-                                    selectedPersonIds = selectedPersonIds + item.person.id
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                     item {
@@ -7205,6 +7242,7 @@ fun PersonDebtRowItem(
 
 // ---------------- SAVINGS TAB ----------------
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun SavingsScreen(
     language: AppLanguage,
     isDark: Boolean,
@@ -7477,31 +7515,39 @@ fun SavingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(sortedGoals) { goal ->
+                    items(sortedGoals, key = { it.id }) { goal ->
                         val isSelected = selectedGoalIds.contains(goal.id)
-                        SavingsGoalCardItem(
-                            goal = goal,
-                            language = language,
-                            isDark = isDark,
-                            profileName = profileName,
-                            onGoalClick = { item ->
-                                if (isSelectionMode) {
-                                    selectedGoalIds = if (isSelected) selectedGoalIds - item.id else selectedGoalIds + item.id
-                                } else {
-                                    onGoalClick(item)
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = true,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                initialOffsetY = { 40 }
+                            ),
+                            modifier = Modifier.animateItemPlacement()
+                        ) {
+                            SavingsGoalCardItem(
+                                goal = goal,
+                                language = language,
+                                isDark = isDark,
+                                profileName = profileName,
+                                onGoalClick = { item ->
+                                    if (isSelectionMode) {
+                                        selectedGoalIds = if (isSelected) selectedGoalIds - item.id else selectedGoalIds + item.id
+                                    } else {
+                                        onGoalClick(item)
+                                    }
+                                },
+                                onContributeClick = onContributeClick,
+                                onEditGoal = onEditGoal,
+                                onMove = onMoveGoal,
+                                isHighlighted = (goal.id == highlightedGoalId),
+                                searchQuery = searchQuery,
+                                isSelected = isSelected,
+                                isSelectionMode = isSelectionMode,
+                                onLongClick = {
+                                    selectedGoalIds = if (isSelected) selectedGoalIds - goal.id else selectedGoalIds + goal.id
                                 }
-                            },
-                            onContributeClick = onContributeClick,
-                            onEditGoal = onEditGoal,
-                            onMove = onMoveGoal,
-                            isHighlighted = (goal.id == highlightedGoalId),
-                            searchQuery = searchQuery,
-                            isSelected = isSelected,
-                            isSelectionMode = isSelectionMode,
-                            onLongClick = {
-                                selectedGoalIds = if (isSelected) selectedGoalIds - goal.id else selectedGoalIds + goal.id
-                            }
-                        )
+                            )
+                        }
                     }
                     item {
                         Spacer(modifier = Modifier.height(70.dp))
