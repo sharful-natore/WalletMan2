@@ -2629,26 +2629,47 @@ fun FinanceNoteApp(
 
                     // 2. Floating Add Button sits beautifully centered in the notch cutout
                     Box(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
                             .padding(bottom = 9.dp + navBarPadding) // Lowered to nestle perfectly in the notch
-                            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0xFF6F7BF7), ambientColor = Color(0xFF38BDF8))
-                            .size(68.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
-                                )
-                            )
-                            .clickable { showAddTransactionDialog = true }
-                            .testTag("fab_add_transaction"),
-                        contentAlignment = Alignment.Center
+                            .size(68.dp) // Fix size so the glowing background doesn't shift the button up
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = "Add Transaction",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        if (isDarkTheme) {
+                            Box(
+                                modifier = Modifier
+                                    .requiredSize(92.dp) // larger than the 68.dp button for a soft glowing edge
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(
+                                                Color(0xFF6F7BF7).copy(alpha = 0.45f),
+                                                Color(0xFF38BDF8).copy(alpha = 0.15f),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0xFF6F7BF7), ambientColor = Color(0xFF38BDF8))
+                                .size(68.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
+                                    )
+                                )
+                                .clickable { showAddTransactionDialog = true }
+                                .testTag("fab_add_transaction"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Add Transaction",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             },
@@ -4811,7 +4832,7 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Monthly Budget Control Card (সাদা রং এর)
             Card(
@@ -4825,7 +4846,7 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
+                        .padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
