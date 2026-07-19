@@ -225,11 +225,11 @@ fun CategorySegmentedDonutChart(
     val vDeepOrange = Color(0xFFFF7043)
     val vBlueGrey = Color(0xFF78909C)
 
-    val incomeColors = listOf(vCyan, vLime, vPurple, vIndigo, vTeal, vOrange, vRed, vPink, vAmber, vDeepOrange, vBlueGrey)
-    val expenseColors = listOf(vRed, vOrange, vAmber, vDeepOrange, vPink, vPurple, vIndigo, vCyan, vLime, vTeal, vBlueGrey)
-    val savingsColors = listOf(vPurple, vCyan, vTeal, vIndigo, vLime, vPink, vOrange, vRed, vAmber, vDeepOrange, vBlueGrey)
+    val incomeColors = listOf(vLime, vCyan, vPurple, vRed, vOrange, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
+    val expenseColors = listOf(vRed, vOrange, vLime, vCyan, vPurple, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
+    val savingsColors = listOf(vOrange, vLime, vCyan, vPurple, vRed, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
 
-    val defaultColors = listOf(vIndigo, vCyan, vLime, vTeal, vPurple, vRed, vOrange, vPink, vAmber, vDeepOrange, vBlueGrey)
+    val defaultColors = listOf(vPurple, vRed, vOrange, vLime, vCyan, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors
