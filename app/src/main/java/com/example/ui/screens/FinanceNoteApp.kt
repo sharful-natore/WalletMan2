@@ -213,23 +213,23 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val vPurple = Color(0xFF9166E6)
-    val vRed = Color(0xFFF14D4D)
-    val vOrange = Color(0xFFFFA235)
-    val vLime = Color(0xFFC6E217)
-    val vCyan = Color(0xFF3FB9E6)
-    val vTeal = Color(0xFF26A69A)
-    val vIndigo = Color(0xFF5C6BC0)
-    val vPink = Color(0xFFEC407A)
-    val vAmber = Color(0xFFFFCA28)
-    val vDeepOrange = Color(0xFFFF7043)
-    val vBlueGrey = Color(0xFF78909C)
+    val cGreen = Color(0xFF34C759)
+    val cOrange = Color(0xFFFF9500)
+    val cFintechBlue = Color(0xFF007AFF)
+    val cBrown = Color(0xFFA0522D)
+    val cPurple = Color(0xFFAF52DE)
+    val cSkyBlue = Color(0xFF5AC8FA)
+    val cRed = Color(0xFFFF3B30)
+    val cYellow = Color(0xFFFFCC00)
+    val cPink = Color(0xFFFF2D55)
+    val cTeal = Color(0xFF00C7BE)
+    val cIndigo = Color(0xFF5856D6)
 
-    val incomeColors = listOf(vLime, vCyan, vPurple, vRed, vOrange, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
-    val expenseColors = listOf(vRed, vOrange, vLime, vCyan, vPurple, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
-    val savingsColors = listOf(vOrange, vLime, vCyan, vPurple, vRed, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
+    val incomeColors = listOf(cGreen, cOrange, cFintechBlue, cBrown, cPurple, cSkyBlue, cRed, cYellow, cTeal, cPink, cIndigo)
+    val expenseColors = listOf(cRed, cGreen, cOrange, cBrown, cFintechBlue, cYellow, cPurple, cPink, cSkyBlue, cTeal, cIndigo)
+    val savingsColors = listOf(cFintechBlue, cBrown, cOrange, cGreen, cRed, cYellow, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
 
-    val defaultColors = listOf(vPurple, vRed, vOrange, vLime, vCyan, vTeal, vIndigo, vPink, vAmber, vDeepOrange, vBlueGrey)
+    val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cBrown, cPink, cTeal, cIndigo)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors
