@@ -213,23 +213,23 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val cGreen = Color(0xFF34C759)
-    val cOrange = Color(0xFFFF9500)
-    val cFintechBlue = Color(0xFF007AFF)
-    val cBrown = Color(0xFFA0522D)
-    val cPurple = Color(0xFFAF52DE)
-    val cSkyBlue = Color(0xFF5AC8FA)
-    val cRed = Color(0xFFFF3B30)
-    val cYellow = Color(0xFFFFCC00)
-    val cPink = Color(0xFFFF2D55)
-    val cTeal = Color(0xFF00C7BE)
-    val cIndigo = Color(0xFF5856D6)
+    val gBlue = Color(0xFF4285F4)
+    val gRed = Color(0xFFEA4335)
+    val gYellow = Color(0xFFFBBC05)
+    val gGreen = Color(0xFF34A853)
+    val mIndigo = Color(0xFF3F51B5)
+    val mPurple = Color(0xFF9C27B0)
+    val mCyan = Color(0xFF00BCD4)
+    val mTeal = Color(0xFF009688)
+    val mOrange = Color(0xFFFF9800)
+    val mPink = Color(0xFFE91E63)
+    val mDeepOrange = Color(0xFFFF5722)
 
-    val incomeColors = listOf(cGreen, cOrange, cFintechBlue, cBrown, cPurple, cSkyBlue, cRed, cYellow, cTeal, cPink, cIndigo)
-    val expenseColors = listOf(cRed, cGreen, cOrange, cBrown, cFintechBlue, cYellow, cPurple, cPink, cSkyBlue, cTeal, cIndigo)
-    val savingsColors = listOf(cFintechBlue, cBrown, cOrange, cGreen, cRed, cYellow, cPurple, cSkyBlue, cPink, cTeal, cIndigo)
+    val incomeColors = listOf(gGreen, gYellow, gBlue, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
+    val expenseColors = listOf(gRed, gYellow, gBlue, gGreen, mPurple, mOrange, mCyan, mPink, mIndigo, mTeal, mDeepOrange)
+    val savingsColors = listOf(gBlue, gYellow, gGreen, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
 
-    val defaultColors = listOf(cFintechBlue, cGreen, cOrange, cPurple, cRed, cYellow, cSkyBlue, cBrown, cPink, cTeal, cIndigo)
+    val defaultColors = listOf(gBlue, gGreen, gRed, gYellow, mIndigo, mPurple, mCyan, mTeal, mOrange, mPink, mDeepOrange)
 
     val colors = when (categoryType) {
         "INCOME" -> incomeColors
@@ -1910,6 +1910,18 @@ fun FinanceNoteApp(
     val isFetchingFiles by viewModel.isFetchingFiles.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
 
+    var showSyncSuccessIcon by remember { mutableStateOf(false) }
+    var previousIsSyncing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isSyncing) {
+        if (previousIsSyncing && !isSyncing) {
+            showSyncSuccessIcon = true
+            kotlinx.coroutines.delay(3000)
+            showSyncSuccessIcon = false
+        }
+        previousIsSyncing = isSyncing
+    }
+
 
     var showBackupConfirm by remember { mutableStateOf(false) }
     var cloudBackupStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
@@ -2244,18 +2256,43 @@ fun FinanceNoteApp(
                                     },
                                     modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = if (!isGoogleSignedIn) {
-                                            Icons.Rounded.CloudOff
-                                        } else if (hasUnsavedChanges) {
-                                            Icons.Rounded.Sync
+                                    Box(contentAlignment = Alignment.Center) {
+                                        if (isSyncing) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                color = Color.White,
+                                                strokeWidth = 2.dp
+                                            )
                                         } else {
-                                            Icons.Rounded.CloudDone
-                                        },
-                                        contentDescription = "Cloud Sync",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                            androidx.compose.animation.AnimatedVisibility(
+                                                visible = showSyncSuccessIcon,
+                                                enter = scaleIn() + fadeIn(),
+                                                exit = scaleOut() + fadeOut()
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.CheckCircle,
+                                                    contentDescription = "Sync Success",
+                                                    tint = Color(0xFF34A853), // Success Green
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+
+                                            if (!showSyncSuccessIcon) {
+                                                Icon(
+                                                    imageVector = if (!isGoogleSignedIn) {
+                                                        Icons.Rounded.CloudOff
+                                                    } else if (hasUnsavedChanges) {
+                                                        Icons.Rounded.Sync
+                                                    } else {
+                                                        Icons.Rounded.CloudDone
+                                                    },
+                                                    contentDescription = "Cloud Sync",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                                 SyncStatusBadge(
                                     isNetworkAvailable = isNetworkActive,
@@ -4638,7 +4675,8 @@ fun DashboardScreen(
                             text = if (language == AppLanguage.BN) "মাসিক বাজেট কন্ট্রোল" else "Monthly Budget Control",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = FintechBlue
+                            color = FintechBlue,
+                            modifier = Modifier.padding(start = 8.dp)
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

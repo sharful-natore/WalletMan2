@@ -661,7 +661,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             )
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
-            val finalName = if (note.isBlank()) category else note
+            val personName = personId?.let { pid -> repository.allPersons.first().find { it.id == pid }?.name }
+            val finalName = personName ?: if (type == "INCOME") (if (_language.value == com.example.ui.AppLanguage.BN) "আয়" else "Income")
+            else if (type == "EXPENSE") (if (_language.value == com.example.ui.AppLanguage.BN) "ব্যয়" else "Expense")
+            else if (note.isBlank()) category else note
             val finalCategory = "${type.uppercase()} - $category"
             recordDatabaseMutation("ADD", finalName, finalCategory, amount)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন সফলভাবে সংরক্ষণ করা হয়েছে" else "Transaction saved", isSuccess = true, type = "SUCCESS")
@@ -673,7 +676,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             repository.updateTransaction(transaction)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
-            val finalName = if (transaction.note.isBlank()) transaction.category else transaction.note
+            val personName = transaction.personId?.let { pid -> repository.allPersons.first().find { it.id == pid }?.name }
+            val finalName = personName ?: if (transaction.type == "INCOME") (if (_language.value == com.example.ui.AppLanguage.BN) "আয়" else "Income")
+            else if (transaction.type == "EXPENSE") (if (_language.value == com.example.ui.AppLanguage.BN) "ব্যয়" else "Expense")
+            else if (transaction.note.isBlank()) transaction.category else transaction.note
             val finalCategory = "${transaction.type.uppercase()} - ${transaction.category}"
             recordDatabaseMutation("EDIT", finalName, finalCategory, transaction.amount)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন আপডেট করা হয়েছে" else "Transaction updated", isSuccess = true, type = "SUCCESS")
@@ -685,7 +691,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             val t = repository.getTransactionById(id)
             if (t != null) {
                 repository.insertTrashItem(com.example.data.TrashItem(originalId = id, itemType = "TRANSACTION", itemJson = transactionAdapter.toJson(t)))
-                val finalName = if (t.note.isBlank()) t.category else t.note
+                val personName = t.personId?.let { pid -> repository.allPersons.first().find { it.id == pid }?.name }
+                val finalName = personName ?: if (t.type == "INCOME") (if (_language.value == com.example.ui.AppLanguage.BN) "আয়" else "Income")
+                else if (t.type == "EXPENSE") (if (_language.value == com.example.ui.AppLanguage.BN) "ব্যয়" else "Expense")
+                else if (t.note.isBlank()) t.category else t.note
                 val finalCategory = "${t.type.uppercase()} - ${t.category}"
                 recordDatabaseMutation("DELETE", finalName, finalCategory, t.amount)
             }
