@@ -164,16 +164,16 @@ fun getBudgetCategoryColors(categoryType: String?): List<Color> {
         Color(0xFFE6EE9C)  // Very Pale Lime
     )
     val expenseColors = listOf(
-        Color(0xFFE65100), // Very Dark Orange
-        Color(0xFFFFB74D), // Light Warm Orange
-        Color(0xFFD84315), // Deep Burnt Orange
-        Color(0xFFFFCC80), // Pastel Orange
-        Color(0xFFEF6C00), // Rich Dark Orange
-        Color(0xFFFFD54F), // Soft Amber Orange
-        Color(0xFFF57C00), // Vibrant Medium Dark Orange
-        Color(0xFFFFE082), // Pale Warm Gold
+        Color(0xFFFFF3E0), // Extremely Light Orange
+        Color(0xFFFFE0B2), // Very Light Orange
+        Color(0xFFFFCC80), // Light Orange
+        Color(0xFFFFB74D), // Soft Warm Orange
+        Color(0xFFFFA726), // Medium Light Orange
         Color(0xFFFF9800), // Standard Orange
-        Color(0xFFFF8F00)  // Warm Amber Orange
+        Color(0xFFFB8C00), // Rich Orange
+        Color(0xFFF57C00), // Vibrant Dark Orange
+        Color(0xFFEF6C00), // Rich Dark Orange
+        Color(0xFFE65100)  // Deepest Dark Orange
     )
     val savingsColors = listOf(
         Color(0xFF0D47A1), // Deep Navy Blue
@@ -599,16 +599,16 @@ fun BudgetControlDonutChart(
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
         "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
-        "EXPENSE" -> listOf(Color(0xFFFFCC80), Color(0xFFFFB74D), Color(0xFFFF9800), Color(0xFFF57C00), Color(0xFFE65100)) // Pastel orange -> light orange -> standard orange -> dark orange -> burnt orange
+        "EXPENSE" -> listOf(Color(0xFFFF5722), Color(0xFFBF360C)) // Deep Orange -> Dark Burnt Orange
         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
 
     val trackColor = when (categoryType) {
-        "INCOME" -> Color(0xFF34A853).copy(alpha = 0.25f)             // 25% green
-        "EXPENSE" -> Color(0xFFFF5722).copy(alpha = 0.25f)            // 25% deep orange
-        "SAVINGS" -> Color(0xFF4285F4).copy(alpha = 0.25f)            // 25% tech blue
-        else -> Color.LightGray.copy(alpha = 0.25f)
+        "INCOME" -> Color(0xFF34A853).copy(alpha = 0.20f)             // 20% green
+        "EXPENSE" -> Color(0xFFFF5722).copy(alpha = 0.20f)            // 20% deep orange
+        "SAVINGS" -> Color(0xFF4285F4).copy(alpha = 0.20f)            // 20% tech blue
+        else -> Color.LightGray.copy(alpha = 0.20f)
     }
 
     val percentageColor = when (categoryType) {
@@ -1006,6 +1006,27 @@ fun SpecificDatePickerDialog(
     var selectedHour by remember { mutableStateOf(initialHour) }
     var selectedMinute by remember { mutableStateOf(initialMinute) }
     
+    val dayState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val monthState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val yearState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val hourState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val minuteState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+    val currentYearCal = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    val years = (currentYearCal - 3..currentYearCal + 2).toList()
+
+    LaunchedEffect(Unit) {
+        // Centering logic: Scroll so selected item is in the middle
+        // Assuming 180dp height and ~30dp item height (including padding) -> 6 items visible
+        // Let's use index - 2 or - 3
+        dayState.scrollToItem(kotlin.math.max(0, initialDay - 1 - 2))
+        monthState.scrollToItem(kotlin.math.max(0, initialMonth - 1 - 2))
+        val yearIndex = years.indexOf(initialYear)
+        if (yearIndex != -1) yearState.scrollToItem(kotlin.math.max(0, yearIndex - 2))
+        hourState.scrollToItem(kotlin.math.max(0, initialHour - 2))
+        minuteState.scrollToItem(kotlin.math.max(0, initialMinute - 2))
+    }
+    
     val monthsBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
     val monthsEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
     val months = if (language == AppLanguage.BN) monthsBn else monthsEn
@@ -1014,14 +1035,27 @@ fun SpecificDatePickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (language == AppLanguage.BN) "তারিখ ও সময় নির্বাচন করুন" else "Select Date & Time") },
         text = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Box(contentAlignment = Alignment.Center) {
+                // Selector overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                 Column(modifier = Modifier.weight(0.9f)) {
                     Text(if (language == AppLanguage.BN) "দিন" else "Day", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
-                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.height(180.dp),
+                        state = dayState
+                    ) {
                         items(31) { index ->
                             val d = index + 1
                             val isSelected = selectedDay == d
@@ -1043,7 +1077,10 @@ fun SpecificDatePickerDialog(
                 Column(modifier = Modifier.weight(1.3f)) {
                     Text(if (language == AppLanguage.BN) "মাস" else "Month", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
-                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.height(180.dp),
+                        state = monthState
+                    ) {
                         items(12) { index ->
                             val m = index + 1
                             val isSelected = selectedMonth == m
@@ -1065,9 +1102,10 @@ fun SpecificDatePickerDialog(
                 Column(modifier = Modifier.weight(1.0f)) {
                     Text(if (language == AppLanguage.BN) "বছর" else "Year", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
-                    val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-                    val years = (currentYear - 3..currentYear + 2).toList()
-                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.height(180.dp),
+                        state = yearState
+                    ) {
                         items(years.size) { index ->
                             val y = years[index]
                             val isSelected = selectedYear == y
@@ -1089,7 +1127,10 @@ fun SpecificDatePickerDialog(
                 Column(modifier = Modifier.weight(0.9f)) {
                     Text(if (language == AppLanguage.BN) "ঘণ্টা" else "Hour", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
-                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.height(180.dp),
+                        state = hourState
+                    ) {
                         items(24) { h ->
                             val isSelected = selectedHour == h
                             Box(
@@ -1110,7 +1151,10 @@ fun SpecificDatePickerDialog(
                 Column(modifier = Modifier.weight(0.9f)) {
                     Text(if (language == AppLanguage.BN) "মিনিট" else "Min", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     Spacer(modifier = Modifier.height(4.dp))
-                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.height(180.dp)) {
+                    androidx.compose.foundation.lazy.LazyColumn(
+                        modifier = Modifier.height(180.dp),
+                        state = minuteState
+                    ) {
                         items(60) { m ->
                             val isSelected = selectedMinute == m
                             Box(
@@ -1128,7 +1172,8 @@ fun SpecificDatePickerDialog(
                     }
                 }
             }
-        },
+        }
+    },
         confirmButton = {
             TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay, selectedHour, selectedMinute) }) {
                 Text(Translation.get("confirm", language))
@@ -2916,7 +2961,8 @@ fun FinanceNoteApp(
                                                     selectedPersonDetail = foundDebt
                                                     activeTab = "debts"
                                                 }
-                                            }
+                                            },
+                                            activeTab = activeTab
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -2944,7 +2990,8 @@ fun FinanceNoteApp(
                                                     selectedPersonDetail = foundDebt
                                                     activeTab = "debts"
                                                 }
-                                            }
+                                            },
+                                            activeTab = activeTab
                                         )
                                         2 -> DebtsScreen(
                                             language = language,
@@ -2960,12 +3007,14 @@ fun FinanceNoteApp(
                                             onFilterChange = { debtFilter = it },
                                             timeFilter = timeFilter,
                                             onTimeFilterChange = handleTimeFilterChange,
-                                            highlightedPersonId = highlightedPersonId
+                                            highlightedPersonId = highlightedPersonId,
+                                            activeTab = activeTab
                                         )
                                         3 -> SavingsScreen(
                                             language = language,
                                             isDark = isDarkTheme,
                                             profileName = profileName,
+                                            profilePhotoUri = profilePhotoUri,
                                             savingsGoals = savingsGoals,
                                             onAddSavingsGoalClick = { showAddSavingsGoalDialog = true },
                                             onGoalClick = { selectedSavingsGoalDetail = it },
@@ -2977,7 +3026,8 @@ fun FinanceNoteApp(
                                             onMoveGoal = { goalActionChoice = it },
                                             onDeleteGoals = { pendingDeleteGoals = it },
                                             onMoveGoals = { goalsToMoveIds = it },
-                                            highlightedGoalId = highlightedGoalId
+                                            highlightedGoalId = highlightedGoalId,
+                                            activeTab = activeTab
                                         )
                                     }
                                 }
@@ -4398,7 +4448,8 @@ fun DashboardScreen(
     onSignInClick: () -> Unit = {},
     onBackupClick: () -> Unit = {},
     viewModel: FinanceViewModel? = null,
-    onPersonClick: ((Person) -> Unit)? = null
+    onPersonClick: ((Person) -> Unit)? = null,
+    activeTab: String = ""
 ) {
     val context = LocalContext.current
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -5371,7 +5422,7 @@ fun DashboardScreen(
                 }
                 items(txs, key = { it.id }) { tx ->
                     val isSelected = selectedTxIds.contains(tx.id)
-                    val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                    val visibleState = remember(activeTab == "dashboard") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                     androidx.compose.animation.AnimatedVisibility(
                         visibleState = visibleState,
                         enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -6518,7 +6569,8 @@ fun TransactionsScreen(
     onTimeFilterChange: (String) -> Unit = {},
     highlightedTxId: Int? = null,
     onNavigateToTab: ((String, String) -> Unit)? = null,
-    onPersonClick: ((Person) -> Unit)? = null
+    onPersonClick: ((Person) -> Unit)? = null,
+    activeTab: String = ""
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("DATE_DESC") }
@@ -6920,7 +6972,7 @@ fun TransactionsScreen(
                             }
                             items(txs, key = { it.id }) { tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
-                                val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                                val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery, activeTab == "transactions") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                                 androidx.compose.animation.AnimatedVisibility(
                                     visibleState = visibleState,
                                     enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -6963,7 +7015,7 @@ fun TransactionsScreen(
                     ) {
                         items(sortedTransactions, key = { it.id }) { tx ->
                             val isSelected = selectedTxIds.contains(tx.id)
-                            val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                            val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery, activeTab == "transactions") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                             androidx.compose.animation.AnimatedVisibility(
                                 visibleState = visibleState,
                                 enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -7055,7 +7107,8 @@ fun DebtsScreen(
     onFilterChange: (String) -> Unit = {},
     timeFilter: String = "ALL",
     onTimeFilterChange: (String) -> Unit = {},
-    highlightedPersonId: Int? = null
+    highlightedPersonId: Int? = null,
+    activeTab: String = ""
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("NAME_ASC") }
@@ -7409,7 +7462,7 @@ fun DebtsScreen(
                 ) {
                     items(sortedDebts, key = { it.person.id }) { item ->
                         val isSelected = selectedPersonIds.contains(item.person.id)
-                        val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                        val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery, activeTab == "debts") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                         androidx.compose.animation.AnimatedVisibility(
                             visibleState = visibleState,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -7890,6 +7943,7 @@ fun SavingsScreen(
     language: AppLanguage,
     isDark: Boolean,
     profileName: String,
+    profilePhotoUri: String?,
     savingsGoals: List<SavingsGoal>,
     onAddSavingsGoalClick: () -> Unit,
     onGoalClick: (SavingsGoal) -> Unit,
@@ -7898,7 +7952,8 @@ fun SavingsScreen(
     onMoveGoal: (SavingsGoal) -> Unit = {},
     onDeleteGoals: (List<Int>) -> Unit = {},
     onMoveGoals: (List<Int>) -> Unit = {},
-    highlightedGoalId: Int? = null
+    highlightedGoalId: Int? = null,
+    activeTab: String = ""
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("TITLE_ASC") }
@@ -8180,7 +8235,7 @@ fun SavingsScreen(
                 ) {
                     items(sortedGoals, key = { it.id }) { goal ->
                         val isSelected = selectedGoalIds.contains(goal.id)
-                        val visibleState = remember(currentSortBy, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                        val visibleState = remember(currentSortBy, searchQuery, activeTab == "savings") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                         androidx.compose.animation.AnimatedVisibility(
                             visibleState = visibleState,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
