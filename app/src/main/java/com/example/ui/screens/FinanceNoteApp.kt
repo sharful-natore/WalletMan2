@@ -164,16 +164,14 @@ fun getBudgetCategoryColors(categoryType: String?): List<Color> {
         Color(0xFFE6EE9C)  // Very Pale Lime
     )
     val expenseColors = listOf(
-        Color(0xFFFFF3E0), // Extremely Light Orange
-        Color(0xFFFFE0B2), // Very Light Orange
-        Color(0xFFFFCC80), // Light Orange
-        Color(0xFFFFB74D), // Soft Warm Orange
-        Color(0xFFFFA726), // Medium Light Orange
-        Color(0xFFFF9800), // Standard Orange
-        Color(0xFFFB8C00), // Rich Orange
-        Color(0xFFF57C00), // Vibrant Dark Orange
+        Color(0xFFE65100), // Deepest Dark Orange
         Color(0xFFEF6C00), // Rich Dark Orange
-        Color(0xFFE65100)  // Deepest Dark Orange
+        Color(0xFFF57C00), // Vibrant Dark Orange
+        Color(0xFFFB8C00), // Rich Orange
+        Color(0xFFFF9800), // Standard Orange
+        Color(0xFFFFA726), // Medium Light Orange
+        Color(0xFFFFB74D), // Soft Warm Orange
+        Color(0xFFFFCC80)  // Light Orange
     )
     val savingsColors = listOf(
         Color(0xFF0D47A1), // Deep Navy Blue
@@ -1035,16 +1033,6 @@ fun SpecificDatePickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (language == AppLanguage.BN) "তারিখ ও সময় নির্বাচন করুন" else "Select Date & Time") },
         text = {
-            Box(contentAlignment = Alignment.Center) {
-                // Selector overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(30.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1172,8 +1160,7 @@ fun SpecificDatePickerDialog(
                     }
                 }
             }
-        }
-    },
+        },
         confirmButton = {
             TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay, selectedHour, selectedMinute) }) {
                 Text(Translation.get("confirm", language))
@@ -5422,7 +5409,7 @@ fun DashboardScreen(
                 }
                 items(txs, key = { it.id }) { tx ->
                     val isSelected = selectedTxIds.contains(tx.id)
-                    val visibleState = remember(activeTab == "dashboard") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                    val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                     androidx.compose.animation.AnimatedVisibility(
                         visibleState = visibleState,
                         enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -6972,7 +6959,7 @@ fun TransactionsScreen(
                             }
                             items(txs, key = { it.id }) { tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
-                                val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery, activeTab == "transactions") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                                val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                                 androidx.compose.animation.AnimatedVisibility(
                                     visibleState = visibleState,
                                     enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -7015,7 +7002,7 @@ fun TransactionsScreen(
                     ) {
                         items(sortedTransactions, key = { it.id }) { tx ->
                             val isSelected = selectedTxIds.contains(tx.id)
-                            val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery, activeTab == "transactions") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                            val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                             androidx.compose.animation.AnimatedVisibility(
                                 visibleState = visibleState,
                                 enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -7462,7 +7449,7 @@ fun DebtsScreen(
                 ) {
                     items(sortedDebts, key = { it.person.id }) { item ->
                         val isSelected = selectedPersonIds.contains(item.person.id)
-                        val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery, activeTab == "debts") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                        val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                         androidx.compose.animation.AnimatedVisibility(
                             visibleState = visibleState,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -8235,7 +8222,7 @@ fun SavingsScreen(
                 ) {
                     items(sortedGoals, key = { it.id }) { goal ->
                         val isSelected = selectedGoalIds.contains(goal.id)
-                        val visibleState = remember(currentSortBy, searchQuery, activeTab == "savings") { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                        val visibleState = remember(currentSortBy, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                         androidx.compose.animation.AnimatedVisibility(
                             visibleState = visibleState,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
