@@ -242,8 +242,8 @@ fun CalculatorDialog(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(
                                         when {
-                                            isOp -> Color(0xFF3B82F6).copy(alpha = 0.2f)
-                                            isEq -> Color(0xFF3B82F6)
+                                            isOp -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                                            isEq -> MaterialTheme.colorScheme.primary
                                             isClear -> Color(0xFFEF4444).copy(alpha = 0.2f)
                                             isFunc -> Color(0xFF10B981).copy(alpha = 0.2f)
                                             else -> if (isDark) Color(0xFF2D3249) else Color(0xFFF8FAFC)
@@ -257,7 +257,7 @@ fun CalculatorDialog(
                                     fontSize = 24.sp,
                                     fontWeight = if (isOp || isEq || isClear || isFunc) FontWeight.Bold else FontWeight.Medium,
                                     color = when {
-                                        isOp -> Color(0xFF3B82F6)
+                                        isOp -> MaterialTheme.colorScheme.primary
                                         isEq -> Color.White
                                         isClear -> Color(0xFFEF4444)
                                         isFunc -> Color(0xFF10B981)

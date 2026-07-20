@@ -91,7 +91,7 @@ fun SearchDialog(
                 elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
                 border = BorderStroke(
                     width = 1.5.dp,
-                    color = if (isDark) Color(0xFF2563EB).copy(alpha = 0.3f) else Color(0xFF3B82F6).copy(alpha = 0.2f)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.3f else 0.2f)
                 )
             ) {
                 Column(
@@ -149,7 +149,7 @@ fun SearchDialog(
                             Icon(
                                 Icons.Rounded.Search, 
                                 contentDescription = null, 
-                                tint = if (isDark) Color(0xFF3B82F6) else Color(0xFF2563EB)
+                                tint = MaterialTheme.colorScheme.primary
                             ) 
                         },
                         trailingIcon = {
@@ -170,7 +170,7 @@ fun SearchDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = if (isDark) Color(0xFF181C2A) else Color(0xFFF8FAFC),
                             unfocusedContainerColor = if (isDark) Color(0xFF181C2A) else Color(0xFFF8FAFC),
-                            focusedBorderColor = Color(0xFF3B82F6),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = if (isDark) Color(0xFF2E354F) else Color(0xFFE2E8F0)
                         ),
                         singleLine = true
@@ -321,7 +321,7 @@ fun CategoryHeader(title: String, count: Int, isDark: Boolean) {
     ) {
         Text(
             text = title,
-            color = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+            color = MaterialTheme.colorScheme.primary,
             fontSize = 13.sp,
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 0.5.sp
@@ -329,12 +329,12 @@ fun CategoryHeader(title: String, count: Int, isDark: Boolean) {
         Box(
             modifier = Modifier
                 .clip(CircleShape)
-                .background(if (isDark) Color(0xFF1E293B) else Color(0xFFEFF6FF))
+                .background(if (isDark) Color(0xFF1E293B) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                 .padding(horizontal = 8.dp, vertical = 2.dp)
         ) {
             Text(
                 text = count.toString(),
-                color = if (isDark) Color.White else Color(0xFF2563EB),
+                color = if (isDark) Color.White else MaterialTheme.colorScheme.primary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -464,13 +464,13 @@ fun PersonSearchItem(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background((if (isDark) Color(0xFF3B82F6) else Color(0xFF2563EB)).copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Rounded.Person, 
                     contentDescription = null, 
-                    tint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB), 
+                    tint = MaterialTheme.colorScheme.primary, 
                     modifier = Modifier.size(18.dp)
                 )
             }

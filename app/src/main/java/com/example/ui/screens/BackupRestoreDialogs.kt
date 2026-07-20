@@ -437,7 +437,7 @@ fun BackupStatsDialog(
                             fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 6.sp,
-                            color = Color(0xFF3B82F6),
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(vertical = 2.dp)
                         )
                         OutlinedTextField(
@@ -448,7 +448,7 @@ fun BackupStatsDialog(
                             shape = RoundedCornerShape(10.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = if (isCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                                focusedBorderColor = if (isCorrect) Color(0xFF10B981) else MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
                                 focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
                                 unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -477,7 +477,7 @@ fun BackupStatsDialog(
                         enabled = isCorrect && selectedWorkspaces.isNotEmpty(),
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRestoreMode) Color(0xFF10B981) else Color(0xFF3B82F6),
+                            containerColor = if (isRestoreMode) Color(0xFF10B981) else MaterialTheme.colorScheme.primary,
                             disabledContainerColor = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)
                         ),
                         shape = RoundedCornerShape(12.dp)
@@ -629,7 +629,7 @@ fun CaptchaDeleteDialog(
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 6.sp,
-                        color = Color(0xFF3B82F6),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
@@ -642,7 +642,7 @@ fun CaptchaDeleteDialog(
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = if (isCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                        focusedBorderColor = if (isCorrect) Color(0xFF10B981) else MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
                         focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
                         unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -948,7 +948,7 @@ fun MoveToWorkspaceDialog(
                     Icon(
                         imageVector = Icons.Rounded.SwapHoriz,
                         contentDescription = null,
-                        tint = Color(0xFF3B82F6),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                     Text(
@@ -977,10 +977,10 @@ fun MoveToWorkspaceDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) Color(0xFF3B82F6).copy(alpha = 0.1f) else Color.Transparent)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
                                 .border(
                                     1.dp,
-                                    if (isSelected) Color(0xFF3B82F6) else (if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)),
+                                    if (isSelected) MaterialTheme.colorScheme.primary else (if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)),
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable { selectedWorkspaceId = ws.workspace.id }
@@ -990,7 +990,7 @@ fun MoveToWorkspaceDialog(
                             RadioButton(
                                 selected = isSelected,
                                 onClick = { selectedWorkspaceId = ws.workspace.id },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF3B82F6))
+                                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -1025,7 +1025,7 @@ fun MoveToWorkspaceDialog(
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 6.sp,
-                        color = Color(0xFF3B82F6),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     OutlinedTextField(
@@ -1036,7 +1036,7 @@ fun MoveToWorkspaceDialog(
                         shape = RoundedCornerShape(10.dp),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isCorrect) Color(0xFF10B981) else Color(0xFF3B82F6),
+                            focusedBorderColor = if (isCorrect) Color(0xFF10B981) else MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
                             focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
                             unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -1064,7 +1064,7 @@ fun MoveToWorkspaceDialog(
                         enabled = isCorrect && selectedWorkspaceId != null,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF3B82F6),
+                            containerColor = MaterialTheme.colorScheme.primary,
                             disabledContainerColor = if (isDark) Color(0xFF2E334D) else Color(0xFFE2E8F0)
                         ),
                         shape = RoundedCornerShape(12.dp)
@@ -1135,7 +1135,7 @@ fun ItemActionChoiceDialog(
                         Icon(
                             imageVector = Icons.Rounded.SwapHoriz,
                             contentDescription = null,
-                            tint = Color(0xFF3B82F6),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
                         )
                         Text(

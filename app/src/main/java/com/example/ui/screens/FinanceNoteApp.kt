@@ -2679,6 +2679,8 @@ fun FinanceNoteApp(
                             .padding(bottom = 12.dp + navBarPadding) // Lowered to nestle perfectly in the notch
                             .size(68.dp) // Fix size so the glowing background doesn't shift the button up
                     ) {
+                        val fabPrimary = activeThemeGradient[0]
+                        val fabSecondary = activeThemeGradient.getOrElse(1) { fabPrimary }
                         if (isDarkTheme) {
                             Box(
                                 modifier = Modifier
@@ -2686,8 +2688,8 @@ fun FinanceNoteApp(
                                     .background(
                                         Brush.radialGradient(
                                             colors = listOf(
-                                                Color(0xFF6F7BF7).copy(alpha = 0.45f),
-                                                Color(0xFF38BDF8).copy(alpha = 0.15f),
+                                                fabPrimary.copy(alpha = 0.45f),
+                                                fabSecondary.copy(alpha = 0.15f),
                                                 Color.Transparent
                                             )
                                         )
@@ -2696,12 +2698,12 @@ fun FinanceNoteApp(
                         }
                         Box(
                             modifier = Modifier
-                                .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0xFF6F7BF7), ambientColor = Color(0xFF38BDF8))
+                                .shadow(elevation = 8.dp, shape = CircleShape, spotColor = fabPrimary, ambientColor = fabSecondary)
                                 .size(68.dp)
                                 .clip(CircleShape)
                                 .background(
                                     Brush.linearGradient(
-                                        colors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
+                                        colors = listOf(fabPrimary, fabSecondary)
                                     )
                                 )
                                 .clickable { showAddTransactionDialog = true }
@@ -11055,9 +11057,9 @@ fun SettingsScreen(
 
         // --- 2. DARK MODE CARD ---
         SettingCategory(
-            title = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
+            title = if (language == AppLanguage.BN) "অ্যাপ থিম কাস্টমাইজেশন" else "App Theme Customization",
             isDark = isDark,
-            icon = Icons.Rounded.NightsStay,
+            icon = Icons.Rounded.Palette,
             initiallyExpanded = false
         ) {
             val selectedThemeIndex by viewModel.selectedThemeGradientIndex.collectAsState()
