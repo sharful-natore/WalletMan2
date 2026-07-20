@@ -1207,7 +1207,15 @@ fun WorkspaceManagementDialog(
                         .fillMaxWidth()
                         .weight(1f, fill = false)
                 ) {
-                    items(workspaces) { ws ->
+                    items(workspaces, key = { it.workspace.id }) { ws ->
+                        val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                        androidx.compose.animation.AnimatedVisibility(
+                            visibleState = visibleState,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                initialOffsetY = { 40 }
+                            ),
+                            modifier = Modifier.animateItem()
+                        ) {
                         val isSelected = ws.workspace.id == currentWorkspace.id
                         val itemBg = if (isSelected) FintechBlue.copy(alpha = 0.08f) else (if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC))
                         val cardBorderCol = if (isSelected) FintechBlue else borderCol
@@ -1428,6 +1436,7 @@ fun WorkspaceManagementDialog(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -4402,6 +4411,10 @@ fun DashboardScreen(
     val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
+
+    androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
+        selectedTxIds = emptySet()
+    }
     val incomeByCategory = remember(transactions) {
         // Include INCOME type AND LEND transactions that are of subtype "CREDIT" (Credit Sales)
         transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
@@ -5358,12 +5371,13 @@ fun DashboardScreen(
                 }
                 items(txs, key = { it.id }) { tx ->
                     val isSelected = selectedTxIds.contains(tx.id)
+                    val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = true,
+                        visibleState = visibleState,
                         enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
                             initialOffsetY = { 40 }
                         ),
-                        modifier = Modifier.animateItemPlacement()
+                        modifier = Modifier.animateItem()
                     ) {
                         TransactionRowItem(
                             tx = tx,
@@ -6513,6 +6527,9 @@ fun TransactionsScreen(
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
 
+    androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
+        selectedTxIds = emptySet()
+    }
     val timeFilteredTransactions = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
     }
@@ -6903,12 +6920,13 @@ fun TransactionsScreen(
                             }
                             items(txs, key = { it.id }) { tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
+                                val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                                 androidx.compose.animation.AnimatedVisibility(
-                                    visible = true,
+                                    visibleState = visibleState,
                                     enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
                                         initialOffsetY = { 40 }
                                     ),
-                                    modifier = Modifier.animateItemPlacement()
+                                    modifier = Modifier.animateItem()
                                 ) {
                                     Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                         TransactionRowItem(
@@ -6945,12 +6963,13 @@ fun TransactionsScreen(
                     ) {
                         items(sortedTransactions, key = { it.id }) { tx ->
                             val isSelected = selectedTxIds.contains(tx.id)
+                            val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                             androidx.compose.animation.AnimatedVisibility(
-                                visible = true,
+                                visibleState = visibleState,
                                 enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
                                     initialOffsetY = { 40 }
                                 ),
-                                modifier = Modifier.animateItemPlacement()
+                                modifier = Modifier.animateItem()
                             ) {
                                 Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                     TransactionRowItem(
@@ -7044,6 +7063,10 @@ fun DebtsScreen(
 
     var selectedPersonIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedPersonIds.isNotEmpty()
+
+    androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
+        selectedPersonIds = emptySet()
+    }
 
     val filteredDebts = remember(personDebts, filter) {
         when (filter) {
@@ -7386,12 +7409,13 @@ fun DebtsScreen(
                 ) {
                     items(sortedDebts, key = { it.person.id }) { item ->
                         val isSelected = selectedPersonIds.contains(item.person.id)
+                        val visibleState = remember(filter, currentSortBy, timeFilter, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = true,
+                            visibleState = visibleState,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
                                 initialOffsetY = { 40 }
                             ),
-                            modifier = Modifier.animateItemPlacement()
+                            modifier = Modifier.animateItem()
                         ) {
                             Box(modifier = Modifier.padding(horizontal = 4.dp)) {
                                 PersonDebtRowItem(
@@ -7883,6 +7907,10 @@ fun SavingsScreen(
     var selectedGoalIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedGoalIds.isNotEmpty()
 
+    androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
+        selectedGoalIds = emptySet()
+    }
+
     val searchQueryLower = searchQuery.lowercase().trim()
     val searchedGoals = remember(savingsGoals, searchQuery) {
         if (searchQueryLower.isEmpty()) {
@@ -8152,12 +8180,13 @@ fun SavingsScreen(
                 ) {
                     items(sortedGoals, key = { it.id }) { goal ->
                         val isSelected = selectedGoalIds.contains(goal.id)
+                        val visibleState = remember(currentSortBy, searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = true,
+                            visibleState = visibleState,
                             enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
                                 initialOffsetY = { 40 }
                             ),
-                            modifier = Modifier.animateItemPlacement()
+                            modifier = Modifier.animateItem()
                         ) {
                             SavingsGoalCardItem(
                                 goal = goal,
@@ -8588,7 +8617,15 @@ fun PersonSelectorDialog(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(filteredPersons) { person ->
+                        items(filteredPersons, key = { it.id }) { person ->
+                            val visibleState = remember(searchQuery) { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                            androidx.compose.animation.AnimatedVisibility(
+                                visibleState = visibleState,
+                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                    initialOffsetY = { 40 }
+                                ),
+                                modifier = Modifier.animateItem()
+                            ) {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -8684,6 +8721,7 @@ fun PersonSelectorDialog(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -10022,6 +10060,10 @@ fun SavingsGoalDetailOverlay(
     var txToDelete by remember { mutableStateOf<SavingsTransaction?>(null) }
     var selectedSavingsTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedSavingsTxIds.isNotEmpty()
+
+    androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
+        selectedSavingsTxIds = emptySet()
+    }
     var showMultiDeleteConfirm by remember { mutableStateOf(false) }
     
     if (txToDelete != null) {
@@ -10202,8 +10244,16 @@ fun SavingsGoalDetailOverlay(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(txList) { tx ->
-                        val isDeposit = tx.isDeposit
+                    items(txList, key = { it.id }) { tx ->
+                        val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                        androidx.compose.animation.AnimatedVisibility(
+                            visibleState = visibleState,
+                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                initialOffsetY = { 40 }
+                            ),
+                            modifier = Modifier.animateItem()
+                        ) {
+                            val isDeposit = tx.isDeposit
                         val amountColor = if (isDeposit) FintechGreen else FintechRed
                         val txIcon = if (isDeposit) Icons.AutoMirrored.Rounded.TrendingUp else Icons.AutoMirrored.Rounded.TrendingDown
                         val txLabel = if (isDeposit) Translation.get("deposit", language) else Translation.get("withdraw", language)
@@ -10327,6 +10377,7 @@ fun SavingsGoalDetailOverlay(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                     item { Spacer(modifier = Modifier.height(110.dp)) }
@@ -11036,8 +11087,17 @@ fun PersonDetailOverlay(
                                 modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                             )
                         }
-                        items(txs) { tx ->
-                            TransactionRowItem(tx, language, isDark, listOf(personDebt.person), onDeleteTx, onEditTx)
+                        items(txs, key = { it.id }) { tx ->
+                            val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                            androidx.compose.animation.AnimatedVisibility(
+                                visibleState = visibleState,
+                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                    initialOffsetY = { 40 }
+                                ),
+                                modifier = Modifier.animateItem()
+                            ) {
+                                TransactionRowItem(tx, language, isDark, listOf(personDebt.person), onDeleteTx, onEditTx)
+                            }
                         }
                     }
                     item { Spacer(modifier = Modifier.height(110.dp)) }
@@ -15845,7 +15905,15 @@ fun BudgetHistoryDialog(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(allMonthKeys) { monthKey ->
+                        items(allMonthKeys, key = { it }) { monthKey ->
+                            val visibleState = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                            androidx.compose.animation.AnimatedVisibility(
+                                visibleState = visibleState,
+                                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
+                                    initialOffsetY = { 40 }
+                                ),
+                                modifier = Modifier.animateItem()
+                            ) {
                             val displayMonth = getCustomTimeFilterLabel("CUSTOM_MONTH:$monthKey", language)
                             
                             val monthlyIncome = remember(transactions, monthKey) {
@@ -15983,6 +16051,7 @@ fun BudgetHistoryDialog(
                                         }
                                     }
                                 }
+                            }
                             }
                         }
                     }
