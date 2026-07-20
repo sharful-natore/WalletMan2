@@ -7734,7 +7734,13 @@ fun PersonDebtRowItem(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { onClick(item) },
+                onClick = {
+                    if (isSelectionMode) {
+                        onLongClick()
+                    } else {
+                        onClick(item)
+                    }
+                },
                 onLongClick = onLongClick
             )
             .testTag("person_item_${item.person.id}")
@@ -8300,7 +8306,13 @@ fun SavingsGoalCardItem(
                 else Modifier
             )
             .combinedClickable(
-                onClick = { onGoalClick(goal) },
+                onClick = {
+                    if (isSelectionMode) {
+                        onLongClick()
+                    } else {
+                        onGoalClick(goal)
+                    }
+                },
                 onLongClick = onLongClick
             )
             .testTag("savings_item_${goal.id}")
