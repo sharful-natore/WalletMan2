@@ -71,6 +71,14 @@ import androidx.activity.result.contract.ActivityResultContract
 import com.yalantis.ucrop.UCrop
 import java.io.File
 
+val FintechBlue: Color
+    @Composable
+    get() = MaterialTheme.colorScheme.primary
+
+val activeThemeGradient: List<Color>
+    @Composable
+    get() = com.example.ui.theme.GradientsList.find { it.firstOrNull() == MaterialTheme.colorScheme.primary } ?: com.example.ui.theme.GradientsList[0]
+
 class UCropContract : ActivityResultContract<Pair<Uri, Uri>, Uri?>() {
     override fun createIntent(context: Context, input: Pair<Uri, Uri>): Intent {
         val (sourceUri, destinationUri) = input
@@ -134,43 +142,40 @@ fun getCustomTimeFilterLabel(timeFilter: String, lang: AppLanguage): String {
 
 fun getBudgetCategoryColors(categoryType: String?): List<Color> {
     val incomeColors = listOf(
-        Color(0xFF8BC34A), // Lime Green (Light Green)
+        Color(0xFF8BC34A), // Distinct Lime Green
+        Color(0xFF4CAF50), // Standard Green
         Color(0xFF9CCC65), // Soft Light Green
-        Color(0xFFA5D6A7), // Pale Light Green
-        Color(0xFFC5E1A5), // Very Soft Lime
-        Color(0xFFCDDC39), // Bright Lime
-        Color(0xFFD4E157), // Soft Bright Lime
-        Color(0xFFE6EE9C), // Pastel Lime
-        Color(0xFF7CB342), // Medium Light Green
-        Color(0xFF689F38), // Darker Light Green
-        Color(0xFF9E9D24), // Olive Yellow-Green
-        Color(0xFFAED581)  // Pastel Light Green
+        Color(0xFFCDDC39), // Bright Lime Yellow
+        Color(0xFFAED581), // Soft Pastel Lime Green
+        Color(0xFF7CB342), // Rich Olive Green
+        Color(0xFFC5E1A5), // Pale Light Green
+        Color(0xFF558B2F), // Dark Olive Green
+        Color(0xFFD4E157), // Mid Lime Yellow
+        Color(0xFFE6EE9C)  // Very Pale Lime
     )
     val expenseColors = listOf(
-        Color(0xFFFF5722), // Deep Orange
-        Color(0xFFF4511E), // Reddish Orange
-        Color(0xFFFF7043), // Soft Deep Orange
-        Color(0xFFFF8A65), // Light Deep Orange
-        Color(0xFFFFAB91), // Soft Pastel Orange
-        Color(0xFFFF9800), // Orange
-        Color(0xFFFB8C00), // Darker Orange
-        Color(0xFFFFA726), // Light Orange
-        Color(0xFFFFB74D), // Soft Warm Orange
-        Color(0xFFFFCC80), // Pastel Warm Orange
-        Color(0xFFE64A19)  // Rich Deep Orange
+        Color(0xFFE65100), // Very Dark Orange
+        Color(0xFFFFB74D), // Light Warm Orange
+        Color(0xFFD84315), // Deep Burnt Orange
+        Color(0xFFFFCC80), // Pastel Orange
+        Color(0xFFEF6C00), // Rich Dark Orange
+        Color(0xFFFFD54F), // Soft Amber Orange
+        Color(0xFFF57C00), // Vibrant Medium Dark Orange
+        Color(0xFFFFE082), // Pale Warm Gold
+        Color(0xFFFF9800), // Standard Orange
+        Color(0xFFFF8F00)  // Warm Amber Orange
     )
     val savingsColors = listOf(
-        Color(0xFF2196F3), // Standard Blue
-        Color(0xFF1E88E5), // Dodger Blue
-        Color(0xFF03A9F4), // Light Blue
-        Color(0xFF00BCD4), // Cyan
-        Color(0xFF00ACC1), // Dark Cyan
-        Color(0xFF42A5F5), // Soft Blue
-        Color(0xFF29B6F6), // Bright Light Blue
-        Color(0xFF26C6DA), // Bright Cyan
-        Color(0xFF4FC3F7), // Soft Light Blue
-        Color(0xFF80DEEA), // Soft Cyan
-        Color(0xFF90CAF9)  // Soft Pastel Blue
+        Color(0xFF0D47A1), // Deep Navy Blue
+        Color(0xFF2196F3), // Bright Royal Blue
+        Color(0xFF03A9F4), // Sky Blue
+        Color(0xFF1565C0), // Rich Dark Blue
+        Color(0xFF00BCD4), // Teal Blue/Cyan
+        Color(0xFF90CAF9), // Pastel Soft Blue
+        Color(0xFF1E88E5), // Vivid Dodger Blue
+        Color(0xFF80DEEA), // Soft Pastel Cyan
+        Color(0xFF0288D1), // Medium Dark Cyan Blue
+        Color(0xFFB3E5FC)  // Very Light Ice Blue
     )
     val defaultColors = listOf(
         Color(0xFF4285F4),
@@ -245,25 +250,12 @@ fun CategorySegmentedDonutChart(
         if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
     }
 
-    // Dynamic color logic: default theme blue, income/savings >= 80% is green, expense >= 80% is red
+    // Dynamic color logic: green for INCOME, dark orange for EXPENSE, and theme blue for SAVINGS
     val percentageColor = if (targetAmount > 0.0) {
-        val progressPercent = progress * 100
         when (categoryType) {
-            "INCOME" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFF10B981) // Green
-                } else {
-                    FintechBlue
-                }
-            }
-            "SAVINGS" -> Color(0xFF4285F4) // Always blue for savings
-            "EXPENSE" -> {
-                if (progressPercent >= 80.0) {
-                    Color(0xFFEF4444) // Red
-                } else {
-                    FintechBlue
-                }
-            }
+            "INCOME" -> Color(0xFF10B981) // Green
+            "EXPENSE" -> Color(0xFFE65100) // Dark Orange
+            "SAVINGS" -> FintechBlue // Theme Blue
             else -> FintechBlue
         }
     } else {
@@ -385,6 +377,18 @@ fun CategorySegmentedDonutChart(
                 drawSegments.add(Pair(360f, resolvedUnfilledColor))
             }
 
+            // Compute concentric paths for the double-layer design (outer solid color, inner lighter color layer)
+            val outerStrokeWidth = strokeWidthPx * 0.72f
+            val innerStrokeWidth = strokeWidthPx * 0.28f
+            val outerRadius = radius + (innerStrokeWidth / 2f)
+            val concentricInnerRadius = radius - (outerStrokeWidth / 2f)
+
+            val outerArcTopLeft = androidx.compose.ui.geometry.Offset(center.x - outerRadius, center.y - outerRadius)
+            val outerArcSize = androidx.compose.ui.geometry.Size(outerRadius * 2f, outerRadius * 2f)
+
+            val innerArcTopLeft = androidx.compose.ui.geometry.Offset(center.x - concentricInnerRadius, center.y - concentricInnerRadius)
+            val innerArcSize = androidx.compose.ui.geometry.Size(concentricInnerRadius * 2f, concentricInnerRadius * 2f)
+
             // Draw the segments
             if (drawSegments.size == 1) {
                 // Single segment, draw perfect continuous circle with no gaps/caps artifacts
@@ -403,7 +407,7 @@ fun CategorySegmentedDonutChart(
                         style = Stroke(width = strokeWidthPx)
                     )
                 } else {
-                    // 1. Full-width background track representing the "channel"
+                    // 1. Draw background unfilled track first
                     drawArc(
                         color = resolvedUnfilledColor,
                         startAngle = -90f,
@@ -414,37 +418,26 @@ fun CategorySegmentedDonutChart(
                         style = Stroke(width = strokeWidthPx)
                     )
 
-                    // 2. 3D Bottom/Right Drop Shadow underneath the active segment (recessed inside track)
-                    drawArc(
-                        color = Color.Black.copy(alpha = 0.18f),
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = androidx.compose.ui.geometry.Offset(arcTopLeft.x + 1.5.dp.toPx(), arcTopLeft.y + 2.dp.toPx()),
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx * 0.72f)
-                    )
-
-                    // 3. Main Colored Arc (drawn slightly narrower, sitting nestled inside the track)
+                    // 2. Draw outer solid segment
                     drawArc(
                         color = color,
                         startAngle = -90f,
                         sweepAngle = 360f,
                         useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx * 0.72f)
+                        topLeft = outerArcTopLeft,
+                        size = outerArcSize,
+                        style = Stroke(width = outerStrokeWidth)
                     )
 
-                    // 4. Glossy 3D Center Highlight (creates a shiny 3D tubular/glass effect)
+                    // 3. Draw inner concentric lighter layer
                     drawArc(
-                        color = Color.White.copy(alpha = 0.35f),
+                        color = color.copy(alpha = 0.38f),
                         startAngle = -90f,
                         sweepAngle = 360f,
                         useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx * 0.22f)
+                        topLeft = innerArcTopLeft,
+                        size = innerArcSize,
+                        style = Stroke(width = innerStrokeWidth)
                     )
                 }
             } else if (drawSegments.size > 1) {
@@ -463,43 +456,32 @@ fun CategorySegmentedDonutChart(
                     style = Stroke(width = strokeWidthPx)
                 )
 
-                // 2. Draw active segments on top
+                // 2. Draw active segments on top using double-layer concentric arcs
                 drawSegments.forEach { segment ->
                     val allocatedSweep = segment.first
                     val color = segment.second
 
                     if (color != resolvedUnfilledColor) {
-                        // Drop shadow for the segment
-                        drawArc(
-                            color = Color.Black.copy(alpha = 0.18f),
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep,
-                            useCenter = false,
-                            topLeft = androidx.compose.ui.geometry.Offset(arcTopLeft.x + 1.5.dp.toPx(), arcTopLeft.y + 2.dp.toPx()),
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx * 0.72f, cap = StrokeCap.Butt)
-                        )
-
-                        // Main Colored Segment Arc (nestled inside)
+                        // Outer vibrant arc segment
                         drawArc(
                             color = color,
                             startAngle = startAngle,
                             sweepAngle = allocatedSweep,
                             useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx * 0.72f, cap = StrokeCap.Butt)
+                            topLeft = outerArcTopLeft,
+                            size = outerArcSize,
+                            style = Stroke(width = outerStrokeWidth, cap = StrokeCap.Butt)
                         )
 
-                        // Glassy 3D Highlight Layer
+                        // Inner concentric lighter layer
                         drawArc(
-                            color = Color.White.copy(alpha = 0.35f),
+                            color = color.copy(alpha = 0.38f),
                             startAngle = startAngle,
                             sweepAngle = allocatedSweep,
                             useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx * 0.22f, cap = StrokeCap.Butt)
+                            topLeft = innerArcTopLeft,
+                            size = innerArcSize,
+                            style = Stroke(width = innerStrokeWidth, cap = StrokeCap.Butt)
                         )
                     }
 
@@ -522,16 +504,6 @@ fun CategorySegmentedDonutChart(
                 color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
                 textAlign = TextAlign.Center
             )
-            if (targetAmount > 0.0) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${if (language == AppLanguage.BN) "মোট: " else "Total: "}${formatCurrency(totalFilledAmount, language)}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.LightGray.copy(alpha = 0.8f) else Color(0xFF64748B),
-                    textAlign = TextAlign.Center
-                )
-            }
         }
 
         // External Tooltip
@@ -611,7 +583,7 @@ fun BudgetControlDonutChart(
     val percentageText = if (targetAmount > 0.0) {
         "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
     } else {
-        if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+        if (language == AppLanguage.BN) "সেট করুন" else "Set"
     }
 
     // Colors & Gradients selection
@@ -1846,6 +1818,8 @@ fun FinanceNoteApp(
 ) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val selectedThemeIndex by viewModel.selectedThemeGradientIndex.collectAsState()
+    val themeGradient = GradientsList[selectedThemeIndex % GradientsList.size]
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
     val isNetworkActive by viewModel.isNetworkActive.collectAsState()
     val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
@@ -2401,7 +2375,7 @@ fun FinanceNoteApp(
                     colors = if (isDarkTheme) {
                         listOf(Color(0xFF121212), Color(0xFF121212))
                     } else {
-                        GradientsList[0]
+                        activeThemeGradient
                     }
                 )
                 Box(
@@ -2568,7 +2542,7 @@ fun FinanceNoteApp(
                     colors = if (isDarkTheme) {
                         listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E))
                     } else {
-                        GradientsList[0]
+                        activeThemeGradient
                     }
                 )
                 
@@ -4461,7 +4435,7 @@ fun DashboardScreen(
         // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
         item {
             FintechGradientCard(
-                gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                 cornerRadius = 24.dp,
                 padding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
                 onClick = { onWorkspaceClick() },
@@ -4663,7 +4637,7 @@ fun DashboardScreen(
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
             FintechGradientCard(
-                gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0], // Sleek Indigo-Violet-Fuchsia Gradient
+                gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient, // Sleek Indigo-Violet-Fuchsia Gradient
                 cornerRadius = 32.dp,
                 padding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
                 modifier = Modifier.testTag("dashboard_balance_card")
@@ -4814,7 +4788,7 @@ fun DashboardScreen(
             ) {
                 // I Owe Card (দেনা)
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
@@ -4859,7 +4833,7 @@ fun DashboardScreen(
 
                 // Owed to Me Card (পাওনা)
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
@@ -5206,7 +5180,7 @@ fun DashboardScreen(
             else -> ""
         }
 
-        var isEditingBudget by remember { mutableStateOf(false) }
+        var isEditingBudget by remember(targetAmount) { mutableStateOf(targetAmount == 0.0) }
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
@@ -5271,6 +5245,21 @@ fun DashboardScreen(
                                     }
                                 }
                             )
+                            if (targetAmount > 0.0) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = "${if (language == AppLanguage.BN) "মোট: " else "Total: "}${formatCurrency(totalFilledAmount, language)}",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when (categoryType) {
+                                        "INCOME" -> Color(0xFF10B981)
+                                        "EXPENSE" -> Color(0xFFE65100)
+                                        "SAVINGS" -> FintechBlue
+                                        else -> FintechBlue
+                                    },
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
 
@@ -6381,7 +6370,7 @@ fun TransactionsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
@@ -6405,7 +6394,7 @@ fun TransactionsScreen(
                     }
                 }
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
@@ -6866,7 +6855,7 @@ fun DebtsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
@@ -6890,7 +6879,7 @@ fun DebtsScreen(
                     }
                 }
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     modifier = Modifier.weight(1f).height(80.dp)
@@ -10479,7 +10468,7 @@ fun QuickActionCard(
     modifier: Modifier = Modifier
 ) {
     FintechGradientCard(
-        gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else GradientsList[0],
+        gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
         cornerRadius = 24.dp,
         onClick = onClick,
         modifier = modifier
@@ -11071,47 +11060,92 @@ fun SettingsScreen(
             icon = Icons.Rounded.NightsStay,
             initiallyExpanded = false
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color(0xFFEAB308).copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center
+            val selectedThemeIndex by viewModel.selectedThemeGradientIndex.collectAsState()
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.WbSunny,
-                        contentDescription = null,
-                        tint = Color(0xFFEAB308),
-                        modifier = Modifier.size(20.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFFEAB308).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.WbSunny,
+                            contentDescription = null,
+                            tint = Color(0xFFEAB308),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "চোখের সুরক্ষায় ডার্ক থিম সক্রিয় করুন" else "Activate dark theme for eye protection",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Switch(
+                        checked = isDark,
+                        onCheckedChange = { viewModel.toggleTheme(context) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = FintechBlue,
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
                     )
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isDark) Color.White else Color(0xFF1E293B)
-                    )
-                    Text(
-                        text = if (language == AppLanguage.BN) "চোখের সুরক্ষায় ডার্ক থিম সক্রিয় করুন" else "Activate dark theme for eye protection",
-                        fontSize = 12.sp,
-                        color = if (isDark) Color.Gray else Color(0xFF64748B)
-                    )
-                }
-                Switch(
-                    checked = isDark,
-                    onCheckedChange = { viewModel.toggleTheme(context) },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = FintechBlue,
-                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
-                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
-                    )
+
+                Spacer(modifier = Modifier.height(4.dp))
+                HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                
+                Text(
+                    text = if (language == AppLanguage.BN) "থিম কালার স্কীম" else "Theme Color Scheme",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isDark) Color.White else Color(0xFF1E293B)
                 )
+                Text(
+                    text = if (language == AppLanguage.BN) "অ্যাপের ড্যাশবোর্ড, টাইটেল বার, বাটনসহ সম্পূর্ণ থিম কালার কাস্টমাইজ করুন" else "Customize the primary color theme of dashboard, cards, headers and buttons",
+                    fontSize = 11.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GradientsList.forEachIndexed { idx, grad ->
+                        val isSelected = selectedThemeIndex == idx
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(grad))
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) (if (isDark) Color.White else Color(0xFF1E293B)) else (if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                                    shape = CircleShape
+                                )
+                                .clickable {
+                                    viewModel.selectThemeGradientIndex(context, idx)
+                                }
+                        )
+                    }
+                }
             }
         }
 
@@ -11901,14 +11935,14 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Rounded.Person,
                                 contentDescription = null,
-                                tint = com.example.ui.theme.FintechBlue,
+                                tint = FintechBlue,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
                         Column {
                             Text(
                                 text = "Shariful Islam",
-                                color = com.example.ui.theme.FintechBlue,
+                                color = FintechBlue,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -11951,7 +11985,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = null,
-                                    tint = com.example.ui.theme.FintechBlue,
+                                    tint = FintechBlue,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -11964,7 +11998,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowForwardIos,
                                     contentDescription = null,
-                                    tint = com.example.ui.theme.FintechBlue.copy(alpha = 0.6f),
+                                    tint = FintechBlue.copy(alpha = 0.6f),
                                     modifier = Modifier.size(10.dp)
                                 )
                             }
@@ -11981,19 +12015,19 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.textButtonColors(
-                            containerColor = com.example.ui.theme.FintechBlue.copy(alpha = 0.1f)
+                            containerColor = FintechBlue.copy(alpha = 0.1f)
                         )
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Campaign,
                             contentDescription = null,
-                            tint = com.example.ui.theme.FintechBlue,
+                            tint = FintechBlue,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "হোয়াটসঅ্যাপে যোগাযোগ করুন" else "Contact on WhatsApp",
-                            color = com.example.ui.theme.FintechBlue,
+                            color = FintechBlue,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -15264,7 +15298,7 @@ fun BudgetHistoryDialog(
 
                                     // 1. Income Progress
                                     val incProgress = if (budgetIncome > 0) (monthlyIncome / budgetIncome).coerceIn(0.0, 1.0).toFloat() else 0f
-                                    val incPercentText = if (budgetIncome > 0) "${(monthlyIncome / budgetIncome * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+                                    val incPercentText = if (budgetIncome > 0) "${(monthlyIncome / budgetIncome * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
                                     
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(
@@ -15296,7 +15330,7 @@ fun BudgetHistoryDialog(
 
                                     // 2. Expense Progress
                                     val expProgress = if (budgetExpense > 0) (monthlyExpense / budgetExpense).coerceIn(0.0, 1.0).toFloat() else 0f
-                                    val expPercentText = if (budgetExpense > 0) "${(monthlyExpense / budgetExpense * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+                                    val expPercentText = if (budgetExpense > 0) "${(monthlyExpense / budgetExpense * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
                                     val isExpOverLimit = budgetExpense > 0 && monthlyExpense >= budgetExpense * 0.8
 
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -15329,7 +15363,7 @@ fun BudgetHistoryDialog(
 
                                     // 3. Savings Progress
                                     val savProgress = if (budgetSavings > 0) (monthlySavings / budgetSavings).coerceIn(0.0, 1.0).toFloat() else 0f
-                                    val savPercentText = if (budgetSavings > 0) "${(monthlySavings / budgetSavings * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
+                                    val savPercentText = if (budgetSavings > 0) "${(monthlySavings / budgetSavings * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
 
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(

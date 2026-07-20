@@ -30,6 +30,11 @@ val GradientSunsetCoral = listOf(Color(0xFFF87171), Color(0xFFDC2626))
 val GradientGoldOrange = listOf(Color(0xFFFBBF24), Color(0xFFD97706))
 val GradientCyanBlue = listOf(Color(0xFF22D3EE), Color(0xFF0891B2))
 val GradientSlateObsidian = listOf(Color(0xFF4B5563), Color(0xFF1F2937))
+val GradientLimeGreen = listOf(Color(0xFFCDDC39), Color(0xFF8BC34A)) // Lime + Light Green
+val GradientSakuraRose = listOf(Color(0xFFF472B6), Color(0xFFE11D48)) // Sakura Pink + Rose
+val GradientMidnightViolet = listOf(Color(0xFF8B5CF6), Color(0xFFD946EF)) // Purple + Fuchsia
+val GradientOceanCyan = listOf(Color(0xFF06B6D4), Color(0xFF3B82F6)) // Ocean Cyan + Blue
+val GradientTealMint = listOf(Color(0xFF0D9488), Color(0xFF10B981)) // Teal + Mint Green
 
 val GradientsList = listOf(
     GradientSleekIndigo,
@@ -38,5 +43,10 @@ val GradientsList = listOf(
     GradientCyanBlue,
     GradientGoldOrange,
     GradientSunsetCoral,
+    GradientLimeGreen,
+    GradientSakuraRose,
+    GradientMidnightViolet,
+    GradientOceanCyan,
+    GradientTealMint,
     GradientSlateObsidian
 )

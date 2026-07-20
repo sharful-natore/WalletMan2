@@ -89,6 +89,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isDarkTheme = MutableStateFlow(false) // Default to light theme as requested
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
+    private val _selectedThemeGradientIndex = MutableStateFlow(0)
+    val selectedThemeGradientIndex: StateFlow<Int> = _selectedThemeGradientIndex.asStateFlow()
+
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
 
@@ -492,6 +495,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("is_dark_theme", newTheme)
+            .apply()
+    }
+
+    fun selectThemeGradientIndex(context: Context, index: Int) {
+        _selectedThemeGradientIndex.value = index
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putInt("selected_theme_gradient_index", index)
             .apply()
     }
 
@@ -1049,6 +1060,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val savedLangStr = prefs.getString("app_language", AppLanguage.BN.name) ?: AppLanguage.BN.name
         _language.value = try { AppLanguage.valueOf(savedLangStr) } catch (e: Exception) { AppLanguage.BN }
         _isDarkTheme.value = prefs.getBoolean("is_dark_theme", false)
+        _selectedThemeGradientIndex.value = prefs.getInt("selected_theme_gradient_index", 0)
 
         // Load notification setting
         var notifEnabled = prefs.getBoolean("notification_enabled", true)

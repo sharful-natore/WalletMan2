@@ -36,9 +36,16 @@ private val LightColorScheme = lightColorScheme(
 fun FinanceNoteTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     language: AppLanguage = AppLanguage.BN,
+    themeGradientIndex: Int = 0,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val themePrimaryColor = if (themeGradientIndex in GradientsList.indices) {
+        GradientsList[themeGradientIndex][0]
+    } else {
+        FintechBlue
+    }
+    val baseColorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = baseColorScheme.copy(primary = themePrimaryColor)
     val typography = getTypographyForLanguage(language)
 
     MaterialTheme(

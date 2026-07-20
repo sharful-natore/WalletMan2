@@ -63,10 +63,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
             val language by viewModel.language.collectAsState()
+            val themeGradientIndex by viewModel.selectedThemeGradientIndex.collectAsState()
             val action by actionState
             val targetWorkspaceId by targetWorkspaceState
             
-            FinanceNoteTheme(darkTheme = isDarkTheme, language = language) {
+            FinanceNoteTheme(darkTheme = isDarkTheme, language = language, themeGradientIndex = themeGradientIndex) {
                 FinanceNoteApp(
                     viewModel = viewModel, 
                     initialAction = action,
