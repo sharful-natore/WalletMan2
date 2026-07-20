@@ -133,22 +133,56 @@ fun getCustomTimeFilterLabel(timeFilter: String, lang: AppLanguage): String {
 }
 
 fun getBudgetCategoryColors(categoryType: String?): List<Color> {
-    val gBlue = Color(0xFF4285F4)
-    val gRed = Color(0xFFEA4335)
-    val gYellow = Color(0xFFFBBC05)
-    val gGreen = Color(0xFF34A853)
-    val mIndigo = Color(0xFF3F51B5)
-    val mPurple = Color(0xFF9C27B0)
-    val mCyan = Color(0xFF00BCD4)
-    val mTeal = Color(0xFF009688)
-    val mOrange = Color(0xFFFF9800)
-    val mPink = Color(0xFFE91E63)
-    val mDeepOrange = Color(0xFFFF5722)
-
-    val incomeColors = listOf(gGreen, gYellow, gBlue, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
-    val expenseColors = listOf(gRed, gGreen, gYellow, gBlue, mPurple, mOrange, mCyan, mPink, mIndigo, mTeal, mDeepOrange)
-    val savingsColors = listOf(gBlue, gYellow, gGreen, gRed, mCyan, mOrange, mPurple, mTeal, mPink, mIndigo, mDeepOrange)
-    val defaultColors = listOf(gBlue, gYellow, gGreen, gRed, mIndigo, mPurple, mCyan, mTeal, mOrange, mPink, mDeepOrange)
+    val incomeColors = listOf(
+        Color(0xFF8BC34A), // Lime Green (Light Green)
+        Color(0xFF9CCC65), // Soft Light Green
+        Color(0xFFA5D6A7), // Pale Light Green
+        Color(0xFFC5E1A5), // Very Soft Lime
+        Color(0xFFCDDC39), // Bright Lime
+        Color(0xFFD4E157), // Soft Bright Lime
+        Color(0xFFE6EE9C), // Pastel Lime
+        Color(0xFF7CB342), // Medium Light Green
+        Color(0xFF689F38), // Darker Light Green
+        Color(0xFF9E9D24), // Olive Yellow-Green
+        Color(0xFFAED581)  // Pastel Light Green
+    )
+    val expenseColors = listOf(
+        Color(0xFFFF5722), // Deep Orange
+        Color(0xFFF4511E), // Reddish Orange
+        Color(0xFFFF7043), // Soft Deep Orange
+        Color(0xFFFF8A65), // Light Deep Orange
+        Color(0xFFFFAB91), // Soft Pastel Orange
+        Color(0xFFFF9800), // Orange
+        Color(0xFFFB8C00), // Darker Orange
+        Color(0xFFFFA726), // Light Orange
+        Color(0xFFFFB74D), // Soft Warm Orange
+        Color(0xFFFFCC80), // Pastel Warm Orange
+        Color(0xFFE64A19)  // Rich Deep Orange
+    )
+    val savingsColors = listOf(
+        Color(0xFF2196F3), // Standard Blue
+        Color(0xFF1E88E5), // Dodger Blue
+        Color(0xFF03A9F4), // Light Blue
+        Color(0xFF00BCD4), // Cyan
+        Color(0xFF00ACC1), // Dark Cyan
+        Color(0xFF42A5F5), // Soft Blue
+        Color(0xFF29B6F6), // Bright Light Blue
+        Color(0xFF26C6DA), // Bright Cyan
+        Color(0xFF4FC3F7), // Soft Light Blue
+        Color(0xFF80DEEA), // Soft Cyan
+        Color(0xFF90CAF9)  // Soft Pastel Blue
+    )
+    val defaultColors = listOf(
+        Color(0xFF4285F4),
+        Color(0xFF00BCD4),
+        Color(0xFF34A853),
+        Color(0xFFEA4335),
+        Color(0xFF3F51B5),
+        Color(0xFF9C27B0),
+        Color(0xFFFF9800),
+        Color(0xFFE91E63),
+        Color(0xFFFF5722)
+    )
 
     return when (categoryType) {
         "INCOME" -> incomeColors
@@ -358,31 +392,69 @@ fun CategorySegmentedDonutChart(
                 val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
                 val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
                 
-                if (color != resolvedUnfilledColor) {
-                    // Soft glowing shadow extending ONLY outwards (blurred)
-                    // Android 8.1 compatible natural outward glow with smooth gradient fade
-                    val glowLayers = 100
-                    val glowSize = 6.dp.toPx()
-                    for (i in glowLayers downTo 1) {
-                        val fraction = i.toFloat() / glowLayers
-                        val currentGlowWidth = glowSize * fraction
-                        val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
-                        // Linear fade for smoother outer transition and blurrier falloff
-                        val alpha = 0.0142f * (1.0f - fraction) 
-                        drawArc(
-                            color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
-                            startAngle = -90f,
-                            sweepAngle = 360f,
-                            useCenter = false,
-                            topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                            size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                        )
-                    }
-                }
+                if (color == resolvedUnfilledColor) {
+                    drawArc(
+                        color = color,
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx)
+                    )
+                } else {
+                    // 1. Full-width background track representing the "channel"
+                    drawArc(
+                        color = resolvedUnfilledColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx)
+                    )
 
+                    // 2. 3D Bottom/Right Drop Shadow underneath the active segment (recessed inside track)
+                    drawArc(
+                        color = Color.Black.copy(alpha = 0.18f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = androidx.compose.ui.geometry.Offset(arcTopLeft.x + 1.5.dp.toPx(), arcTopLeft.y + 2.dp.toPx()),
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx * 0.72f)
+                    )
+
+                    // 3. Main Colored Arc (drawn slightly narrower, sitting nestled inside the track)
+                    drawArc(
+                        color = color,
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx * 0.72f)
+                    )
+
+                    // 4. Glossy 3D Center Highlight (creates a shiny 3D tubular/glass effect)
+                    drawArc(
+                        color = Color.White.copy(alpha = 0.35f),
+                        startAngle = -90f,
+                        sweepAngle = 360f,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx * 0.22f)
+                    )
+                }
+            } else if (drawSegments.size > 1) {
+                var startAngle = -90f
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+
+                // 1. Draw the continuous unfilled background channel track first
                 drawArc(
-                    color = color,
+                    color = resolvedUnfilledColor,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
@@ -390,47 +462,46 @@ fun CategorySegmentedDonutChart(
                     size = arcSize,
                     style = Stroke(width = strokeWidthPx)
                 )
-            } else if (drawSegments.size > 1) {
-                var startAngle = -90f
-                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
-                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
 
+                // 2. Draw active segments on top
                 drawSegments.forEach { segment ->
                     val allocatedSweep = segment.first
                     val color = segment.second
 
                     if (color != resolvedUnfilledColor) {
-                        // Soft glowing shadow extending ONLY outwards (blurred)
-                        // Android 8.1 compatible natural outward glow with smooth gradient fade
-                        val glowLayers = 100
-                        val glowSize = 6.dp.toPx()
-                        for (i in glowLayers downTo 1) {
-                            val fraction = i.toFloat() / glowLayers
-                            val currentGlowWidth = glowSize * fraction
-                            val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
-                            // Linear fade for smoother outer transition and blurrier falloff
-                            val alpha = 0.0142f * (1.0f - fraction)
-                            drawArc(
-                                color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
-                                startAngle = startAngle,
-                                sweepAngle = allocatedSweep + 0.8f,
-                                useCenter = false,
-                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                            )
-                        }
-                    }
+                        // Drop shadow for the segment
+                        drawArc(
+                            color = Color.Black.copy(alpha = 0.18f),
+                            startAngle = startAngle,
+                            sweepAngle = allocatedSweep,
+                            useCenter = false,
+                            topLeft = androidx.compose.ui.geometry.Offset(arcTopLeft.x + 1.5.dp.toPx(), arcTopLeft.y + 2.dp.toPx()),
+                            size = arcSize,
+                            style = Stroke(width = strokeWidthPx * 0.72f, cap = StrokeCap.Butt)
+                        )
 
-                    drawArc(
-                        color = color,
-                        startAngle = startAngle,
-                        sweepAngle = allocatedSweep + 0.8f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                    )
+                        // Main Colored Segment Arc (nestled inside)
+                        drawArc(
+                            color = color,
+                            startAngle = startAngle,
+                            sweepAngle = allocatedSweep,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidthPx * 0.72f, cap = StrokeCap.Butt)
+                        )
+
+                        // Glassy 3D Highlight Layer
+                        drawArc(
+                            color = Color.White.copy(alpha = 0.35f),
+                            startAngle = startAngle,
+                            sweepAngle = allocatedSweep,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidthPx * 0.22f, cap = StrokeCap.Butt)
+                        )
+                    }
 
                     startAngle += allocatedSweep
                 }
@@ -446,11 +517,21 @@ fun CategorySegmentedDonutChart(
         ) {
             Text(
                 text = formatNumberString(percentageText, language),
-                fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
+                fontSize = if (targetAmount > 0.0) 28.sp else 16.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
                 textAlign = TextAlign.Center
             )
+            if (targetAmount > 0.0) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "${if (language == AppLanguage.BN) "মোট: " else "Total: "}${formatCurrency(totalFilledAmount, language)}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.LightGray.copy(alpha = 0.8f) else Color(0xFF64748B),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
         // External Tooltip
@@ -562,8 +643,7 @@ fun BudgetControlDonutChart(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
-            // Subtract space for the glow shadow
-            val radius = (sizeMin - strokeWidthPx - 16.dp.toPx()) / 2f
+            val radius = (sizeMin - strokeWidthPx) / 2f
             val centerOffset = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
 
             // Draw central hollow background
@@ -599,18 +679,7 @@ fun BudgetControlDonutChart(
                     end = Offset(centerOffset.x, centerOffset.y + radius)
                 )
 
-                // 1. A single soft, clean drop shadow underneath the arc (very tight, low alpha, no wide spreading)
-                drawArc(
-                    color = Color.Black.copy(alpha = 0.12f),
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = Offset(arcTopLeft.x + 1.dp.toPx(), arcTopLeft.y + 2.dp.toPx()),
-                    size = arcSize,
-                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
-                )
-
-                // 2. Main Gradient Arc
+                // Main Gradient Arc
                 drawArc(
                     brush = brush,
                     startAngle = -90f,
@@ -4979,6 +5048,14 @@ fun DashboardScreen(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "বিস্তারিত দেখতে চার্টের ওপর ক্লিক করুন" else "Click on charts to view details",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = FintechBlue,
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 4.dp)
+                    )
                 }
             }
 
@@ -5187,14 +5264,12 @@ fun DashboardScreen(
                                 strokeWidthDp = 22.dp, // Match budget section with increased thickness
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
-                                centerColorOverride = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF8F9FA) // Match budget section
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "${if (language == AppLanguage.BN) "মোট:" else "Total:"} ${formatCurrency(totalFilledAmount, language)}",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FintechBlue
+                                centerColorOverride = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF8F9FA), // Match budget section
+                                onCenterClick = {
+                                    if (targetAmount == 0.0) {
+                                        isEditingBudget = true
+                                    }
+                                }
                             )
                         }
                     }
@@ -5211,18 +5286,24 @@ fun DashboardScreen(
                         Column(modifier = Modifier.padding(12.dp)) {
                             if (!isEditingBudget) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            if (targetAmount == 0.0) {
+                                                isEditingBudget = true
+                                            }
+                                        },
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column {
                                         Text(
-                                            text = if (language == AppLanguage.BN) "বাজেট সীমা" else "Budget Limit",
+                                            text = if (language == AppLanguage.BN) "বাজেট সীমা নির্ধারণ করুন" else "Set Budget Limit",
                                             fontSize = 12.sp,
                                             color = Color.Gray
                                         )
                                         Text(
-                                            text = if (targetAmount > 0.0) formatCurrency(targetAmount, language) else (if (language == AppLanguage.BN) "সেট করা নেই" else "Not Set"),
+                                            text = if (targetAmount > 0.0) formatCurrency(targetAmount, language) else (if (language == AppLanguage.BN) "সেট করুন" else "Set Budget"),
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (targetAmount > 0.0) FintechBlue else Color.Gray
