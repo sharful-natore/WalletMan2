@@ -77,7 +77,17 @@ val FintechBlue: Color
 
 val activeThemeGradient: List<Color>
     @Composable
-    get() = com.example.ui.theme.GradientsList.find { it.firstOrNull() == MaterialTheme.colorScheme.primary } ?: com.example.ui.theme.GradientsList[0]
+    get() {
+        val primary = MaterialTheme.colorScheme.primary
+        return androidx.compose.runtime.remember(primary) {
+            com.example.ui.theme.GradientsList.find { gradient ->
+                val firstColor = gradient.firstOrNull() ?: return@find false
+                java.lang.Math.abs(firstColor.red - primary.red) < 0.01f &&
+                java.lang.Math.abs(firstColor.green - primary.green) < 0.01f &&
+                java.lang.Math.abs(firstColor.blue - primary.blue) < 0.01f
+            } ?: com.example.ui.theme.GradientsList[0]
+        }
+    }
 
 class UCropContract : ActivityResultContract<Pair<Uri, Uri>, Uri?>() {
     override fun createIntent(context: Context, input: Pair<Uri, Uri>): Intent {
@@ -589,7 +599,7 @@ fun BudgetControlDonutChart(
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
         "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
-        "EXPENSE" -> listOf(Color(0xFF8BC34A), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722)) // light green -> amber -> orange -> deep orange
+        "EXPENSE" -> listOf(Color(0xFFFFCC80), Color(0xFFFFB74D), Color(0xFFFF9800), Color(0xFFF57C00), Color(0xFFE65100)) // Pastel orange -> light orange -> standard orange -> dark orange -> burnt orange
         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
@@ -2088,6 +2098,7 @@ fun FinanceNoteApp(
     }
 
     var showSearch by remember { mutableStateOf(false) }
+    var showThemeCustomizeDialog by remember { mutableStateOf(false) }
     var showRealtimeSyncDialog by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
     var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -2505,12 +2516,12 @@ fun FinanceNoteApp(
                             }
 
                             IconButton(
-                                onClick = { viewModel.toggleTheme(context) },
+                                onClick = { showThemeCustomizeDialog = true },
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (isDarkTheme) Icons.Rounded.LightMode else Icons.Rounded.DarkMode,
-                                    contentDescription = "Theme Toggle",
+                                    imageVector = Icons.Rounded.Palette,
+                                    contentDescription = "Theme Customization",
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -2679,8 +2690,8 @@ fun FinanceNoteApp(
                             .padding(bottom = 12.dp + navBarPadding) // Lowered to nestle perfectly in the notch
                             .size(68.dp) // Fix size so the glowing background doesn't shift the button up
                     ) {
-                        val fabPrimary = activeThemeGradient[0]
-                        val fabSecondary = activeThemeGradient.getOrElse(1) { fabPrimary }
+                        val fabPrimary = activeThemeGradient.first()
+                        val fabSecondary = activeThemeGradient.last()
                         if (isDarkTheme) {
                             Box(
                                 modifier = Modifier
@@ -3330,6 +3341,179 @@ fun FinanceNoteApp(
                 }
             }
         }
+    }
+
+    if (showThemeCustomizeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeCustomizeDialog = false },
+            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 8.dp,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Palette,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "থিম কাস্টমাইজেশন" else "Theme Customization",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                        )
+                    }
+                    IconButton(
+                        onClick = { showThemeCustomizeDialog = false },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = if (isDarkTheme) Color.Gray else Color.DarkGray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // 1. Dark Mode Toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isDarkTheme) Color(0xFF282E47) else Color(0xFFF1F5F9))
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isDarkTheme) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
+                                contentDescription = null,
+                                tint = if (isDarkTheme) Color(0xFFFBBF24) else Color(0xFF3B82F6),
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = if (language == AppLanguage.BN) "ডার্ক মোড" else "Dark Mode",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                            )
+                        }
+                        Switch(
+                            checked = isDarkTheme,
+                            onCheckedChange = { viewModel.toggleTheme(context) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = Color.Gray,
+                                uncheckedTrackColor = if (isDarkTheme) Color(0xFF1E2235) else Color(0xFFE2E8F0)
+                            )
+                        )
+                    }
+
+                    // 2. Color Schemes Title
+                    Text(
+                        text = if (language == AppLanguage.BN) "পছন্দের কালার স্কীম বেছে নিন" else "Choose Color Scheme",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                    )
+
+                    // 3. Grid of Color Schemes with Chunked Rows to prevent nested scroll issues
+                    val chunkedGradients = GradientsList.chunked(4)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        chunkedGradients.forEachIndexed { rowIndex, rowGradients ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowGradients.forEachIndexed { colIndex, gradient ->
+                                    val actualIndex = rowIndex * 4 + colIndex
+                                    val isSelected = selectedThemeIndex == actualIndex
+                                    val firstColor = gradient.first()
+                                    val lastColor = gradient.last()
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.sweepGradient(
+                                                    colors = if (gradient.size >= 2) gradient else listOf(firstColor, firstColor)
+                                                )
+                                            )
+                                            .border(
+                                                width = if (isSelected) 3.dp else 1.dp,
+                                                color = if (isSelected) {
+                                                    if (isDarkTheme) Color.White else Color(0xFF0F172A)
+                                                } else {
+                                                    Color.White.copy(alpha = 0.3f)
+                                                },
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                viewModel.selectThemeGradientIndex(context, actualIndex)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color.White.copy(alpha = 0.9f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Check,
+                                                    contentDescription = "Selected",
+                                                    tint = Color.Black,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                if (rowGradients.size < 4) {
+                                    repeat(4 - rowGradients.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showThemeCustomizeDialog = false }
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "সম্পন্ন" else "Done",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        )
     }
 
     if (showRealtimeSyncDialog) {

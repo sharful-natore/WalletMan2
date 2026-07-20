@@ -36,8 +36,20 @@ val GradientMidnightViolet = listOf(Color(0xFF8B5CF6), Color(0xFFD946EF)) // Pur
 val GradientOceanCyan = listOf(Color(0xFF06B6D4), Color(0xFF3B82F6)) // Ocean Cyan + Blue
 val GradientTealMint = listOf(Color(0xFF0D9488), Color(0xFF10B981)) // Teal + Mint Green
 
+// New premium eye-catching gradients
+val GradientCosmicNebula = listOf(Color(0xFF7C3AED), Color(0xFFC084FC), Color(0xFFF472B6)) // Violet + Purple + Pink
+val GradientAuroraBorealis = listOf(Color(0xFF00F2FE), Color(0xFF4FACFE), Color(0xFF00FF87)) // Cyan + Bright Blue + Green
+val GradientCyberpunkDream = listOf(Color(0xFFF43F5E), Color(0xFFD946EF), Color(0xFF8B5CF6)) // Fuchsia + Violet + Dark Indigo
+val GradientRetroRoseGold = listOf(Color(0xFFFDBA74), Color(0xFFF472B6), Color(0xFFFB7185)) // Peach + Pink + Rose
+val GradientElectricAmber = listOf(Color(0xFFFF5722), Color(0xFFFF9800), Color(0xFFFFEB3B)) // Flame Orange + Amber + Lemon Yellow
+
 val GradientsList = listOf(
     GradientSleekIndigo,
+    GradientCosmicNebula,
+    GradientAuroraBorealis,
+    GradientCyberpunkDream,
+    GradientRetroRoseGold,
+    GradientElectricAmber,
     GradientPurpleBlue,
     GradientEmeraldTeal,
     GradientCyanBlue,
