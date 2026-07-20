@@ -1269,38 +1269,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return false
     }
 
-    private fun showSyncNotification(title: String, message: String) {
-        val context = getApplication<Application>()
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-        if (notificationManager != null) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                val channel = android.app.NotificationChannel(
-                    "finance_sync_channel",
-                    "Finance Sync Status",
-                    android.app.NotificationManager.IMPORTANCE_DEFAULT
-                ).apply {
-                    description = "Notifications about cloud database sync status"
-                }
-                notificationManager.createNotificationChannel(channel)
-            }
-            
-            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    return
-                }
-            }
-
-            val builder = androidx.core.app.NotificationCompat.Builder(context, "finance_sync_channel")
-                .setSmallIcon(com.example.R.drawable.ic_pie_chart)
-                .setContentTitle(title)
-                .setContentText(message)
-                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
-                .setAutoCancel(true)
-
-            notificationManager.notify(9988, builder.build())
-        }
-    }
-
     private fun updateSyncSuccess(context: Context, isUpload: Boolean) {
         val now = System.currentTimeMillis()
         _lastSyncTime.value = now
@@ -1314,7 +1282,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         } else {
             if (isUpload) "Your data has been successfully saved to the cloud!" else "New data has been successfully restored from the cloud!"
         }
-        showSyncNotification(title, message)
         triggerCustomNotification(message, isSuccess = true, type = "SYNC")
     }
 

@@ -215,13 +215,14 @@ fun CategorySegmentedDonutChart(
     val percentageColor = if (targetAmount > 0.0) {
         val progressPercent = progress * 100
         when (categoryType) {
-            "INCOME", "SAVINGS" -> {
+            "INCOME" -> {
                 if (progressPercent >= 80.0) {
                     Color(0xFF10B981) // Green
                 } else {
                     FintechBlue
                 }
             }
+            "SAVINGS" -> Color(0xFF4285F4) // Always blue for savings
             "EXPENSE" -> {
                 if (progressPercent >= 80.0) {
                     Color(0xFFEF4444) // Red
@@ -536,7 +537,7 @@ fun BudgetControlDonutChart(
     val gradientColors = when (categoryType) {
         "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
         "EXPENSE" -> listOf(Color(0xFF8BC34A), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722)) // light green -> amber -> orange -> deep orange
-        "SAVINGS" -> listOf(Color(0xFF00BCD4), Color(0xFF4285F4), Color(0xFF1A73E8), Color(0xFF3F51B5)) // cyan -> blue -> deep blue -> indigo
+        "SAVINGS" -> listOf(Color(0xFF00BCD4), Color(0xFF03A9F4), Color(0xFF2196F3), Color(0xFFCDDC39)) // cyan -> light blue -> blue -> lime
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
 
@@ -550,7 +551,7 @@ fun BudgetControlDonutChart(
     val percentageColor = when (categoryType) {
         "INCOME" -> Color(0xFF10B981)
         "EXPENSE" -> Color(0xFFFF5722)
-        "SAVINGS" -> Color(0xFF009688)
+        "SAVINGS" -> Color(0xFF4285F4)
         else -> FintechBlue
     }
 
@@ -2063,15 +2064,16 @@ fun FinanceNoteApp(
     val isSyncing by viewModel.isSyncing.collectAsState()
 
     var showSyncSuccessIcon by remember { mutableStateOf(false) }
-    var previousIsSyncing by remember { mutableStateOf(false) }
+    var previousFirestoreSyncStatus by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(isSyncing) {
-        if (previousIsSyncing && !isSyncing) {
+    LaunchedEffect(firestoreSyncStatus) {
+        val wasSyncing = previousFirestoreSyncStatus == "Syncing..." || previousFirestoreSyncStatus == "Downloading..."
+        if (wasSyncing && firestoreSyncStatus == "Synced") {
             showSyncSuccessIcon = true
             kotlinx.coroutines.delay(3000)
             showSyncSuccessIcon = false
         }
-        previousIsSyncing = isSyncing
+        previousFirestoreSyncStatus = firestoreSyncStatus
     }
 
 
@@ -2413,7 +2415,7 @@ fun FinanceNoteApp(
                                     modifier = Modifier.size(36.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        if (isSyncing) {
+                                        if (firestoreSyncStatus == "Syncing..." || firestoreSyncStatus == "Downloading...") {
                                             CircularProgressIndicator(
                                                 modifier = Modifier.size(20.dp),
                                                 color = Color.White,
@@ -2428,7 +2430,7 @@ fun FinanceNoteApp(
                                                 Icon(
                                                     imageVector = Icons.Rounded.CheckCircle,
                                                     contentDescription = "Sync Success",
-                                                    tint = Color(0xFF34A853), // Success Green
+                                                    tint = Color.White, // Success White
                                                     modifier = Modifier.size(24.dp)
                                                 )
                                             }
@@ -5169,11 +5171,11 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     ) {
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(vertical = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             CategorySegmentedDonutChart(
                                 targetAmount = targetAmount,
@@ -5186,6 +5188,13 @@ fun DashboardScreen(
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
                                 centerColorOverride = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF8F9FA) // Match budget section
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "${if (language == AppLanguage.BN) "মোট:" else "Total:"} ${formatCurrency(totalFilledAmount, language)}",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = FintechBlue
                             )
                         }
                     }
