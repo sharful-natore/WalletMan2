@@ -2567,7 +2567,7 @@ fun FinanceNoteApp(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 0.dp) // Removed 16dp space to avoid "fixed card" look
-                            .height(55.dp + navBarPadding)
+                            .height(58.dp + navBarPadding)
                             .clip(NotchedBottomBarShape(notchRadiusDp = 38.dp, cornerRadiusDp = 12.dp))
                             .background(bottomBarGradient)
                             .border(
@@ -2579,7 +2579,7 @@ fun FinanceNoteApp(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(55.dp)
+                                .height(58.dp)
                                 .align(Alignment.TopCenter),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -2633,7 +2633,7 @@ fun FinanceNoteApp(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .padding(bottom = 9.dp + navBarPadding) // Lowered to nestle perfectly in the notch
+                            .padding(bottom = 12.dp + navBarPadding) // Lowered to nestle perfectly in the notch
                             .size(68.dp) // Fix size so the glowing background doesn't shift the button up
                     ) {
                         if (isDarkTheme) {
@@ -7088,7 +7088,7 @@ fun DebtsScreen(
             exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 110.dp, end = 16.dp)
+                .padding(bottom = 113.dp, end = 16.dp)
         ) {
             FloatingActionButton(
                 onClick = onAddPersonClick,
@@ -7822,7 +7822,7 @@ fun SavingsScreen(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = 110.dp, end = 16.dp)
+                    .padding(bottom = 113.dp, end = 16.dp)
                     .size(60.dp)
                     .testTag("fab_add_savings_goal")
             ) {
