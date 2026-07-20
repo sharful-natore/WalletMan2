@@ -743,7 +743,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return repository.getSavingsTransactionsByGoal(goalId)
     }
 
-    fun addSavingsContribution(id: Int, contribution: Double, note: String = "") {
+    fun addSavingsContribution(id: Int, contribution: Double, note: String = "", timestamp: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
             // Find current savings goal and update it
             val currentList = savingsGoals.value
@@ -761,6 +761,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         amount = absoluteAmount,
                         isDeposit = isDeposit,
                         note = note,
+                        timestamp = timestamp,
                         workspaceId = _currentWorkspaceId.value
                     )
                 )

@@ -2879,6 +2879,7 @@ fun FinanceNoteApp(
                                             onAddPersonClick = { showAddPersonDialog = true },
                                             onAddSavingClick = { showAddSavingsGoalDialog = true },
                                             onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                                            onDeleteTransactions = { pendingDeleteTransactions = it },
                                             onEditTransaction = { transactionToEdit = it },
                                             onNavigate = { tab, filter ->
                                                 activeTab = tab
@@ -3105,18 +3106,19 @@ fun FinanceNoteApp(
                                 showSavingsContributionDialog = null 
                                 savingsTxToEdit = null
                             },
-                            onConfirm = { amount, isWithdraw, note ->
+                            onConfirm = { amount, isWithdraw, note, timestamp ->
                                 val finalAmount = if (isWithdraw) -amount else amount
                                 if (savingsTxToEdit != null) {
                                     val updatedTx = savingsTxToEdit!!.copy(
                                         amount = amount,
                                         isDeposit = !isWithdraw,
-                                        note = note
+                                        note = note,
+                                        timestamp = timestamp
                                     )
                                     viewModel.updateSavingsTransaction(savingsTxToEdit!!, updatedTx)
                                     savingsTxToEdit = null
                                 } else {
-                                    viewModel.addSavingsContribution(goal.id, finalAmount, note)
+                                    viewModel.addSavingsContribution(goal.id, finalAmount, note, timestamp = timestamp)
                                     showSavingsContributionDialog = null
                                 }
                             }
@@ -3197,17 +3199,17 @@ fun FinanceNoteApp(
                             personDebt = debtInfo,
                             transactionsFlow = viewModel.getTransactionsByPerson(debtInfo.person.id),
                             onDismiss = { selectedPersonDetail = null },
-                            onLendClick = { amt, note ->
-                                viewModel.addTransaction(amt, "LEND", "Lending", note.ifBlank { "Lent money to ${debtInfo.person.name}" }, debtInfo.person.id)
+                            onLendClick = { amt, note, ts, subType ->
+                                viewModel.addTransaction(amt, "LEND", "Lending", note.ifBlank { "Lent money to ${debtInfo.person.name}" }, debtInfo.person.id, timestamp = ts, subType = subType)
                             },
-                            onBorrowClick = { amt, note ->
-                                viewModel.addTransaction(amt, "BORROW", "Borrowing", note.ifBlank { "Borrowed money from ${debtInfo.person.name}" }, debtInfo.person.id)
+                            onBorrowClick = { amt, note, ts, subType ->
+                                viewModel.addTransaction(amt, "BORROW", "Borrowing", note.ifBlank { "Borrowed money from ${debtInfo.person.name}" }, debtInfo.person.id, timestamp = ts, subType = subType)
                             },
-                            onRepayPaidClick = { amt, note ->
-                                viewModel.addTransaction(amt, "REPAY_PAID", "Repay Paid", note.ifBlank { "Paid back borrowed loan" }, debtInfo.person.id)
+                            onRepayPaidClick = { amt, note, ts ->
+                                viewModel.addTransaction(amt, "REPAY_PAID", "Repay Paid", note.ifBlank { "Paid back borrowed loan" }, debtInfo.person.id, timestamp = ts)
                             },
-                            onRepayReceivedClick = { amt, note ->
-                                viewModel.addTransaction(amt, "REPAY_RECEIVED", "Repay Received", note.ifBlank { "Received back lent loan" }, debtInfo.person.id)
+                            onRepayReceivedClick = { amt, note, ts ->
+                                viewModel.addTransaction(amt, "REPAY_RECEIVED", "Repay Received", note.ifBlank { "Received back lent loan" }, debtInfo.person.id, timestamp = ts)
                             },
                             onDeleteTx = { viewModel.deleteTransaction(it) },
                             onEditTx = { transactionToEdit = it },
@@ -4377,6 +4379,7 @@ fun DashboardScreen(
     onAddPersonClick: () -> Unit,
     onAddSavingClick: () -> Unit,
     onDeleteTransaction: (Int) -> Unit,
+    onDeleteTransactions: (List<Int>) -> Unit = {},
     onEditTransaction: (Transaction) -> Unit,
     onNavigate: (String, String) -> Unit,
     onWorkspaceClick: () -> Unit = {},
@@ -4397,6 +4400,8 @@ fun DashboardScreen(
     var showBudgetDetailsType by remember { mutableStateOf<String?>(null) }
     var activeAlertPopup by remember { mutableStateOf<BudgetAlertData?>(null) }
     val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
+    val isSelectionMode = selectedTxIds.isNotEmpty()
     val incomeByCategory = remember(transactions) {
         // Include INCOME type AND LEND transactions that are of subtype "CREDIT" (Credit Sales)
         transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
@@ -4611,13 +4616,61 @@ fun DashboardScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 90.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Multi-Select Header Toolbar
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(FintechBlue)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selectedTxIds = emptySet() }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                        Text(
+                            text = "${selectedTxIds.size} ${if (language == AppLanguage.BN) "টি নির্বাচিত" else "selected"}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    
+                    TextButton(
+                        onClick = {
+                            if (selectedTxIds.size == recentTransactions.size) {
+                                selectedTxIds = emptySet()
+                            } else {
+                                selectedTxIds = recentTransactions.map { it.id }.toSet()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (selectedTxIds.size == recentTransactions.size) 
+                                (if (language == AppLanguage.BN) "সব আনমার্ক" else "Deselect All")
+                            else (if (language == AppLanguage.BN) "সব মার্ক" else "Select All"),
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 90.dp)
+            ) {
         // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
         item {
             FintechGradientCard(
@@ -5304,6 +5357,7 @@ fun DashboardScreen(
                     )
                 }
                 items(txs, key = { it.id }) { tx ->
+                    val isSelected = selectedTxIds.contains(tx.id)
                     androidx.compose.animation.AnimatedVisibility(
                         visible = true,
                         enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(
@@ -5319,7 +5373,12 @@ fun DashboardScreen(
                             onDelete = onDeleteTransaction,
                             onEdit = onEditTransaction,
                             onNavigateToTab = onNavigate,
-                            onPersonClick = onPersonClick
+                            onPersonClick = onPersonClick,
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onLongClick = {
+                                selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                            }
                         )
                     }
                 }
@@ -5331,6 +5390,51 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(110.dp))
         }
     }
+            } // Close Column
+
+            // Bulk Actions Floating Buttons
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isSelectionMode,
+                enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 113.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(if (isDark) Color(0xFF2C2C2E) else Color.White)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(24.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Delete Button
+                    Button(
+                        onClick = {
+                            onDeleteTransactions(selectedTxIds.toList())
+                            selectedTxIds = emptySet()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = "Delete",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        } // Close Box
 
     if (showBudgetDetailsType != null) {
         val categoryType = showBudgetDetailsType!!
@@ -5976,7 +6080,7 @@ fun TransactionRowItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) FintechBlue else (if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))),
+        border = BorderStroke(if (isHighlighted || isSelected) 2.dp else 1.dp, if (isHighlighted) Color(0xFFFBBF24) else if (isSelected) FintechBlue else (if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))),
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
@@ -6456,6 +6560,38 @@ fun TransactionsScreen(
         list
     }
 
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    
+    LaunchedEffect(highlightedTxId) {
+        if (highlightedTxId != null) {
+            var targetIndex = -1
+            if (currentSortBy.startsWith("DATE")) {
+                val grouped = sortedTransactions.groupBy { formatDateToDay(it.timestamp) }
+                var currentIndex = 0
+                outer@ for ((_, txs) in grouped) {
+                    currentIndex++ // for the date header item
+                    for (tx in txs) {
+                        if (tx.id == highlightedTxId) {
+                            targetIndex = currentIndex
+                            break@outer
+                        }
+                        currentIndex++
+                    }
+                }
+            } else {
+                targetIndex = sortedTransactions.indexOfFirst { it.id == highlightedTxId }
+            }
+            
+            if (targetIndex != -1) {
+                try {
+                    lazyListState.animateScrollToItem(targetIndex)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
     val totalIncome = timeFilteredTransactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
     val totalExpense = timeFilteredTransactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
 
@@ -6750,6 +6886,7 @@ fun TransactionsScreen(
                 if (currentSortBy.startsWith("DATE")) {
                     val grouped = sortedTransactions.groupBy { formatDateToDay(it.timestamp) }
                     LazyColumn(
+                        state = lazyListState,
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
@@ -6801,6 +6938,7 @@ fun TransactionsScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = lazyListState,
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
@@ -6938,6 +7076,21 @@ fun DebtsScreen(
             "AMOUNT_ASC" -> list.sortBy { kotlin.math.abs(it.netBalance) }
         }
         list
+    }
+
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    
+    LaunchedEffect(highlightedPersonId) {
+        if (highlightedPersonId != null) {
+            val targetIndex = sortedDebts.indexOfFirst { it.person.id == highlightedPersonId }
+            if (targetIndex != -1) {
+                try {
+                    lazyListState.animateScrollToItem(targetIndex)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     val totalDena = personDebts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
@@ -7226,6 +7379,7 @@ fun DebtsScreen(
                 }
             } else {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
@@ -7563,7 +7717,9 @@ fun PersonDebtRowItem(
         }
     )
     
-    val borderColor = if (isSelected) {
+    val borderColor = if (isHighlighted) {
+        Color(0xFFFBBF24) // Beautiful glowing amber color
+    } else if (isSelected) {
         FintechBlue
     } else if (isDark) {
         Color.White.copy(alpha = 0.05f)
@@ -7574,7 +7730,7 @@ fun PersonDebtRowItem(
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+        border = BorderStroke(if (isHighlighted || isSelected) 2.dp else 1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
@@ -7745,6 +7901,21 @@ fun SavingsScreen(
             "SAVED_ASC" -> list.sortBy { it.savedAmount }
         }
         list
+    }
+
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    
+    LaunchedEffect(highlightedGoalId) {
+        if (highlightedGoalId != null) {
+            val targetIndex = sortedGoals.indexOfFirst { it.id == highlightedGoalId }
+            if (targetIndex != -1) {
+                try {
+                    lazyListState.animateScrollToItem(targetIndex)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -7967,6 +8138,7 @@ fun SavingsScreen(
                 }
             } else {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.weight(1f)
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -9592,12 +9764,13 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
     initialIsWithdraw: Boolean = false,
     txToEdit: SavingsTransaction? = null,
     onDismiss: () -> Unit,
-    onConfirm: (Double, Boolean, String) -> Unit
+    onConfirm: (Double, Boolean, String, Long) -> Unit
 ) {
     var amountStr by remember { mutableStateOf(if (txToEdit != null) txToEdit.amount.toString() else "") }
     var showSavTxCalculator by remember { mutableStateOf(false) }
     var noteStr by remember { mutableStateOf(txToEdit?.note ?: "") }
     var isWithdraw by remember { mutableStateOf(txToEdit?.let { !it.isDeposit } ?: initialIsWithdraw) }
+    var customTimestamp by remember { mutableStateOf<Long?>(txToEdit?.timestamp) }
     val context = LocalContext.current
 
     val dialogBg = if (isDark) Color(0xFF121212) else Color.White
@@ -9705,6 +9878,78 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                         .fillMaxWidth()
                 )
 
+                // Date & Time Selector (Custom time) for savings contribution
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        if (language == AppLanguage.BN) "তারিখ ও সময় (ঐচ্ছিক)" else "Date & Time (Optional)",
+                        color = labelColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    var showManualDatePicker by remember { mutableStateOf(false) }
+                    
+                    val dateLabel = if (customTimestamp != null) {
+                        formatDate(customTimestamp!!, language)
+                    } else {
+                        if (language == AppLanguage.BN) "বর্তমান সময় (স্বয়ংক্রিয়)" else "Current Time (Automatic)"
+                    }
+                    
+                    val chipBg = if (isDark) Color(0xFF2D2D30) else Color(0xFFF3F4F6)
+                    val inputTextColor = if (isDark) Color.White else Color.Black
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(chipBg)
+                            .clickable { showManualDatePicker = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Rounded.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Text(dateLabel, color = inputTextColor, fontSize = 14.sp)
+                        }
+                        if (customTimestamp != null) {
+                            IconButton(onClick = { customTimestamp = null }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Clear", tint = FintechRed, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                    
+                    if (showManualDatePicker) {
+                        val calendar = java.util.Calendar.getInstance()
+                        if (customTimestamp != null) {
+                            calendar.timeInMillis = customTimestamp!!
+                        }
+                        val curYear = calendar.get(java.util.Calendar.YEAR)
+                        val curMonth = calendar.get(java.util.Calendar.MONTH) + 1
+                        val curDay = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+                        val curHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+                        val curMinute = calendar.get(java.util.Calendar.MINUTE)
+                        SpecificDatePickerDialog(
+                            initialYear = curYear,
+                            initialMonth = curMonth,
+                            initialDay = curDay,
+                            initialHour = curHour,
+                            initialMinute = curMinute,
+                            language = language,
+                            onDismiss = { showManualDatePicker = false },
+                            onConfirm = { year, month, day, hour, minute ->
+                                calendar.clear()
+                                calendar.set(year, month - 1, day, hour, minute)
+                                customTimestamp = calendar.timeInMillis
+                                showManualDatePicker = false
+                            }
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -9722,7 +9967,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                                 if (isWithdraw && amount > savingsGoal.savedAmount) {
                                     viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "পর্যাপ্ত ব্যালেন্স নেই!" else "Insufficient balance!", isSuccess = false, type = "ERROR")
                                 } else {
-                                    onConfirm(amount, isWithdraw, noteStr)
+                                    onConfirm(amount, isWithdraw, noteStr, customTimestamp ?: System.currentTimeMillis())
                                 }
                             } else {
                                 viewModel.triggerCustomNotification(Translation.get("error_empty_amount", language), isSuccess = false, type = "ERROR")
@@ -10253,10 +10498,10 @@ fun PersonDetailOverlay(
     personDebt: PersonDebt,
     transactionsFlow: kotlinx.coroutines.flow.Flow<List<Transaction>>,
     onDismiss: () -> Unit,
-    onLendClick: (Double, String) -> Unit,
-    onBorrowClick: (Double, String) -> Unit,
-    onRepayPaidClick: (Double, String) -> Unit,
-    onRepayReceivedClick: (Double, String) -> Unit,
+    onLendClick: (Double, String, Long, String) -> Unit,
+    onBorrowClick: (Double, String, Long, String) -> Unit,
+    onRepayPaidClick: (Double, String, Long) -> Unit,
+    onRepayReceivedClick: (Double, String, Long) -> Unit,
     onDeleteTx: (Int) -> Unit,
     onEditTx: (Transaction) -> Unit,
     onEditPerson: (Person) -> Unit,
@@ -10267,6 +10512,8 @@ fun PersonDetailOverlay(
     var actionAmountStr by remember { mutableStateOf("") }
     var showActionCalculator by remember { mutableStateOf(false) }
     var actionNoteStr by remember { mutableStateOf("") }
+    var actionSubType by remember(showActionSheet) { mutableStateOf("CASH") }
+    var customActionTimestamp by remember(showActionSheet) { mutableStateOf<Long?>(null) }
 
     Surface(
         modifier = Modifier
@@ -10322,13 +10569,30 @@ fun PersonDetailOverlay(
                             color = if (isDark) Color.White else Color(0xFF1E222F)
                         )
                         if (personDebt.person.phone.isNotEmpty()) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
-                                Icon(Icons.Rounded.Phone, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(13.dp))
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${personDebt.person.phone}"))
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                    }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                Icon(Icons.Rounded.Phone, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = personDebt.person.phone,
                                     fontSize = 13.sp,
-                                    color = Color.Gray
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    style = TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
                                 )
                             }
                         }
@@ -10560,6 +10824,133 @@ fun PersonDetailOverlay(
                                 modifier = Modifier.fillMaxWidth()
                             )
 
+                            // Sub-type selector (LEND/BORROW specific)
+                            if (actType == "LEND" || actType == "BORROW") {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        if (language == AppLanguage.BN) "লেনদেনের ধরন" else "Transaction Detail",
+                                        color = overlayLabelColor,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.align(Alignment.Start)
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        val options = if (actType == "LEND") {
+                                            listOf(
+                                                Triple("CASH", if (language == AppLanguage.BN) "নগদ ধার" else "Cash Loan", FintechBlue),
+                                                Triple("CREDIT", if (language == AppLanguage.BN) "বাকি বিক্রয়" else "Credit Sale", FintechRed)
+                                            )
+                                        } else {
+                                            listOf(
+                                                Triple("CASH", if (language == AppLanguage.BN) "নগদ ধার" else "Cash Loan", FintechBlue),
+                                                Triple("CREDIT", if (language == AppLanguage.BN) "বাকি ক্রয়" else "Credit Purchase", FintechRed)
+                                            )
+                                        }
+
+                                        options.forEach { (sValue, sLabel, sColor) ->
+                                            val isSelected = actionSubType == sValue
+                                            val chipBg = if (isDark) Color(0xFF2D2D30) else Color(0xFFF3F4F6)
+                                            val textColor = if (isDark) Color.White else Color.Black
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(if (isSelected) sColor else chipBg)
+                                                    .clickable { actionSubType = sValue }
+                                                    .padding(vertical = 10.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = sLabel,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected) Color.White else textColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Date & Time Selector (Custom time)
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    if (language == AppLanguage.BN) "তারিখ ও সময় (ঐচ্ছিক)" else "Date & Time (Optional)",
+                                    color = overlayLabelColor,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.align(Alignment.Start)
+                                )
+                                
+                                var showManualDatePicker by remember { mutableStateOf(false) }
+                                
+                                val dateLabel = if (customActionTimestamp != null) {
+                                    formatDate(customActionTimestamp!!, language)
+                                } else {
+                                    if (language == AppLanguage.BN) "বর্তমান সময় (স্বয়ংক্রিয়)" else "Current Time (Automatic)"
+                                }
+                                
+                                val chipBg = if (isDark) Color(0xFF2D2D30) else Color(0xFFF3F4F6)
+                                val textColor = if (isDark) Color.White else Color.Black
+                                
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(chipBg)
+                                        .clickable { showManualDatePicker = true }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Rounded.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Text(dateLabel, color = textColor, fontSize = 14.sp)
+                                    }
+                                    if (customActionTimestamp != null) {
+                                        IconButton(onClick = { customActionTimestamp = null }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Rounded.Close, contentDescription = "Clear", tint = FintechRed, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                }
+                                
+                                if (showManualDatePicker) {
+                                    val calendar = java.util.Calendar.getInstance()
+                                    if (customActionTimestamp != null) {
+                                        calendar.timeInMillis = customActionTimestamp!!
+                                    }
+                                    val curYear = calendar.get(java.util.Calendar.YEAR)
+                                    val curMonth = calendar.get(java.util.Calendar.MONTH) + 1
+                                    val curDay = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+                                    val curHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+                                    val curMinute = calendar.get(java.util.Calendar.MINUTE)
+                                    SpecificDatePickerDialog(
+                                        initialYear = curYear,
+                                        initialMonth = curMonth,
+                                        initialDay = curDay,
+                                        initialHour = curHour,
+                                        initialMinute = curMinute,
+                                        language = language,
+                                        onDismiss = { showManualDatePicker = false },
+                                        onConfirm = { year, month, day, hour, minute ->
+                                            calendar.clear()
+                                            calendar.set(year, month - 1, day, hour, minute)
+                                            customActionTimestamp = calendar.timeInMillis
+                                            showManualDatePicker = false
+                                        }
+                                    )
+                                }
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -10574,11 +10965,12 @@ fun PersonDetailOverlay(
                                     onClick = {
                                         val amt = actionAmountStr.toDoubleOrNull() ?: 0.0
                                         if (amt > 0) {
+                                            val finalTimestamp = customActionTimestamp ?: System.currentTimeMillis()
                                             when (actType) {
-                                                "LEND" -> onLendClick(amt, actionNoteStr)
-                                                "BORROW" -> onBorrowClick(amt, actionNoteStr)
-                                                "REPAY_PAID" -> onRepayPaidClick(amt, actionNoteStr)
-                                                "REPAY_RECEIVED" -> onRepayReceivedClick(amt, actionNoteStr)
+                                                "LEND" -> onLendClick(amt, actionNoteStr, finalTimestamp, actionSubType)
+                                                "BORROW" -> onBorrowClick(amt, actionNoteStr, finalTimestamp, actionSubType)
+                                                "REPAY_PAID" -> onRepayPaidClick(amt, actionNoteStr, finalTimestamp)
+                                                "REPAY_RECEIVED" -> onRepayReceivedClick(amt, actionNoteStr, finalTimestamp)
                                             }
                                             actionAmountStr = ""
                                             actionNoteStr = ""
