@@ -2716,6 +2716,98 @@ fun FinanceNoteApp(
                                     )
                                 }
                             }
+                            
+                            Spacer(modifier = Modifier.width(4.dp))
+                            
+                            var verticalDragAmount by remember { mutableStateOf(0f) }
+                            AnimatedContent(
+                                targetState = currentWorkspace.id,
+                                transitionSpec = {
+                                    if (targetState != initialState) {
+                                        if (verticalDragAmount > 0) {
+                                            (slideInVertically { -it } + fadeIn()).togetherWith(slideOutVertically { it } + fadeOut())
+                                        } else {
+                                            (slideInVertically { it } + fadeIn()).togetherWith(slideOutVertically { -it } + fadeOut())
+                                        }
+                                    } else {
+                                        fadeIn().togetherWith(fadeOut())
+                                    }
+                                },
+                                label = "workspace_switch_transition"
+                            ) { _ ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.2f))
+                                        .clickable { showWorkspaceDialog = true }
+                                        .border(2.dp, Color.White, CircleShape)
+                                        .pointerInput(workspaceStatsList) {
+                                            detectVerticalDragGestures(
+                                                onVerticalDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    verticalDragAmount += dragAmount
+                                                },
+                                                onDragEnd = {
+                                                    if (verticalDragAmount > 40) {
+                                                        val currentIndex = workspaceStatsList.indexOfFirst { it.workspace.id == currentWorkspace.id }
+                                                        if (currentIndex != -1 && workspaceStatsList.size > 1) {
+                                                            val nextIndex = (currentIndex + 1) % workspaceStatsList.size
+                                                            viewModel.selectWorkspace(workspaceStatsList[nextIndex].workspace.id)
+                                                        }
+                                                    } else if (verticalDragAmount < -40) {
+                                                        val currentIndex = workspaceStatsList.indexOfFirst { it.workspace.id == currentWorkspace.id }
+                                                        if (currentIndex != -1 && workspaceStatsList.size > 1) {
+                                                            val prevIndex = (currentIndex - 1 + workspaceStatsList.size) % workspaceStatsList.size
+                                                            viewModel.selectWorkspace(workspaceStatsList[prevIndex].workspace.id)
+                                                        }
+                                                    }
+                                                    kotlinx.coroutines.MainScope().launch {
+                                                        kotlinx.coroutines.delay(300)
+                                                        verticalDragAmount = 0f
+                                                    }
+                                                }
+                                            )
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (profilePhotoUri != null) {
+                                        AsyncImage(
+                                            model = profilePhotoUri,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else if (!isGoogleSignedIn) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Cloud,
+                                            contentDescription = "Sign in to backup",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    } else {
+                                        val initials = if (profileName.isNotBlank()) {
+                                            profileName.split(" ").take(2).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").uppercase()
+                                        } else ""
+
+                                        if (initials.isNotEmpty()) {
+                                            Text(
+                                                text = initials,
+                                                color = Color.White,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Person,
+                                                contentDescription = null,
+                                                tint = FintechBlue,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -5668,209 +5760,48 @@ fun DashboardScreen(
                     .weight(1f)
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 90.dp)
+                contentPadding = PaddingValues(top = 16.dp, bottom = 90.dp)
             ) {
-        // Profile Card (Fintech Gradient Card styled beautifully with the same indigo-fuchsia gradient)
-        item {
-            FintechGradientCard(
-                gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
-                cornerRadius = 24.dp,
-                padding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
-                onClick = { onWorkspaceClick() },
-                modifier = Modifier
-                    .testTag("dashboard_profile_card")
-                    .padding(top = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Profile Avatar Circle with initials or photo
-                    var verticalDragAmount by remember { mutableStateOf(0f) }
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .clickable { onWorkspaceClick() }
-                            .border(2.5.dp, Color.White, CircleShape)
-                            .pointerInput(workspaces) {
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        verticalDragAmount += dragAmount
-                                    },
-                                    onDragEnd = {
-                                        if (verticalDragAmount > 40) {
-                                            // Swipe Down: Next workspace
-                                            val currentIndex = workspaces.indexOfFirst { it.id == currentWorkspace.id }
-                                            if (currentIndex != -1 && workspaces.size > 1) {
-                                                val nextIndex = (currentIndex + 1) % workspaces.size
-                                                viewModel?.selectWorkspace(workspaces[nextIndex].id)
-                                            }
-                                        } else if (verticalDragAmount < -40) {
-                                            // Swipe Up: Previous workspace
-                                            val currentIndex = workspaces.indexOfFirst { it.id == currentWorkspace.id }
-                                            if (currentIndex != -1 && workspaces.size > 1) {
-                                                val prevIndex = (currentIndex - 1 + workspaces.size) % workspaces.size
-                                                viewModel?.selectWorkspace(workspaces[prevIndex].id)
-                                            }
-                                        }
-                                        verticalDragAmount = 0f
-                                    }
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (profilePhotoUri != null) {
-                            AsyncImage(
-                                model = profilePhotoUri,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                if (!isGoogleSignedIn) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onSignInClick() },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF1F5F9)
                             )
-                        } else if (!isGoogleSignedIn) {
-                            Icon(
-                                imageVector = Icons.Rounded.Cloud,
-                                contentDescription = "Sign in to backup",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        } else {
-                            val initials = if (profileName.isNotBlank()) {
-                                profileName.split(" ")
-                                    .take(2)
-                                    .mapNotNull { it.firstOrNull()?.toString() }
-                                    .joinToString("")
-                                    .uppercase()
-                            } else ""
-
-                            if (initials.isNotEmpty()) {
-                                Text(
-                                    text = initials,
-                                    color = Color.White,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.Person,
-                                    contentDescription = null,
-                                    tint = FintechBlue,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Profile text details
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${getGreeting(language)} | ${currentWorkspace?.name ?: ""}",
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(
-                                text = profileName.ifBlank { currentWorkspace?.name ?: "" },
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f, fill = false)
-                                    .clickable { onWorkspaceClick() }
-                            )
-                            
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.15f))
-                                    .clickable { onWorkspaceClick() },
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.ArrowDropDown,
-                                    contentDescription = "Switch Workspace",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(22.dp)
+                                    imageVector = Icons.Rounded.CloudOff,
+                                    contentDescription = "Sign In",
+                                    tint = if (isDark) Color.LightGray else Color(0xFF64748B),
+                                    modifier = Modifier.size(24.dp)
                                 )
-                            }
-                        }
-                        if (isGoogleSignedIn) {
-                            if (profileEmail.isNotBlank()) {
-                                Text(
-                                    text = profileEmail,
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Normal,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        } else {
-                            Text(
-                                text = if (language == AppLanguage.BN) "ডেটা ব্যাকআপ/রিস্টোর ও সিঙ্ক করতে সাইন ইন করুন" else "Sign in to backup/restore and sync data",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    // Action Buttons
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isGoogleSignedIn) {
-                            // Cloud Sync Button
-                            IconButton(
-                                onClick = { onBackupClick() },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.15f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
-                                    .size(36.dp)
-                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "ডেটা সিঙ্ক ও ব্যাকআপ করতে সাইন ইন করুন" else "Sign in to sync and backup data",
+                                        color = if (isDark) Color.White else Color(0xFF1E293B),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                                 Icon(
-                                    imageVector = Icons.Rounded.CloudUpload,
-                                    contentDescription = if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক" else "Cloud Sync",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        } else {
-                            // Google Sign In Button - shows Sign In icon
-                            IconButton(
-                                onClick = { onSignInClick() },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.15f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
-                                    .size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.Login,
-                                    contentDescription = if (language == AppLanguage.BN) "গুগল সাইন-ইন" else "Google Sign-In",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    imageVector = Icons.Rounded.ChevronRight,
+                                    contentDescription = "Sign In",
+                                    tint = if (isDark) Color.LightGray else Color(0xFF64748B),
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
                     }
                 }
-            }
-        }
 
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
