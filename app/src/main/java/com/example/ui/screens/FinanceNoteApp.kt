@@ -598,7 +598,7 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
-        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
+        "INCOME" -> listOf(Color(0xFFCDDC39), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Lime -> Yellow -> Amber -> Orange -> Deep Orange -> Red
         "EXPENSE" -> listOf(Color(0xFFCDDC39), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Lime -> Yellow -> Amber -> Orange -> Deep Orange -> Red
         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
@@ -2022,6 +2022,7 @@ fun FinanceNoteApp(
     val transactions by viewModel.transactions.collectAsState()
     val savingsGoals by viewModel.savingsGoals.collectAsState()
     val personDebts by viewModel.personDebts.collectAsState()
+    val savingsTransactions by viewModel.savingsTransactions.collectAsState()
 
     val totalBalance by viewModel.totalBalance.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
@@ -2046,11 +2047,89 @@ fun FinanceNoteApp(
         filterTransactionsByTime(transactions, timeFilter)
     }
 
+    val filteredSavingsTransactions = remember(savingsTransactions, timeFilter) {
+        // We can reuse the logic by temporarily mapping or just using a generic filter
+        val now = System.currentTimeMillis()
+        val calendar = java.util.Calendar.getInstance()
+        when {
+            timeFilter == "ALL" -> savingsTransactions
+            timeFilter == "TODAY" -> {
+                calendar.timeInMillis = now
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val startOfDay = calendar.timeInMillis
+                savingsTransactions.filter { it.timestamp >= startOfDay }
+            }
+            timeFilter == "MONTH" -> {
+                calendar.timeInMillis = now
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val startOfMonth = calendar.timeInMillis
+                savingsTransactions.filter { it.timestamp >= startOfMonth }
+            }
+            timeFilter.startsWith("CUSTOM_MONTH:") -> {
+                val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+                if (parts.size == 2) {
+                    val year = parts[0].toIntOrNull() ?: 2026
+                    val month = parts[1].toIntOrNull() ?: 1
+                    calendar.clear()
+                    calendar.set(java.util.Calendar.YEAR, year)
+                    calendar.set(java.util.Calendar.MONTH, month - 1)
+                    calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    calendar.set(java.util.Calendar.MINUTE, 0)
+                    calendar.set(java.util.Calendar.SECOND, 0)
+                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                    val start = calendar.timeInMillis
+                    calendar.add(java.util.Calendar.MONTH, 1)
+                    val end = calendar.timeInMillis
+                    savingsTransactions.filter { it.timestamp in start until end }
+                } else savingsTransactions
+            }
+            timeFilter.startsWith("CUSTOM_DATE:") -> {
+                val parts = timeFilter.substringAfter("CUSTOM_DATE:").split("-")
+                if (parts.size == 3) {
+                    val year = parts[0].toIntOrNull() ?: 2026
+                    val month = parts[1].toIntOrNull() ?: 1
+                    val day = parts[2].toIntOrNull() ?: 1
+                    calendar.clear()
+                    calendar.set(year, month - 1, day, 0, 0, 0)
+                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                    val start = calendar.timeInMillis
+                    calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                    val end = calendar.timeInMillis
+                    savingsTransactions.filter { it.timestamp in start until end }
+                } else savingsTransactions
+            }
+            else -> savingsTransactions
+        }
+    }
+
     val currentTotalIncome = remember(filteredTransactionsForMetrics) {
-        filteredTransactionsForMetrics.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+        filteredTransactionsForMetrics.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.fold(0.0) { acc, tx -> acc + tx.amount }
     }
     val currentTotalExpense = remember(filteredTransactionsForMetrics) {
-        filteredTransactionsForMetrics.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+        filteredTransactionsForMetrics.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.fold(0.0) { acc, tx -> acc + tx.amount }
+    }
+    
+    val currentTotalBalance = remember(filteredTransactionsForMetrics, filteredSavingsTransactions) {
+        val cashIncome = filteredTransactionsForMetrics.filter { it.type == "INCOME" }.fold(0.0) { acc, tx -> acc + tx.amount }
+        val cashBorrowed = filteredTransactionsForMetrics.filter { it.type == "BORROW" && it.subType != "CREDIT" }.fold(0.0) { acc, tx -> acc + tx.amount }
+        val repaidReceived = filteredTransactionsForMetrics.filter { it.type == "REPAY_RECEIVED" }.fold(0.0) { acc, tx -> acc + tx.amount }
+        val savingsWithdrawals = filteredSavingsTransactions.filter { !it.isDeposit }.fold(0.0) { acc, tx -> acc + tx.amount }
+
+        val cashExpense = filteredTransactionsForMetrics.filter { it.type == "EXPENSE" }.fold(0.0) { acc, tx -> acc + tx.amount }
+        val cashLent = filteredTransactionsForMetrics.filter { it.type == "LEND" && it.subType != "CREDIT" }.fold(0.0) { acc, tx -> acc + tx.amount }
+        val repaidPaid = filteredTransactionsForMetrics.filter { it.type == "REPAY_PAID" }.fold(0.0) { acc, tx -> acc + tx.amount }
+        val savingsDeposits = filteredSavingsTransactions.filter { it.isDeposit }.fold(0.0) { acc, tx -> acc + tx.amount }
+
+        (cashIncome + cashBorrowed + repaidReceived + savingsWithdrawals) - 
+        (cashExpense + cashLent + repaidPaid + savingsDeposits)
     }
 
     // Filter personDebts by time locally for UI if needed
@@ -2911,7 +2990,7 @@ fun FinanceNoteApp(
                                             profileName = profileName,
                                             profileEmail = profileEmail,
                                             profilePhotoUri = profilePhotoUri,
-                                            balance = totalBalance,
+                                            balance = currentTotalBalance,
                                             income = currentTotalIncome,
                                             expense = currentTotalExpense,
                                             owedToMe = currentTotalOwedToMe,
@@ -4962,7 +5041,7 @@ fun DashboardScreen(
                         val netWorth by viewModel?.netWorth?.collectAsState() ?: remember { mutableStateOf(0.0) }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = if (language == AppLanguage.BN) "নেট ওয়ার্থ (নিট সম্পদ): " else "Net Worth: ",
+                                text = if (language == AppLanguage.BN) "নীট সম্পদ: " else "Net Worth: ",
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium

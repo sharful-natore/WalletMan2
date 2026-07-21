@@ -478,7 +478,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalSavings: StateFlow<Double> = savingsGoals
-        .map { goals -> goals.sumOf { it.savedAmount } }
+        .map { goals -> goals.fold(0.0) { acc, goal -> acc + goal.savedAmount } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val netWorth: StateFlow<Double> = combine(totalBalance, totalSavings, totalOwedToMe, totalIOwe) { balance, savings, owed, owe ->
