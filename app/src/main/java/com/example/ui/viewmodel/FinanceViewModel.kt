@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -285,8 +286,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             val wsPersons = allPersons.filter { it.workspaceId == wsId }
             val wsGoals = allSavingsGoals.filter { it.workspaceId == wsId }
             
-            val income = wsTransactions.filter { it.type == "INCOME" }.sumOf { it.amount }
-            val expense = wsTransactions.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+            val income = wsTransactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val expense = wsTransactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
             
             var owedToMe = 0.0
             var iOwe = 0.0
@@ -435,15 +436,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     // Financial Metrics State
     val totalIncome: StateFlow<Double> = transactions
         .combine(personDebts) { txList, debts ->
-            // INCOME is general cash-in.
-            // + LEND with CREDIT subtype (Credit Sales) as per user request
+            // In Accounting (Accrual Basis):
+            // Revenue = Cash Income + Sales on Credit (LEND with CREDIT subtype)
             txList.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalExpense: StateFlow<Double> = transactions
         .combine(personDebts) { txList, debts ->
-            // EXPENSE is general cash-out.
-            // + BORROW with CREDIT subtype (Credit Purchases) as per user request point #2
+            // In Accounting (Accrual Basis):
+            // Expenses = Cash Expenses + Purchases on Credit (BORROW with CREDIT subtype)
             txList.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
@@ -457,25 +458,34 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             debts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val totalBalance: StateFlow<Double> = combine(transactions, totalOwedToMe, totalIOwe) { txList, _, _ ->
-        // Total Balance formula: (Total Income + Loans Collected) - (Cash Expenses + Debts Repaid + Loans Given)
-        // 1. Total Income: INCOME
-        val income = txList.filter { it.type == "INCOME" }.sumOf { it.amount }
+    val totalBalance: StateFlow<Double> = combine(transactions, savingsTransactions) { txList, savingsTxList ->
+        // Total Balance (Cash in Hand/Wallet) formula:
+        // Cash Inflow: INCOME (Cash) + BORROW (Cash) + REPAY_RECEIVED (Debt collected) + Savings Withdrawals
+        // Cash Outflow: EXPENSE (Cash) + LEND (Cash given) + REPAY_PAID (Debt paid back) + Savings Deposits
         
-        // 2. Loans Collected: REPAY_RECEIVED
+        val cashIncome = txList.filter { it.type == "INCOME" }.sumOf { it.amount }
+        val cashBorrowed = txList.filter { it.type == "BORROW" && it.subType != "CREDIT" }.sumOf { it.amount }
         val repaidReceived = txList.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+        val savingsWithdrawals = savingsTxList.filter { !it.isDeposit }.sumOf { it.amount }
 
-        // 3. Cash Expenses: EXPENSE (Direct cash out)
-        val expense = txList.filter { it.type == "EXPENSE" }.sumOf { it.amount }
-        
-        // 4. Debts Repaid: REPAY_PAID
+        val cashExpense = txList.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+        val cashLent = txList.filter { it.type == "LEND" && it.subType != "CREDIT" }.sumOf { it.amount }
         val repaidPaid = txList.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+        val savingsDeposits = savingsTxList.filter { it.isDeposit }.sumOf { it.amount }
 
-        // 5. Loans Given: LEND
-        val lent = txList.filter { it.type == "LEND" }.sumOf { it.amount }
+        (cashIncome + cashBorrowed + repaidReceived + savingsWithdrawals) - 
+        (cashExpense + cashLent + repaidPaid + savingsDeposits)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-        // Note: BORROW is excluded from the formula as per point #2 (Total Balance No Change for Buying on Credit/Taking Debt)
-        (income + repaidReceived) - (expense + repaidPaid + lent)
+    val totalSavings: StateFlow<Double> = savingsGoals
+        .map { goals -> goals.sumOf { it.savedAmount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val netWorth: StateFlow<Double> = combine(totalBalance, totalSavings, totalOwedToMe, totalIOwe) { balance, savings, owed, owe ->
+        // Accounting Equation: Equity (Net Worth) = Assets - Liabilities
+        // Assets = Cash (Balance) + Savings + Accounts Receivable (Owed to Me)
+        // Liabilities = Accounts Payable (I Owe)
+        (balance + savings + owed) - owe
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     // User Actions / Intents
