@@ -139,6 +139,18 @@ data class DebtNotificationLog(
     val lastNotifiedAt: Long
 )
 
+@Entity(tableName = "monthly_budgets")
+@JsonClass(generateAdapter = true)
+data class MonthlyBudget(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val year: Int,
+    val month: Int,
+    val income: Double = 0.0,
+    val expense: Double = 0.0,
+    val savings: Double = 0.0,
+    val workspaceId: String = "default"
+)
+
 @JsonClass(generateAdapter = true)
 data class PersonWithTransactions(
     val person: Person,

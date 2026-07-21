@@ -595,8 +595,8 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
-        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
-        "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFCDDC39), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Green -> Lime -> Yellow -> Amber -> Orange -> Deep Orange -> Red
+        "INCOME" -> listOf(Color(0xFF81C784), Color(0xFF4CAF50), Color(0xFF2E7D32))  // Light green to dark green
+        "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Green -> Lime -> Amber -> Orange -> Deep Orange -> Red
         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
@@ -4553,12 +4553,80 @@ fun DashboardScreen(
         savingsGoals.map { Pair(it.title, it.savedAmount) }
             .sortedByDescending { it.second }
     }
-    val budgetIncomeAmount by viewModel?.budgetIncome?.collectAsState() ?: remember { mutableStateOf(0.0) }
-    val budgetExpenseAmount by viewModel?.budgetExpense?.collectAsState() ?: remember { mutableStateOf(0.0) }
-    val budgetSavingsAmount by viewModel?.budgetSavings?.collectAsState() ?: remember { mutableStateOf(0.0) }
+    val monthlyBudgets by viewModel?.monthlyBudgets?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
+    val budgetIncomeAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
+        val ym = getYearMonthFromFilter(timeFilter)
+        if (ym != null) {
+            monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.income ?: 0.0
+        } else if (timeFilter == "ALL") {
+            if (currentWorkspace.budgetIncome > 0.0) currentWorkspace.budgetIncome
+            else monthlyBudgets.filter { it.income > 0.0 }.sumOf { it.income }
+        } else 0.0
+    }
+    val budgetExpenseAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
+        val ym = getYearMonthFromFilter(timeFilter)
+        if (ym != null) {
+            monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.expense ?: 0.0
+        } else if (timeFilter == "ALL") {
+            if (currentWorkspace.budgetExpense > 0.0) currentWorkspace.budgetExpense
+            else monthlyBudgets.filter { it.expense > 0.0 }.sumOf { it.expense }
+        } else 0.0
+    }
+    val budgetSavingsAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
+        val ym = getYearMonthFromFilter(timeFilter)
+        if (ym != null) {
+            monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.savings ?: 0.0
+        } else if (timeFilter == "ALL") {
+            if (currentWorkspace.budgetSavings > 0.0) currentWorkspace.budgetSavings
+            else monthlyBudgets.filter { it.savings > 0.0 }.sumOf { it.savings }
+        } else 0.0
+    }
     val savingsTransactions by viewModel?.savingsTransactions?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
     var showBudgetHistoryDialog by remember { mutableStateOf(false) }
     val totalSavingsAmount = savingsGoals.sumOf { it.savedAmount }
+
+    val currentNetWorth = remember(balance, totalSavingsAmount, owedToMe, iOwe) {
+        balance + totalSavingsAmount + owedToMe - iOwe
+    }
+
+    val effectiveIncome = remember(timeFilter, income, monthlyBudgets, transactions, currentWorkspace) {
+        if (timeFilter == "ALL" && currentWorkspace.budgetIncome == 0.0) {
+            val monthsWithBudget = monthlyBudgets.filter { it.income > 0.0 }.map { "${it.year}-${String.format("%02d", it.month)}" }
+            if (monthsWithBudget.isEmpty()) 0.0
+            else {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
+                transactions.filter { 
+                    (it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT")) &&
+                    monthsWithBudget.contains(sdf.format(java.util.Date(it.timestamp)))
+                }.sumOf { it.amount }
+            }
+        } else income
+    }
+    val effectiveExpense = remember(timeFilter, expense, monthlyBudgets, transactions, currentWorkspace) {
+        if (timeFilter == "ALL" && currentWorkspace.budgetExpense == 0.0) {
+            val monthsWithBudget = monthlyBudgets.filter { it.expense > 0.0 }.map { "${it.year}-${String.format("%02d", it.month)}" }
+            if (monthsWithBudget.isEmpty()) 0.0
+            else {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
+                transactions.filter { 
+                    (it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT")) &&
+                    monthsWithBudget.contains(sdf.format(java.util.Date(it.timestamp)))
+                }.sumOf { it.amount }
+            }
+        } else expense
+    }
+    val effectiveSavings = remember(timeFilter, totalSavingsAmount, monthlyBudgets, savingsTransactions, currentWorkspace) {
+        if (timeFilter == "ALL" && currentWorkspace.budgetSavings == 0.0) {
+            val monthsWithBudget = monthlyBudgets.filter { it.savings > 0.0 }.map { "${it.year}-${String.format("%02d", it.month)}" }
+            if (monthsWithBudget.isEmpty()) 0.0
+            else {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
+                savingsTransactions.filter { 
+                    it.isDeposit && monthsWithBudget.contains(sdf.format(java.util.Date(it.timestamp)))
+                }.sumOf { it.amount }
+            }
+        } else totalSavingsAmount
+    }
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -5039,7 +5107,6 @@ fun DashboardScreen(
                         )
                         
                         // Net Worth Display
-                        val netWorth by viewModel?.netWorth?.collectAsState() ?: remember { mutableStateOf(0.0) }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = if (language == AppLanguage.BN) "নীট সম্পদ: " else "Net Worth: ",
@@ -5048,7 +5115,7 @@ fun DashboardScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = formatCurrency(netWorth, language),
+                                text = formatCurrency(currentNetWorth, language),
                                 color = Color.White.copy(alpha = 0.9f),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
@@ -5288,7 +5355,10 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (language == AppLanguage.BN) "মাসিক বাজেট কন্ট্রোল" else "Monthly Budget Control",
+                            text = when {
+                                timeFilter == "ALL" -> if (language == AppLanguage.BN) "সর্বমোট বাজেট কন্ট্রোল" else "Total Budget Control"
+                                else -> if (language == AppLanguage.BN) "মাসিক বাজেট কন্ট্রোল" else "Monthly Budget Control"
+                            },
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = FintechBlue,
@@ -5342,7 +5412,7 @@ fun DashboardScreen(
                             )
                             BudgetControlDonutChart(
                                 targetAmount = budgetIncomeAmount,
-                                totalFilledAmount = income,
+                                totalFilledAmount = effectiveIncome,
                                 categoryType = "INCOME",
                                 language = language,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
@@ -5371,7 +5441,7 @@ fun DashboardScreen(
                             )
                             BudgetControlDonutChart(
                                 targetAmount = budgetExpenseAmount,
-                                totalFilledAmount = expense,
+                                totalFilledAmount = effectiveExpense,
                                 categoryType = "EXPENSE",
                                 language = language,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
@@ -5400,7 +5470,7 @@ fun DashboardScreen(
                             )
                             BudgetControlDonutChart(
                                 targetAmount = budgetSavingsAmount,
-                                totalFilledAmount = totalSavingsAmount,
+                                totalFilledAmount = effectiveSavings,
                                 categoryType = "SAVINGS",
                                 language = language,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
@@ -5588,9 +5658,9 @@ fun DashboardScreen(
             else -> 0.0
         }
         val totalFilledAmount = when (categoryType) {
-            "INCOME" -> income
-            "EXPENSE" -> expense
-            "SAVINGS" -> totalSavingsAmount
+            "INCOME" -> effectiveIncome
+            "EXPENSE" -> effectiveExpense
+            "SAVINGS" -> effectiveSavings
             else -> 0.0
         }
         val segments = when (categoryType) {
@@ -5614,6 +5684,7 @@ fun DashboardScreen(
         }
 
         var isEditingBudget by remember(targetAmount) { mutableStateOf(targetAmount == 0.0) }
+        var showResetConfirm by remember { mutableStateOf(false) }
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
@@ -5631,6 +5702,46 @@ fun DashboardScreen(
                 )
             },
             text = {
+                if (showResetConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showResetConfirm = false },
+                        title = {
+                            Text(
+                                text = if (language == AppLanguage.BN) "বাজেট রিসেট" else "Reset Budget",
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = if (language == AppLanguage.BN) "কাস্টম বাজেট রিসেট করতে চান?" else "Do you want to reset the custom budget?",
+                                fontSize = 14.sp
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    when (categoryType) {
+                                        "INCOME" -> viewModel?.setBudgetIncome(0.0)
+                                        "EXPENSE" -> viewModel?.setBudgetExpense(0.0)
+                                        "SAVINGS" -> viewModel?.setBudgetSavings(0.0)
+                                    }
+                                    showResetConfirm = false
+                                }
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "হ্যাঁ" else "Yes",
+                                    color = FintechRed
+                                )
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showResetConfirm = false }) {
+                                Text(text = if (language == AppLanguage.BN) "না" else "No")
+                            }
+                        }
+                    )
+                }
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -5706,6 +5817,14 @@ fun DashboardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
+                            val isSumAllTime = timeFilter == "ALL" && when(categoryType) {
+                                "INCOME" -> currentWorkspace.budgetIncome == 0.0
+                                "EXPENSE" -> currentWorkspace.budgetExpense == 0.0
+                                "SAVINGS" -> currentWorkspace.budgetSavings == 0.0
+                                else -> false
+                            }
+                            val ym = getYearMonthFromFilter(timeFilter)
+
                             if (!isEditingBudget) {
                                 Row(
                                     modifier = Modifier
@@ -5718,7 +5837,7 @@ fun DashboardScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = if (language == AppLanguage.BN) "বাজেট সীমা নির্ধারণ করুন" else "Set Budget Limit",
                                             fontSize = 12.sp,
@@ -5731,15 +5850,29 @@ fun DashboardScreen(
                                             color = if (targetAmount > 0.0) FintechBlue else Color.Gray
                                         )
                                     }
-                                    IconButton(
-                                        onClick = { isEditingBudget = true }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Edit,
-                                            contentDescription = "Edit Budget",
-                                            tint = FintechBlue,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (timeFilter == "ALL") {
+                                            IconButton(
+                                                onClick = { showResetConfirm = true }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.RestartAlt,
+                                                    contentDescription = "Reset",
+                                                    tint = FintechRed,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                        IconButton(
+                                            onClick = { isEditingBudget = true }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Edit,
+                                                contentDescription = "Edit Budget",
+                                                tint = FintechBlue,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 }
                             } else {
@@ -5750,7 +5883,7 @@ fun DashboardScreen(
                                     OutlinedTextField(
                                         value = localBudgetInput,
                                         onValueChange = { input -> 
-                                            if (input.all { it.isDigit() }) localBudgetInput = input
+                                            if (input.all { it.isDigit() || it == '.' }) localBudgetInput = input
                                         },
                                         label = {
                                             Text(
@@ -5804,10 +5937,18 @@ fun DashboardScreen(
                                         Button(
                                             onClick = {
                                                 val newAmount = localBudgetInput.toDoubleOrNull() ?: 0.0
-                                                when (categoryType) {
-                                                    "INCOME" -> viewModel?.setBudgetIncome(newAmount)
-                                                    "EXPENSE" -> viewModel?.setBudgetExpense(newAmount)
-                                                    "SAVINGS" -> viewModel?.setBudgetSavings(newAmount)
+                                                if (ym != null) {
+                                                    when (categoryType) {
+                                                        "INCOME" -> viewModel?.setMonthlyBudget(ym.first, ym.second, newAmount, null, null)
+                                                        "EXPENSE" -> viewModel?.setMonthlyBudget(ym.first, ym.second, null, newAmount, null)
+                                                        "SAVINGS" -> viewModel?.setMonthlyBudget(ym.first, ym.second, null, null, newAmount)
+                                                    }
+                                                } else if (timeFilter == "ALL") {
+                                                    when (categoryType) {
+                                                        "INCOME" -> viewModel?.setBudgetIncome(newAmount)
+                                                        "EXPENSE" -> viewModel?.setBudgetExpense(newAmount)
+                                                        "SAVINGS" -> viewModel?.setBudgetSavings(newAmount)
+                                                    }
                                                 }
                                                 isEditingBudget = false
                                             },
@@ -7805,6 +7946,22 @@ fun filterTransactionsByTime(transactions: List<Transaction>, timeFilter: String
             } else transactions
         }
         else -> transactions
+    }
+}
+
+fun getYearMonthFromFilter(filter: String): Pair<Int, Int>? {
+    val calendar = java.util.Calendar.getInstance()
+    return when {
+        filter == "MONTH" -> {
+            Pair(calendar.get(java.util.Calendar.YEAR), calendar.get(java.util.Calendar.MONTH) + 1)
+        }
+        filter.startsWith("CUSTOM_MONTH:") -> {
+            val parts = filter.substringAfter("CUSTOM_MONTH:").split("-")
+            if (parts.size == 2) {
+                Pair(parts[0].toIntOrNull() ?: 2026, parts[1].toIntOrNull() ?: 1)
+            } else null
+        }
+        else -> null
     }
 }
 

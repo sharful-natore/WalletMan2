@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -227,6 +228,38 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private val _budgetSavings = MutableStateFlow(0.0)
     val budgetSavings: StateFlow<Double> = _budgetSavings.asStateFlow()
+
+    val monthlyBudgets: StateFlow<List<com.example.data.MonthlyBudget>> = _currentWorkspaceId
+        .flatMapLatest { workspaceId -> repository.getAllMonthlyBudgets(workspaceId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setMonthlyBudget(year: Int, month: Int, income: Double?, expense: Double?, savings: Double?) {
+        viewModelScope.launch {
+            val workspaceId = _currentWorkspaceId.value
+            val existing = repository.getMonthlyBudget(year, month, workspaceId)
+            val newBudget = existing?.copy(
+                income = income ?: existing.income,
+                expense = expense ?: existing.expense,
+                savings = savings ?: existing.savings
+            ) ?: com.example.data.MonthlyBudget(
+                year = year,
+                month = month,
+                income = income ?: 0.0,
+                expense = expense ?: 0.0,
+                savings = savings ?: 0.0,
+                workspaceId = workspaceId
+            )
+            repository.insertMonthlyBudget(newBudget)
+            onLocalDatabaseChanged()
+        }
+    }
+
+    fun deleteMonthlyBudget(year: Int, month: Int) {
+        viewModelScope.launch {
+            repository.deleteMonthlyBudget(year, month, _currentWorkspaceId.value)
+            onLocalDatabaseChanged()
+        }
+    }
 
     fun loadBudgets() {
         // No-op, now handled by collecting currentWorkspace flow

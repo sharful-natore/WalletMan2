@@ -194,5 +194,27 @@ interface FinanceDao {
 
     @Query("DELETE FROM debt_notification_logs WHERE personId = :personId")
     suspend fun deleteDebtNotificationLog(personId: Int)
+
+    // Monthly Budgets
+    @Query("SELECT * FROM monthly_budgets WHERE workspaceId = :workspaceId")
+    fun getAllMonthlyBudgets(workspaceId: String): Flow<List<MonthlyBudget>>
+
+    @Query("SELECT * FROM monthly_budgets WHERE workspaceId = :workspaceId")
+    suspend fun getAllMonthlyBudgetsList(workspaceId: String): List<MonthlyBudget>
+
+    @Query("SELECT * FROM monthly_budgets WHERE year = :year AND month = :month AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun getMonthlyBudget(year: Int, month: Int, workspaceId: String): MonthlyBudget?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMonthlyBudget(budget: MonthlyBudget)
+
+    @Query("DELETE FROM monthly_budgets WHERE year = :year AND month = :month AND workspaceId = :workspaceId")
+    suspend fun deleteMonthlyBudget(year: Int, month: Int, workspaceId: String)
+
+    @Query("DELETE FROM monthly_budgets WHERE workspaceId = :workspaceId")
+    suspend fun deleteAllMonthlyBudgetsByWorkspace(workspaceId: String)
+
+    @Query("DELETE FROM monthly_budgets")
+    suspend fun deleteAllMonthlyBudgets()
 }
 

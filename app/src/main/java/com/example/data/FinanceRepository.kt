@@ -131,5 +131,13 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun getDebtNotificationLog(personId: Int): DebtNotificationLog? = financeDao.getDebtNotificationLog(personId)
     suspend fun insertDebtNotificationLog(log: DebtNotificationLog) = financeDao.insertDebtNotificationLog(log)
     suspend fun deleteDebtNotificationLog(personId: Int) = financeDao.deleteDebtNotificationLog(personId)
+
+    // Monthly Budgets
+    fun getAllMonthlyBudgets(workspaceId: String) = financeDao.getAllMonthlyBudgets(workspaceId)
+    suspend fun getAllMonthlyBudgetsList(workspaceId: String) = financeDao.getAllMonthlyBudgetsList(workspaceId)
+    suspend fun getMonthlyBudget(year: Int, month: Int, workspaceId: String) = financeDao.getMonthlyBudget(year, month, workspaceId)
+    suspend fun insertMonthlyBudget(budget: MonthlyBudget) = financeDao.insertMonthlyBudget(budget)
+    suspend fun deleteMonthlyBudget(year: Int, month: Int, workspaceId: String) = financeDao.deleteMonthlyBudget(year, month, workspaceId)
+    suspend fun deleteAllMonthlyBudgetsByWorkspace(workspaceId: String) = financeDao.deleteAllMonthlyBudgetsByWorkspace(workspaceId)
 }
 
