@@ -4535,22 +4535,20 @@ fun DashboardScreen(
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
         selectedTxIds = emptySet()
     }
-    val incomeByCategory = remember(transactions) {
+    val incomeByCategory = remember(transactions, timeFilter) {
+        val filtered = filterTransactionsByTime(transactions, timeFilter)
         // Include INCOME type AND LEND transactions that are of subtype "CREDIT" (Credit Sales)
-        transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+        filtered.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
             .groupBy { it.category }
             .map { Pair(it.key, it.value.sumOf { tx -> tx.amount }) }
             .sortedByDescending { it.second }
     }
-    val expenseByCategory = remember(transactions) {
+    val expenseByCategory = remember(transactions, timeFilter) {
+        val filtered = filterTransactionsByTime(transactions, timeFilter)
         // Include EXPENSE type AND BORROW transactions that are of subtype "CREDIT" (Credit Purchases)
-        transactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
+        filtered.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
             .groupBy { it.category }
             .map { Pair(it.key, it.value.sumOf { tx -> tx.amount }) }
-            .sortedByDescending { it.second }
-    }
-    val savingsByGoal = remember(savingsGoals) {
-        savingsGoals.map { Pair(it.title, it.savedAmount) }
             .sortedByDescending { it.second }
     }
     val monthlyBudgets by viewModel?.monthlyBudgets?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
@@ -4653,6 +4651,21 @@ fun DashboardScreen(
         }
     }
 
+    val savingsByGoal = remember(savingsGoals, localFilteredSavingsTransactions, timeFilter) {
+        savingsGoals.map { goal ->
+            val savedInPeriod = if (timeFilter == "ALL") {
+                goal.savedAmount
+            } else {
+                val goalTx = localFilteredSavingsTransactions.filter { it.goalId == goal.id }
+                goalTx.filter { it.isDeposit }.sumOf { it.amount } - 
+                goalTx.filter { !it.isDeposit }.sumOf { it.amount }
+            }
+            Pair(goal.title, savedInPeriod)
+        }
+        .filter { it.second > 0.0 }
+        .sortedByDescending { it.second }
+    }
+
     val currentNetWorth = remember(balance, dynamicSavingsAmount, owedToMe, iOwe) {
         balance + dynamicSavingsAmount + owedToMe - iOwe
     }
@@ -4700,7 +4713,7 @@ fun DashboardScreen(
     }
 
     LaunchedEffect(
-        income, expense, totalSavingsAmount,
+        income, expense, effectiveSavings,
         budgetIncomeAmount, budgetExpenseAmount, budgetSavingsAmount,
         currentYearMonth, isAlertSystemReady
     ) {
@@ -4757,16 +4770,16 @@ fun DashboardScreen(
         if (budgetSavingsAmount > 0.0) {
             val key = "${currentYearMonth}_savings_80_alert"
             val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
-            val ratio = totalSavingsAmount / budgetSavingsAmount
+            val ratio = effectiveSavings / budgetSavingsAmount
             val ratioPercent = (ratio * 100).toInt()
             if (ratio >= 0.8) {
                 if (lastPercent != ratioPercent) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
                     val msg = if (language == AppLanguage.BN) {
-                        "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের $formattedPct (${formatCurrency(totalSavingsAmount, language)}) পূরণ করেছেন!"
+                        "অসাধারণ! আপনি আপনার সঞ্চয় লক্ষ্যের $formattedPct (${formatCurrency(effectiveSavings, language)}) পূরণ করেছেন!"
                     } else {
-                        "Amazing! You have fulfilled $ratioPercent% of your Savings Goal (${formatCurrency(totalSavingsAmount, language)})!"
+                        "Amazing! You have fulfilled $ratioPercent% of your Savings Goal (${formatCurrency(effectiveSavings, language)})!"
                     }
                     showLocalSystemNotification(context, title, msg, 8003)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
@@ -5115,31 +5128,38 @@ fun DashboardScreen(
                 padding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
                 modifier = Modifier.testTag("dashboard_balance_card")
             ) {
-                // Total Balance Header Row
+                // Total Balance Header Row (Full-width)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = Translation.get("total_balance", language),
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text(
+                        text = getFormattedPeriodText(timeFilter, language),
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Main Balance Row with Icon
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = Translation.get("total_balance", language),
-                                color = Color.White.copy(alpha = 0.85f),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = getFormattedPeriodText(timeFilter, language),
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Normal
-                            )
-                        }
                         Text(
                             text = formatCurrency(balance, language),
                             color = Color.White,
@@ -6096,7 +6116,7 @@ fun DashboardScreen(
         val currentValue = when (category) {
             "INCOME" -> income
             "EXPENSE" -> expense
-            "SAVINGS" -> totalSavingsAmount
+            "SAVINGS" -> effectiveSavings
             else -> 0.0
         }
         val title = when (category) {
@@ -7957,10 +7977,10 @@ fun getYearMonthFromFilter(filter: String): Pair<Int, Int>? {
 
 fun getFormattedPeriodText(timeFilter: String, language: AppLanguage): String {
     if (timeFilter == "ALL") {
-        return if (language == AppLanguage.BN) "(সব সময়ের ডেটা প্রদর্শিত)" else "(All-time data shown)"
+        return if (language == AppLanguage.BN) "সব সময়ের তথ্য দেখানো হচ্ছে" else "All-time data is shown"
     }
     if (timeFilter == "TODAY") {
-        return if (language == AppLanguage.BN) "(আজকের তথ্য প্রদর্শিত)" else "(Today's data shown)"
+        return if (language == AppLanguage.BN) "আজকের তথ্য দেখানো হচ্ছে" else "Today's data is shown"
     }
     
     val now = System.currentTimeMillis()
@@ -8035,9 +8055,9 @@ fun getFormattedPeriodText(timeFilter: String, language: AppLanguage): String {
     }
     
     return if (language == AppLanguage.BN) {
-        "($monthNameBn $yearFormatted এর তথ্য প্রদর্শিত)"
+        "$monthNameBn $yearFormatted এর তথ্য দেখানো হচ্ছে"
     } else {
-        "($monthNameEn $yearFormatted's data shown)"
+        "$monthNameEn $yearFormatted's data is shown"
     }
 }
 
