@@ -8,6 +8,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.example.ui.AppLanguage
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
+import android.content.Context
+import androidx.compose.runtime.remember
+
+private fun loadCustomGradients(context: Context): List<List<Color>> {
+    val serialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        .getString("custom_gradients_v2", "") ?: ""
+    if (serialized.isBlank()) return emptyList()
+    return try {
+        serialized.split(";").map { gradStr ->
+            gradStr.split(",").map { colorStr ->
+                Color(colorStr.toInt())
+            }
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
 private val DarkColorScheme = darkColorScheme(
     primary = FintechBlue,
     secondary = PurpleGrey80,
@@ -39,8 +59,12 @@ fun FinanceNoteTheme(
     themeGradientIndex: Int = 0,
     content: @Composable () -> Unit
 ) {
-    val themePrimaryColor = if (themeGradientIndex in GradientsList.indices) {
-        GradientsList[themeGradientIndex][0]
+    val context = LocalContext.current
+    val customGradients = remember(context) { loadCustomGradients(context) }
+    val fullGradientsList = GradientsList + customGradients
+
+    val themePrimaryColor = if (themeGradientIndex in fullGradientsList.indices) {
+        fullGradientsList[themeGradientIndex][0]
     } else {
         FintechBlue
     }

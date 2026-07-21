@@ -140,8 +140,18 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         try {
             val dao = AppDatabase.getDatabase(context).financeDao()
             
-            // Filter by active widgetWorkspaceId
-            val allTxs = dao.getAllTransactionsList().filter { it.workspaceId == widgetWorkspaceId }
+            // Filter by active widgetWorkspaceId and current month
+            val calendar = java.util.Calendar.getInstance()
+            calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            calendar.set(java.util.Calendar.MINUTE, 0)
+            calendar.set(java.util.Calendar.SECOND, 0)
+            calendar.set(java.util.Calendar.MILLISECOND, 0)
+            val startOfMonth = calendar.timeInMillis
+
+            val allTxs = dao.getAllTransactionsList()
+                .filter { it.workspaceId == widgetWorkspaceId && it.timestamp >= startOfMonth }
+            
             val income = allTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
             val expense = allTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
             val balance = income - expense
@@ -156,11 +166,12 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
                 val repaidPaid = pTxs.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
                 val repaidReceived = pTxs.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
                 
-                val netPaona = lent - repaidReceived
-                val netDena = borrowed - repaidPaid
-                
-                if (netPaona > 0) totalPaona += netPaona
-                if (netDena > 0) totalDena += netDena
+                val net = (lent + repaidPaid) - (borrowed + repaidReceived)
+                if (net > 0) {
+                    totalPaona += net
+                } else if (net < 0) {
+                    totalDena += -net
+                }
             }
 
             // Load user settings and profile details for the selected workspace

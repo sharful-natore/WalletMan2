@@ -23,6 +23,10 @@ val FintechRed = Color(0xFFEF4444)
 val FintechBlue = Color(0xFF3F8CFF)
 
 // Gradient Schemes (Pairs/Triplets of colors)
+val GradientIrregular = listOf(Color(0xFF00F5D4), Color(0xFF00B4D8), Color(0xFF9B5DE5)) // Irregular (Neon Turquoise, Ocean Blue, Bright Purple)
+val GradientMulticolorCustom = listOf(Color(0xFF00A896), Color(0xFFF77F00), Color(0xFF5A189A)) // Multicolor (Teal, Amber/Orange, Deep Violet)
+val GradientTricolorCustom = listOf(Color(0xFF00C6FF), Color(0xFF0072FF), Color(0xFFF35588)) // Tricolor (Cyan, Royal Blue, Bright Rose Pink)
+
 val GradientSleekIndigo = listOf(Color(0xFF6F7BF7), Color(0xFF918EF4), Color(0xFF38BDF8)) // Premium Sky Blue & Indigo-Cyan gradient from screenshot
 val GradientPurpleBlue = listOf(Color(0xFF6366F1), Color(0xFF4F46E5))
 val GradientSunsetCoral = listOf(Color(0xFFF87171), Color(0xFFDC2626))
@@ -54,24 +58,27 @@ val GradientDeepTeal = listOf(Color(0xFF0F766E), Color(0xFF134E4A)) // Deep Teal
 val GradientIndigoDusk = listOf(Color(0xFF4338CA), Color(0xFF312E81)) // Indigo Dusk
 
 val GradientsList = listOf(
-    GradientSleekIndigo,       // 1
-    GradientCosmicNebula,      // 2
-    GradientCyberpunkDream,    // 3
-    GradientRoyalPurple,       // 4
-    GradientPurpleBlue,        // 5
-    GradientDeepLavender,      // 6
-    GradientCalmBlue,          // 7
-    GradientMidnightViolet,    // 8
-    GradientOceanCyan,         // 9
-    GradientTealMint,          // 10
-    GradientSlateObsidian,     // 11
-    GradientMidnightIndigo,    // 12
-    GradientOceanDeepBlue,     // 13
-    GradientDeepViolet,        // 14
-    GradientDeepAmethyst,      // 15
-    GradientSteelLavender,     // 16
-    GradientMidnightPurple,    // 17 (Replaced EmeraldNight)
-    GradientDeepTeal,          // 18 (Replaced SlateBlue)
-    GradientIndigoDusk,        // 19 (Replaced OceanDepth)
-    GradientStormySky          // 20
+    GradientSleekIndigo,       // 0
+    GradientCosmicNebula,      // 1
+    GradientCyberpunkDream,    // 2
+    GradientRoyalPurple,       // 3
+    GradientPurpleBlue,        // 4
+    GradientDeepLavender,      // 5
+    GradientCalmBlue,          // 6
+    GradientMidnightViolet,    // 7
+    GradientOceanCyan,         // 8
+    GradientTealMint,          // 9
+    GradientSlateObsidian,     // 10
+    GradientMidnightIndigo,    // 11
+    GradientOceanDeepBlue,     // 12
+    GradientDeepViolet,        // 13
+    GradientDeepAmethyst,      // 14
+    GradientSteelLavender,     // 15
+    GradientMidnightPurple,    // 16 (Replaced EmeraldNight)
+    GradientDeepTeal,          // 17 (Replaced SlateBlue)
+    GradientIndigoDusk,        // 18 (Replaced OceanDepth)
+    GradientStormySky,         // 19
+    GradientIrregular,         // 20
+    GradientMulticolorCustom,  // 21
+    GradientTricolorCustom     // 22
 )

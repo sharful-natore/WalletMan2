@@ -75,17 +75,35 @@ val FintechBlue: Color
     @Composable
     get() = MaterialTheme.colorScheme.primary
 
+private fun loadCustomGradients(context: android.content.Context): List<List<Color>> {
+    val serialized = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+        .getString("custom_gradients_v2", "") ?: ""
+    if (serialized.isBlank()) return emptyList()
+    return try {
+        serialized.split(";").map { gradStr ->
+            gradStr.split(",").map { colorStr ->
+                Color(colorStr.toInt())
+            }
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
 val activeThemeGradient: List<Color>
     @Composable
     get() {
         val primary = MaterialTheme.colorScheme.primary
-        return androidx.compose.runtime.remember(primary) {
-            com.example.ui.theme.GradientsList.find { gradient ->
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val customGradients = androidx.compose.runtime.remember(context) { loadCustomGradients(context) }
+        val fullGradientsList = com.example.ui.theme.GradientsList + customGradients
+        return androidx.compose.runtime.remember(primary, customGradients) {
+            fullGradientsList.find { gradient ->
                 val firstColor = gradient.firstOrNull() ?: return@find false
                 java.lang.Math.abs(firstColor.red - primary.red) < 0.01f &&
                 java.lang.Math.abs(firstColor.green - primary.green) < 0.01f &&
                 java.lang.Math.abs(firstColor.blue - primary.blue) < 0.01f
-            } ?: com.example.ui.theme.GradientsList[0]
+            } ?: fullGradientsList[0]
         }
     }
 
@@ -2218,6 +2236,12 @@ fun FinanceNoteApp(
 
     var showSearch by remember { mutableStateOf(false) }
     var showThemeCustomizeDialog by remember { mutableStateOf(false) }
+    var showCustomGradientDialog by remember { mutableStateOf(false) }
+    var editingCustomGradientIndex by remember { mutableStateOf<Int?>(null) }
+    var customGradientColors by remember { mutableStateOf(listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))) }
+    var selectedColorIndexInGradient by remember { mutableStateOf(0) }
+    var showLongPressOptions by remember { mutableStateOf(false) }
+    var longPressedIndex by remember { mutableStateOf(-1) }
     var showRealtimeSyncDialog by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
     var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -3474,6 +3498,9 @@ fun FinanceNoteApp(
     }
 
     if (showThemeCustomizeDialog) {
+        val allGradientsList by viewModel.allGradients.collectAsState()
+        val staticGradientsSize = com.example.ui.theme.GradientsList.size
+
         AlertDialog(
             onDismissRequest = { showThemeCustomizeDialog = false },
             containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
@@ -3555,16 +3582,45 @@ fun FinanceNoteApp(
                         )
                     }
 
-                    // 2. Color Schemes Title
-                    Text(
-                        text = if (language == AppLanguage.BN) "পছন্দের কালার স্কীম বেছে নিন" else "Choose Color Scheme",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
-                    )
+                    // 2. Color Schemes Title and Add button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "পছন্দের কালার স্কীম বেছে নিন" else "Choose Color Scheme",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) Color.LightGray else Color(0xFF475569),
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = {
+                                editingCustomGradientIndex = null
+                                customGradientColors = listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))
+                                selectedColorIndexInGradient = 0
+                                showCustomGradientDialog = true
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Add,
+                                contentDescription = "Add custom gradient",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (language == AppLanguage.BN) "নতুন" else "New",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
                     // 3. Grid of Color Schemes with Chunked Rows to prevent nested scroll issues
-                    val chunkedGradients = GradientsList.chunked(4)
+                    val chunkedGradients = allGradientsList.chunked(4)
                     Column(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -3580,6 +3636,7 @@ fun FinanceNoteApp(
                                     val firstColor = gradient.first()
                                     val lastColor = gradient.last()
 
+                                    @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
@@ -3599,9 +3656,17 @@ fun FinanceNoteApp(
                                                 },
                                                 shape = CircleShape
                                             )
-                                            .clickable {
-                                                viewModel.selectThemeGradientIndex(context, actualIndex)
-                                            },
+                                            .combinedClickable(
+                                                onClick = {
+                                                    viewModel.selectThemeGradientIndex(context, actualIndex)
+                                                },
+                                                onLongClick = {
+                                                    if (actualIndex >= staticGradientsSize) {
+                                                        longPressedIndex = actualIndex
+                                                        showLongPressOptions = true
+                                                    }
+                                                }
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (isSelected) {
@@ -3641,6 +3706,494 @@ fun FinanceNoteApp(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                }
+            }
+        )
+    }
+
+    if (showCustomGradientDialog) {
+        val activeStats = workspaceStatsList.find { it.workspace.id == currentWorkspace.id }
+        val currentTotalIncome = activeStats?.income ?: 0.0
+
+        val parseHexColor: (String) -> Color? = { hex ->
+            val clean = hex.trim().replace("#", "")
+            try {
+                if (clean.length == 6) {
+                    val r = clean.substring(0, 2).toInt(16)
+                    val g = clean.substring(2, 4).toInt(16)
+                    val b = clean.substring(4, 6).toInt(16)
+                    Color(r, g, b)
+                } else if (clean.length == 8) {
+                    val a = clean.substring(0, 2).toInt(16)
+                    val r = clean.substring(2, 4).toInt(16)
+                    val g = clean.substring(4, 6).toInt(16)
+                    val b = clean.substring(6, 8).toInt(16)
+                    Color(r, g, b, a)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showCustomGradientDialog = false },
+            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 8.dp,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (editingCustomGradientIndex != null) {
+                            if (language == AppLanguage.BN) "গ্রাডিয়েন্ট এডিট করুন" else "Edit Gradient"
+                        } else {
+                            if (language == AppLanguage.BN) "কাস্টম গ্রাডিয়েন্ট তৈরি করুন" else "Create Custom Gradient"
+                        },
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                    )
+                    IconButton(
+                        onClick = { showCustomGradientDialog = false },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = if (isDarkTheme) Color.Gray else Color.DarkGray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Preview Card Title
+                    Text(
+                        text = if (language == AppLanguage.BN) "প্রিভিউ (মোট আয় কার্ড)" else "Preview (Total Income Card)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                    )
+
+                    // Card Preview
+                    FintechGradientCard(
+                        gradientColors = customGradientColors,
+                        cornerRadius = 24.dp,
+                        padding = PaddingValues(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(90.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "মোট আয়" else "Total Income",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    maxLines = 1
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = formatCurrency(currentTotalIncome, language),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 20.sp,
+                                    maxLines = 1
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFE2E8F0))
+
+                    // Gradient Colors list with selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "গ্রাডিয়েন্ট কালারসমূহ" else "Gradient Colors",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                        )
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Add Color button
+                            if (customGradientColors.size < 5) {
+                                IconButton(
+                                    onClick = {
+                                        customGradientColors = customGradientColors + Color(0xFF8B5CF6)
+                                        selectedColorIndexInGradient = customGradientColors.size - 1
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Add,
+                                        contentDescription = "Add Color",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            // Delete Color button (visible if > 2 colors)
+                            if (customGradientColors.size > 2) {
+                                IconButton(
+                                    onClick = {
+                                        val mutable = customGradientColors.toMutableList()
+                                        mutable.removeAt(selectedColorIndexInGradient)
+                                        customGradientColors = mutable
+                                        selectedColorIndexInGradient = Math.max(0, selectedColorIndexInGradient - 1)
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Delete,
+                                        contentDescription = "Delete Color",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Display horizontal list of gradient circles
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        customGradientColors.forEachIndexed { idx, color ->
+                            val isSelected = selectedColorIndexInGradient == idx
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) {
+                                            if (isDarkTheme) Color.White else Color(0xFF0F172A)
+                                        } else {
+                                            Color.Gray.copy(alpha = 0.5f)
+                                        },
+                                        shape = CircleShape
+                                    )
+                                    .clickable { selectedColorIndexInGradient = idx },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = "Selected color",
+                                        tint = if (color.red * 0.299 + color.green * 0.587 + color.blue * 0.114 > 0.5) Color.Black else Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // RGB Sliders for the selected color
+                    val activeColor = customGradientColors.getOrNull(selectedColorIndexInGradient) ?: Color.White
+                    var redSliderVal by remember(activeColor) { mutableStateOf((activeColor.red * 255f)) }
+                    var greenSliderVal by remember(activeColor) { mutableStateOf((activeColor.green * 255f)) }
+                    var blueSliderVal by remember(activeColor) { mutableStateOf((activeColor.blue * 255f)) }
+                    var hexText by remember(activeColor) {
+                        mutableStateOf(
+                            String.format("#%02X%02X%02X", (activeColor.red * 255f).toInt(), (activeColor.green * 255f).toInt(), (activeColor.blue * 255f).toInt())
+                        )
+                    }
+
+                    // Red Slider
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "লাল (Red)" else "Red",
+                                fontSize = 11.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray
+                            )
+                            Text(
+                                text = "${redSliderVal.toInt()}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray
+                            )
+                        }
+                        Slider(
+                            value = redSliderVal,
+                            onValueChange = { newValue ->
+                                redSliderVal = newValue
+                                val newCol = Color(redSliderVal.toInt(), greenSliderVal.toInt(), blueSliderVal.toInt())
+                                val mutable = customGradientColors.toMutableList()
+                                if (selectedColorIndexInGradient in mutable.indices) {
+                                    mutable[selectedColorIndexInGradient] = newCol
+                                    customGradientColors = mutable
+                                }
+                            },
+                            valueRange = 0f..255f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.Red,
+                                activeTrackColor = Color.Red.copy(alpha = 0.7f),
+                                inactiveTrackColor = Color.Red.copy(alpha = 0.2f)
+                            )
+                        )
+                    }
+
+                    // Green Slider
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "সবুজ (Green)" else "Green",
+                                fontSize = 11.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray
+                            )
+                            Text(
+                                text = "${greenSliderVal.toInt()}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray
+                            )
+                        }
+                        Slider(
+                            value = greenSliderVal,
+                            onValueChange = { newValue ->
+                                greenSliderVal = newValue
+                                val newCol = Color(redSliderVal.toInt(), greenSliderVal.toInt(), blueSliderVal.toInt())
+                                val mutable = customGradientColors.toMutableList()
+                                if (selectedColorIndexInGradient in mutable.indices) {
+                                    mutable[selectedColorIndexInGradient] = newCol
+                                    customGradientColors = mutable
+                                }
+                            },
+                            valueRange = 0f..255f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFF10B981),
+                                activeTrackColor = Color(0xFF10B981).copy(alpha = 0.7f),
+                                inactiveTrackColor = Color(0xFF10B981).copy(alpha = 0.2f)
+                            )
+                        )
+                    }
+
+                    // Blue Slider
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "নীল (Blue)" else "Blue",
+                                fontSize = 11.sp,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray
+                            )
+                            Text(
+                                text = "${blueSliderVal.toInt()}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDarkTheme) Color.LightGray else Color.Gray
+                            )
+                        }
+                        Slider(
+                            value = blueSliderVal,
+                            onValueChange = { newValue ->
+                                blueSliderVal = newValue
+                                val newCol = Color(redSliderVal.toInt(), greenSliderVal.toInt(), blueSliderVal.toInt())
+                                val mutable = customGradientColors.toMutableList()
+                                if (selectedColorIndexInGradient in mutable.indices) {
+                                    mutable[selectedColorIndexInGradient] = newCol
+                                    customGradientColors = mutable
+                                }
+                            },
+                            valueRange = 0f..255f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFF3B82F6),
+                                activeTrackColor = Color(0xFF3B82F6).copy(alpha = 0.7f),
+                                inactiveTrackColor = Color(0xFF3B82F6).copy(alpha = 0.2f)
+                            )
+                        )
+                    }
+
+                    // Hex Color input
+                    OutlinedTextField(
+                        value = hexText,
+                        onValueChange = { text ->
+                            hexText = text
+                            val parsed = parseHexColor(text)
+                            if (parsed != null) {
+                                val mutable = customGradientColors.toMutableList()
+                                if (selectedColorIndexInGradient in mutable.indices) {
+                                    mutable[selectedColorIndexInGradient] = parsed
+                                    customGradientColors = mutable
+                                }
+                            }
+                        },
+                        label = { Text(if (language == AppLanguage.BN) "হেক্স কোড (Hex Code)" else "Hex Code") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDarkTheme) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                        ),
+                        leadingIcon = {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(activeColor)
+                                    .border(1.dp, Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            )
+                        }
+                    )
+
+                    // Palette Presets
+                    Text(
+                        text = if (language == AppLanguage.BN) "সহজ কালার প্যালেট" else "Preset Colors",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDarkTheme) Color.LightGray else Color.Gray
+                    )
+                    
+                    val presets = listOf(
+                        Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFEF4444),
+                        Color(0xFFFBBF24), Color(0xFF8B5CF6), Color(0xFFEC4899),
+                        Color(0xFF06B6D4), Color(0xFF14B8A6), Color(0xFFF97316)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        presets.forEach { presetColor ->
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(presetColor)
+                                    .clickable {
+                                        val mutable = customGradientColors.toMutableList()
+                                        if (selectedColorIndexInGradient in mutable.indices) {
+                                            mutable[selectedColorIndexInGradient] = presetColor
+                                            customGradientColors = mutable
+                                        }
+                                    }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCustomGradientDialog = false
+                        val idx = editingCustomGradientIndex
+                        if (idx != null) {
+                            viewModel.updateCustomGradient(context, idx, customGradientColors)
+                        } else {
+                            viewModel.addCustomGradient(context, customGradientColors)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "সংরক্ষণ" else "Save",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCustomGradientDialog = false }
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                        color = if (isDarkTheme) Color.Gray else Color.DarkGray
+                    )
+                }
+            }
+        )
+    }
+
+    if (showLongPressOptions) {
+        val allGradientsList by viewModel.allGradients.collectAsState()
+        AlertDialog(
+            onDismissRequest = { showLongPressOptions = false },
+            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    text = if (language == AppLanguage.BN) "গ্রাডিয়েন্ট অপশন" else "Gradient Options",
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                )
+            },
+            text = {
+                Text(
+                    text = if (language == AppLanguage.BN) "আপনি কি এই কাস্টম গ্রাডিয়েন্টটি এডিট বা ডিলিট করতে চান?" else "Do you want to edit or delete this custom gradient?",
+                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLongPressOptions = false
+                        val staticSize = com.example.ui.theme.GradientsList.size
+                        editingCustomGradientIndex = longPressedIndex - staticSize
+                        customGradientColors = allGradientsList[longPressedIndex]
+                        selectedColorIndexInGradient = 0
+                        showCustomGradientDialog = true
+                    }
+                ) {
+                    Text(if (language == AppLanguage.BN) "এডিট করুন" else "Edit")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = {
+                            showLongPressOptions = false
+                            val staticSize = com.example.ui.theme.GradientsList.size
+                            viewModel.deleteCustomGradient(context, longPressedIndex - staticSize)
+                        }
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "ডিলিট করুন" else "Delete",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    TextButton(
+                        onClick = { showLongPressOptions = false }
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                            color = if (isDarkTheme) Color.Gray else Color.DarkGray
+                        )
+                    }
                 }
             }
         )
@@ -8769,11 +9322,7 @@ fun SavingsGoalCardItem(
     isSelectionMode: Boolean = false,
     onLongClick: () -> Unit = {}
 ) {
-    val gradient = if (isDark) {
-        listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E))
-    } else {
-        GradientsList[goal.colorIndex % GradientsList.size]
-    }
+    val gradient = GradientsList[goal.colorIndex % GradientsList.size]
 
     FintechGradientCard(
         gradientColors = gradient,

@@ -27,6 +27,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import androidx.core.app.NotificationCompat
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.example.MainActivity
 import com.example.R
 import okhttp3.FormBody
@@ -93,6 +95,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private val _selectedThemeGradientIndex = MutableStateFlow(0)
     val selectedThemeGradientIndex: StateFlow<Int> = _selectedThemeGradientIndex.asStateFlow()
+
+    private val _customGradients = MutableStateFlow<List<List<Color>>>(emptyList())
+    val customGradients: StateFlow<List<List<Color>>> = _customGradients.asStateFlow()
+
+    val allGradients: StateFlow<List<List<Color>>> = _customGradients.map { custom ->
+        com.example.ui.theme.GradientsList + custom
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList)
 
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
@@ -315,7 +324,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             val pName = workspace.profileName
             val pPhoto = workspace.profilePhotoUri
             
-            val wsTransactions = allTransactions.filter { it.workspaceId == wsId }
+            val calendar = java.util.Calendar.getInstance()
+            calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            calendar.set(java.util.Calendar.MINUTE, 0)
+            calendar.set(java.util.Calendar.SECOND, 0)
+            calendar.set(java.util.Calendar.MILLISECOND, 0)
+            val startOfMonth = calendar.timeInMillis
+
+            val wsTransactionsAll = allTransactions.filter { it.workspaceId == wsId }
+            val wsTransactions = wsTransactionsAll.filter { it.timestamp >= startOfMonth }
             val wsPersons = allPersons.filter { it.workspaceId == wsId }
             val wsGoals = allSavingsGoals.filter { it.workspaceId == wsId }
             
@@ -1108,6 +1126,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _language.value = try { AppLanguage.valueOf(savedLangStr) } catch (e: Exception) { AppLanguage.BN }
         _isDarkTheme.value = prefs.getBoolean("is_dark_theme", false)
         _selectedThemeGradientIndex.value = prefs.getInt("selected_theme_gradient_index", 0)
+        loadCustomGradients(context)
 
         // Load notification setting
         var notifEnabled = prefs.getBoolean("notification_enabled", true)
@@ -1138,6 +1157,74 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     context.startService(intent)
                 }
             } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    fun loadCustomGradients(context: Context) {
+        val serialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .getString("custom_gradients_v2", "") ?: ""
+        if (serialized.isBlank()) {
+            _customGradients.value = emptyList()
+            return
+        }
+        try {
+            val loaded = serialized.split(";").map { gradStr ->
+                gradStr.split(",").map { colorStr ->
+                    Color(colorStr.toInt())
+                }
+            }
+            _customGradients.value = loaded
+        } catch (e: Exception) {
+            _customGradients.value = emptyList()
+        }
+    }
+
+    private fun saveCustomGradients(context: Context, gradients: List<List<Color>>) {
+        val serialized = gradients.joinToString(separator = ";") { gradient ->
+            gradient.joinToString(separator = ",") { color ->
+                color.toArgb().toString()
+            }
+        }
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("custom_gradients_v2", serialized)
+            .apply()
+        _customGradients.value = gradients
+    }
+
+    fun addCustomGradient(context: Context, colors: List<Color>) {
+        val current = _customGradients.value.toMutableList()
+        current.add(colors)
+        saveCustomGradients(context, current)
+    }
+
+    fun updateCustomGradient(context: Context, customIndex: Int, colors: List<Color>) {
+        val current = _customGradients.value.toMutableList()
+        if (customIndex in current.indices) {
+            current[customIndex] = colors
+            saveCustomGradients(context, current)
+        }
+    }
+
+    fun deleteCustomGradient(context: Context, customIndex: Int) {
+        val current = _customGradients.value.toMutableList()
+        if (customIndex in current.indices) {
+            current.removeAt(customIndex)
+            saveCustomGradients(context, current)
+            
+            // Adjust the selected theme index if needed
+            val staticSize = com.example.ui.theme.GradientsList.size
+            val currentSelected = _selectedThemeGradientIndex.value
+            if (currentSelected >= staticSize) {
+                val selectedCustomIdx = currentSelected - staticSize
+                if (selectedCustomIdx == customIndex) {
+                    // Reset to default (0)
+                    selectThemeGradientIndex(context, 0)
+                } else if (selectedCustomIdx > customIndex) {
+                    // Decrement by 1 to adjust for removed item
+                    selectThemeGradientIndex(context, currentSelected - 1)
+                }
+            }
         }
     }
 
