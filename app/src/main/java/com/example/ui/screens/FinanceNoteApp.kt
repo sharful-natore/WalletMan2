@@ -4707,8 +4707,41 @@ fun DashboardScreen(
     }
 
     var isAlertSystemReady by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(2000) // Wait 2 seconds for all database flows to warm up and emit their real values
+    LaunchedEffect(currentWorkspace.id) {
+        isAlertSystemReady = false
+        delay(1500) // Wait 1.5 seconds for all database flows to warm up and emit their real values for the new workspace
+        
+        // Initialize shown flags for already-exceeded thresholds so switching workspace never triggers them
+        val editor = budgetPrefs.edit()
+        
+        // Income Budget
+        if (budgetIncomeAmount > 0.0) {
+            val ratio = income / budgetIncomeAmount
+            val key80 = "${currentWorkspace.id}_${currentYearMonth}_income_80_shown"
+            val key100 = "${currentWorkspace.id}_${currentYearMonth}_income_100_shown"
+            editor.putBoolean(key80, ratio >= 0.8)
+            editor.putBoolean(key100, ratio >= 1.0)
+        }
+        
+        // Expense Budget
+        if (budgetExpenseAmount > 0.0) {
+            val ratio = expense / budgetExpenseAmount
+            val key80 = "${currentWorkspace.id}_${currentYearMonth}_expense_80_shown"
+            val key100 = "${currentWorkspace.id}_${currentYearMonth}_expense_100_shown"
+            editor.putBoolean(key80, ratio >= 0.8)
+            editor.putBoolean(key100, ratio >= 1.0)
+        }
+        
+        // Savings Budget
+        if (budgetSavingsAmount > 0.0) {
+            val ratio = effectiveSavings / budgetSavingsAmount
+            val key80 = "${currentWorkspace.id}_${currentYearMonth}_savings_80_shown"
+            val key100 = "${currentWorkspace.id}_${currentYearMonth}_savings_100_shown"
+            editor.putBoolean(key80, ratio >= 0.8)
+            editor.putBoolean(key100, ratio >= 1.0)
+        }
+        
+        editor.apply()
         isAlertSystemReady = true
     }
 
@@ -4718,14 +4751,31 @@ fun DashboardScreen(
         currentYearMonth, isAlertSystemReady
     ) {
         if (!isAlertSystemReady) return@LaunchedEffect
-        // Check Income 80%
+        
+        // Check Income
         if (budgetIncomeAmount > 0.0) {
-            val key = "${currentYearMonth}_income_80_alert"
-            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
+            val key80 = "${currentWorkspace.id}_${currentYearMonth}_income_80_shown"
+            val key100 = "${currentWorkspace.id}_${currentYearMonth}_income_100_shown"
+            val shown80 = budgetPrefs.getBoolean(key80, false)
+            val shown100 = budgetPrefs.getBoolean(key100, false)
             val ratio = income / budgetIncomeAmount
             val ratioPercent = (ratio * 100).toInt()
-            if (ratio >= 0.8) {
-                if (lastPercent != ratioPercent) {
+            
+            if (ratio >= 1.0) {
+                if (!shown100) {
+                    val formattedPct = formatNumberString("$ratioPercent%", language)
+                    val title = if (language == AppLanguage.BN) "লক্ষ্য পূরণ! 🏆" else "Goal Achieved! 🏆"
+                    val msg = if (language == AppLanguage.BN) {
+                        "অভিনন্দন! আপনি আপনার আয় বাজেটের $formattedPct (${formatCurrency(income, language)}) অর্জন করেছেন!"
+                    } else {
+                        "Congratulations! You have achieved $ratioPercent% of your Income Budget (${formatCurrency(income, language)})!"
+                    }
+                    showLocalSystemNotification(context, title, msg, 8001)
+                    activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
+                    budgetPrefs.edit().putBoolean(key100, true).putBoolean(key80, true).apply()
+                }
+            } else if (ratio >= 0.8) {
+                if (!shown80) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "অভিনন্দন! 🎉" else "Congratulations! 🎉"
                     val msg = if (language == AppLanguage.BN) {
@@ -4735,21 +4785,42 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8001)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
+                    budgetPrefs.edit().putBoolean(key80, true).apply()
                 }
-            } else if (ratio < 0.8 && lastPercent > 0) {
-                budgetPrefs.edit().remove("${key}_percent").apply()
+                if (shown100) {
+                    budgetPrefs.edit().putBoolean(key100, false).apply()
+                }
+            } else {
+                if (shown80 || shown100) {
+                    budgetPrefs.edit().putBoolean(key80, false).putBoolean(key100, false).apply()
+                }
             }
         }
 
-        // Check Expense 80%
+        // Check Expense
         if (budgetExpenseAmount > 0.0) {
-            val key = "${currentYearMonth}_expense_80_alert"
-            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
+            val key80 = "${currentWorkspace.id}_${currentYearMonth}_expense_80_shown"
+            val key100 = "${currentWorkspace.id}_${currentYearMonth}_expense_100_shown"
+            val shown80 = budgetPrefs.getBoolean(key80, false)
+            val shown100 = budgetPrefs.getBoolean(key100, false)
             val ratio = expense / budgetExpenseAmount
             val ratioPercent = (ratio * 100).toInt()
-            if (ratio >= 0.8) {
-                if (lastPercent != ratioPercent) {
+            
+            if (ratio >= 1.0) {
+                if (!shown100) {
+                    val formattedPct = formatNumberString("$ratioPercent%", language)
+                    val title = if (language == AppLanguage.BN) "বাজেট অতিক্রম! 🚨" else "Budget Exceeded! 🚨"
+                    val msg = if (language == AppLanguage.BN) {
+                        "সতর্কতা! আপনার ব্যয় বাজেট ১০০% অতিক্রম করেছে (${formatCurrency(expense, language)})!"
+                    } else {
+                        "Warning! Your expense has exceeded 100% of your Expense Budget limit (${formatCurrency(expense, language)})!"
+                    }
+                    showLocalSystemNotification(context, title, msg, 8002)
+                    activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
+                    budgetPrefs.edit().putBoolean(key100, true).putBoolean(key80, true).apply()
+                }
+            } else if (ratio >= 0.8) {
+                if (!shown80) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "সতর্কতা! ⚠️" else "Budget Warning! ⚠️"
                     val msg = if (language == AppLanguage.BN) {
@@ -4759,21 +4830,42 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8002)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = true)
-                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
+                    budgetPrefs.edit().putBoolean(key80, true).apply()
                 }
-            } else if (ratio < 0.8 && lastPercent > 0) {
-                budgetPrefs.edit().remove("${key}_percent").apply()
+                if (shown100) {
+                    budgetPrefs.edit().putBoolean(key100, false).apply()
+                }
+            } else {
+                if (shown80 || shown100) {
+                    budgetPrefs.edit().putBoolean(key80, false).putBoolean(key100, false).apply()
+                }
             }
         }
 
-        // Check Savings 80%
+        // Check Savings
         if (budgetSavingsAmount > 0.0) {
-            val key = "${currentYearMonth}_savings_80_alert"
-            val lastPercent = budgetPrefs.getInt("${key}_percent", 0)
+            val key80 = "${currentWorkspace.id}_${currentYearMonth}_savings_80_shown"
+            val key100 = "${currentWorkspace.id}_${currentYearMonth}_savings_100_shown"
+            val shown80 = budgetPrefs.getBoolean(key80, false)
+            val shown100 = budgetPrefs.getBoolean(key100, false)
             val ratio = effectiveSavings / budgetSavingsAmount
             val ratioPercent = (ratio * 100).toInt()
-            if (ratio >= 0.8) {
-                if (lastPercent != ratioPercent) {
+            
+            if (ratio >= 1.0) {
+                if (!shown100) {
+                    val formattedPct = formatNumberString("$ratioPercent%", language)
+                    val title = if (language == AppLanguage.BN) "লক্ষ্য পূরণ! 🎯" else "Savings Goal Met! 🎯"
+                    val msg = if (language == AppLanguage.BN) {
+                        "চমত্কার! আপনি আপনার সঞ্চয় লক্ষ্যের $formattedPct (${formatCurrency(effectiveSavings, language)}) পূরণ করেছেন!"
+                    } else {
+                        "Fantastic! You have fulfilled $ratioPercent% of your Savings Goal (${formatCurrency(effectiveSavings, language)})!"
+                    }
+                    showLocalSystemNotification(context, title, msg, 8003)
+                    activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
+                    budgetPrefs.edit().putBoolean(key100, true).putBoolean(key80, true).apply()
+                }
+            } else if (ratio >= 0.8) {
+                if (!shown80) {
                     val formattedPct = formatNumberString("$ratioPercent%", language)
                     val title = if (language == AppLanguage.BN) "দুর্দান্ত অর্জন! 🎯" else "Great Achievement! 🎯"
                     val msg = if (language == AppLanguage.BN) {
@@ -4783,10 +4875,15 @@ fun DashboardScreen(
                     }
                     showLocalSystemNotification(context, title, msg, 8003)
                     activeAlertPopup = BudgetAlertData(title, msg, isWarning = false)
-                    budgetPrefs.edit().putInt("${key}_percent", ratioPercent).apply()
+                    budgetPrefs.edit().putBoolean(key80, true).apply()
                 }
-            } else if (ratio < 0.8 && lastPercent > 0) {
-                budgetPrefs.edit().remove("${key}_percent").apply()
+                if (shown100) {
+                    budgetPrefs.edit().putBoolean(key100, false).apply()
+                }
+            } else {
+                if (shown80 || shown100) {
+                    budgetPrefs.edit().putBoolean(key80, false).putBoolean(key100, false).apply()
+                }
             }
         }
     }
