@@ -74,7 +74,8 @@ class FinanceRepository(private val financeDao: FinanceDao) {
             savingsGoals = financeDao.getAllSavingsGoalsList(),
             savingsTransactions = financeDao.getAllSavingsTransactionsList(),
             workspaces = financeDao.getAllWorkspacesList(),
-            trashItems = financeDao.getAllTrashItemsList()
+            trashItems = financeDao.getAllTrashItemsList(),
+            monthlyBudgets = financeDao.getAllMonthlyBudgetsAllWorkspacesList()
         )
     }
 
@@ -85,6 +86,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         financeDao.deleteAllSavingsTransactions()
         financeDao.deleteAllWorkspaces()
         financeDao.deleteAllTrashItems()
+        financeDao.deleteAllMonthlyBudgets()
 
         financeDao.insertPersons(backup.persons)
         financeDao.insertTransactions(backup.transactions)
@@ -99,6 +101,9 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         }
         if (backup.trashItems.isNotEmpty()) {
             financeDao.insertTrashItems(backup.trashItems)
+        }
+        if (backup.monthlyBudgets.isNotEmpty()) {
+            financeDao.insertMonthlyBudgets(backup.monthlyBudgets)
         }
     }
 

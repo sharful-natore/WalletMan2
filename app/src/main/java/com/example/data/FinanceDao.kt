@@ -202,11 +202,17 @@ interface FinanceDao {
     @Query("SELECT * FROM monthly_budgets WHERE workspaceId = :workspaceId")
     suspend fun getAllMonthlyBudgetsList(workspaceId: String): List<MonthlyBudget>
 
+    @Query("SELECT * FROM monthly_budgets")
+    suspend fun getAllMonthlyBudgetsAllWorkspacesList(): List<MonthlyBudget>
+
     @Query("SELECT * FROM monthly_budgets WHERE year = :year AND month = :month AND workspaceId = :workspaceId LIMIT 1")
     suspend fun getMonthlyBudget(year: Int, month: Int, workspaceId: String): MonthlyBudget?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMonthlyBudget(budget: MonthlyBudget)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMonthlyBudgets(budgets: List<MonthlyBudget>)
 
     @Query("DELETE FROM monthly_budgets WHERE year = :year AND month = :month AND workspaceId = :workspaceId")
     suspend fun deleteMonthlyBudget(year: Int, month: Int, workspaceId: String)

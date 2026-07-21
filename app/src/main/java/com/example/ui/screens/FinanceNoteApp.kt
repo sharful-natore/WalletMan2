@@ -595,7 +595,7 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
-        "INCOME" -> listOf(Color(0xFF81C784), Color(0xFF4CAF50), Color(0xFF2E7D32))  // Light green to dark green
+        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
         "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Green -> Lime -> Amber -> Orange -> Deep Orange -> Red
         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
@@ -4585,8 +4585,79 @@ fun DashboardScreen(
     var showBudgetHistoryDialog by remember { mutableStateOf(false) }
     val totalSavingsAmount = savingsGoals.sumOf { it.savedAmount }
 
-    val currentNetWorth = remember(balance, totalSavingsAmount, owedToMe, iOwe) {
-        balance + totalSavingsAmount + owedToMe - iOwe
+    val localFilteredSavingsTransactions = remember(savingsTransactions, timeFilter) {
+        val now = System.currentTimeMillis()
+        val calendar = java.util.Calendar.getInstance()
+        when {
+            timeFilter == "ALL" -> savingsTransactions
+            timeFilter == "TODAY" -> {
+                calendar.timeInMillis = now
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val startOfDay = calendar.timeInMillis
+                savingsTransactions.filter { it.timestamp >= startOfDay }
+            }
+            timeFilter == "MONTH" -> {
+                calendar.timeInMillis = now
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val startOfMonth = calendar.timeInMillis
+                savingsTransactions.filter { it.timestamp >= startOfMonth }
+            }
+            timeFilter.startsWith("CUSTOM_MONTH:") -> {
+                val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+                if (parts.size == 2) {
+                    val year = parts[0].toIntOrNull() ?: 2026
+                    val month = parts[1].toIntOrNull() ?: 1
+                    calendar.clear()
+                    calendar.set(java.util.Calendar.YEAR, year)
+                    calendar.set(java.util.Calendar.MONTH, month - 1)
+                    calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    calendar.set(java.util.Calendar.MINUTE, 0)
+                    calendar.set(java.util.Calendar.SECOND, 0)
+                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                    val start = calendar.timeInMillis
+                    calendar.add(java.util.Calendar.MONTH, 1)
+                    val end = calendar.timeInMillis
+                    savingsTransactions.filter { it.timestamp in start until end }
+                } else savingsTransactions
+            }
+            timeFilter.startsWith("CUSTOM_DATE:") -> {
+                val parts = timeFilter.substringAfter("CUSTOM_DATE:").split("-")
+                if (parts.size == 3) {
+                    val year = parts[0].toIntOrNull() ?: 2026
+                    val month = parts[1].toIntOrNull() ?: 1
+                    val day = parts[2].toIntOrNull() ?: 1
+                    calendar.clear()
+                    calendar.set(year, month - 1, day, 0, 0, 0)
+                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                    val start = calendar.timeInMillis
+                    calendar.add(java.util.Calendar.DAY_OF_MONTH, 1)
+                    val end = calendar.timeInMillis
+                    savingsTransactions.filter { it.timestamp in start until end }
+                } else savingsTransactions
+            }
+            else -> savingsTransactions
+        }
+    }
+
+    val dynamicSavingsAmount = remember(timeFilter, totalSavingsAmount, localFilteredSavingsTransactions) {
+        if (timeFilter == "ALL") {
+            totalSavingsAmount
+        } else {
+            localFilteredSavingsTransactions.filter { it.isDeposit }.sumOf { it.amount } - 
+            localFilteredSavingsTransactions.filter { !it.isDeposit }.sumOf { it.amount }
+        }
+    }
+
+    val currentNetWorth = remember(balance, dynamicSavingsAmount, owedToMe, iOwe) {
+        balance + dynamicSavingsAmount + owedToMe - iOwe
     }
 
     val effectiveIncome = remember(timeFilter, income, monthlyBudgets, transactions, currentWorkspace) {
@@ -5684,7 +5755,6 @@ fun DashboardScreen(
         }
 
         var isEditingBudget by remember(targetAmount) { mutableStateOf(targetAmount == 0.0) }
-        var showResetConfirm by remember { mutableStateOf(false) }
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
@@ -5702,46 +5772,6 @@ fun DashboardScreen(
                 )
             },
             text = {
-                if (showResetConfirm) {
-                    AlertDialog(
-                        onDismissRequest = { showResetConfirm = false },
-                        title = {
-                            Text(
-                                text = if (language == AppLanguage.BN) "বাজেট রিসেট" else "Reset Budget",
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        text = {
-                            Text(
-                                text = if (language == AppLanguage.BN) "কাস্টম বাজেট রিসেট করতে চান?" else "Do you want to reset the custom budget?",
-                                fontSize = 14.sp
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    when (categoryType) {
-                                        "INCOME" -> viewModel?.setBudgetIncome(0.0)
-                                        "EXPENSE" -> viewModel?.setBudgetExpense(0.0)
-                                        "SAVINGS" -> viewModel?.setBudgetSavings(0.0)
-                                    }
-                                    showResetConfirm = false
-                                }
-                            ) {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "হ্যাঁ" else "Yes",
-                                    color = FintechRed
-                                )
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showResetConfirm = false }) {
-                                Text(text = if (language == AppLanguage.BN) "না" else "No")
-                            }
-                        }
-                    )
-                }
-
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -5850,29 +5880,15 @@ fun DashboardScreen(
                                             color = if (targetAmount > 0.0) FintechBlue else Color.Gray
                                         )
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (timeFilter == "ALL") {
-                                            IconButton(
-                                                onClick = { showResetConfirm = true }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.RestartAlt,
-                                                    contentDescription = "Reset",
-                                                    tint = FintechRed,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-                                        IconButton(
-                                            onClick = { isEditingBudget = true }
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Edit,
-                                                contentDescription = "Edit Budget",
-                                                tint = FintechBlue,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
+                                    IconButton(
+                                        onClick = { isEditingBudget = true }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Edit,
+                                            contentDescription = "Edit Budget",
+                                            tint = FintechBlue,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                 }
                             } else {

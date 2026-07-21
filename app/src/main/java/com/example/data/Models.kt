@@ -81,6 +81,7 @@ data class FinanceBackup(
     val savingsTransactions: List<SavingsTransaction> = emptyList(),
     val workspaces: List<Workspace> = emptyList(),
     val trashItems: List<TrashItem> = emptyList(),
+    val monthlyBudgets: List<MonthlyBudget> = emptyList(),
     val budgetIncome: Double? = 0.0,
     val budgetExpense: Double? = 0.0,
     val budgetSavings: Double? = 0.0,

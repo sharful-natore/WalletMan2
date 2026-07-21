@@ -998,12 +998,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val preservedGoals = currentData.savingsGoals.filter { it.workspaceId !in workspaceIds }
         val preservedSavingsTxs = currentData.savingsTransactions.filter { it.workspaceId !in workspaceIds }
         val preservedWorkspaces = currentData.workspaces.filter { it.id !in workspaceIds }
+        val preservedBudgets = currentData.monthlyBudgets.filter { it.workspaceId !in workspaceIds }
         
         val incomingPersons = backup.persons.filter { it.workspaceId in workspaceIds }
         val incomingTransactions = backup.transactions.filter { it.workspaceId in workspaceIds }
         val incomingGoals = backup.savingsGoals.filter { it.workspaceId in workspaceIds }
         val incomingSavingsTxs = backup.savingsTransactions.filter { it.workspaceId in workspaceIds }
         val incomingWorkspaces = backup.workspaces.filter { it.id in workspaceIds }
+        val incomingBudgets = backup.monthlyBudgets.filter { it.workspaceId in workspaceIds }
         
         val combinedBackup = FinanceBackup(
             persons = preservedPersons + incomingPersons,
@@ -1011,6 +1013,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             savingsGoals = preservedGoals + incomingGoals,
             savingsTransactions = preservedSavingsTxs + incomingSavingsTxs,
             workspaces = preservedWorkspaces + incomingWorkspaces,
+            monthlyBudgets = preservedBudgets + incomingBudgets,
             comment = backup.comment,
             createdAt = backup.createdAt,
             profileName = currentData.profileName,
@@ -1706,6 +1709,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId in workspaceIds },
                         savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId in workspaceIds },
                         workspaces = fullBackup.workspaces.filter { it.id in workspaceIds },
+                        monthlyBudgets = fullBackup.monthlyBudgets.filter { it.workspaceId in workspaceIds },
                         comment = comment,
                         createdAt = System.currentTimeMillis()
                     )
@@ -1762,6 +1766,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId in workspaceIds },
                         savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId in workspaceIds },
                         workspaces = fullBackup.workspaces.filter { it.id in workspaceIds },
+                        monthlyBudgets = fullBackup.monthlyBudgets.filter { it.workspaceId in workspaceIds },
                         comment = comment,
                         createdAt = System.currentTimeMillis()
                     )
@@ -2150,6 +2155,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         savingsGoals = fullBackup.savingsGoals.filter { it.workspaceId in workspaceIds },
                         savingsTransactions = fullBackup.savingsTransactions.filter { it.workspaceId in workspaceIds },
                         workspaces = fullBackup.workspaces.filter { it.id in workspaceIds },
+                        monthlyBudgets = fullBackup.monthlyBudgets.filter { it.workspaceId in workspaceIds },
                         comment = comment,
                         createdAt = System.currentTimeMillis()
                     )
