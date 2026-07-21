@@ -4559,8 +4559,7 @@ fun DashboardScreen(
         if (ym != null) {
             monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.income ?: 0.0
         } else if (timeFilter == "ALL") {
-            if (currentWorkspace.budgetIncome > 0.0) currentWorkspace.budgetIncome
-            else monthlyBudgets.filter { it.income > 0.0 }.sumOf { it.income }
+            currentWorkspace.budgetIncome
         } else 0.0
     }
     val budgetExpenseAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
@@ -4568,8 +4567,7 @@ fun DashboardScreen(
         if (ym != null) {
             monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.expense ?: 0.0
         } else if (timeFilter == "ALL") {
-            if (currentWorkspace.budgetExpense > 0.0) currentWorkspace.budgetExpense
-            else monthlyBudgets.filter { it.expense > 0.0 }.sumOf { it.expense }
+            currentWorkspace.budgetExpense
         } else 0.0
     }
     val budgetSavingsAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
@@ -4577,8 +4575,7 @@ fun DashboardScreen(
         if (ym != null) {
             monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.savings ?: 0.0
         } else if (timeFilter == "ALL") {
-            if (currentWorkspace.budgetSavings > 0.0) currentWorkspace.budgetSavings
-            else monthlyBudgets.filter { it.savings > 0.0 }.sumOf { it.savings }
+            currentWorkspace.budgetSavings
         } else 0.0
     }
     val savingsTransactions by viewModel?.savingsTransactions?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
@@ -4660,44 +4657,9 @@ fun DashboardScreen(
         balance + dynamicSavingsAmount + owedToMe - iOwe
     }
 
-    val effectiveIncome = remember(timeFilter, income, monthlyBudgets, transactions, currentWorkspace) {
-        if (timeFilter == "ALL" && currentWorkspace.budgetIncome == 0.0) {
-            val monthsWithBudget = monthlyBudgets.filter { it.income > 0.0 }.map { "${it.year}-${String.format("%02d", it.month)}" }
-            if (monthsWithBudget.isEmpty()) 0.0
-            else {
-                val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
-                transactions.filter { 
-                    (it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT")) &&
-                    monthsWithBudget.contains(sdf.format(java.util.Date(it.timestamp)))
-                }.sumOf { it.amount }
-            }
-        } else income
-    }
-    val effectiveExpense = remember(timeFilter, expense, monthlyBudgets, transactions, currentWorkspace) {
-        if (timeFilter == "ALL" && currentWorkspace.budgetExpense == 0.0) {
-            val monthsWithBudget = monthlyBudgets.filter { it.expense > 0.0 }.map { "${it.year}-${String.format("%02d", it.month)}" }
-            if (monthsWithBudget.isEmpty()) 0.0
-            else {
-                val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
-                transactions.filter { 
-                    (it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT")) &&
-                    monthsWithBudget.contains(sdf.format(java.util.Date(it.timestamp)))
-                }.sumOf { it.amount }
-            }
-        } else expense
-    }
-    val effectiveSavings = remember(timeFilter, totalSavingsAmount, monthlyBudgets, savingsTransactions, currentWorkspace) {
-        if (timeFilter == "ALL" && currentWorkspace.budgetSavings == 0.0) {
-            val monthsWithBudget = monthlyBudgets.filter { it.savings > 0.0 }.map { "${it.year}-${String.format("%02d", it.month)}" }
-            if (monthsWithBudget.isEmpty()) 0.0
-            else {
-                val sdf = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US)
-                savingsTransactions.filter { 
-                    it.isDeposit && monthsWithBudget.contains(sdf.format(java.util.Date(it.timestamp)))
-                }.sumOf { it.amount }
-            }
-        } else totalSavingsAmount
-    }
+    val effectiveIncome = income
+    val effectiveExpense = expense
+    val effectiveSavings = dynamicSavingsAmount
     val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 0.95f,
@@ -5160,12 +5122,24 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = Translation.get("total_balance", language),
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = Translation.get("total_balance", language),
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = getFormattedPeriodText(timeFilter, language),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
                         Text(
                             text = formatCurrency(balance, language),
                             color = Color.White,
@@ -7978,6 +7952,92 @@ fun getYearMonthFromFilter(filter: String): Pair<Int, Int>? {
             } else null
         }
         else -> null
+    }
+}
+
+fun getFormattedPeriodText(timeFilter: String, language: AppLanguage): String {
+    if (timeFilter == "ALL") {
+        return if (language == AppLanguage.BN) "(সব সময়ের ডেটা প্রদর্শিত)" else "(All-time data shown)"
+    }
+    if (timeFilter == "TODAY") {
+        return if (language == AppLanguage.BN) "(আজকের তথ্য প্রদর্শিত)" else "(Today's data shown)"
+    }
+    
+    val now = System.currentTimeMillis()
+    val calendar = java.util.Calendar.getInstance()
+    var year = calendar.get(java.util.Calendar.YEAR)
+    var month = calendar.get(java.util.Calendar.MONTH) + 1
+    
+    if (timeFilter.startsWith("CUSTOM_MONTH:")) {
+        val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+        if (parts.size == 2) {
+            year = parts[0].toIntOrNull() ?: year
+            month = parts[1].toIntOrNull() ?: month
+        }
+    } else if (timeFilter.startsWith("CUSTOM_DATE:")) {
+        val parts = timeFilter.substringAfter("CUSTOM_DATE:").split("-")
+        if (parts.size == 3) {
+            year = parts[0].toIntOrNull() ?: year
+            month = parts[1].toIntOrNull() ?: month
+        }
+    }
+    
+    val monthNameBn = when (month) {
+        1 -> "জানুয়ারি"
+        2 -> "ফেব্রুয়ারি"
+        3 -> "মার্চ"
+        4 -> "এপ্রিল"
+        5 -> "মে"
+        6 -> "জুন"
+        7 -> "জুলাই"
+        8 -> "আগস্ট"
+        9 -> "সেপ্টেম্বর"
+        10 -> "অক্টোবর"
+        11 -> "নভেম্বর"
+        12 -> "ডিসেম্বর"
+        else -> "জুলাই"
+    }
+    val monthNameEn = when (month) {
+        1 -> "January"
+        2 -> "February"
+        3 -> "March"
+        4 -> "April"
+        5 -> "May"
+        6 -> "June"
+        7 -> "July"
+        8 -> "August"
+        9 -> "September"
+        10 -> "October"
+        11 -> "November"
+        12 -> "December"
+        else -> "July"
+    }
+    
+    val yearStr = year.toString()
+    val yearFormatted = if (language == AppLanguage.BN) {
+        yearStr.map { char ->
+            when (char) {
+                '0' -> '০'
+                '1' -> '১'
+                '2' -> '২'
+                '3' -> '৩'
+                '4' -> '৪'
+                '5' -> '৫'
+                '6' -> '৬'
+                '7' -> '৭'
+                '8' -> '৮'
+                '9' -> '৯'
+                else -> char
+            }
+        }.joinToString("")
+    } else {
+        yearStr
+    }
+    
+    return if (language == AppLanguage.BN) {
+        "($monthNameBn $yearFormatted এর তথ্য প্রদর্শিত)"
+    } else {
+        "($monthNameEn $yearFormatted's data shown)"
     }
 }
 
