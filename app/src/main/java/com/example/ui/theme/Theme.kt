@@ -13,34 +13,6 @@ import androidx.compose.ui.graphics.toArgb
 import android.content.Context
 import androidx.compose.runtime.remember
 
-private fun loadCustomGradients(context: Context): List<List<Color>> {
-    val serialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-        .getString("custom_gradients_v3", "") ?: ""
-    if (serialized.isBlank()) {
-        val oldSerialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-            .getString("custom_gradients_v2", "") ?: ""
-        if (oldSerialized.isBlank()) return emptyList()
-        return try {
-            oldSerialized.split(";").map { gradStr ->
-                gradStr.split(",").map { colorStr ->
-                    Color(colorStr.toInt())
-                }
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-    return try {
-        serialized.split(";").mapNotNull { gradStr ->
-            if (gradStr.isBlank()) return@mapNotNull null
-            val parts = gradStr.split(":")
-            val colorsStr = if (parts.isNotEmpty()) parts[0] else gradStr
-            colorsStr.split(",").map { Color(it.toInt()) }
-        }
-    } catch (e: Exception) {
-        emptyList()
-    }
-}
 
 private val DarkColorScheme = darkColorScheme(
     primary = FintechBlue,
@@ -70,18 +42,9 @@ private val LightColorScheme = lightColorScheme(
 fun FinanceNoteTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     language: AppLanguage = AppLanguage.BN,
-    themeGradientIndex: Int = 0,
+    themePrimaryColor: Color = FintechBlue,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-    val customGradients = remember(context) { loadCustomGradients(context) }
-    val fullGradientsList = GradientsList + customGradients
-
-    val themePrimaryColor = if (themeGradientIndex in fullGradientsList.indices) {
-        fullGradientsList[themeGradientIndex][0]
-    } else {
-        FintechBlue
-    }
     val baseColorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val colorScheme = baseColorScheme.copy(primary = themePrimaryColor)
     val typography = getTypographyForLanguage(language)

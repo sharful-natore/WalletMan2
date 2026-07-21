@@ -9,6 +9,7 @@ import androidx.activity.SystemBarStyle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.view.WindowCompat
 import com.example.data.AppDatabase
 import com.example.data.FinanceRepository
@@ -64,15 +65,23 @@ class MainActivity : ComponentActivity() {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
             val language by viewModel.language.collectAsState()
             val themeGradientIndex by viewModel.selectedThemeGradientIndex.collectAsState()
+            val allGradientsConfig by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
             val action by actionState
             val targetWorkspaceId by targetWorkspaceState
             
-            FinanceNoteTheme(darkTheme = isDarkTheme, language = language, themeGradientIndex = themeGradientIndex) {
-                FinanceNoteApp(
-                    viewModel = viewModel, 
-                    initialAction = action,
-                    targetWorkspaceId = targetWorkspaceId
-                )
+            val activeThemeGradient = remember(allGradientsConfig, themeGradientIndex) {
+                if (themeGradientIndex in allGradientsConfig.indices) allGradientsConfig[themeGradientIndex]
+                else allGradientsConfig.firstOrNull() ?: com.example.ui.theme.ThemeGradient(com.example.ui.theme.GradientsList[0])
+            }
+            
+            FinanceNoteTheme(darkTheme = isDarkTheme, language = language, themePrimaryColor = activeThemeGradient.colors.firstOrNull() ?: com.example.ui.theme.FintechBlue) {
+                androidx.compose.runtime.CompositionLocalProvider(com.example.ui.screens.LocalActiveThemeGradient provides activeThemeGradient) {
+                    FinanceNoteApp(
+                        viewModel = viewModel, 
+                        initialAction = action,
+                        targetWorkspaceId = targetWorkspaceId
+                    )
+                }
             }
         }
     }

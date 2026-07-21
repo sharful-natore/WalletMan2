@@ -248,6 +248,28 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _budgetSavings = MutableStateFlow(0.0)
     val budgetSavings: StateFlow<Double> = _budgetSavings.asStateFlow()
 
+    private fun loadBudgetGradients(): Map<String, List<Color>> {
+        val map = mutableMapOf<String, List<Color>>()
+        listOf("INCOME", "EXPENSE", "SAVINGS").forEach { type ->
+            val saved = prefs.getString("budget_gradient_$type", null)
+            if (saved != null && saved.isNotBlank()) {
+                try {
+                    map[type] = saved.split(",").map { Color(it.toInt()) }
+                } catch (e: Exception) {}
+            }
+        }
+        return map
+    }
+
+    private val _budgetGradients = MutableStateFlow(loadBudgetGradients())
+    val budgetGradients: StateFlow<Map<String, List<Color>>> = _budgetGradients.asStateFlow()
+
+    fun updateBudgetGradient(type: String, colors: List<Color>) {
+        val str = colors.joinToString(",") { it.toArgb().toString() }
+        prefs.edit().putString("budget_gradient_$type", str).apply()
+        _budgetGradients.value = loadBudgetGradients()
+    }
+
     val monthlyBudgets: StateFlow<List<com.example.data.MonthlyBudget>> = _currentWorkspaceId
         .flatMapLatest { workspaceId -> repository.getAllMonthlyBudgets(workspaceId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
