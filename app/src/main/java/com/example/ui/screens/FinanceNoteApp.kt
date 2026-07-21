@@ -164,16 +164,13 @@ fun getBudgetCategoryColors(categoryType: String?): List<Color> {
         Color(0xFFE6EE9C)  // Very Pale Lime
     )
     val expenseColors = listOf(
-        Color(0xFFFFEB3B), // Yellow
-        Color(0xFFFFF176), // Light Yellow
-        Color(0xFFFFEE58), // Bright Yellow
+        Color(0xFF8BC34A), // Light Green
+        Color(0xFFCDDC39), // Lime
         Color(0xFFFFC107), // Amber
-        Color(0xFFFFB300), // Dark Amber
         Color(0xFFFF9800), // Orange
-        Color(0xFFFB8C00), // Dark Orange
         Color(0xFFFF5722), // Deep Orange
         Color(0xFFF44336), // Red
-        Color(0xFFD32F2F)  // Dark Red
+        Color(0xFFE91E63)  // Pink
     )
     val savingsColors = listOf(
         Color(0xFF0D47A1), // Deep Navy Blue
@@ -598,8 +595,8 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = when (categoryType) {
-        "INCOME" -> listOf(Color(0xFFCDDC39), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Lime -> Yellow -> Amber -> Orange -> Deep Orange -> Red
-        "EXPENSE" -> listOf(Color(0xFFCDDC39), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Lime -> Yellow -> Amber -> Orange -> Deep Orange -> Red
+        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
+        "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFCDDC39), Color(0xFFFFEB3B), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Green -> Lime -> Yellow -> Amber -> Orange -> Deep Orange -> Red
         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
     }
@@ -2959,7 +2956,10 @@ fun FinanceNoteApp(
                                         else -> null
                                     }
                                     if (page != null && pagerState.currentPage != page) {
-                                        pagerState.animateScrollToPage(page)
+                                        pagerState.animateScrollToPage(
+                                            page = page,
+                                            animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing)
+                                        )
                                     }
                                 }
 
@@ -2981,6 +2981,7 @@ fun FinanceNoteApp(
 
                                 HorizontalPager(
                                     state = pagerState,
+                                    beyondViewportPageCount = 1,
                                     modifier = Modifier.fillMaxSize()
                                 ) { page ->
                                     when (page) {
