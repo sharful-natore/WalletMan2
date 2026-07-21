@@ -75,14 +75,33 @@ val FintechBlue: Color
     @Composable
     get() = MaterialTheme.colorScheme.primary
 
-private fun loadCustomGradients(context: android.content.Context): List<List<Color>> {
+private fun loadCustomGradients(context: android.content.Context): List<com.example.ui.theme.ThemeGradient> {
     val serialized = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
-        .getString("custom_gradients_v2", "") ?: ""
-    if (serialized.isBlank()) return emptyList()
+        .getString("custom_gradients_v3", "") ?: ""
+    if (serialized.isBlank()) {
+        val oldSerialized = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+            .getString("custom_gradients_v2", "") ?: ""
+        if (oldSerialized.isBlank()) return emptyList()
+        return try {
+            oldSerialized.split(";").map { gradStr ->
+                com.example.ui.theme.ThemeGradient(gradStr.split(",").map { Color(it.toInt()) })
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
     return try {
-        serialized.split(";").map { gradStr ->
-            gradStr.split(",").map { colorStr ->
-                Color(colorStr.toInt())
+        serialized.split(";").mapNotNull { gradStr ->
+            if (gradStr.isBlank()) return@mapNotNull null
+            val parts = gradStr.split(":")
+            if (parts.size >= 3) {
+                val colors = parts[0].split(",").map { Color(it.toInt()) }
+                val type = try { com.example.ui.theme.CustomGradientType.valueOf(parts[1]) } catch (e: Exception) { com.example.ui.theme.CustomGradientType.LINEAR }
+                val direction = try { com.example.ui.theme.CustomGradientDirection.valueOf(parts[2]) } catch (e: Exception) { com.example.ui.theme.CustomGradientDirection.HORIZONTAL }
+                com.example.ui.theme.ThemeGradient(colors, type, direction)
+            } else {
+                val colors = gradStr.split(",").map { Color(it.toInt()) }
+                com.example.ui.theme.ThemeGradient(colors)
             }
         }
     } catch (e: Exception) {
@@ -90,22 +109,30 @@ private fun loadCustomGradients(context: android.content.Context): List<List<Col
     }
 }
 
-val activeThemeGradient: List<Color>
+val activeThemeGradientConfig: com.example.ui.theme.ThemeGradient
     @Composable
     get() {
         val primary = MaterialTheme.colorScheme.primary
         val context = androidx.compose.ui.platform.LocalContext.current
         val customGradients = androidx.compose.runtime.remember(context) { loadCustomGradients(context) }
-        val fullGradientsList = com.example.ui.theme.GradientsList + customGradients
+        val fullGradientsList = com.example.ui.theme.GradientsList.map { com.example.ui.theme.ThemeGradient(it) } + customGradients
         return androidx.compose.runtime.remember(primary, customGradients) {
             fullGradientsList.find { gradient ->
-                val firstColor = gradient.firstOrNull() ?: return@find false
+                val firstColor = gradient.colors.firstOrNull() ?: return@find false
                 java.lang.Math.abs(firstColor.red - primary.red) < 0.01f &&
                 java.lang.Math.abs(firstColor.green - primary.green) < 0.01f &&
                 java.lang.Math.abs(firstColor.blue - primary.blue) < 0.01f
             } ?: fullGradientsList[0]
         }
     }
+
+val activeThemeGradient: List<Color>
+    @Composable
+    get() = activeThemeGradientConfig.colors
+
+val activeThemeGradientBrush: androidx.compose.ui.graphics.Brush
+    @Composable
+    get() = activeThemeGradientConfig.toBrush()
 
 class UCropContract : ActivityResultContract<Pair<Uri, Uri>, Uri?>() {
     override fun createIntent(context: Context, input: Pair<Uri, Uri>): Intent {
@@ -2239,6 +2266,8 @@ fun FinanceNoteApp(
     var showCustomGradientDialog by remember { mutableStateOf(false) }
     var editingCustomGradientIndex by remember { mutableStateOf<Int?>(null) }
     var customGradientColors by remember { mutableStateOf(listOf(Color(0xFF6F7BF7), Color(0xFF38BDF8))) }
+    var customGradientType by remember { mutableStateOf(com.example.ui.theme.CustomGradientType.LINEAR) }
+    var customGradientDirection by remember { mutableStateOf(com.example.ui.theme.CustomGradientDirection.HORIZONTAL) }
     var selectedColorIndexInGradient by remember { mutableStateOf(0) }
     var showLongPressOptions by remember { mutableStateOf(false) }
     var longPressedIndex by remember { mutableStateOf(-1) }
@@ -3498,7 +3527,7 @@ fun FinanceNoteApp(
     }
 
     if (showThemeCustomizeDialog) {
-        val allGradientsList by viewModel.allGradients.collectAsState()
+        val allGradientsList by viewModel.allGradientsConfig.collectAsState()
         val staticGradientsSize = com.example.ui.theme.GradientsList.size
 
         AlertDialog(
@@ -3542,7 +3571,7 @@ fun FinanceNoteApp(
             },
             text = {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     // 1. Dark Mode Toggle
@@ -3633,8 +3662,7 @@ fun FinanceNoteApp(
                                 rowGradients.forEachIndexed { colIndex, gradient ->
                                     val actualIndex = rowIndex * 4 + colIndex
                                     val isSelected = selectedThemeIndex == actualIndex
-                                    val firstColor = gradient.first()
-                                    val lastColor = gradient.last()
+                                    val firstColor = gradient.colors.firstOrNull() ?: Color.Gray
 
                                     @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
                                     Box(
@@ -3642,11 +3670,7 @@ fun FinanceNoteApp(
                                             .weight(1f)
                                             .aspectRatio(1f)
                                             .clip(CircleShape)
-                                            .background(
-                                                Brush.sweepGradient(
-                                                    colors = if (gradient.size >= 2) gradient else listOf(firstColor, firstColor)
-                                                )
-                                            )
+                                            .background(gradient.toBrush())
                                             .border(
                                                 width = if (isSelected) 3.dp else 1.dp,
                                                 color = if (isSelected) {
@@ -3789,6 +3813,7 @@ fun FinanceNoteApp(
                     // Card Preview
                     FintechGradientCard(
                         gradientColors = customGradientColors,
+                        brush = com.example.ui.theme.ThemeGradient(customGradientColors, customGradientType, customGradientDirection).toBrush(),
                         cornerRadius = 24.dp,
                         padding = PaddingValues(16.dp),
                         modifier = Modifier.fillMaxWidth().height(90.dp)
@@ -3820,6 +3845,80 @@ fun FinanceNoteApp(
                                 tint = Color.White.copy(alpha = 0.7f),
                                 modifier = Modifier.size(24.dp)
                             )
+                        }
+                    }
+
+                    HorizontalDivider(color = if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFE2E8F0))
+
+                    // Gradient Type Selection
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "গ্রাডিয়েন্ট টাইপ" else "Gradient Type",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            com.example.ui.theme.CustomGradientType.values().forEach { type ->
+                                val isSelected = customGradientType == type
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) MaterialTheme.colorScheme.primary else (if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFF1F5F9)))
+                                        .clickable { customGradientType = type }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = type.name.lowercase().replaceFirstChar { it.uppercase() },
+                                        color = if (isSelected) Color.White else (if (isDarkTheme) Color.LightGray else Color.DarkGray),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Gradient Direction Selection (Only for LINEAR)
+                    if (customGradientType == com.example.ui.theme.CustomGradientType.LINEAR) {
+                        Column {
+                            Text(
+                                text = if (language == AppLanguage.BN) "ডিরেকশন" else "Direction",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                com.example.ui.theme.CustomGradientDirection.values().forEach { dir ->
+                                    val isSelected = customGradientDirection == dir
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) MaterialTheme.colorScheme.primary else (if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFF1F5F9)))
+                                            .clickable { customGradientDirection = dir }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = dir.name.lowercase().replaceFirstChar { it.uppercase() },
+                                            color = if (isSelected) Color.White else (if (isDarkTheme) Color.LightGray else Color.DarkGray),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -4112,9 +4211,9 @@ fun FinanceNoteApp(
                         showCustomGradientDialog = false
                         val idx = editingCustomGradientIndex
                         if (idx != null) {
-                            viewModel.updateCustomGradient(context, idx, customGradientColors)
+                            viewModel.updateCustomGradient(context, idx, customGradientColors, customGradientType, customGradientDirection)
                         } else {
-                            viewModel.addCustomGradient(context, customGradientColors)
+                            viewModel.addCustomGradient(context, customGradientColors, customGradientType, customGradientDirection)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -4140,7 +4239,7 @@ fun FinanceNoteApp(
     }
 
     if (showLongPressOptions) {
-        val allGradientsList by viewModel.allGradients.collectAsState()
+        val allGradientsList by viewModel.allGradientsConfig.collectAsState()
         AlertDialog(
             onDismissRequest = { showLongPressOptions = false },
             containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
@@ -4164,7 +4263,10 @@ fun FinanceNoteApp(
                         showLongPressOptions = false
                         val staticSize = com.example.ui.theme.GradientsList.size
                         editingCustomGradientIndex = longPressedIndex - staticSize
-                        customGradientColors = allGradientsList[longPressedIndex]
+                        val selectedGradient = allGradientsList[longPressedIndex]
+                        customGradientColors = selectedGradient.colors
+                        customGradientType = selectedGradient.type
+                        customGradientDirection = selectedGradient.direction
                         selectedColorIndexInGradient = 0
                         showCustomGradientDialog = true
                     }

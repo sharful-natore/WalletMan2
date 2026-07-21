@@ -26,6 +26,7 @@ fun FintechGradientCard(
     cornerRadius: Dp = 20.dp,
     padding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
     onClick: (() -> Unit)? = null,
+    brush: Brush? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
@@ -36,8 +37,8 @@ fun FintechGradientCard(
             .fillMaxWidth()
             .clip(shape)
             .background(
-                brush = Brush.linearGradient(
-                    colors = gradientColors
+                brush = brush ?: Brush.linearGradient(
+                    colors = if (gradientColors.size >= 2) gradientColors else listOf(gradientColors.firstOrNull() ?: Color.Gray, gradientColors.lastOrNull() ?: Color.Gray)
                 )
             )
             .border(

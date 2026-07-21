@@ -33,6 +33,9 @@ import com.example.MainActivity
 import com.example.R
 import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
+import com.example.ui.theme.ThemeGradient
+import com.example.ui.theme.CustomGradientType
+import com.example.ui.theme.CustomGradientDirection
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -102,6 +105,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val allGradients: StateFlow<List<List<Color>>> = _customGradients.map { custom ->
         com.example.ui.theme.GradientsList + custom
     }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList)
+
+    private val _customGradientsConfig = MutableStateFlow<List<ThemeGradient>>(emptyList())
+    val customGradientsConfig: StateFlow<List<ThemeGradient>> = _customGradientsConfig.asStateFlow()
+
+    val allGradientsConfig: StateFlow<List<ThemeGradient>> = _customGradientsConfig.map { custom ->
+        com.example.ui.theme.GradientsList.map { ThemeGradient(it) } + custom
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList.map { ThemeGradient(it) })
 
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
@@ -1162,52 +1172,75 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun loadCustomGradients(context: Context) {
         val serialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-            .getString("custom_gradients_v2", "") ?: ""
+            .getString("custom_gradients_v3", "") ?: ""
         if (serialized.isBlank()) {
+            val oldSerialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                .getString("custom_gradients_v2", "") ?: ""
+            if (oldSerialized.isNotBlank()) {
+                try {
+                    val oldLoaded = oldSerialized.split(";").map { gradStr ->
+                        ThemeGradient(gradStr.split(",").map { Color(it.toInt()) })
+                    }
+                    _customGradientsConfig.value = oldLoaded
+                    _customGradients.value = oldLoaded.map { it.colors }
+                    return
+                } catch (e: Exception) {}
+            }
+            _customGradientsConfig.value = emptyList()
             _customGradients.value = emptyList()
             return
         }
         try {
-            val loaded = serialized.split(";").map { gradStr ->
-                gradStr.split(",").map { colorStr ->
-                    Color(colorStr.toInt())
+            val loaded = serialized.split(";").mapNotNull { gradStr ->
+                if (gradStr.isBlank()) return@mapNotNull null
+                val parts = gradStr.split(":")
+                if (parts.size >= 3) {
+                    val colors = parts[0].split(",").map { Color(it.toInt()) }
+                    val type = try { CustomGradientType.valueOf(parts[1]) } catch (e: Exception) { CustomGradientType.LINEAR }
+                    val direction = try { CustomGradientDirection.valueOf(parts[2]) } catch (e: Exception) { CustomGradientDirection.HORIZONTAL }
+                    ThemeGradient(colors, type, direction)
+                } else {
+                    val colors = gradStr.split(",").map { Color(it.toInt()) }
+                    ThemeGradient(colors)
                 }
             }
-            _customGradients.value = loaded
+            _customGradientsConfig.value = loaded
+            _customGradients.value = loaded.map { it.colors }
         } catch (e: Exception) {
+            _customGradientsConfig.value = emptyList()
             _customGradients.value = emptyList()
         }
     }
 
-    private fun saveCustomGradients(context: Context, gradients: List<List<Color>>) {
-        val serialized = gradients.joinToString(separator = ";") { gradient ->
-            gradient.joinToString(separator = ",") { color ->
-                color.toArgb().toString()
-            }
+    private fun saveCustomGradients(context: Context, gradients: List<ThemeGradient>) {
+        val serialized = gradients.joinToString(separator = ";") { grad ->
+            val colorsStr = grad.colors.joinToString(separator = ",") { it.toArgb().toString() }
+            "${colorsStr}:${grad.type.name}:${grad.direction.name}"
         }
         context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
             .edit()
-            .putString("custom_gradients_v2", serialized)
+            .putString("custom_gradients_v3", serialized)
             .apply()
-        _customGradients.value = gradients
+        _customGradientsConfig.value = gradients
+        _customGradients.value = gradients.map { it.colors }
     }
 
-    fun addCustomGradient(context: Context, colors: List<Color>) {
-        val current = _customGradients.value.toMutableList()
-        current.add(colors)
+    fun addCustomGradient(context: Context, colors: List<Color>, type: CustomGradientType = CustomGradientType.LINEAR, direction: CustomGradientDirection = CustomGradientDirection.HORIZONTAL) {
+        val current = _customGradientsConfig.value.toMutableList()
+        current.add(ThemeGradient(colors, type, direction))
         saveCustomGradients(context, current)
     }
 
-    fun updateCustomGradient(context: Context, customIndex: Int, colors: List<Color>) {
-        val current = _customGradients.value.toMutableList()
+    fun updateCustomGradient(context: Context, customIndex: Int, colors: List<Color>, type: CustomGradientType = CustomGradientType.LINEAR, direction: CustomGradientDirection = CustomGradientDirection.HORIZONTAL) {
+        val current = _customGradientsConfig.value.toMutableList()
         if (customIndex in current.indices) {
-            current[customIndex] = colors
+            current[customIndex] = ThemeGradient(colors, type, direction)
             saveCustomGradients(context, current)
         }
     }
 
     fun deleteCustomGradient(context: Context, customIndex: Int) {
-        val current = _customGradients.value.toMutableList()
+        val current = _customGradientsConfig.value.toMutableList()
         if (customIndex in current.indices) {
             current.removeAt(customIndex)
             saveCustomGradients(context, current)

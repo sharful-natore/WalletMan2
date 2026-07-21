@@ -60,25 +60,15 @@ val GradientIndigoDusk = listOf(Color(0xFF4338CA), Color(0xFF312E81)) // Indigo 
 val GradientsList = listOf(
     GradientSleekIndigo,       // 0
     GradientCosmicNebula,      // 1
-    GradientCyberpunkDream,    // 2
-    GradientRoyalPurple,       // 3
-    GradientPurpleBlue,        // 4
-    GradientDeepLavender,      // 5
-    GradientCalmBlue,          // 6
-    GradientMidnightViolet,    // 7
-    GradientOceanCyan,         // 8
-    GradientTealMint,          // 9
-    GradientSlateObsidian,     // 10
-    GradientMidnightIndigo,    // 11
-    GradientOceanDeepBlue,     // 12
-    GradientDeepViolet,        // 13
-    GradientDeepAmethyst,      // 14
-    GradientSteelLavender,     // 15
-    GradientMidnightPurple,    // 16 (Replaced EmeraldNight)
-    GradientDeepTeal,          // 17 (Replaced SlateBlue)
-    GradientIndigoDusk,        // 18 (Replaced OceanDepth)
-    GradientStormySky,         // 19
-    GradientIrregular,         // 20
-    GradientMulticolorCustom,  // 21
-    GradientTricolorCustom     // 22
+    GradientRoyalPurple,       // 2
+    GradientPurpleBlue,        // 3
+    GradientDeepLavender,      // 4
+    GradientCalmBlue,          // 5
+    GradientMidnightViolet,    // 6
+    GradientSlateObsidian,     // 7
+    GradientMidnightIndigo,    // 8
+    GradientOceanDeepBlue,     // 9
+    GradientDeepViolet,        // 10
+    GradientMidnightPurple,    // 11
+    GradientIndigoDusk         // 12
 )
