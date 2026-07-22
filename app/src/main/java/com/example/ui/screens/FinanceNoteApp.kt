@@ -1197,6 +1197,7 @@ fun WorkspaceManagementDialog(
     onSelect: (String) -> Unit,
     onCreate: (String) -> Unit,
     onEdit: (String, String) -> Unit,
+    onUpdatePhoto: (String, String?) -> Unit,
     onDelete: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1205,6 +1206,17 @@ fun WorkspaceManagementDialog(
     var editingWorkspaceId by remember { mutableStateOf<String?>(null) }
     var editWorkspaceName by remember { mutableStateOf("") }
     var deletingWorkspaceId by remember { mutableStateOf<String?>(null) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var pickingPhotoForWorkspaceId by remember { mutableStateOf<String?>(null) }
+    val workspacePhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        pickingPhotoForWorkspaceId?.let { wsId ->
+            uri?.let { onUpdatePhoto(wsId, it.toString()) }
+            pickingPhotoForWorkspaceId = null
+        }
+    }
 
     val textColor = if (isDark) Color.White else Color(0xFF0F1724)
     val subtitleColor = if (isDark) Color.LightGray else Color.Gray
@@ -1292,6 +1304,7 @@ fun WorkspaceManagementDialog(
                                             modifier = Modifier
                                                 .size(40.dp)
                                                 .clip(CircleShape)
+                                                .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") }
                                                 .border(1.5.dp, if (isSelected) FintechBlue else Color.Gray, CircleShape),
                                             contentScale = ContentScale.Crop
                                         )
@@ -1302,14 +1315,15 @@ fun WorkspaceManagementDialog(
                                                 .size(40.dp)
                                                 .clip(CircleShape)
                                                 .background(if (isSelected) FintechBlue.copy(alpha = 0.2f) else (if (isDark) Color(0xFF2E344A) else Color(0xFFE2E8F0)))
-                                                .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape),
+                                                .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape)
+                                                .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(
-                                                text = initials,
-                                                color = if (isSelected) FintechBlue else textColor,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold
+                                            Icon(
+                                                imageVector = Icons.Rounded.AddAPhoto,
+                                                contentDescription = "Add photo",
+                                                tint = if (isSelected) FintechBlue else textColor,
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         }
                                     }
@@ -2529,6 +2543,9 @@ fun FinanceNoteApp(
             onEdit = { id, name ->
                 viewModel.editWorkspace(id, name)
             },
+            onUpdatePhoto = { id, photo ->
+                viewModel.updateWorkspaceProfilePhoto(id, photo)
+            },
             onDelete = { workspaceId ->
                 viewModel.deleteWorkspace(workspaceId)
             },
@@ -2561,6 +2578,7 @@ fun FinanceNoteApp(
             },
             onBackupRestore = {
                 showEnhancedProfileMenu = false
+                settingsFilter = "backup"
                 activeTab = "settings"
             },
             onLogin = {
@@ -12797,6 +12815,9 @@ fun SettingsScreen(
             onEdit = { id, name ->
                 viewModel.editWorkspace(id, name)
             },
+            onUpdatePhoto = { id, photo ->
+                viewModel.updateWorkspaceProfilePhoto(id, photo)
+            },
             onDelete = { workspaceId ->
                 viewModel.deleteWorkspace(workspaceId)
             },
@@ -13233,7 +13254,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
             isDark = isDark,
             icon = Icons.Rounded.Backup,
-            initiallyExpanded = false
+            initiallyExpanded = filter == "backup"
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -17393,71 +17414,69 @@ fun LoginScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "লগইন সিস্টেম" else "Login Portal",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color.Black
-                    )
-                    Spacer(modifier = Modifier.size(48.dp))
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // App Logo / Illustration Banner
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = FintechBlue.copy(alpha = 0.1f)),
-                    modifier = Modifier.fillMaxWidth().height(120.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Lock,
-                            contentDescription = null,
-                            tint = FintechBlue,
-                            modifier = Modifier.size(36.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            modifier = Modifier.size(64.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            color = FintechBlue.copy(alpha = 0.15f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.AccountBalanceWallet,
+                                    contentDescription = null,
+                                    tint = FintechBlue,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট সুরক্ষিত রাখুন" else "Secure & Instant Authentication",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = FintechBlue
+                            text = if (language == AppLanguage.BN) "Finance Note অ্যাপটি ব্যবহার করতে আপনার একাউন্ট লগিন করুন" else "Please login to your account to use Finance Note app",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color.Black,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
 
-                // Google Sign-In Button (Primary option)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Google Sign-In Button (Modernized)
                 Button(
                     onClick = {
                         onGoogleSignIn()
                         onDismiss()
                     },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF2C2C2E) else Color.White),
-                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray)
+                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Cloud,
-                            contentDescription = null,
-                            tint = FintechBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        // Custom Google-like icon or official icon if available
+                        Surface(
+                            modifier = Modifier.size(24.dp),
+                            shape = CircleShape,
+                            color = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Cloud, // Placeholder for Google Icon
+                                contentDescription = null,
+                                tint = FintechBlue,
+                                modifier = Modifier.size(18.dp).padding(2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = if (language == AppLanguage.BN) "গুগল দিয়ে লগইন / ড্রাইভ ব্যাকআপ" else "Continue with Google (Sync & Drive)",
+                            text = if (language == AppLanguage.BN) "গুগল একাউন্ট দিয়ে লগিন করুন" else "Sign in with Google Account",
                             color = if (isDark) Color.White else Color(0xFF1E293B),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp
                         )
                     }
                 }
@@ -17831,10 +17850,14 @@ fun ProfileSetupScreen(
 ) {
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
     val userAddress by viewModel.userAddress.collectAsStateWithLifecycle()
+    val userPhone by viewModel.userPhone.collectAsStateWithLifecycle()
+    val userDOB by viewModel.userDOB.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     
     var name by remember { mutableStateOf(googleName ?: "") }
     var address by remember { mutableStateOf(userAddress ?: "") }
+    var phone by remember { mutableStateOf(userPhone ?: "") }
+    var dob by remember { mutableStateOf(userDOB ?: "") }
     var photoUri by remember { mutableStateOf(googlePhotoUrl ?: "") }
     
     val context = LocalContext.current
@@ -17916,9 +17939,42 @@ fun ProfileSetupScreen(
                 )
 
                 OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text(if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number") },
+                    leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = if (isDark) Color.White else Color.Black,
+                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                        focusedLabelColor = FintechBlue,
+                        unfocusedLabelColor = Color.Gray
+                    )
+                )
+
+                OutlinedTextField(
+                    value = dob,
+                    onValueChange = { dob = it },
+                    label = { Text(if (language == AppLanguage.BN) "জন্ম তারিখ" else "Date of Birth") },
+                    leadingIcon = { Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = FintechBlue) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    placeholder = { Text("DD/MM/YYYY", color = Color.Gray.copy(alpha = 0.5f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = if (isDark) Color.White else Color.Black,
+                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                        focusedLabelColor = FintechBlue,
+                        unfocusedLabelColor = Color.Gray
+                    )
+                )
+
+                OutlinedTextField(
                     value = address,
                     onValueChange = { address = it },
                     label = { Text(if (language == AppLanguage.BN) "ঠিকানা" else "Address") },
+                    leadingIcon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = FintechBlue) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -17938,7 +17994,7 @@ fun ProfileSetupScreen(
                 Button(
                     onClick = {
                         isLoading = true
-                        viewModel.updateUserProfile(name, address, photoUri,
+                        viewModel.updateUserProfile(name, address, phone, dob, photoUri,
                             onSuccess = {
                                 isLoading = false
                                 onDismiss()
@@ -17983,6 +18039,7 @@ fun EnhancedProfileMenu(
 ) {
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
+    val profileName by viewModel.profileName.collectAsStateWithLifecycle()
     val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
 
@@ -18023,7 +18080,7 @@ fun EnhancedProfileMenu(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
+                            text = if (isGoogleSignedIn) (googleName ?: (if (profileName.isNotBlank()) profileName else (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User"))) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black

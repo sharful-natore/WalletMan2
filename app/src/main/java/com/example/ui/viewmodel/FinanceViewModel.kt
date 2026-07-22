@@ -113,13 +113,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             
             if (signedIn && user != null) {
                 // Use Firebase user details as default profile data
-                _googleEmail.value = user.email ?: user.uid // Fallback to UID for phone users
+                _googleEmail.value = user.email ?: user.uid
                 _googleName.value = user.displayName
                 _googlePhotoUrl.value = user.photoUrl?.toString()
                 
-                // Also check if we have provider data (like Google)
-                val isGoogle = user.providerData.any { it.providerId == "google.com" }
-                // We keep _isGoogleSignedIn as true for any user so sync works
+                // Keep SharedPreferences in sync for Widget
+                val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                gPrefs.edit().apply {
+                    putString("google_email", user.email ?: user.uid)
+                    putString("google_name", user.displayName)
+                    putString("google_photo_url", user.photoUrl?.toString())
+                }.apply()
+
                 startRealtimeSync()
             } else {
                 _googleEmail.value = null
@@ -511,6 +517,25 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _currentWorkspaceId.value = _currentWorkspaceId.value
                 com.example.widget.updateAllWidgets(getApplication())
                 triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস নাম পরিবর্তন করা হয়েছে" else "Workspace updated", isSuccess = true, type = "SUCCESS")
+            }
+        }
+    }
+
+    fun updateWorkspaceProfilePhoto(workspaceId: String, photoUri: String?) {
+        viewModelScope.launch {
+            val existing = workspaces.value.find { it.id == workspaceId }
+            if (existing != null) {
+                repository.insertWorkspace(existing.copy(profilePhotoUri = photoUri))
+                if (_currentWorkspaceId.value == workspaceId) {
+                    _profilePhotoUri.value = photoUri
+                    
+                    // Update SharedPreferences for widget
+                    val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                    val keySuffix = if (workspaceId == "default") "" else "_$workspaceId"
+                    cachedPrefs.edit().putString("user_photo$keySuffix", photoUri).apply()
+                }
+                com.example.widget.updateAllWidgets(getApplication())
+                triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "প্রোফাইল ছবি পরিবর্তন করা হয়েছে" else "Profile photo updated", isSuccess = true, type = "SUCCESS")
             }
         }
     }
@@ -2140,6 +2165,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _userAddress = MutableStateFlow<String?>(null)
     val userAddress: StateFlow<String?> = _userAddress.asStateFlow()
 
+    private val _userPhone = MutableStateFlow<String?>(null)
+    val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
+
+    private val _userDOB = MutableStateFlow<String?>(null)
+    val userDOB: StateFlow<String?> = _userDOB.asStateFlow()
+
     private val _isProfileSetupComplete = MutableStateFlow(false)
     val isProfileSetupComplete: StateFlow<Boolean> = _isProfileSetupComplete.asStateFlow()
 
@@ -3043,11 +3074,30 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
 
-    fun updateUserProfile(name: String, address: String, photoUri: String?, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+    fun updateUserProfile(name: String, address: String, phone: String, dob: String, photoUri: String?, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         _googleName.value = name
         _userAddress.value = address
+        _userPhone.value = phone
+        _userDOB.value = dob
         _googlePhotoUrl.value = photoUri
         _isProfileSetupComplete.value = true
+
+        // Also update the current workspace profile so it reflects in Dashboard and Widget
+        viewModelScope.launch {
+            val wsId = _currentWorkspaceId.value
+            val existing = repository.getWorkspaceById(wsId) ?: com.example.data.Workspace(id = wsId, name = "ব্যক্তিগত")
+            repository.insertWorkspace(existing.copy(
+                profileName = name,
+                profileAddress = address,
+                profilePhone = phone,
+                profilePhotoUri = photoUri
+            ))
+            _profileName.value = name
+            _profileAddress.value = address
+            _profilePhone.value = phone
+            _profilePhotoUri.value = photoUri
+            com.example.widget.updateAllWidgets(getApplication())
+        }
         
         val email = _googleEmail.value
         if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
@@ -3057,6 +3107,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val profileData = mapOf(
                         "name" to name,
                         "address" to address,
+                        "phone" to phone,
+                        "dob" to dob,
                         "photoUrl" to photoUri,
                         "setupComplete" to true,
                         "updatedAt" to System.currentTimeMillis()
