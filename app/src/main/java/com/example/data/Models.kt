@@ -92,7 +92,11 @@ data class FinanceBackup(
     val profilePhone: String = "",
     val profileSocial: String = "",
     val profileAddress: String = "",
-    val profilePhotoUri: String? = null
+    val profilePhotoUri: String? = null,
+    val customGradientsConfigSerialized: String? = null,
+    val staticGradientOverridesSerialized: String? = null,
+    val chartGradientsSerialized: String? = null,
+    val selectedThemeGradientIndex: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

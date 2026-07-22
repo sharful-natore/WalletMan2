@@ -219,6 +219,7 @@ fun CategorySegmentedDonutChart(
     categoryType: String? = null,
     unfilledColorOverride: Color? = null,
     centerColorOverride: Color? = null,
+    customPalette: List<Color>? = null,
     onCenterClick: () -> Unit = {},
     onLongPress: () -> Unit = {}
 ) {
@@ -276,7 +277,7 @@ fun CategorySegmentedDonutChart(
     // Unfilled base color
     val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
 
-    val colors = getBudgetCategoryColors(categoryType)
+    val colors = if (!customPalette.isNullOrEmpty()) customPalette else getBudgetCategoryColors(categoryType)
 
     Box(
         modifier = modifier,
@@ -2464,6 +2465,7 @@ fun FinanceNoteApp(
             transactions = transactions,
             persons = persons,
             savingsGoals = savingsGoals,
+            savingsTransactions = savingsTransactions,
             onNavigateToTransaction = { 
                 activeTab = "transactions"
                 highlightedTxId = it
@@ -2477,6 +2479,15 @@ fun FinanceNoteApp(
             onNavigateToGoal = { 
                 activeTab = "savings"
                 highlightedGoalId = it
+                showSearch = false
+            },
+            onNavigateToSavingsTransaction = {
+                activeTab = "savings"
+                showSearch = false
+            },
+            onNavigateToSettings = { settingId ->
+                activeTab = "settings"
+                settingsFilter = settingId
                 showSearch = false
             }
         )
@@ -2525,13 +2536,11 @@ fun FinanceNoteApp(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                val topBarGradient = Brush.linearGradient(
-                    colors = if (isDarkTheme) {
-                        listOf(Color(0xFF121212), Color(0xFF121212))
-                    } else {
-                        activeThemeGradient
-                    }
-                )
+                val topBarGradient = if (isDarkTheme) {
+                    Brush.linearGradient(listOf(Color(0xFF121212), Color(0xFF121212)))
+                } else {
+                    activeThemeGradientBrush
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2545,11 +2554,14 @@ fun FinanceNoteApp(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             if (activeTab == "settings" || activeTab == "charts") {
                                 IconButton(
                                     onClick = { activeTab = "dashboard" },
-                                    modifier = Modifier.padding(end = 8.dp).size(24.dp)
+                                    modifier = Modifier.padding(end = 4.dp).size(24.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
@@ -2573,6 +2585,7 @@ fun FinanceNoteApp(
                             
                             AnimatedContent(
                                 targetState = screenTitle,
+                                modifier = Modifier.weight(1f, fill = false),
                                 transitionSpec = {
                                     (slideInVertically { height -> height } + fadeIn())
                                         .togetherWith(slideOutVertically { height -> -height } + fadeOut())
@@ -2581,27 +2594,31 @@ fun FinanceNoteApp(
                             ) { title ->
                                 Text(
                                     text = title,
-                                    fontSize = 22.sp,
+                                    fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            IconButton(
-                                onClick = { showSearch = true },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Search,
-                                    contentDescription = "Search",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            if (activeTab != "charts") {
+                                IconButton(
+                                    onClick = { showSearch = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Search,
+                                        contentDescription = "Search",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
 
                             Box(contentAlignment = Alignment.TopEnd) {
@@ -2693,6 +2710,7 @@ fun FinanceNoteApp(
                             var verticalDragAmount by remember { mutableStateOf(0f) }
                             AnimatedContent(
                                 targetState = currentWorkspace.id,
+                                modifier = Modifier.requiredSize(32.dp),
                                 transitionSpec = {
                                     if (targetState != initialState) {
                                         if (verticalDragAmount > 0) {
@@ -2708,7 +2726,7 @@ fun FinanceNoteApp(
                             ) { _ ->
                                 Box(
                                     modifier = Modifier
-                                        .size(32.dp)
+                                        .requiredSize(32.dp)
                                         .graphicsLayer { translationY = verticalDragAmount.coerceIn(-40f, 40f) }
                                         .clip(CircleShape)
                                         .background(Color.White.copy(alpha = 0.2f))
@@ -2747,7 +2765,7 @@ fun FinanceNoteApp(
                                         AsyncImage(
                                             model = profilePhotoUri,
                                             contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(),
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape),
                                             contentScale = ContentScale.Crop
                                         )
                                     } else if (!isGoogleSignedIn) {
@@ -2785,13 +2803,11 @@ fun FinanceNoteApp(
                 }
             },
             bottomBar = {
-                val bottomBarGradient = Brush.linearGradient(
-                    colors = if (isDarkTheme) {
-                        listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E))
-                    } else {
-                        activeThemeGradient
-                    }
-                )
+                val bottomBarGradient = if (isDarkTheme) {
+                    Brush.linearGradient(listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)))
+                } else {
+                    activeThemeGradientBrush
+                }
                 
                 val glassBorderColor = if (isDarkTheme) {
                     Color.White.copy(alpha = 0.15f)
@@ -3232,6 +3248,9 @@ fun FinanceNoteApp(
                         "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))
                         "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336))
                         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A))
+                        "BUDGET_DETAILS_INCOME" -> listOf(Color(0xFF4285F4), Color(0xFF00BCD4), Color(0xFF34A853), Color(0xFFEA4335), Color(0xFF3F51B5))
+                        "BUDGET_DETAILS_EXPENSE" -> listOf(Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFFFF5722), Color(0xFFFF9800), Color(0xFF3F51B5))
+                        "BUDGET_DETAILS_SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFC107))
                         "CHART_INCOME_CAT" -> listOf(Color(0xFF22C55E), Color(0xFF10B981), Color(0xFF06B6D4), Color(0xFF3B82F6), Color(0xFF8B5CF6))
                         "CHART_EXPENSE_CAT" -> listOf(Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFFBBF24), Color(0xFFEC4899), Color(0xFFA855F7))
                         "SPLINE_INC_EXP" -> listOf(Color(0xFF3B82F6), Color(0xFFEF4444))
@@ -3246,6 +3265,9 @@ fun FinanceNoteApp(
                     var dragWindowPos by remember { mutableStateOf(Offset.Zero) }
                     var hoveredUpperIndex by remember { mutableStateOf<Int?>(null) }
                     val upperItemBounds = remember { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+                    var dialogTopLeftInWindow by remember { mutableStateOf(Offset.Zero) }
+
+                    val isGradientChart = type in listOf("INCOME", "EXPENSE", "SAVINGS")
 
                     val presets = listOf(
                         Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFEF4444),
@@ -3257,13 +3279,23 @@ fun FinanceNoteApp(
                         Color(0xFF0F172A), Color(0xFF94A3B8)
                     )
 
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coords ->
+                                dialogTopLeftInWindow = coords.boundsInWindow().topLeft
+                            }
+                    ) {
                         AlertDialog(
                             onDismissRequest = { editingBudgetGradientType = null },
                             containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
                             title = {
                                 Text(
-                                    text = if (language == AppLanguage.BN) "চার্টের কালার পরিবর্তন" else "Edit Chart Colors",
+                                    text = if (language == AppLanguage.BN) {
+                                        if (isGradientChart) "গ্রাডিয়েন্ট কালার পরিবর্তন" else "চার্ট কালার প্যালেট পরিবর্তন"
+                                    } else {
+                                        if (isGradientChart) "Edit Chart Gradient" else "Edit Chart Colors"
+                                    },
                                     color = if (isDarkTheme) Color.White else Color.Black,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 18.sp
@@ -3280,19 +3312,38 @@ fun FinanceNoteApp(
                                         fontSize = 12.sp
                                     )
 
-                                    // Live Gradient Bar Preview
-                                    if (editedColors.size >= 2) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(28.dp)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .background(Brush.horizontalGradient(editedColors))
-                                                .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
-                                        )
+                                    // Live Bar Preview (Gradient vs Segmented Palette)
+                                    if (editedColors.isNotEmpty()) {
+                                        if (isGradientChart && editedColors.size >= 2) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(28.dp)
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .background(Brush.horizontalGradient(editedColors))
+                                                    .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                            )
+                                        } else {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(28.dp)
+                                                    .clip(RoundedCornerShape(14.dp))
+                                                    .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                            ) {
+                                                editedColors.forEach { col ->
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .fillMaxHeight()
+                                                            .background(col)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
 
-                                    // Top Line: Active Gradient Colors
+                                    // Top Line: Active Colors
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -3317,7 +3368,7 @@ fun FinanceNoteApp(
                                                     Icon(Icons.Rounded.Add, contentDescription = "Add Color", tint = FintechBlue)
                                                 }
                                             }
-                                            if (editedColors.size > 2) {
+                                            if (editedColors.size > (if (isGradientChart) 2 else 1)) {
                                                 IconButton(
                                                     onClick = {
                                                         val removeIdx = selectedUpperIndex.coerceIn(0, editedColors.size - 1)
@@ -3477,8 +3528,8 @@ fun FinanceNoteApp(
                             Box(
                                 modifier = Modifier
                                     .graphicsLayer {
-                                        translationX = dragWindowPos.x - 21.dp.toPx()
-                                        translationY = dragWindowPos.y - 21.dp.toPx()
+                                        translationX = dragWindowPos.x - dialogTopLeftInWindow.x - 21.dp.toPx()
+                                        translationY = dragWindowPos.y - dialogTopLeftInWindow.y - 21.dp.toPx()
                                     }
                                     .size(42.dp)
                                     .clip(CircleShape)
@@ -4521,7 +4572,7 @@ fun FinanceNoteApp(
                         showCustomGradientDialog = false
                         val idx = editingCustomGradientIndex
                         if (idx != null) {
-                            viewModel.updateCustomGradient(context, idx, customGradientColors, type = customGradientType, direction = customGradientDirection)
+                            viewModel.updateGradientAt(context, idx, customGradientColors, type = customGradientType, direction = customGradientDirection)
                         } else {
                             viewModel.addCustomGradient(context, customGradientColors, type = customGradientType, direction = customGradientDirection)
                         }
@@ -4571,9 +4622,8 @@ fun FinanceNoteApp(
                 TextButton(
                     onClick = {
                         showLongPressOptions = false
-                        val staticSize = com.example.ui.theme.GradientsList.size
-                        editingCustomGradientIndex = longPressedIndex - staticSize
-                        val selectedGradient = allGradientsList[longPressedIndex]
+                        editingCustomGradientIndex = longPressedIndex
+                        val selectedGradient = allGradientsList.getOrNull(longPressedIndex) ?: ThemeGradient(GradientsList.first())
                         customGradientColors = selectedGradient.colors
                         customGradientType = selectedGradient.type
                         customGradientDirection = selectedGradient.direction
@@ -4589,8 +4639,7 @@ fun FinanceNoteApp(
                     TextButton(
                         onClick = {
                             showLongPressOptions = false
-                            val staticSize = com.example.ui.theme.GradientsList.size
-                            viewModel.deleteCustomGradient(context, longPressedIndex - staticSize)
+                            viewModel.deleteGradientAt(context, longPressedIndex)
                         }
                     ) {
                         Text(
@@ -6049,8 +6098,8 @@ fun DashboardScreen(
                         modifier = Modifier.padding(end = 8.dp)
                     )
                     Text(
-                        text = getFormattedPeriodText(timeFilter, language),
-                        color = Color.White.copy(alpha = 0.7f),
+                        text = "(${getFormattedPeriodText(timeFilter, language)})",
+                        color = Color.White,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Normal,
                         textAlign = TextAlign.End,
@@ -6731,13 +6780,14 @@ fun DashboardScreen(
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
                                 centerColorOverride = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF8F9FA), // Match budget section
+                                customPalette = budgetGradients["BUDGET_DETAILS_$categoryType"],
                                 onCenterClick = {
                                     if (targetAmount == 0.0) {
                                         isEditingBudget = true
                                     }
                                 },
                                 onLongPress = {
-                                    onEditGradient?.invoke(categoryType)
+                                    onEditGradient?.invoke("BUDGET_DETAILS_$categoryType")
                                 }
                             )
                             if (targetAmount > 0.0) {

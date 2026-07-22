@@ -102,16 +102,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _customGradients = MutableStateFlow<List<List<Color>>>(emptyList())
     val customGradients: StateFlow<List<List<Color>>> = _customGradients.asStateFlow()
 
-    val allGradients: StateFlow<List<List<Color>>> = _customGradients.map { custom ->
-        com.example.ui.theme.GradientsList + custom
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList)
-
     private val _customGradientsConfig = MutableStateFlow<List<ThemeGradient>>(emptyList())
     val customGradientsConfig: StateFlow<List<ThemeGradient>> = _customGradientsConfig.asStateFlow()
 
-    val allGradientsConfig: StateFlow<List<ThemeGradient>> = _customGradientsConfig.map { custom ->
-        com.example.ui.theme.GradientsList.map { ThemeGradient(it) } + custom
+    private val _staticGradientOverrides = MutableStateFlow<Map<Int, ThemeGradient>>(emptyMap())
+
+    val allGradientsConfig: StateFlow<List<ThemeGradient>> = combine(_staticGradientOverrides, _customGradientsConfig) { overrides, custom ->
+        com.example.ui.theme.GradientsList.mapIndexed { index, defaultGrad ->
+            overrides[index] ?: ThemeGradient(defaultGrad)
+        } + custom
     }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList.map { ThemeGradient(it) })
+
+    val allGradients: StateFlow<List<List<Color>>> = allGradientsConfig.map { list ->
+        list.map { it.colors }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList)
 
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
@@ -250,15 +254,37 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private fun loadBudgetGradients(): Map<String, List<Color>> {
         val map = mutableMapOf<String, List<Color>>()
-        listOf("INCOME", "EXPENSE", "SAVINGS").forEach { type ->
-            val saved = prefs.getString("budget_gradient_$type", null)
-            if (saved != null && saved.isNotBlank()) {
+        val allPrefs = prefs.all
+        allPrefs.forEach { (key, value) ->
+            if (key.startsWith("budget_gradient_") && value is String && value.isNotBlank()) {
+                val type = key.removePrefix("budget_gradient_")
                 try {
-                    map[type] = saved.split(",").map { Color(it.toInt()) }
+                    map[type] = value.split(",").map { Color(it.toInt()) }
                 } catch (e: Exception) {}
             }
         }
         return map
+    }
+
+    private fun getSerializedChartGradients(): String {
+        val allPrefs = prefs.all
+        val list = mutableListOf<String>()
+        allPrefs.forEach { (key, value) ->
+            if (key.startsWith("budget_gradient_") && value is String && value.isNotBlank()) {
+                val type = key.removePrefix("budget_gradient_")
+                list.add("$type=$value")
+            }
+        }
+        return list.joinToString(";")
+    }
+
+    private fun enrichBackupWithColorSettings(backup: FinanceBackup): FinanceBackup {
+        return backup.copy(
+            customGradientsConfigSerialized = prefs.getString("custom_gradients_v3", ""),
+            staticGradientOverridesSerialized = prefs.getString("static_gradient_overrides_v1", ""),
+            chartGradientsSerialized = getSerializedChartGradients(),
+            selectedThemeGradientIndex = _selectedThemeGradientIndex.value
+        )
     }
 
     private val _budgetGradients = MutableStateFlow(loadBudgetGradients())
@@ -268,6 +294,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val str = colors.joinToString(",") { it.toArgb().toString() }
         prefs.edit().putString("budget_gradient_$type", str).apply()
         _budgetGradients.value = loadBudgetGradients()
+        onLocalDatabaseChanged()
     }
 
     val monthlyBudgets: StateFlow<List<com.example.data.MonthlyBudget>> = _currentWorkspaceId
@@ -1019,6 +1046,35 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private suspend fun restoreFullBackup(backup: FinanceBackup) {
         repository.restoreBackupData(backup)
+
+        if (!backup.customGradientsConfigSerialized.isNullOrBlank()) {
+            prefs.edit().putString("custom_gradients_v3", backup.customGradientsConfigSerialized).apply()
+            loadCustomGradients(getApplication())
+        }
+        if (!backup.staticGradientOverridesSerialized.isNullOrBlank()) {
+            prefs.edit().putString("static_gradient_overrides_v1", backup.staticGradientOverridesSerialized).apply()
+            loadStaticGradientOverrides(getApplication())
+        }
+        if (!backup.chartGradientsSerialized.isNullOrBlank()) {
+            try {
+                val editor = prefs.edit()
+                prefs.all.keys.filter { it.startsWith("budget_gradient_") }.forEach { editor.remove(it) }
+                backup.chartGradientsSerialized.split(";").forEach { entry ->
+                    if (entry.isNotBlank()) {
+                        val parts = entry.split("=")
+                        if (parts.size == 2) {
+                            editor.putString("budget_gradient_${parts[0]}", parts[1])
+                        }
+                    }
+                }
+                editor.apply()
+                _budgetGradients.value = loadBudgetGradients()
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+        if (backup.selectedThemeGradientIndex != null) {
+            prefs.edit().putInt("selected_theme_gradient_index", backup.selectedThemeGradientIndex).apply()
+            _selectedThemeGradientIndex.value = backup.selectedThemeGradientIndex
+        }
         
         // Restore budgets for each workspace if available
         backup.workspaces.forEach { ws ->
@@ -1193,6 +1249,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun loadCustomGradients(context: Context) {
+        loadStaticGradientOverrides(context)
         val serialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
             .getString("custom_gradients_v3", "") ?: ""
         if (serialized.isBlank()) {
@@ -1234,6 +1291,50 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    private fun loadStaticGradientOverrides(context: Context) {
+        val serialized = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .getString("static_gradient_overrides_v1", "") ?: ""
+        if (serialized.isNotBlank()) {
+            try {
+                val map = mutableMapOf<Int, ThemeGradient>()
+                serialized.split(";").forEach { entry ->
+                    if (entry.isNotBlank()) {
+                        val parts = entry.split("=")
+                        if (parts.size == 2) {
+                            val idx = parts[0].toInt()
+                            val gradStr = parts[1]
+                            val subParts = gradStr.split(":")
+                            if (subParts.size >= 3) {
+                                val colors = subParts[0].split(",").map { Color(it.toInt()) }
+                                val type = try { CustomGradientType.valueOf(subParts[1]) } catch (e: Exception) { CustomGradientType.LINEAR }
+                                val direction = try { CustomGradientDirection.valueOf(subParts[2]) } catch (e: Exception) { CustomGradientDirection.HORIZONTAL }
+                                map[idx] = ThemeGradient(colors, type, direction)
+                            } else {
+                                val colors = gradStr.split(",").map { Color(it.toInt()) }
+                                map[idx] = ThemeGradient(colors)
+                            }
+                        }
+                    }
+                }
+                _staticGradientOverrides.value = map
+            } catch (e: Exception) {
+                _staticGradientOverrides.value = emptyMap()
+            }
+        }
+    }
+
+    private fun saveStaticGradientOverrides(context: Context, map: Map<Int, ThemeGradient>) {
+        val serialized = map.entries.joinToString(separator = ";") { (idx, grad) ->
+            val colorsStr = grad.colors.joinToString(separator = ",") { it.toArgb().toString() }
+            "${idx}=${colorsStr}:${grad.type.name}:${grad.direction.name}"
+        }
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("static_gradient_overrides_v1", serialized)
+            .apply()
+        _staticGradientOverrides.value = map
+    }
+
     private fun saveCustomGradients(context: Context, gradients: List<ThemeGradient>) {
         val serialized = gradients.joinToString(separator = ";") { grad ->
             val colorsStr = grad.colors.joinToString(separator = ",") { it.toArgb().toString() }
@@ -1251,6 +1352,32 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val current = _customGradientsConfig.value.toMutableList()
         current.add(ThemeGradient(colors, type, direction))
         saveCustomGradients(context, current)
+    }
+
+    fun updateGradientAt(context: Context, globalIndex: Int, colors: List<Color>, type: CustomGradientType = CustomGradientType.LINEAR, direction: CustomGradientDirection = CustomGradientDirection.HORIZONTAL) {
+        if (globalIndex == 0) return // Primary default theme (index 0) cannot be edited
+        val staticSize = com.example.ui.theme.GradientsList.size
+        if (globalIndex in 1 until staticSize) {
+            val current = _staticGradientOverrides.value.toMutableMap()
+            current[globalIndex] = ThemeGradient(colors, type, direction)
+            saveStaticGradientOverrides(context, current)
+        } else if (globalIndex >= staticSize) {
+            val customIndex = globalIndex - staticSize
+            updateCustomGradient(context, customIndex, colors, type, direction)
+        }
+    }
+
+    fun deleteGradientAt(context: Context, globalIndex: Int) {
+        if (globalIndex == 0) return // Primary default theme (index 0) cannot be deleted
+        val staticSize = com.example.ui.theme.GradientsList.size
+        if (globalIndex in 1 until staticSize) {
+            val current = _staticGradientOverrides.value.toMutableMap()
+            current.remove(globalIndex)
+            saveStaticGradientOverrides(context, current)
+        } else if (globalIndex >= staticSize) {
+            val customIndex = globalIndex - staticSize
+            deleteCustomGradient(context, customIndex)
+        }
     }
 
     fun updateCustomGradient(context: Context, customIndex: Int, colors: List<Color>, type: CustomGradientType = CustomGradientType.LINEAR, direction: CustomGradientDirection = CustomGradientDirection.HORIZONTAL) {
@@ -1513,7 +1640,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     private suspend fun getFullBackupData(): FinanceBackup {
-        return repository.getBackupData()
+        return enrichBackupWithColorSettings(repository.getBackupData())
     }
 
     fun checkUnsavedChanges() {
