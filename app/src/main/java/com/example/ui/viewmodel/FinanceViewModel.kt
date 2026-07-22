@@ -499,24 +499,39 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    fun createWorkspace(name: String) {
+    fun createWorkspace(name: String, profileName: String = "", photoUri: String? = null) {
         viewModelScope.launch {
             val id = "ws_${System.currentTimeMillis()}"
-            repository.insertWorkspace(com.example.data.Workspace(id = id, name = name))
+            repository.insertWorkspace(com.example.data.Workspace(
+                id = id, 
+                name = name, 
+                profileName = if (profileName.isBlank()) name else profileName,
+                profilePhotoUri = photoUri
+            ))
             selectWorkspace(id)
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস তৈরি করা হয়েছে" else "Workspace created", isSuccess = true, type = "SUCCESS")
         }
     }
 
-    fun editWorkspace(workspaceId: String, name: String) {
+    fun editWorkspace(workspaceId: String, name: String, profileName: String = "", photoUri: String? = null) {
         viewModelScope.launch {
-            val existing = workspaces.value.find { it.id == workspaceId }
+            val existing = repository.getWorkspaceById(workspaceId)
             if (existing != null) {
-                repository.insertWorkspace(existing.copy(name = name))
-                // trigger refresh by updating flow slightly
+                repository.insertWorkspace(existing.copy(
+                    name = name,
+                    profileName = if (profileName.isNotBlank()) profileName else existing.profileName,
+                    profilePhotoUri = if (photoUri != null) photoUri else existing.profilePhotoUri
+                ))
+                // If it's current workspace, update local state
+                if (_currentWorkspaceId.value == workspaceId) {
+                    if (profileName.isNotBlank()) _profileName.value = profileName
+                    if (photoUri != null) _profilePhotoUri.value = photoUri
+                }
+                
+                // trigger refresh
                 _currentWorkspaceId.value = _currentWorkspaceId.value
                 com.example.widget.updateAllWidgets(getApplication())
-                triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস নাম পরিবর্তন করা হয়েছে" else "Workspace updated", isSuccess = true, type = "SUCCESS")
+                triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস তথ্য পরিবর্তন করা হয়েছে" else "Workspace info updated", isSuccess = true, type = "SUCCESS")
             }
         }
     }
@@ -534,6 +549,14 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val keySuffix = if (workspaceId == "default") "" else "_$workspaceId"
                     cachedPrefs.edit().putString("user_photo$keySuffix", photoUri).apply()
                 }
+
+                // If updating default workspace photo, also sync with main account photo state
+                if (workspaceId == "default") {
+                    _googlePhotoUrl.value = photoUri
+                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    gPrefs.edit().putString("google_photo_url", photoUri).apply()
+                }
+
                 com.example.widget.updateAllWidgets(getApplication())
                 triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "প্রোফাইল ছবি পরিবর্তন করা হয়েছে" else "Profile photo updated", isSuccess = true, type = "SUCCESS")
             }
@@ -1505,6 +1528,49 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     // Firestore Sync States
     private val _hasUnsavedChanges = MutableStateFlow(false)
     val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+
+    fun getUnsyncedItems(): List<String> {
+        val email = _googleEmail.value
+        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return emptyList()
+
+        val currentData = com.example.data.FinanceBackup(
+            persons = persons.value,
+            transactions = transactions.value,
+            savingsGoals = savingsGoals.value,
+            savingsTransactions = savingsTransactions.value,
+            monthlyBudgets = monthlyBudgets.value,
+            workspaces = workspaces.value
+        )
+
+        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+        val unsynced = mutableListOf<String>()
+        val isBn = _language.value == com.example.ui.AppLanguage.BN
+
+        if (cachedJson == null) {
+            if (currentData.transactions.isNotEmpty()) unsynced.add(if (isBn) "লেনদেন" else "Transactions")
+            if (currentData.persons.isNotEmpty()) unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
+            if (currentData.savingsGoals.isNotEmpty()) unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
+            if (currentData.workspaces.isNotEmpty()) unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
+            return unsynced
+        }
+
+        val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
+        if (cachedData == null) return listOf(if (isBn) "সমস্ত ডাটা" else "All Data")
+
+        if (currentData.transactions.size != cachedData.transactions.size || currentData.transactions != cachedData.transactions) 
+            unsynced.add(if (isBn) "লেনদেন" else "Transactions")
+        if (currentData.persons.size != cachedData.persons.size || currentData.persons != cachedData.persons) 
+            unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
+        if (currentData.savingsGoals.size != cachedData.savingsGoals.size || currentData.savingsGoals != cachedData.savingsGoals) 
+            unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
+        if (currentData.workspaces.size != cachedData.workspaces.size || currentData.workspaces != cachedData.workspaces) 
+            unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
+        if (currentData.monthlyBudgets.size != cachedData.monthlyBudgets.size || currentData.monthlyBudgets != cachedData.monthlyBudgets) 
+            unsynced.add(if (isBn) "বাজেট" else "Budgets")
+
+        return unsynced
+    }
 
     private val _isNetworkActive = MutableStateFlow(false)
     val isNetworkActive: StateFlow<Boolean> = _isNetworkActive.asStateFlow()
@@ -3096,6 +3162,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _profileAddress.value = address
             _profilePhone.value = phone
             _profilePhotoUri.value = photoUri
+
+            // If we are updating the "default" workspace, we also update the "Main" google photo url state
+            // to keep them in sync as requested.
+            if (wsId == "default") {
+                _googlePhotoUrl.value = photoUri
+                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                gPrefs.edit().putString("google_photo_url", photoUri).apply()
+            }
+
             com.example.widget.updateAllWidgets(getApplication())
         }
         
@@ -3138,6 +3213,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             if (doc.exists()) {
                                 _googleName.value = doc.getString("name") ?: _googleName.value
                                 _userAddress.value = doc.getString("address")
+                                _userPhone.value = doc.getString("phone") ?: ""
+                                _userDOB.value = doc.getString("dob") ?: ""
                                 _googlePhotoUrl.value = doc.getString("photoUrl") ?: _googlePhotoUrl.value
                                 _isProfileSetupComplete.value = doc.getBoolean("setupComplete") ?: false
                             }

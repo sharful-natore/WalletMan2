@@ -1209,11 +1209,23 @@ fun WorkspaceManagementDialog(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     var pickingPhotoForWorkspaceId by remember { mutableStateOf<String?>(null) }
+    
+    val cropLauncher = rememberLauncherForActivityResult(com.example.ui.screens.UCropContract()) { uri ->
+        if (uri != null && pickingPhotoForWorkspaceId != null) {
+            onUpdatePhoto(pickingPhotoForWorkspaceId!!, uri.toString())
+            pickingPhotoForWorkspaceId = null
+        } else {
+            pickingPhotoForWorkspaceId = null
+        }
+    }
+    
     val workspacePhotoPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
     ) { uri ->
-        pickingPhotoForWorkspaceId?.let { wsId ->
-            uri?.let { onUpdatePhoto(wsId, it.toString()) }
+        if (uri != null) {
+            val destinationUri = android.net.Uri.fromFile(java.io.File(context.cacheDir, "workspace_crop_${System.currentTimeMillis()}.jpg"))
+            cropLauncher.launch(uri to destinationUri)
+        } else {
             pickingPhotoForWorkspaceId = null
         }
     }
@@ -2587,7 +2599,10 @@ fun FinanceNoteApp(
             },
             onLogout = {
                 showEnhancedProfileMenu = false
-                showLogoutConfirm = true
+                composeCoroutineScope.launch {
+                    kotlinx.coroutines.delay(300)
+                    showLogoutConfirm = true
+                }
             }
         )
     }
@@ -4875,27 +4890,44 @@ fun FinanceNoteApp(
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
 
                         // Unsaved Changes Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা আছে কিনা:" else "Unsaved Data Status:",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
-                            )
-                            Text(
-                                text = if (hasUnsavedChanges) {
-                                    if (language == AppLanguage.BN) "হ্যাঁ (সিঙ্ক প্রয়োজন)" else "Yes (Sync needed)"
-                                } else {
-                                    if (language == AppLanguage.BN) "না (সব সংরক্ষিত)" else "No (Fully saved)"
-                                },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (hasUnsavedChanges) Color(0xFFFFB300) else Color(0xFF4CAF50)
-                            )
+                        if (hasUnsavedChanges) {
+                            val unsyncedItems = viewModel.getUnsyncedItems()
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা:" else "Unsaved Data:",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                )
+                                Text(
+                                    text = unsyncedItems.joinToString(", "),
+                                    fontSize = 13.sp,
+                                    color = Color(0xFFFFB300),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "সব সংরক্ষিত:" else "All Saved:",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                )
+                                Text(
+                                    text = if (language == AppLanguage.BN) "না (সব সংরক্ষিত)" else "No (Fully saved)",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF4CAF50)
+                                )
+                            }
                         }
 
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
@@ -18080,7 +18112,7 @@ fun EnhancedProfileMenu(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if (isGoogleSignedIn) (googleName ?: (if (profileName.isNotBlank()) profileName else (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User"))) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
+                            text = if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black

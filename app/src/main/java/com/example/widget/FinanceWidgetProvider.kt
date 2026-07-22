@@ -39,7 +39,10 @@ class FinanceWidgetProvider : AppWidgetProvider() {
                             val nextIndex = if (currentIndex == -1) 0 else (currentIndex + 1) % workspaces.size
                             val nextWorkspaceId = workspaces[nextIndex].id
 
-                            prefs.edit().putString("widget_workspace_$appWidgetId", nextWorkspaceId).apply()
+                            prefs.edit()
+                                .putString("widget_workspace_$appWidgetId", nextWorkspaceId)
+                                .putString("active_workspace_id", nextWorkspaceId)
+                                .apply()
 
                             val appWidgetManager = AppWidgetManager.getInstance(context)
                             updateAppWidget(context, appWidgetManager, appWidgetId)
