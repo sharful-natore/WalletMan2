@@ -4071,7 +4071,7 @@ fun FinanceNoteApp(
                                                     viewModel.selectThemeGradientIndex(context, actualIndex)
                                                 },
                                                 onLongClick = {
-                                                    if (actualIndex >= staticGradientsSize) {
+                                                    if (actualIndex > 0) {
                                                         longPressedIndex = actualIndex
                                                         showLongPressOptions = true
                                                     }
@@ -9652,10 +9652,22 @@ fun SavingsGoalCardItem(
     isSelectionMode: Boolean = false,
     onLongClick: () -> Unit = {}
 ) {
-    val gradient = if (goal.colorIndex in allGradientsList.indices) {
+    val rawGradient = if (goal.colorIndex in allGradientsList.indices) {
         allGradientsList[goal.colorIndex].colors
     } else {
         com.example.ui.theme.GradientsList[0]
+    }
+    val gradient = if (isDark) {
+        rawGradient.map { color ->
+            Color(
+                red = (color.red * 0.45f + 0.08f).coerceIn(0f, 1f),
+                green = (color.green * 0.45f + 0.09f).coerceIn(0f, 1f),
+                blue = (color.blue * 0.45f + 0.14f).coerceIn(0f, 1f),
+                alpha = 1f
+            )
+        }
+    } else {
+        rawGradient
     }
 
     FintechGradientCard(
@@ -9666,6 +9678,7 @@ fun SavingsGoalCardItem(
             .then(
                 if (isHighlighted) Modifier.border(4.dp, Color(0xFFFBBF24), RoundedCornerShape(24.dp))
                 else if (isSelected) Modifier.border(3.dp, Color.White, RoundedCornerShape(24.dp))
+                else if (isDark) Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
                 else Modifier
             )
             .combinedClickable(
