@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.data.*
 import com.example.ui.*
@@ -1901,6 +1902,7 @@ fun FinanceNoteApp(
     val googleEmail by viewModel.googleEmail.collectAsState()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
+    val isAuthenticated by viewModel.isUserSignedInFlow.collectAsStateWithLifecycle()
     
     val currentWorkspace by viewModel.currentWorkspace.collectAsState()
     val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
@@ -2007,6 +2009,7 @@ fun FinanceNoteApp(
         )
             .requestEmail()
             .requestProfile()
+            .requestIdToken(finalClientId)
             .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
             .build()
 
@@ -2244,6 +2247,9 @@ fun FinanceNoteApp(
     var showLongPressOptions by remember { mutableStateOf(false) }
     var longPressedIndex by remember { mutableStateOf(-1) }
     var showRealtimeSyncDialog by remember { mutableStateOf(false) }
+    var showProfileSetup by remember { mutableStateOf(false) }
+    var showEnhancedProfileMenu by remember { mutableStateOf(false) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
     var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -2530,11 +2536,69 @@ fun FinanceNoteApp(
         )
     }
 
+    if (showProfileSetup) {
+        ProfileSetupScreen(
+            viewModel = viewModel,
+            language = language,
+            isDark = isDarkTheme,
+            onDismiss = { showProfileSetup = false }
+        )
+    }
+
+    if (showEnhancedProfileMenu) {
+        EnhancedProfileMenu(
+            viewModel = viewModel,
+            language = language,
+            isDark = isDarkTheme,
+            onDismiss = { showEnhancedProfileMenu = false },
+            onSwitchWorkspace = { 
+                showEnhancedProfileMenu = false
+                showWorkspaceDialog = true 
+            },
+            onProfileSettings = {
+                showEnhancedProfileMenu = false
+                showProfileSetup = true
+            },
+            onBackupRestore = {
+                showEnhancedProfileMenu = false
+                activeTab = "settings"
+            },
+            onLogin = {
+                showEnhancedProfileMenu = false
+                triggerGoogleSignIn()
+            },
+            onLogout = {
+                showEnhancedProfileMenu = false
+                showLogoutConfirm = true
+            }
+        )
+    }
+
+    val isProfileSetupComplete by viewModel.isProfileSetupComplete.collectAsStateWithLifecycle()
+    
+    LaunchedEffect(isAuthenticated, isProfileSetupComplete) {
+        if (isAuthenticated && !isProfileSetupComplete) {
+            showProfileSetup = true
+        }
+        if (isAuthenticated) {
+            viewModel.fetchUserProfile()
+        }
+    }
+
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme
     ) {
-        Scaffold(
-            containerColor = Color.Transparent,
+        if (!isAuthenticated && !showSplash) {
+            LoginScreen(
+                viewModel = viewModel,
+                language = language,
+                isDark = isDarkTheme,
+                onDismiss = { /* mandatory login, no dismiss unless logged in */ },
+                onGoogleSignIn = { triggerGoogleSignIn() }
+            )
+        } else {
+            Scaffold(
+                containerColor = Color.Transparent,
             topBar = {
                 val topBarGradient = if (isDarkTheme) {
                     Brush.linearGradient(listOf(Color(0xFF121212), Color(0xFF121212)))
@@ -2730,7 +2794,7 @@ fun FinanceNoteApp(
                                         .graphicsLayer { translationY = verticalDragAmount.coerceIn(-40f, 40f) }
                                         .clip(CircleShape)
                                         .background(Color.White.copy(alpha = 0.2f))
-                                        .clickable { showWorkspaceDialog = true }
+                                        .clickable { showEnhancedProfileMenu = true }
                                         .border(2.dp, Color.White, CircleShape)
                                         .pointerInput(workspaceStatsList) {
                                             detectVerticalDragGestures(
@@ -3064,7 +3128,10 @@ fun FinanceNoteApp(
                                             showRestoreListDialog = true
                                             viewModel.listGoogleDriveFiles(context)
                                         }
-                                    }
+                                    },
+                                    showLogoutConfirm = showLogoutConfirm,
+                                    onLogoutClick = { showLogoutConfirm = true },
+                                    onLogoutConfirmDismiss = { showLogoutConfirm = false }
                                 )
                             } else if (tabState == "charts") {
                                 ChartsScreen(
@@ -5441,6 +5508,7 @@ fun FinanceNoteApp(
         }
     }
 }
+}
 
 
 @Composable
@@ -6035,47 +6103,6 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 90.dp)
             ) {
-                if (!isGoogleSignedIn) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onSignInClick() },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF1F5F9)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.CloudOff,
-                                    contentDescription = "Sign In",
-                                    tint = if (isDark) Color.LightGray else Color(0xFF64748B),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = if (language == AppLanguage.BN) "ডেটা সিঙ্ক ও ব্যাকআপ করতে সাইন ইন করুন" else "Sign in to sync and backup data",
-                                        color = if (isDark) Color.White else Color(0xFF1E293B),
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Rounded.ChevronRight,
-                                    contentDescription = "Sign In",
-                                    tint = if (isDark) Color.LightGray else Color(0xFF64748B),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
             FintechGradientCard(
@@ -6970,10 +6997,11 @@ fun DashboardScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            segments.forEachIndexed { index, segment ->
+                            segments.filter { it.second > 0.0 }.forEach { segment ->
+                                val originalIndex = segments.indexOf(segment)
                                 val name = segment.first
                                 val amount = segment.second
-                                val color = colors[index % colors.size]
+                                val color = colors[originalIndex % colors.size]
                                 
                                 val percentOfTotal = if (totalFilledAmount > 0.0) {
                                     (amount / totalFilledAmount) * 100
@@ -12648,7 +12676,10 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onSignInClick: () -> Unit,
     onBackupClick: () -> Unit,
-    onRestoreClick: () -> Unit
+    onRestoreClick: () -> Unit,
+    showLogoutConfirm: Boolean,
+    onLogoutClick: () -> Unit,
+    onLogoutConfirmDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val localCoroutineScope = rememberCoroutineScope()
@@ -12676,7 +12707,6 @@ fun SettingsScreen(
     val profileEmail = rawProfileEmail.ifBlank { (if (isGoogleSignedIn) googleEmail else null) ?: "" }
     val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
-    var showLogoutConfirm by remember { mutableStateOf(false) }
     var isSignoutBackupActive by remember { mutableStateOf(false) }
     var pendingLocalBackupComment by remember { mutableStateOf("") }
     var pendingLocalWorkspaceIds by remember { mutableStateOf<List<String>?>(null) }
@@ -12884,179 +12914,6 @@ fun SettingsScreen(
                 }
             }
         }
-
-        // --- 1. USER PROFILE EDIT CARD ---
-        SettingCategory(
-            title = if (language == AppLanguage.BN) "ব্যবহারকারী প্রোফাইল এডিট" else "Edit User Profile",
-            isDark = isDark,
-            icon = Icons.Rounded.Person,
-            initiallyExpanded = false
-        ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Circular Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(105.dp)
-                            .clickable { photoLauncher.launch("image/*") }
-                            .testTag("settings_avatar_box")
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(if (isDark) Color(0xFF121212) else Color(0xFFE2E8F0), CircleShape)
-                                .border(3.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!photoUriInput.isNullOrBlank()) {
-                                AsyncImage(
-                                    model = photoUriInput,
-                                    contentDescription = "Profile Photo",
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.Person,
-                                    contentDescription = "Profile Icon",
-                                    tint = FintechBlue,
-                                    modifier = Modifier.size(50.dp)
-                                )
-                            }
-                        }
-                        // Small camera badge
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(32.dp)
-                                .background(FintechBlue, CircleShape)
-                                .border(2.dp, if (isDark) Color(0xFF121212) else Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.PhotoCamera,
-                                contentDescription = "Edit photo",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-
-                    // Input fields
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Your Name *
-                        val nameLabel = if (language == AppLanguage.BN) "আপনার নাম *" else "Your Name *"
-                        OutlinedTextField(
-                            value = nameInput,
-                            onValueChange = { nameInput = it },
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-                            label = { Text(nameLabel) },
-                            leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null, tint = FintechBlue) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
-                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                            )
-                        )
-
-                        // Phone Number
-                        val phoneLabel = if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number"
-                        OutlinedTextField(
-                            value = phoneInput,
-                            onValueChange = { phoneInput = it },
-                            label = { Text(phoneLabel) },
-                            leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
-                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                            )
-                        )
-
-                        // Email or Social Profile
-                        val socialLabel = if (language == AppLanguage.BN) "ইমেইল বা সোশ্যাল প্রোফাইল" else "Email or Social Profile"
-                        OutlinedTextField(
-                            value = socialInput,
-                            onValueChange = { socialInput = it },
-                            label = { Text(socialLabel) },
-                            leadingIcon = { Icon(Icons.Rounded.AlternateEmail, contentDescription = null, tint = FintechBlue) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
-                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                            )
-                        )
-
-                        // Address
-                        val addressLabel = if (language == AppLanguage.BN) "ঠিকানা" else "Address"
-                        OutlinedTextField(
-                            value = addressInput,
-                            onValueChange = { addressInput = it },
-                            label = { Text(addressLabel) },
-                            leadingIcon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = FintechBlue) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color(0xFF2E334D) else Color(0xFFCBD5E1),
-                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B)
-                            )
-                        )
-                    }
-
-                    // Save Information Button
-                    Button(
-                        onClick = {
-                            if (nameInput.isNotBlank()) {
-                                viewModel.saveProfile(
-                                    context,
-                                    nameInput,
-                                    emailInput,
-                                    photoUriInput,
-                                    phoneInput,
-                                    socialInput,
-                                    addressInput
-                                )
-                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "তথ্য সফলভাবে সংরক্ষণ করা হয়েছে!" else "Information saved successfully!", isSuccess = true, type = "SUCCESS")
-                            } else {
-                                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "দয়া করে নাম লিখুন" else "Please enter your name", isSuccess = true, type = "INFO")
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
-                        contentPadding = PaddingValues(14.dp)
-                    ) {
-                        Icon(imageVector = Icons.Rounded.Save, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (language == AppLanguage.BN) "তথ্য সংরক্ষণ করুন" else "Save Information",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
 
         // --- 2. DARK MODE CARD ---
         SettingCategory(
@@ -13580,7 +13437,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (isGoogleSignedIn) {
-                                    showLogoutConfirm = true
+                                    onLogoutClick()
                                 } else {
                                     onSignInClick()
                                 }
@@ -13734,7 +13591,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (!isGoogleSignedIn) {
-                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভে লগইন করুন!" else "Please sign in to Google Drive first!", isSuccess = true, type = "INFO")
+                                    onSignInClick()
                                 } else {
                                     onBackupClick()
                                 }
@@ -13750,7 +13607,7 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (!isGoogleSignedIn) {
-                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভে লগইন করুন!" else "Please sign in to Google Drive first!", isSuccess = true, type = "INFO")
+                                    onSignInClick()
                                 } else {
                                     onRestoreClick()
                                 }
@@ -14306,7 +14163,7 @@ fun SettingsScreen(
     if (showLogoutConfirm) {
         AlertDialog(
             onDismissRequest = { 
-                showLogoutConfirm = false 
+                onLogoutConfirmDismiss() 
                 logoutUserInput = ""
             },
             title = { Text(if (language == AppLanguage.BN) "লগআউট ও ব্যাকআপ নিশ্চিতকরণ" else "Logout & Backup Confirmation") },
@@ -14373,7 +14230,7 @@ fun SettingsScreen(
                         ),
                         enabled = isLogoutCaptchaCorrect,
                         onClick = {
-                            showLogoutConfirm = false
+                            onLogoutConfirmDismiss()
                             logoutUserInput = ""
                             isSignoutBackupActive = true
                             val timestamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(java.util.Date())
@@ -14392,7 +14249,7 @@ fun SettingsScreen(
                         ),
                         enabled = isLogoutCaptchaCorrect,
                         onClick = {
-                            showLogoutConfirm = false
+                            onLogoutConfirmDismiss()
                             logoutUserInput = ""
                             viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "অটো ব্যাকআপ তৈরি হচ্ছে এবং লগআউট করা হচ্ছে..." else "Creating auto backup and logging out...", isSuccess = true, type = "INFO")
                             viewModel.performAutoBackupAndSignOut(context, profileName) {
@@ -14411,7 +14268,7 @@ fun SettingsScreen(
                     
                     TextButton(
                         onClick = { 
-                            showLogoutConfirm = false 
+                            onLogoutConfirmDismiss() 
                             logoutUserInput = ""
                         },
                         modifier = Modifier.fillMaxWidth(0.95f)
@@ -17481,6 +17338,760 @@ fun SyncStatusBadge(
                 .size(8.dp)
                 .background(badgeColor, shape = CircleShape)
                 .border(1.2.dp, Color.White, CircleShape)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(
+    viewModel: FinanceViewModel,
+    language: AppLanguage,
+    isDark: Boolean,
+    onDismiss: () -> Unit,
+    onGoogleSignIn: () -> Unit
+) {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+
+    var selectedTab by remember { mutableStateOf(0) } // 0: Email, 1: Phone
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+    var isRegisterMode by remember { mutableStateOf(false) }
+
+    var phoneInput by remember { mutableStateOf("") }
+    var otpInput by remember { mutableStateOf("") }
+    var verificationIdState by remember { mutableStateOf<String?>(null) }
+    var codeSent by remember { mutableStateOf(false) }
+
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var forgotEmailInput by remember { mutableStateOf("") }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                // Top Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "লগইন সিস্টেম" else "Login Portal",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color.Black
+                    )
+                    Spacer(modifier = Modifier.size(48.dp))
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // App Logo / Illustration Banner
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = FintechBlue.copy(alpha = 0.1f)),
+                    modifier = Modifier.fillMaxWidth().height(120.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট সুরক্ষিত রাখুন" else "Secure & Instant Authentication",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = FintechBlue
+                        )
+                    }
+                }
+
+                // Google Sign-In Button (Primary option)
+                Button(
+                    onClick = {
+                        onGoogleSignIn()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF2C2C2E) else Color.White),
+                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Cloud,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "গুগল দিয়ে লগইন / ড্রাইভ ব্যাকআপ" else "Continue with Google (Sync & Drive)",
+                            color = if (isDark) Color.White else Color(0xFF1E293B),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Divider(modifier = Modifier.weight(1f), color = Color.Gray.copy(alpha = 0.3f))
+                    Text(
+                        text = if (language == AppLanguage.BN) " অথবা " else " OR ",
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Divider(modifier = Modifier.weight(1f), color = Color.Gray.copy(alpha = 0.3f))
+                }
+
+                // Tabs: Email vs Phone
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (isDark) Color(0xFF1C1C1E) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Button(
+                        onClick = { selectedTab = 0 },
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 0) FintechBlue else Color.Transparent
+                        )
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "ইমেইল ও পাসওয়ার্ড" else "Email & Password",
+                            color = if (selectedTab == 0) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Button(
+                        onClick = { selectedTab = 1 },
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selectedTab == 1) FintechBlue else Color.Transparent
+                        )
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "ফোন নম্বর (OTP)" else "Phone Number (OTP)",
+                            color = if (selectedTab == 1) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (errorMessage != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.15f)),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = errorMessage ?: "",
+                            color = Color(0xFFEF4444),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
+                if (successMessage != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF10B981).copy(alpha = 0.15f)),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = successMessage ?: "",
+                            color = Color(0xFF10B981),
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
+                // Tab 0: Email / Password
+                if (selectedTab == 0) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = emailInput,
+                            onValueChange = { emailInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address") },
+                            leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null, tint = FintechBlue) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FintechBlue,
+                                unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
+                                focusedTextColor = if (isDark) Color.White else Color.Black,
+                                unfocusedTextColor = if (isDark) Color.White else Color.Black
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = passwordInput,
+                            onValueChange = { passwordInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড" else "Password") },
+                            leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = FintechBlue) },
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FintechBlue,
+                                unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
+                                focusedTextColor = if (isDark) Color.White else Color.Black,
+                                unfocusedTextColor = if (isDark) Color.White else Color.Black
+                            )
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = { showForgotPasswordDialog = true }) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "পাসওয়ার্ড ভুলে গেছেন?" else "Forgot Password?",
+                                    color = FintechBlue,
+                                    fontSize = 13.sp
+                                )
+                            }
+                            TextButton(onClick = { isRegisterMode = !isRegisterMode }) {
+                                Text(
+                                    text = if (isRegisterMode) (if (language == AppLanguage.BN) "লগইন করুন" else "Have account? Login") else (if (language == AppLanguage.BN) "নতুন অ্যাকাউন্ট তৈরি করুন" else "Register new account"),
+                                    color = FintechBlue,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                isLoading = true
+                                errorMessage = null
+                                successMessage = null
+                                if (isRegisterMode) {
+                                    viewModel.registerWithEmail(emailInput, passwordInput,
+                                        onSuccess = {
+                                            isLoading = false
+                                            successMessage = if (language == AppLanguage.BN) "রেজিস্ট্রেশন সফল হয়েছে!" else "Registration successful!"
+                                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                                kotlinx.coroutines.delay(1000)
+                                                onDismiss()
+                                            }
+                                        },
+                                        onError = { err ->
+                                            isLoading = false
+                                            errorMessage = err
+                                        }
+                                    )
+                                } else {
+                                    viewModel.loginWithEmail(emailInput, passwordInput,
+                                        onSuccess = {
+                                            isLoading = false
+                                            successMessage = if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!"
+                                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                                kotlinx.coroutines.delay(1000)
+                                                onDismiss()
+                                            }
+                                        },
+                                        onError = { err ->
+                                            isLoading = false
+                                            errorMessage = err
+                                        }
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                            } else {
+                                Text(
+                                    text = if (isRegisterMode) (if (language == AppLanguage.BN) "রেজিস্ট্রেশন করুন" else "Sign Up") else (if (language == AppLanguage.BN) "লগইন করুন" else "Login"),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Tab 1: Phone OTP Login
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = phoneInput,
+                            onValueChange = { phoneInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "ফোন নম্বর (যেমন: +8801...)" else "Phone Number (e.g. +8801...)") },
+                            leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
+                            singleLine = true,
+                            enabled = !codeSent,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = FintechBlue,
+                                unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
+                                focusedTextColor = if (isDark) Color.White else Color.Black,
+                                unfocusedTextColor = if (isDark) Color.White else Color.Black
+                            )
+                        )
+
+                        if (codeSent) {
+                            OutlinedTextField(
+                                value = otpInput,
+                                onValueChange = { otpInput = it },
+                                label = { Text(if (language == AppLanguage.BN) "ওটিপি (OTP) কোড" else "Verification Code (OTP)") },
+                                leadingIcon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = FintechBlue) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = FintechBlue,
+                                    unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
+                                    focusedTextColor = if (isDark) Color.White else Color.Black,
+                                    unfocusedTextColor = if (isDark) Color.White else Color.Black
+                                )
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (!codeSent) {
+                                    if (activity == null) {
+                                        errorMessage = "Activity not available for phone auth"
+                                        return@Button
+                                    }
+                                    isLoading = true
+                                    errorMessage = null
+                                    viewModel.sendPhoneVerificationCode(activity, phoneInput,
+                                        onCodeSent = { vid ->
+                                            isLoading = false
+                                            if (vid == "AUTO_VERIFIED") {
+                                                successMessage = if (language == AppLanguage.BN) "স্বয়ংক্রিয়ভাবে ভেরিফাইড!" else "Automatically verified!"
+                                                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                                    kotlinx.coroutines.delay(1000)
+                                                    onDismiss()
+                                                }
+                                            } else {
+                                                verificationIdState = vid
+                                                codeSent = true
+                                                successMessage = if (language == AppLanguage.BN) "ওটিপি কোড পাঠানো হয়েছে!" else "OTP code sent successfully!"
+                                            }
+                                        },
+                                        onError = { err ->
+                                            isLoading = false
+                                            errorMessage = err
+                                        }
+                                    )
+                                } else {
+                                    if (verificationIdState == null) return@Button
+                                    isLoading = true
+                                    errorMessage = null
+                                    viewModel.verifyPhoneCode(verificationIdState!!, otpInput, phoneInput,
+                                        onSuccess = {
+                                            isLoading = false
+                                            successMessage = if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!"
+                                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                                kotlinx.coroutines.delay(1000)
+                                                onDismiss()
+                                            }
+                                        },
+                                        onError = { err ->
+                                            isLoading = false
+                                            errorMessage = err
+                                        }
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                            } else {
+                                Text(
+                                    text = if (!codeSent) (if (language == AppLanguage.BN) "ওটিপি কোড পাঠান" else "Send OTP") else (if (language == AppLanguage.BN) "ভেরিফাই ও লগইন" else "Verify & Login"),
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showForgotPasswordDialog = false },
+            title = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড রিস্টেট করুন" else "Reset Password") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট ইমেইল দিন:" else "Enter your account email:")
+                    OutlinedTextField(
+                        value = forgotEmailInput,
+                        onValueChange = { forgotEmailInput = it },
+                        label = { Text("Email") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.sendPasswordReset(forgotEmailInput,
+                            onSuccess = {
+                                showForgotPasswordDialog = false
+                                successMessage = if (language == AppLanguage.BN) "পাসওয়ার্ড রিস্টেট লিংক পাঠানো হয়েছে!" else "Password reset email sent!"
+                            },
+                            onError = { err ->
+                                errorMessage = err
+                                showForgotPasswordDialog = false
+                            }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                ) {
+                    Text("Send")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotPasswordDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileSetupScreen(
+    viewModel: FinanceViewModel,
+    language: AppLanguage,
+    isDark: Boolean,
+    onDismiss: () -> Unit
+) {
+    val googleName by viewModel.googleName.collectAsStateWithLifecycle()
+    val userAddress by viewModel.userAddress.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+    
+    var name by remember { mutableStateOf(googleName ?: "") }
+    var address by remember { mutableStateOf(userAddress ?: "") }
+    var photoUri by remember { mutableStateOf(googlePhotoUrl ?: "") }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN) "প্রোফাইল সেটআপ" else "Profile Setup",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.White else Color.Black
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (photoUri.isNotEmpty()) {
+                        AsyncImage(
+                            model = photoUri,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.AddAPhoto,
+                            contentDescription = null,
+                            tint = if (isDark) Color.LightGray else Color.Gray,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(if (language == AppLanguage.BN) "আপনার নাম" else "Your Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = if (isDark) Color.White else Color.Black,
+                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                        focusedLabelColor = FintechBlue,
+                        unfocusedLabelColor = Color.Gray
+                    )
+                )
+
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text(if (language == AppLanguage.BN) "ঠিকানা" else "Address") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = if (isDark) Color.White else Color.Black,
+                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                        focusedLabelColor = FintechBlue,
+                        unfocusedLabelColor = Color.Gray
+                    )
+                )
+
+                if (error != null) {
+                    Text(text = error!!, color = Color.Red, fontSize = 12.sp)
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Button(
+                    onClick = {
+                        isLoading = true
+                        viewModel.updateUserProfile(name, address, photoUri,
+                            onSuccess = {
+                                isLoading = false
+                                onDismiss()
+                            },
+                            onError = { err ->
+                                isLoading = false
+                                error = err
+                            }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text(if (language == AppLanguage.BN) "সংরক্ষণ করুন" else "Save Profile", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+                
+                TextButton(onClick = onDismiss) {
+                    Text(if (language == AppLanguage.BN) "পরে করব" else "Setup Later")
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EnhancedProfileMenu(
+    viewModel: FinanceViewModel,
+    language: AppLanguage,
+    isDark: Boolean,
+    onDismiss: () -> Unit,
+    onSwitchWorkspace: () -> Unit,
+    onProfileSettings: () -> Unit,
+    onBackupRestore: () -> Unit,
+    onLogin: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsStateWithLifecycle()
+    val googleName by viewModel.googleName.collectAsStateWithLifecycle()
+    val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
+    val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+
+    Dialog(
+        onDismissRequest = onDismiss
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .wrapContentHeight(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header User Info
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isGoogleSignedIn && !googlePhotoUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = googlePhotoUrl,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(32.dp), tint = if (isDark) Color.LightGray else Color.Gray)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = if (isGoogleSignedIn) (googleName ?: "User") else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = if (isDark) Color.White else Color.Black
+                        )
+                        if (isGoogleSignedIn) {
+                            Text(
+                                text = googleEmail ?: "",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f))
+
+                // Menu Items
+                ProfileMenuItem(
+                    icon = Icons.Rounded.Workspaces,
+                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস সুইচ করুন" else "Switch Workspace",
+                    isDark = isDark,
+                    onClick = onSwitchWorkspace
+                )
+                
+                ProfileMenuItem(
+                    icon = Icons.Rounded.ManageAccounts,
+                    label = if (language == AppLanguage.BN) "প্রোফাইল সেটিংস" else "Profile Settings",
+                    isDark = isDark,
+                    onClick = onProfileSettings
+                )
+
+                ProfileMenuItem(
+                    icon = Icons.Rounded.CloudSync,
+                    label = if (language == AppLanguage.BN) "ব্যাকআপ ও রিস্টোর" else "Backup & Restore",
+                    isDark = isDark,
+                    onClick = onBackupRestore
+                )
+
+                HorizontalDivider(color = if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f))
+
+                if (isGoogleSignedIn) {
+                    ProfileMenuItem(
+                        icon = Icons.Rounded.Logout,
+                        label = if (language == AppLanguage.BN) "লগআউট" else "Logout",
+                        isDark = isDark,
+                        textColor = Color(0xFFEF4444),
+                        onClick = onLogout
+                    )
+                } else {
+                    Button(
+                        onClick = onLogin,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                    ) {
+                        Text(if (language == AppLanguage.BN) "লগইন করুন" else "Login Now", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProfileMenuItem(
+    icon: ImageVector,
+    label: String,
+    isDark: Boolean,
+    textColor: Color? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = textColor ?: (if (isDark) Color.LightGray else Color(0xFF475569)),
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = textColor ?: (if (isDark) Color.White else Color(0xFF1E293B))
         )
     }
 }

@@ -8,6 +8,12 @@ import android.net.Uri
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.app.Application
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.PhoneAuthProvider
+import com.google.firebase.auth.PhoneAuthOptions
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.FirebaseException
+import java.util.concurrent.TimeUnit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -52,6 +58,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -88,6 +96,28 @@ data class BackupStats(
 class FinanceViewModel(private val repository: FinanceRepository, application: Application) : AndroidViewModel(application) {
 
     val updateManager = UpdateManager()
+
+    private val firebaseAuth = FirebaseAuth.getInstance()
+    private val _currentUser = MutableStateFlow(firebaseAuth.currentUser)
+    val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = _currentUser.asStateFlow()
+    val isUserSignedInFlow = _currentUser.map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null)
+
+    init {
+        firebaseAuth.addAuthStateListener { auth ->
+            val user = auth.currentUser
+            _currentUser.value = user
+            
+            // Update _isGoogleSignedIn based on provider data
+            val isGoogle = user?.providerData?.any { it.providerId == "google.com" } ?: false
+            _isGoogleSignedIn.value = isGoogle
+            
+            if (isGoogle && user != null) {
+                _googleEmail.value = user.email
+                _googleName.value = user.displayName
+                _googlePhotoUrl.value = user.photoUrl?.toString()
+            }
+        }
+    }
 
     // Preferences & UI State
     private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
@@ -2097,6 +2127,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _googleName = MutableStateFlow<String?>(null)
     val googleName: StateFlow<String?> = _googleName.asStateFlow()
 
+    private val _userAddress = MutableStateFlow<String?>(null)
+    val userAddress: StateFlow<String?> = _userAddress.asStateFlow()
+
+    private val _isProfileSetupComplete = MutableStateFlow(false)
+    val isProfileSetupComplete: StateFlow<Boolean> = _isProfileSetupComplete.asStateFlow()
+
     private val _googleEmail = MutableStateFlow<String?>(null)
     val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
 
@@ -2366,6 +2402,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
 
 
+                
+                // Firebase Auth Integration
+                val idToken = account.idToken
+                if (idToken != null) {
+                    val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
+                    firebaseAuth.signInWithCredential(credential)
+                        .addOnSuccessListener {
+                            _currentUser.value = firebaseAuth.currentUser
+                        }
+                }
                 
                 // Proceed normally with automatic realtime sync
                 startRealtimeSync()
@@ -2875,7 +2921,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _googleEmail.value = null
         _googleName.value = null
         _googlePhotoUrl.value = null
-        _isGoogleSignedIn.value = false
+        firebaseAuth.signOut()
         _driveStatusMessage.value = "Signed Out"
         com.example.widget.updateAllWidgets(context)
         stopRealtimeSync()
@@ -2985,6 +3031,188 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             .build()
             
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+    }
+
+    fun updateUserProfile(name: String, address: String, photoUri: String?, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        _googleName.value = name
+        _userAddress.value = address
+        _googlePhotoUrl.value = photoUri
+        _isProfileSetupComplete.value = true
+        
+        val email = _googleEmail.value
+        if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val db = getFirestore(getApplication())
+                    val profileData = mapOf(
+                        "name" to name,
+                        "address" to address,
+                        "photoUrl" to photoUri,
+                        "setupComplete" to true,
+                        "updatedAt" to System.currentTimeMillis()
+                    )
+                    db.collection("users").document(email).collection("profile").document("data")
+                        .set(profileData, com.google.firebase.firestore.SetOptions.merge())
+                        .addOnSuccessListener { onSuccess() }
+                        .addOnFailureListener { e -> onError(e.localizedMessage ?: "Sync failed") }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) { onError(e.localizedMessage ?: "Error updating profile") }
+                }
+            }
+        } else {
+            onSuccess()
+        }
+    }
+
+    fun fetchUserProfile() {
+        val email = _googleEmail.value
+        if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val db = getFirestore(getApplication())
+                    db.collection("users").document(email).collection("profile").document("data")
+                        .get()
+                        .addOnSuccessListener { doc ->
+                            if (doc.exists()) {
+                                _googleName.value = doc.getString("name") ?: _googleName.value
+                                _userAddress.value = doc.getString("address")
+                                _googlePhotoUrl.value = doc.getString("photoUrl") ?: _googlePhotoUrl.value
+                                _isProfileSetupComplete.value = doc.getBoolean("setupComplete") ?: false
+                            }
+                        }
+                } catch (e: Exception) {
+                    // Ignore or log error
+                }
+            }
+        }
+    }
+
+    fun loginWithEmail(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (email.isBlank() || pass.isBlank()) {
+            onError("Email and password cannot be empty")
+            return
+        }
+        firebaseAuth.signInWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val user = task.result?.user
+                    val userEmail = user?.email ?: email
+                    _googleEmail.value = userEmail
+                    _isGoogleSignedIn.value = true
+                    startRealtimeSync()
+                    onSuccess()
+                } else {
+                    onError(task.exception?.localizedMessage ?: "Login failed")
+                }
+            }
+    }
+
+    fun registerWithEmail(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (email.isBlank() || pass.isBlank()) {
+            onError("Email and password cannot be empty")
+            return
+        }
+        firebaseAuth.createUserWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val user = task.result?.user
+                    val userEmail = user?.email ?: email
+                    _googleEmail.value = userEmail
+                    _isGoogleSignedIn.value = true
+                    _isProfileSetupComplete.value = false // Explicitly set to false to trigger setup
+                    startRealtimeSync()
+                    onSuccess()
+                } else {
+                    onError(task.exception?.localizedMessage ?: "Registration failed")
+                }
+            }
+    }
+
+    fun sendPasswordReset(email: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        if (email.isBlank()) {
+            onError("Please enter your email address")
+            return
+        }
+        firebaseAuth.sendPasswordResetEmail(email)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    onSuccess()
+                } else {
+                    onError(task.exception?.localizedMessage ?: "Password reset failed")
+                }
+            }
+    }
+
+    fun sendPhoneVerificationCode(
+        activity: android.app.Activity,
+        phoneNumber: String,
+        onCodeSent: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (phoneNumber.isBlank()) {
+            onError("Please enter a valid phone number")
+            return
+        }
+        val options = PhoneAuthOptions.newBuilder(firebaseAuth)
+            .setPhoneNumber(phoneNumber)
+            .setTimeout(60L, TimeUnit.SECONDS)
+            .setActivity(activity)
+            .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                    firebaseAuth.signInWithCredential(credential)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val user = task.result?.user
+                                val phoneNum = user?.phoneNumber ?: phoneNumber
+                                _googleEmail.value = phoneNum
+                                _isGoogleSignedIn.value = true
+                                startRealtimeSync()
+                                onCodeSent("AUTO_VERIFIED")
+                            }
+                        }
+                }
+
+                override fun onVerificationFailed(e: FirebaseException) {
+                    onError(e.localizedMessage ?: "Phone verification failed")
+                }
+
+                override fun onCodeSent(verificationId: String, token: PhoneAuthProvider.ForceResendingToken) {
+                    onCodeSent(verificationId)
+                }
+            })
+            .build()
+        PhoneAuthProvider.verifyPhoneNumber(options)
+    }
+
+    fun verifyPhoneCode(
+        verificationId: String,
+        code: String,
+        phoneNumber: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        if (code.isBlank()) {
+            onError("Please enter the verification code")
+            return
+        }
+        try {
+            val credential = PhoneAuthProvider.getCredential(verificationId, code)
+            firebaseAuth.signInWithCredential(credential)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val user = task.result?.user
+                        val phoneNum = user?.phoneNumber ?: phoneNumber
+                        _googleEmail.value = phoneNum
+                        _isGoogleSignedIn.value = true
+                        startRealtimeSync()
+                        onSuccess()
+                    } else {
+                        onError(task.exception?.localizedMessage ?: "Invalid OTP code")
+                    }
+                }
+        } catch (e: Exception) {
+            onError(e.localizedMessage ?: "Error verifying code")
+        }
     }
 }
 
