@@ -107,14 +107,24 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             val user = auth.currentUser
             _currentUser.value = user
             
-            // Update _isGoogleSignedIn based on provider data
-            val isGoogle = user?.providerData?.any { it.providerId == "google.com" } ?: false
-            _isGoogleSignedIn.value = isGoogle
+            // Treat any Firebase sign-in as 'signed in' for sync purposes
+            val signedIn = user != null
+            _isGoogleSignedIn.value = signedIn
             
-            if (isGoogle && user != null) {
-                _googleEmail.value = user.email
+            if (signedIn && user != null) {
+                // Use Firebase user details as default profile data
+                _googleEmail.value = user.email ?: user.uid // Fallback to UID for phone users
                 _googleName.value = user.displayName
                 _googlePhotoUrl.value = user.photoUrl?.toString()
+                
+                // Also check if we have provider data (like Google)
+                val isGoogle = user.providerData.any { it.providerId == "google.com" }
+                // We keep _isGoogleSignedIn as true for any user so sync works
+                startRealtimeSync()
+            } else {
+                _googleEmail.value = null
+                _googleName.value = null
+                _googlePhotoUrl.value = null
             }
         }
     }

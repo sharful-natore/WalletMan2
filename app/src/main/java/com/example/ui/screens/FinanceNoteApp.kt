@@ -17358,6 +17358,7 @@ fun LoginScreen(
     var emailInput by remember { mutableStateOf("") }
     var passwordInput by remember { mutableStateOf("") }
     var isRegisterMode by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     var phoneInput by remember { mutableStateOf("") }
     var otpInput by remember { mutableStateOf("") }
@@ -17572,8 +17573,17 @@ fun LoginScreen(
                             onValueChange = { passwordInput = it },
                             label = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড" else "Password") },
                             leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = FintechBlue) },
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                        tint = FintechBlue
+                                    )
+                                }
+                            },
                             singleLine = true,
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -17614,11 +17624,9 @@ fun LoginScreen(
                                     viewModel.registerWithEmail(emailInput, passwordInput,
                                         onSuccess = {
                                             isLoading = false
-                                            successMessage = if (language == AppLanguage.BN) "রেজিস্ট্রেশন সফল হয়েছে!" else "Registration successful!"
-                                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                                kotlinx.coroutines.delay(1000)
-                                                onDismiss()
-                                            }
+                                            successMessage = if (language == AppLanguage.BN) "রেজিস্ট্রেশন সফল হয়েছে! এখন লগইন করুন।" else "Registration successful! Now please login."
+                                            isRegisterMode = false // Switch to login mode
+                                            passwordInput = "" // Clear password for security
                                         },
                                         onError = { err ->
                                             isLoading = false
@@ -17828,6 +17836,20 @@ fun ProfileSetupScreen(
     var name by remember { mutableStateOf(googleName ?: "") }
     var address by remember { mutableStateOf(userAddress ?: "") }
     var photoUri by remember { mutableStateOf(googlePhotoUrl ?: "") }
+    
+    val context = LocalContext.current
+    val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->
+        if (uri != null) {
+            photoUri = uri.toString()
+        }
+    }
+    val photoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val destinationUri = Uri.fromFile(java.io.File(context.cacheDir, "profile_setup_crop_${System.currentTimeMillis()}.jpg"))
+            cropLauncher.launch(uri to destinationUri)
+        }
+    }
+    
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -17858,7 +17880,8 @@ fun ProfileSetupScreen(
                     modifier = Modifier
                         .size(120.dp)
                         .clip(CircleShape)
-                        .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                        .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                        .clickable { photoLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
                     if (photoUri.isNotEmpty()) {
@@ -18000,7 +18023,7 @@ fun EnhancedProfileMenu(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if (isGoogleSignedIn) (googleName ?: "User") else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
+                            text = if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black
