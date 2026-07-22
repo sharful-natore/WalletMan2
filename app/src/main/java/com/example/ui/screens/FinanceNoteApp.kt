@@ -6725,7 +6725,7 @@ fun DashboardScreen(
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
 
-        val colors = getBudgetCategoryColors(categoryType)
+        val colors = budgetGradients["BUDGET_DETAILS_$categoryType"] ?: getBudgetCategoryColors(categoryType)
 
         AlertDialog(
             onDismissRequest = { showBudgetDetailsType = null },
@@ -9658,14 +9658,7 @@ fun SavingsGoalCardItem(
         com.example.ui.theme.GradientsList[0]
     }
     val gradient = if (isDark) {
-        rawGradient.map { color ->
-            Color(
-                red = (color.red * 0.45f + 0.08f).coerceIn(0f, 1f),
-                green = (color.green * 0.45f + 0.09f).coerceIn(0f, 1f),
-                blue = (color.blue * 0.45f + 0.14f).coerceIn(0f, 1f),
-                alpha = 1f
-            )
-        }
+        listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E))
     } else {
         rawGradient
     }

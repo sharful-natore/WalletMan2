@@ -1602,15 +1602,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _lastSyncTime.value = now
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         prefs.edit().putLong("last_firestore_sync_time", now).apply()
-        
-        val isBn = _language.value == AppLanguage.BN
-        val title = if (isBn) "ক্লাউড সিঙ্ক সম্পন্ন" else "Cloud Sync Completed"
-        val message = if (isBn) {
-            if (isUpload) "আপনার তথ্য ক্লাউডে সফলভাবে সংরক্ষিত হয়েছে!" else "নতুন তথ্য ক্লাউড থেকে সফলভাবে রিস্টোর হয়েছে!"
-        } else {
-            if (isUpload) "Your data has been successfully saved to the cloud!" else "New data has been successfully restored from the cloud!"
-        }
-        triggerCustomNotification(message, isSuccess = true, type = "SYNC")
     }
 
     private var firestore: com.google.firebase.firestore.FirebaseFirestore? = null
