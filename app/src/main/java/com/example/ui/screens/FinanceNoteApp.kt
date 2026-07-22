@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.window.Popup
 import kotlinx.coroutines.delay
 import com.example.BuildConfig
@@ -3231,6 +3232,10 @@ fun FinanceNoteApp(
                         "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))
                         "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336))
                         "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A))
+                        "CHART_INCOME_CAT" -> listOf(Color(0xFF22C55E), Color(0xFF10B981), Color(0xFF06B6D4), Color(0xFF3B82F6), Color(0xFF8B5CF6))
+                        "CHART_EXPENSE_CAT" -> listOf(Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFFBBF24), Color(0xFFEC4899), Color(0xFFA855F7))
+                        "SPLINE_INC_EXP" -> listOf(Color(0xFF3B82F6), Color(0xFFEF4444))
+                        "SPLINE_LEND_BORR" -> listOf(Color(0xFF10B981), Color(0xFFF59E0B))
                         else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
                     }
                     val currentColors = budgetGradients[type] ?: defaultColors
@@ -3238,7 +3243,7 @@ fun FinanceNoteApp(
                     var selectedUpperIndex by remember { mutableStateOf(0) }
 
                     var draggedColor by remember { mutableStateOf<Color?>(null) }
-                    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+                    var dragWindowPos by remember { mutableStateOf(Offset.Zero) }
                     var hoveredUpperIndex by remember { mutableStateOf<Int?>(null) }
                     val upperItemBounds = remember { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
 
@@ -3268,9 +3273,9 @@ fun FinanceNoteApp(
                                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                     Text(
                                         text = if (language == AppLanguage.BN) 
-                                            "নিচের কালার প্যালেট থেকে ড্রাগ করে অথবা সিলেক্ট করে ওপরের লাইনে ড্রপ করুন (সর্বোচ্চ ১০টি কালার যুক্ত করতে পারবেন)।" 
+                                            "নিচের কালার প্যালেট থেকে সিলেক্ট করুন অথবা চেপে ধরে (ড্রাগ করে) ওপরের লাইনে বসান (সর্বোচ্চ ১০টি কালার)।" 
                                         else 
-                                            "Drag or click colors from bottom palette to replace upper line colors (up to 10 colors).",
+                                            "Click to replace or long-press & drag colors to upper line (up to 10 colors).",
                                         color = Color.Gray,
                                         fontSize = 12.sp
                                     )
@@ -3388,23 +3393,27 @@ fun FinanceNoteApp(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         presets.forEach { preset ->
+                                            var itemTopLeftInWindow by remember { mutableStateOf(Offset.Zero) }
                                             Box(
                                                 modifier = Modifier
+                                                    .onGloballyPositioned { coords ->
+                                                        itemTopLeftInWindow = coords.boundsInWindow().topLeft
+                                                    }
                                                     .size(34.dp)
                                                     .clip(CircleShape)
                                                     .background(preset)
                                                     .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.15f), CircleShape)
                                                     .pointerInput(preset) {
-                                                        detectDragGestures(
+                                                        detectDragGesturesAfterLongPress(
                                                             onDragStart = { startOffset ->
                                                                 draggedColor = preset
-                                                                dragOffset = startOffset
+                                                                dragWindowPos = itemTopLeftInWindow + startOffset
                                                             },
                                                             onDrag = { change, dragAmount ->
                                                                 change.consume()
-                                                                dragOffset += dragAmount
+                                                                dragWindowPos += dragAmount
                                                                 val match = upperItemBounds.entries.firstOrNull { (_, rect) ->
-                                                                    rect.contains(dragOffset)
+                                                                    rect.contains(dragWindowPos)
                                                                 }
                                                                 hoveredUpperIndex = match?.key
                                                             },
@@ -3468,8 +3477,8 @@ fun FinanceNoteApp(
                             Box(
                                 modifier = Modifier
                                     .graphicsLayer {
-                                        translationX = dragOffset.x
-                                        translationY = dragOffset.y
+                                        translationX = dragWindowPos.x - 21.dp.toPx()
+                                        translationY = dragWindowPos.y - 21.dp.toPx()
                                     }
                                     .size(42.dp)
                                     .clip(CircleShape)
@@ -15426,6 +15435,7 @@ fun ChartsScreen(
     onBack: () -> Unit,
     onEditGradient: ((String) -> Unit)? = null
 ) {
+    val budgetGradients by viewModel?.budgetGradients?.collectAsState() ?: remember { mutableStateOf(emptyMap()) }
     val budgetIncomeAmount by viewModel?.budgetIncome?.collectAsState() ?: remember { mutableStateOf(0.0) }
     val budgetExpenseAmount by viewModel?.budgetExpense?.collectAsState() ?: remember { mutableStateOf(0.0) }
 
@@ -15547,29 +15557,31 @@ fun ChartsScreen(
         )
     }
 
+    val splineIncExpGradients = budgetGradients["SPLINE_INC_EXP"]
     val dataset1 = listOf(
         ChartDataset(
             label = if (language == AppLanguage.BN) "আয়" else "Income",
             data = splineChartData.incomeSums,
-            color = Color(0xFF10B981)
+            color = splineIncExpGradients?.getOrNull(0) ?: Color(0xFF10B981)
         ),
         ChartDataset(
             label = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
             data = splineChartData.expenseSums,
-            color = Color(0xFFEF4444)
+            color = splineIncExpGradients?.getOrNull(1) ?: Color(0xFFEF4444)
         )
     )
 
+    val splineLendBorrGradients = budgetGradients["SPLINE_LEND_BORR"]
     val dataset2 = listOf(
         ChartDataset(
             label = if (language == AppLanguage.BN) "পাওনা" else "Lend",
             data = splineChartData.lendSums,
-            color = Color(0xFF3B82F6)
+            color = splineLendBorrGradients?.getOrNull(0) ?: Color(0xFF3B82F6)
         ),
         ChartDataset(
             label = if (language == AppLanguage.BN) "দেনা" else "Borrow",
             data = splineChartData.borrowSums,
-            color = Color(0xFFFBBF24)
+            color = splineLendBorrGradients?.getOrNull(1) ?: Color(0xFFFBBF24)
         )
     )
 
@@ -15854,10 +15866,10 @@ fun ChartsScreen(
             title = if (language == AppLanguage.BN) "খাত অনুযায়ী আয়" else "Income by Category",
             data = incomesByCategory,
             total = totalIncome,
-            palette = incomePalette,
+            palette = budgetGradients["CHART_INCOME_CAT"] ?: incomePalette,
             language = language,
             isDark = isDark,
-            onLongPress = { onEditGradient?.invoke("INCOME") }
+            onLongPress = { onEditGradient?.invoke("CHART_INCOME_CAT") }
         )
 
         // --- EXPENSE CHART ---
@@ -15865,10 +15877,10 @@ fun ChartsScreen(
             title = if (language == AppLanguage.BN) "খাত অনুযায়ী ব্যয়" else "Expense by Category",
             data = expensesByCategory,
             total = totalExpense,
-            palette = expensePalette,
+            palette = budgetGradients["CHART_EXPENSE_CAT"] ?: expensePalette,
             language = language,
             isDark = isDark,
-            onLongPress = { onEditGradient?.invoke("EXPENSE") }
+            onLongPress = { onEditGradient?.invoke("CHART_EXPENSE_CAT") }
         )
 
 
@@ -16224,7 +16236,7 @@ fun ChartsScreen(
             language = language,
             isDark = isDark,
             targetIndex = targetScrollIndex,
-            onLongPress = { onEditGradient?.invoke("INCOME") }
+            onLongPress = { onEditGradient?.invoke("SPLINE_INC_EXP") }
         )
 
         // --- TIMELINE SPLINE CHART 2: LEND & BORROW ---
@@ -16235,7 +16247,7 @@ fun ChartsScreen(
             language = language,
             isDark = isDark,
             targetIndex = targetScrollIndex,
-            onLongPress = { onEditGradient?.invoke("EXPENSE") }
+            onLongPress = { onEditGradient?.invoke("SPLINE_LEND_BORR") }
         )
         
         Spacer(modifier = Modifier.height(90.dp))
