@@ -2237,8 +2237,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _userDOB = MutableStateFlow<String?>(null)
     val userDOB: StateFlow<String?> = _userDOB.asStateFlow()
 
-    private val _isProfileSetupComplete = MutableStateFlow(false)
-    val isProfileSetupComplete: StateFlow<Boolean> = _isProfileSetupComplete.asStateFlow()
+    private val _isProfileSetupComplete = MutableStateFlow<Boolean?>(null)
+    val isProfileSetupComplete: StateFlow<Boolean?> = _isProfileSetupComplete.asStateFlow()
 
     private val _googleEmail = MutableStateFlow<String?>(null)
     val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
@@ -3217,12 +3217,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                 _userDOB.value = doc.getString("dob") ?: ""
                                 _googlePhotoUrl.value = doc.getString("photoUrl") ?: _googlePhotoUrl.value
                                 _isProfileSetupComplete.value = doc.getBoolean("setupComplete") ?: false
+                            } else {
+                                _isProfileSetupComplete.value = false
                             }
                         }
+                        .addOnFailureListener {
+                            _isProfileSetupComplete.value = false
+                        }
                 } catch (e: Exception) {
-                    // Ignore or log error
+                    _isProfileSetupComplete.value = false
                 }
             }
+        } else {
+            _isProfileSetupComplete.value = false
         }
     }
 

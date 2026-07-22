@@ -1195,16 +1195,18 @@ fun WorkspaceManagementDialog(
     workspaces: List<com.example.data.WorkspaceStats>,
     currentWorkspace: com.example.data.Workspace,
     onSelect: (String) -> Unit,
-    onCreate: (String) -> Unit,
-    onEdit: (String, String) -> Unit,
+    onCreate: (String, String) -> Unit,
+    onEdit: (String, String, String) -> Unit,
     onUpdatePhoto: (String, String?) -> Unit,
     onDelete: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var newWorkspaceName by remember { mutableStateOf("") }
+    var newWorkspaceProfileName by remember { mutableStateOf("") }
     var showAddInput by remember { mutableStateOf(false) }
     var editingWorkspaceId by remember { mutableStateOf<String?>(null) }
     var editWorkspaceName by remember { mutableStateOf("") }
+    var editWorkspaceProfileName by remember { mutableStateOf("") }
     var deletingWorkspaceId by remember { mutableStateOf<String?>(null) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -1396,6 +1398,7 @@ fun WorkspaceManagementDialog(
                                             onClick = {
                                                 editingWorkspaceId = ws.workspace.id
                                                 editWorkspaceName = ws.workspace.name
+                                                editWorkspaceProfileName = ws.profileName
                                             },
                                             modifier = Modifier.size(32.dp)
                                         ) {
@@ -1523,7 +1526,7 @@ fun WorkspaceManagementDialog(
                 )
                 
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -1533,23 +1536,42 @@ fun WorkspaceManagementDialog(
                         exit = fadeOut() + shrinkHorizontally(),
                         modifier = Modifier.weight(1f)
                     ) {
-                        OutlinedTextField(
-                            value = newWorkspaceName,
-                            onValueChange = { newWorkspaceName = it },
-                            placeholder = {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "যেমন: দোকানের হিসাব" else "e.g., Shop Accounts",
-                                    fontSize = 13.sp
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = newWorkspaceName,
+                                onValueChange = { newWorkspaceName = it },
+                                placeholder = {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "যেমন: দোকানের হিসাব" else "e.g., Shop Accounts",
+                                        fontSize = 13.sp
+                                    )
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = FintechBlue,
+                                    unfocusedBorderColor = borderCol
                                 )
-                            },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxHeight(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = borderCol
                             )
-                        )
+                            OutlinedTextField(
+                                value = newWorkspaceProfileName,
+                                onValueChange = { newWorkspaceProfileName = it },
+                                placeholder = {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "প্রোফাইল নাম (ঐচ্ছিক)" else "Profile Name (Optional)",
+                                        fontSize = 13.sp
+                                    )
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = FintechBlue,
+                                    unfocusedBorderColor = borderCol
+                                )
+                            )
+                        }
                     }
                     
                     Button(
@@ -1558,8 +1580,9 @@ fun WorkspaceManagementDialog(
                                 showAddInput = true
                             } else {
                                 if (newWorkspaceName.isNotBlank()) {
-                                    onCreate(newWorkspaceName.trim())
+                                    onCreate(newWorkspaceName.trim(), newWorkspaceProfileName.trim())
                                     newWorkspaceName = ""
+                                    newWorkspaceProfileName = ""
                                     showAddInput = false
                                 } else {
                                     showAddInput = false
@@ -1614,21 +1637,32 @@ fun WorkspaceManagementDialog(
                 )
             },
             text = {
-                OutlinedTextField(
-                    value = editWorkspaceName,
-                    onValueChange = { editWorkspaceName = it },
-                    label = {
-                        Text(if (language == AppLanguage.BN) "নাম" else "Name")
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editWorkspaceName,
+                        onValueChange = { editWorkspaceName = it },
+                        label = {
+                            Text(if (language == AppLanguage.BN) "ওয়ার্কস্পেস নাম" else "Workspace Name")
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editWorkspaceProfileName,
+                        onValueChange = { editWorkspaceProfileName = it },
+                        label = {
+                            Text(if (language == AppLanguage.BN) "প্রোফাইল নাম" else "Profile Name")
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (editWorkspaceName.isNotBlank()) {
-                            onEdit(editingWorkspaceId!!, editWorkspaceName.trim())
+                            onEdit(editingWorkspaceId!!, editWorkspaceName.trim(), editWorkspaceProfileName.trim())
                             editingWorkspaceId = null
                         }
                     },
@@ -2549,11 +2583,11 @@ fun FinanceNoteApp(
                 viewModel.selectWorkspace(workspaceId)
                 showWorkspaceDialog = false
             },
-            onCreate = { name ->
-                viewModel.createWorkspace(name)
+            onCreate = { name, profileName ->
+                viewModel.createWorkspace(name, profileName)
             },
-            onEdit = { id, name ->
-                viewModel.editWorkspace(id, name)
+            onEdit = { id, name, profileName ->
+                viewModel.editWorkspace(id, name, profileName)
             },
             onUpdatePhoto = { id, photo ->
                 viewModel.updateWorkspaceProfilePhoto(id, photo)
@@ -2609,12 +2643,19 @@ fun FinanceNoteApp(
 
     val isProfileSetupComplete by viewModel.isProfileSetupComplete.collectAsStateWithLifecycle()
     
-    LaunchedEffect(isAuthenticated, isProfileSetupComplete) {
-        if (isAuthenticated && !isProfileSetupComplete) {
-            showProfileSetup = true
-        }
+    LaunchedEffect(isAuthenticated) {
         if (isAuthenticated) {
             viewModel.fetchUserProfile()
+        }
+    }
+
+    LaunchedEffect(isAuthenticated, isProfileSetupComplete) {
+        if (isAuthenticated) {
+            if (isProfileSetupComplete == false) {
+                showProfileSetup = true
+            } else if (isProfileSetupComplete == true) {
+                showProfileSetup = false
+            }
         }
     }
 
@@ -12841,11 +12882,11 @@ fun SettingsScreen(
                 viewModel.selectWorkspace(workspaceId)
                 showWorkspaceDialog = false
             },
-            onCreate = { name ->
-                viewModel.createWorkspace(name)
+            onCreate = { name, profileName ->
+                viewModel.createWorkspace(name, profileName)
             },
-            onEdit = { id, name ->
-                viewModel.editWorkspace(id, name)
+            onEdit = { id, name, profileName ->
+                viewModel.editWorkspace(id, name, profileName)
             },
             onUpdatePhoto = { id, photo ->
                 viewModel.updateWorkspaceProfilePhoto(id, photo)
