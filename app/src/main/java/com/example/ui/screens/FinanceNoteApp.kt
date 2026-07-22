@@ -1311,33 +1311,55 @@ fun WorkspaceManagementDialog(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    if (!ws.profilePhoto.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = ws.profilePhoto,
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(CircleShape)
-                                                .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") }
-                                                .border(1.5.dp, if (isSelected) FintechBlue else Color.Gray, CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        val initials = ws.profileName.take(1).uppercase()
+                                    Box(
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        if (!ws.profilePhoto.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = ws.profilePhoto,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape)
+                                                    .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") }
+                                                    .border(1.5.dp, if (isSelected) FintechBlue else Color.Gray, CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            val initials = ws.profileName.take(1).uppercase()
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape)
+                                                    .background(if (isSelected) FintechBlue.copy(alpha = 0.2f) else (if (isDark) Color(0xFF2E344A) else Color(0xFFE2E8F0)))
+                                                    .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape)
+                                                    .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.AddAPhoto,
+                                                    contentDescription = "Add photo",
+                                                    tint = if (isSelected) FintechBlue else textColor,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Edit Pen Icon Overlay
                                         Box(
                                             modifier = Modifier
-                                                .size(40.dp)
+                                                .align(Alignment.BottomEnd)
+                                                .size(14.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isSelected) FintechBlue.copy(alpha = 0.2f) else (if (isDark) Color(0xFF2E344A) else Color(0xFFE2E8F0)))
-                                                .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape)
-                                                .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") },
+                                                .background(FintechBlue)
+                                                .border(1.dp, if (isDark) Color(0xFF1E1E1E) else Color.White, CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Rounded.AddAPhoto,
-                                                contentDescription = "Add photo",
-                                                tint = if (isSelected) FintechBlue else textColor,
-                                                modifier = Modifier.size(20.dp)
+                                                imageVector = Icons.Rounded.Edit,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(8.dp)
                                             )
                                         }
                                     }
@@ -2633,6 +2655,7 @@ fun FinanceNoteApp(
             },
             onLogout = {
                 showEnhancedProfileMenu = false
+                activeTab = "settings"
                 composeCoroutineScope.launch {
                     kotlinx.coroutines.delay(300)
                     showLogoutConfirm = true
@@ -2651,8 +2674,12 @@ fun FinanceNoteApp(
 
     LaunchedEffect(isAuthenticated, isProfileSetupComplete) {
         if (isAuthenticated) {
-            if (isProfileSetupComplete == false) {
+            val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+            val hasPrompted = gPrefs.getBoolean("has_prompted_profile_setup", false)
+            
+            if (isProfileSetupComplete == false && !hasPrompted) {
                 showProfileSetup = true
+                gPrefs.edit().putBoolean("has_prompted_profile_setup", true).apply()
             } else if (isProfileSetupComplete == true) {
                 showProfileSetup = false
             }
@@ -17932,6 +17959,14 @@ fun ProfileSetupScreen(
     var phone by remember { mutableStateOf(userPhone ?: "") }
     var dob by remember { mutableStateOf(userDOB ?: "") }
     var photoUri by remember { mutableStateOf(googlePhotoUrl ?: "") }
+    
+    LaunchedEffect(googleName, userAddress, userPhone, userDOB, googlePhotoUrl) {
+        if (name.isBlank() && !googleName.isNullOrBlank()) name = googleName!!
+        if (address.isBlank() && !userAddress.isNullOrBlank()) address = userAddress!!
+        if (phone.isBlank() && !userPhone.isNullOrBlank()) phone = userPhone!!
+        if (dob.isBlank() && !userDOB.isNullOrBlank()) dob = userDOB!!
+        if (photoUri.isBlank() && !googlePhotoUrl.isNullOrBlank()) photoUri = googlePhotoUrl!!
+    }
     
     val context = LocalContext.current
     val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->
