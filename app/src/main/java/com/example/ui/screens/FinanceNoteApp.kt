@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.window.Popup
 import kotlinx.coroutines.delay
 import com.example.BuildConfig
@@ -217,7 +218,8 @@ fun CategorySegmentedDonutChart(
     categoryType: String? = null,
     unfilledColorOverride: Color? = null,
     centerColorOverride: Color? = null,
-    onCenterClick: () -> Unit = {}
+    onCenterClick: () -> Unit = {},
+    onLongPress: () -> Unit = {}
 ) {
     var animationPlayed by remember { mutableStateOf(false) }
     var hoveredSegment by remember { mutableStateOf<Pair<String, Double>?>(null) }
@@ -282,7 +284,9 @@ fun CategorySegmentedDonutChart(
         Canvas(modifier = Modifier
             .fillMaxSize()
             .pointerInput(segments, targetAmount) {
-                detectTapGestures { offset ->
+                detectTapGestures(
+                    onLongPress = { onLongPress() },
+                    onTap = { offset ->
                     val strokePx = strokeWidthDp.toPx()
                     val chartRadius = (minOf(size.width, size.height) - strokePx) / 2f
                     val innerRadius = chartRadius - strokePx / 2f
@@ -335,8 +339,9 @@ fun CategorySegmentedDonutChart(
                         onCenterClick()
                     }
                 }
-            }
-        ) {
+            )
+        }
+    ) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
             // Subtract 16.dp to leave 8.dp of space on the outside for the glowing shadow to fade out nicely
@@ -1460,7 +1465,7 @@ fun WorkspaceManagementDialog(
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Savings,
+                                                imageVector = Icons.Rounded.AccountBalance,
                                                 contentDescription = "Savings Cards",
                                                 tint = subtitleColor,
                                                 modifier = Modifier.size(14.dp)
@@ -2174,6 +2179,8 @@ fun FinanceNoteApp(
     var settingsFilter by remember { mutableStateOf("") }
     var transactionFilter by remember { mutableStateOf("ALL") }
     var debtFilter by remember { mutableStateOf("ALL") }
+    var editingBudgetGradientType by remember { mutableStateOf<String?>(null) }
+    val budgetGradients by viewModel.budgetGradients.collectAsState(initial = emptyMap())
 
     // Dialog & overlay states
     val composeCoroutineScope = rememberCoroutineScope()
@@ -3049,7 +3056,8 @@ fun FinanceNoteApp(
                                     isDark = isDarkTheme,
                                     transactions = transactions,
                                     persons = persons,
-                                    onBack = { activeTab = "dashboard" }
+                                    onBack = { activeTab = "dashboard" },
+                                    onEditGradient = { editingBudgetGradientType = it }
                                 )
                             } else {
                                 val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
@@ -3140,7 +3148,8 @@ fun FinanceNoteApp(
                                                     activeTab = "debts"
                                                 }
                                             },
-                                            activeTab = activeTab
+                                            activeTab = activeTab,
+                                            onEditGradient = { editingBudgetGradientType = it }
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -3216,6 +3225,260 @@ fun FinanceNoteApp(
                 }
 
                 // Dynamic Overlays & Dialogs
+                if (editingBudgetGradientType != null) {
+                    val type = editingBudgetGradientType!!
+                    val defaultColors = when (type) {
+                        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))
+                        "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336))
+                        "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A))
+                        else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
+                    }
+                    val currentColors = budgetGradients[type] ?: defaultColors
+                    var editedColors by remember { mutableStateOf(currentColors) }
+                    var selectedUpperIndex by remember { mutableStateOf(0) }
+
+                    var draggedColor by remember { mutableStateOf<Color?>(null) }
+                    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+                    var hoveredUpperIndex by remember { mutableStateOf<Int?>(null) }
+                    val upperItemBounds = remember { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+
+                    val presets = listOf(
+                        Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFEF4444),
+                        Color(0xFFFBBF24), Color(0xFF8B5CF6), Color(0xFFEC4899),
+                        Color(0xFF06B6D4), Color(0xFF14B8A6), Color(0xFFF97316),
+                        Color(0xFF6366F1), Color(0xFFA855F7), Color(0xFFD946EF),
+                        Color(0xFFF43F5E), Color(0xFF84CC16), Color(0xFF22C55E),
+                        Color(0xFF0EA5E9), Color(0xFF64748B), Color(0xFF1E293B),
+                        Color(0xFF0F172A), Color(0xFF94A3B8)
+                    )
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AlertDialog(
+                            onDismissRequest = { editingBudgetGradientType = null },
+                            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+                            title = {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "চার্টের কালার পরিবর্তন" else "Edit Chart Colors",
+                                    color = if (isDarkTheme) Color.White else Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) 
+                                            "নিচের কালার প্যালেট থেকে ড্রাগ করে অথবা সিলেক্ট করে ওপরের লাইনে ড্রপ করুন (সর্বোচ্চ ১০টি কালার যুক্ত করতে পারবেন)।" 
+                                        else 
+                                            "Drag or click colors from bottom palette to replace upper line colors (up to 10 colors).",
+                                        color = Color.Gray,
+                                        fontSize = 12.sp
+                                    )
+
+                                    // Live Gradient Bar Preview
+                                    if (editedColors.size >= 2) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(28.dp)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(Brush.horizontalGradient(editedColors))
+                                                .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                        )
+                                    }
+
+                                    // Top Line: Active Gradient Colors
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "সক্রিয় কালারসমূহ (উপরের লাইন)" else "Active Colors (Upper Line)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDarkTheme) Color.LightGray else Color.DarkGray
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            if (editedColors.size < 10) {
+                                                IconButton(
+                                                    onClick = {
+                                                        val newCol = presets.filter { it !in editedColors }.randomOrNull() ?: presets.random()
+                                                        editedColors = editedColors + newCol
+                                                        selectedUpperIndex = editedColors.size - 1
+                                                    },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(Icons.Rounded.Add, contentDescription = "Add Color", tint = FintechBlue)
+                                                }
+                                            }
+                                            if (editedColors.size > 2) {
+                                                IconButton(
+                                                    onClick = {
+                                                        val removeIdx = selectedUpperIndex.coerceIn(0, editedColors.size - 1)
+                                                        val mutable = editedColors.toMutableList()
+                                                        mutable.removeAt(removeIdx)
+                                                        editedColors = mutable
+                                                        selectedUpperIndex = (removeIdx - 1).coerceAtLeast(0)
+                                                    },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(Icons.Rounded.Delete, contentDescription = "Remove Color", tint = FintechRed)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Upper Row Scrollable List
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        editedColors.forEachIndexed { index, color ->
+                                            val isSelected = selectedUpperIndex == index
+                                            val isHovered = hoveredUpperIndex == index
+                                            Box(
+                                                modifier = Modifier
+                                                    .onGloballyPositioned { coords ->
+                                                        upperItemBounds[index] = coords.boundsInWindow()
+                                                    }
+                                                    .size(38.dp)
+                                                    .clip(CircleShape)
+                                                    .background(color)
+                                                    .border(
+                                                        width = if (isSelected || isHovered) 3.dp else 1.dp,
+                                                        color = if (isHovered) Color.Yellow else if (isSelected) FintechBlue else (if (isDarkTheme) Color.White.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.2f)),
+                                                        shape = CircleShape
+                                                    )
+                                                    .clickable {
+                                                        selectedUpperIndex = index
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Check,
+                                                        contentDescription = "Selected",
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalDivider(color = if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFE2E8F0))
+
+                                    // Bottom Line: Palette Presets
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "কালার প্যালেট (নিচের লাইন)" else "Color Palette (Lower Line)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDarkTheme) Color.LightGray else Color.DarkGray
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        presets.forEach { preset ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(34.dp)
+                                                    .clip(CircleShape)
+                                                    .background(preset)
+                                                    .border(1.dp, if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.15f), CircleShape)
+                                                    .pointerInput(preset) {
+                                                        detectDragGestures(
+                                                            onDragStart = { startOffset ->
+                                                                draggedColor = preset
+                                                                dragOffset = startOffset
+                                                            },
+                                                            onDrag = { change, dragAmount ->
+                                                                change.consume()
+                                                                dragOffset += dragAmount
+                                                                val match = upperItemBounds.entries.firstOrNull { (_, rect) ->
+                                                                    rect.contains(dragOffset)
+                                                                }
+                                                                hoveredUpperIndex = match?.key
+                                                            },
+                                                            onDragEnd = {
+                                                                val targetIdx = hoveredUpperIndex
+                                                                if (targetIdx != null && targetIdx in editedColors.indices) {
+                                                                    val mutable = editedColors.toMutableList()
+                                                                    mutable[targetIdx] = preset
+                                                                    editedColors = mutable
+                                                                    selectedUpperIndex = targetIdx
+                                                                }
+                                                                draggedColor = null
+                                                                hoveredUpperIndex = null
+                                                            },
+                                                            onDragCancel = {
+                                                                draggedColor = null
+                                                                hoveredUpperIndex = null
+                                                            }
+                                                        )
+                                                    }
+                                                    .clickable {
+                                                        if (selectedUpperIndex in editedColors.indices) {
+                                                            val mutable = editedColors.toMutableList()
+                                                            mutable[selectedUpperIndex] = preset
+                                                            editedColors = mutable
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        viewModel.updateBudgetGradient(type, editedColors)
+                                        editingBudgetGradientType = null
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "সংরক্ষণ" else "Save",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { editingBudgetGradientType = null }) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                                        color = FintechRed
+                                    )
+                                }
+                            }
+                        )
+
+                        // Floating Dragged Color Bubble
+                        if (draggedColor != null) {
+                            Box(
+                                modifier = Modifier
+                                    .graphicsLayer {
+                                        translationX = dragOffset.x
+                                        translationY = dragOffset.y
+                                    }
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(draggedColor!!)
+                                    .border(2.dp, Color.White, CircleShape)
+                            )
+                        }
+                    }
+                }
                 if (pendingDeleteTransactions != null) {
                     DeleteVerificationDialog(
                         language = language,
@@ -3913,6 +4176,47 @@ fun FinanceNoteApp(
 
                     HorizontalDivider(color = if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFE2E8F0))
 
+                    // Gradient Direction Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "গ্রাডিয়েন্ট ডিরেকশন" else "Gradient Direction",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            com.example.ui.theme.CustomGradientDirection.values().forEach { dir ->
+                                val isSelected = customGradientDirection == dir
+                                val label = when (dir) {
+                                    com.example.ui.theme.CustomGradientDirection.HORIZONTAL -> if (language == AppLanguage.BN) "হরিজন্টাল" else "Horizontal"
+                                    com.example.ui.theme.CustomGradientDirection.VERTICAL -> if (language == AppLanguage.BN) "ভার্টিক্যাল" else "Vertical"
+                                    com.example.ui.theme.CustomGradientDirection.DIAGONAL -> if (language == AppLanguage.BN) "ডায়াগনাল" else "Diagonal"
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) FintechBlue else (if (isDarkTheme) Color(0xFF2A2D3D) else Color(0xFFE2E8F0)))
+                                        .clickable { customGradientDirection = dir }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else (if (isDarkTheme) Color.LightGray else Color.DarkGray)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = if (isDarkTheme) Color(0xFF2E354F) else Color(0xFFE2E8F0))
+
                     // Gradient Colors list with selector
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -4208,9 +4512,9 @@ fun FinanceNoteApp(
                         showCustomGradientDialog = false
                         val idx = editingCustomGradientIndex
                         if (idx != null) {
-                            viewModel.updateCustomGradient(context, idx, customGradientColors)
+                            viewModel.updateCustomGradient(context, idx, customGradientColors, type = customGradientType, direction = customGradientDirection)
                         } else {
-                            viewModel.addCustomGradient(context, customGradientColors)
+                            viewModel.addCustomGradient(context, customGradientColors, type = customGradientType, direction = customGradientDirection)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -5170,7 +5474,8 @@ fun DashboardScreen(
     onBackupClick: () -> Unit = {},
     viewModel: FinanceViewModel? = null,
     onPersonClick: ((Person) -> Unit)? = null,
-    activeTab: String = ""
+    activeTab: String = "",
+    onEditGradient: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -5205,7 +5510,6 @@ fun DashboardScreen(
     }
     val monthlyBudgets by viewModel?.monthlyBudgets?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
     val budgetGradients by viewModel?.budgetGradients?.collectAsState() ?: remember { mutableStateOf(emptyMap()) }
-    var editingBudgetGradientType by remember { mutableStateOf<String?>(null) }
 
     val budgetIncomeAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
         val ym = getYearMonthFromFilter(timeFilter)
@@ -6060,7 +6364,7 @@ fun DashboardScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .combinedClickable(
                                     onClick = { showBudgetDetailsType = "INCOME" },
-                                    onLongClick = { editingBudgetGradientType = "INCOME" }
+                                    onLongClick = { onEditGradient?.invoke("INCOME") }
                                 )
                                 .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -6083,7 +6387,7 @@ fun DashboardScreen(
                                 centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
                                 customGradient = budgetGradients["INCOME"],
                                 onCenterClick = { showBudgetDetailsType = "INCOME" },
-                                onLongPress = { editingBudgetGradientType = "INCOME" }
+                                onLongPress = { onEditGradient?.invoke("INCOME") }
                             )
                         }
 
@@ -6094,7 +6398,7 @@ fun DashboardScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .combinedClickable(
                                     onClick = { showBudgetDetailsType = "EXPENSE" },
-                                    onLongClick = { editingBudgetGradientType = "EXPENSE" }
+                                    onLongClick = { onEditGradient?.invoke("EXPENSE") }
                                 )
                                 .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -6117,7 +6421,7 @@ fun DashboardScreen(
                                 centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
                                 customGradient = budgetGradients["EXPENSE"],
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" },
-                                onLongPress = { editingBudgetGradientType = "EXPENSE" }
+                                onLongPress = { onEditGradient?.invoke("EXPENSE") }
                             )
                         }
 
@@ -6128,7 +6432,7 @@ fun DashboardScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .combinedClickable(
                                     onClick = { showBudgetDetailsType = "SAVINGS" },
-                                    onLongClick = { editingBudgetGradientType = "SAVINGS" }
+                                    onLongClick = { onEditGradient?.invoke("SAVINGS") }
                                 )
                                 .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -6151,7 +6455,7 @@ fun DashboardScreen(
                                 centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
                                 customGradient = budgetGradients["SAVINGS"],
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" },
-                                onLongPress = { editingBudgetGradientType = "SAVINGS" }
+                                onLongPress = { onEditGradient?.invoke("SAVINGS") }
                             )
                         }
                     }
@@ -6323,91 +6627,7 @@ fun DashboardScreen(
             }
         } // Close Box
 
-    if (editingBudgetGradientType != null) {
-        val type = editingBudgetGradientType!!
-        val defaultColors = when (type) {
-            "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))
-            "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336))
-            "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A))
-            else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
-        }
-        val currentColors = budgetGradients[type] ?: defaultColors
-        var editedColors by remember { mutableStateOf(currentColors) }
-        val presets = listOf(
-            Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFEF4444),
-            Color(0xFFFBBF24), Color(0xFF8B5CF6), Color(0xFFEC4899),
-            Color(0xFF06B6D4), Color(0xFF14B8A6), Color(0xFFF97316)
-        )
 
-        AlertDialog(
-            onDismissRequest = { editingBudgetGradientType = null },
-            containerColor = if (isDark) Color(0xFF1E2235) else Color.White,
-            title = {
-                Text(
-                    text = if (language == AppLanguage.BN) "চার্টের রঙ পরিবর্তন করুন" else "Change Chart Color",
-                    color = if (isDark) Color.White else Color.Black,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "এই চার্টের জন্য আপনার পছন্দমতো রঙ সেট করুন।" else "Set custom colors for this chart.",
-                        color = Color.Gray, fontSize = 13.sp
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        editedColors.forEachIndexed { index, color ->
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp).clip(CircleShape).background(color)
-                                    .clickable {
-                                        val mutable = editedColors.toMutableList()
-                                        mutable[index] = presets.random() // Temporary quick cycle
-                                        editedColors = mutable
-                                    }
-                            )
-                        }
-                        if (editedColors.size < 5) {
-                            IconButton(onClick = { editedColors = editedColors + Color(0xFF8B5CF6) }, modifier = Modifier.size(32.dp)) {
-                                Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = "Add Color", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        if (editedColors.size > 2) {
-                            IconButton(onClick = { editedColors = editedColors.dropLast(1) }, modifier = Modifier.size(32.dp)) {
-                                Icon(androidx.compose.material.icons.Icons.Rounded.Delete, contentDescription = "Remove Color", tint = Color.Red)
-                            }
-                        }
-                    }
-                    Text(text = if (language == AppLanguage.BN) "প্যালেট থেকে নির্বাচন করুন (উপরে কালার বক্সে ক্লিক করে সর্ট করুন)" else "Select from Palette (click color circle to cycle)", fontSize = 11.sp, color = Color.Gray)
-                    androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(presets) { preset ->
-                            Box(
-                                modifier = Modifier.size(28.dp).clip(CircleShape).background(preset)
-                                .clickable {
-                                    val mutable = editedColors.toMutableList()
-                                    if (mutable.isNotEmpty()) mutable[mutable.size - 1] = preset
-                                    editedColors = mutable
-                                }
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel?.updateBudgetGradient(type, editedColors)
-                    editingBudgetGradientType = null
-                }) {
-                    Text(text = if (language == AppLanguage.BN) "সেভ করুন" else "Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingBudgetGradientType = null }) {
-                    Text(text = if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
-                }
-            }
-        )
-    }
 
     if (showBudgetDetailsType != null) {
         val categoryType = showBudgetDetailsType!!
@@ -6506,6 +6726,9 @@ fun DashboardScreen(
                                     if (targetAmount == 0.0) {
                                         isEditingBudget = true
                                     }
+                                },
+                                onLongPress = {
+                                    onEditGradient?.invoke(categoryType)
                                 }
                             )
                             if (targetAmount > 0.0) {
@@ -14465,7 +14688,8 @@ fun TimelineSplineChart(
     monthsLabels: List<String>,
     language: AppLanguage,
     isDark: Boolean,
-    targetIndex: Int = -1
+    targetIndex: Int = -1,
+    onLongPress: () -> Unit = {}
 ) {
     val bgColor = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -14482,6 +14706,9 @@ fun TimelineSplineChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(onLongPress = { onLongPress() })
+                }
         ) {
         Column {
             // Title & Legends Row
@@ -15196,7 +15423,8 @@ fun ChartsScreen(
     isDark: Boolean,
     transactions: List<Transaction>,
     persons: List<Person>,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEditGradient: ((String) -> Unit)? = null
 ) {
     val budgetIncomeAmount by viewModel?.budgetIncome?.collectAsState() ?: remember { mutableStateOf(0.0) }
     val budgetExpenseAmount by viewModel?.budgetExpense?.collectAsState() ?: remember { mutableStateOf(0.0) }
@@ -15628,7 +15856,8 @@ fun ChartsScreen(
             total = totalIncome,
             palette = incomePalette,
             language = language,
-            isDark = isDark
+            isDark = isDark,
+            onLongPress = { onEditGradient?.invoke("INCOME") }
         )
 
         // --- EXPENSE CHART ---
@@ -15638,7 +15867,8 @@ fun ChartsScreen(
             total = totalExpense,
             palette = expensePalette,
             language = language,
-            isDark = isDark
+            isDark = isDark,
+            onLongPress = { onEditGradient?.invoke("EXPENSE") }
         )
 
 
@@ -15993,7 +16223,8 @@ fun ChartsScreen(
             monthsLabels = splineChartData.labels,
             language = language,
             isDark = isDark,
-            targetIndex = targetScrollIndex
+            targetIndex = targetScrollIndex,
+            onLongPress = { onEditGradient?.invoke("INCOME") }
         )
 
         // --- TIMELINE SPLINE CHART 2: LEND & BORROW ---
@@ -16003,7 +16234,8 @@ fun ChartsScreen(
             monthsLabels = splineChartData.labels,
             language = language,
             isDark = isDark,
-            targetIndex = targetScrollIndex
+            targetIndex = targetScrollIndex,
+            onLongPress = { onEditGradient?.invoke("EXPENSE") }
         )
         
         Spacer(modifier = Modifier.height(90.dp))
@@ -16264,7 +16496,8 @@ fun ChartSection(
     total: Double,
     palette: List<Color>,
     language: AppLanguage,
-    isDark: Boolean = true
+    isDark: Boolean = true,
+    onLongPress: () -> Unit = {}
 ) {
     val bgColor = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
@@ -16287,6 +16520,9 @@ fun ChartSection(
         padding = PaddingValues(20.dp),
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .pointerInput(Unit) {
+                detectTapGestures(onLongPress = { onLongPress() })
+            }
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
