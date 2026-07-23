@@ -97,12 +97,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     val updateManager = UpdateManager()
 
-    private fun getFirebaseAuth(): FirebaseAuth {
-        com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
-        return FirebaseAuth.getInstance()
-    }
-
-    private val _currentUser = MutableStateFlow<com.google.firebase.auth.FirebaseUser?>(null)
+    private val firebaseAuth = FirebaseAuth.getInstance()
+    private val _currentUser = MutableStateFlow(firebaseAuth.currentUser)
     val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = _currentUser.asStateFlow()
 
     private val _googleName = MutableStateFlow<String?>(null)
@@ -134,16 +130,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     val isUserSignedInFlow = combine(_currentUser, _isGoogleSignedIn) { user, googleSignedIn ->
         user != null || googleSignedIn
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _currentUser.value != null || _isGoogleSignedIn.value)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null || _isGoogleSignedIn.value)
 
     init {
-        com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
-        try {
-            _currentUser.value = getFirebaseAuth().currentUser
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
         val initialGPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
         val savedEmail = initialGPrefs.getString("google_email", null)
         if (!savedEmail.isNullOrBlank()) {
@@ -154,50 +143,46 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _isProfileSetupComplete.value = initialGPrefs.getBoolean("profile_setup_complete", false)
         }
 
-        try {
-            getFirebaseAuth().addAuthStateListener { auth ->
-                val user = auth.currentUser
-                _currentUser.value = user
+        firebaseAuth.addAuthStateListener { auth ->
+            val user = auth.currentUser
+            _currentUser.value = user
+            
+            // Treat any Firebase sign-in as 'signed in' for sync purposes
+            val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
+            _isGoogleSignedIn.value = signedIn
+            
+            if (signedIn && user != null) {
+                // Use Firebase user details as default profile data
+                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 
-                // Treat any Firebase sign-in as 'signed in' for sync purposes
-                val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
-                _isGoogleSignedIn.value = signedIn
+                _googleEmail.value = user.email ?: user.uid
                 
-                if (signedIn && user != null) {
-                    // Use Firebase user details as default profile data
-                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                    
-                    _googleEmail.value = user.email ?: user.uid
-                    
-                    if (gPrefs.getBoolean("profile_setup_complete", false)) {
-                        _googleName.value = gPrefs.getString("google_name", user.displayName)
-                        _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
-                        _userAddress.value = gPrefs.getString("user_address", null)
-                        _userPhone.value = gPrefs.getString("user_phone", null)
-                        _userDOB.value = gPrefs.getString("user_dob", null)
-                        _isProfileSetupComplete.value = true
-                    } else {
-                        _googleName.value = user.displayName
-                        _googlePhotoUrl.value = user.photoUrl?.toString()
-                    }
-
-                    // Keep SharedPreferences in sync for Widget
-                    val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                    gPrefs.edit().apply {
-                        putString("google_email", _googleEmail.value)
-                        putString("google_name", _googleName.value)
-                        putString("google_photo_url", _googlePhotoUrl.value)
-                    }.apply()
-
-                    startRealtimeSync()
-                } else if (!signedIn) {
-                    _googleEmail.value = null
-                    _googleName.value = null
-                    _googlePhotoUrl.value = null
+                if (gPrefs.getBoolean("profile_setup_complete", false)) {
+                    _googleName.value = gPrefs.getString("google_name", user.displayName)
+                    _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
+                    _userAddress.value = gPrefs.getString("user_address", null)
+                    _userPhone.value = gPrefs.getString("user_phone", null)
+                    _userDOB.value = gPrefs.getString("user_dob", null)
+                    _isProfileSetupComplete.value = true
+                } else {
+                    _googleName.value = user.displayName
+                    _googlePhotoUrl.value = user.photoUrl?.toString()
                 }
+
+                // Keep SharedPreferences in sync for Widget
+                val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                gPrefs.edit().apply {
+                    putString("google_email", _googleEmail.value)
+                    putString("google_name", _googleName.value)
+                    putString("google_photo_url", _googlePhotoUrl.value)
+                }.apply()
+
+                startRealtimeSync()
+            } else if (!signedIn) {
+                _googleEmail.value = null
+                _googleName.value = null
+                _googlePhotoUrl.value = null
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
         }
     }
 
@@ -1242,27 +1227,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             prefs.edit().putInt("selected_theme_gradient_index", backup.selectedThemeGradientIndex).apply()
             _selectedThemeGradientIndex.value = backup.selectedThemeGradientIndex
         }
-
+        
         // Restore budgets and check profile photos for each workspace
         backup.workspaces.forEach { ws ->
             restoreProfilePhotoFromCloud(getApplication(), ws.id)
         }
-
-        // Update active workspace ID to a valid one from the restored workspaces
-        val currentWsId = _currentWorkspaceId.value
-        val restoredWorkspaces = backup.workspaces
-        if (restoredWorkspaces.isNotEmpty()) {
-            val exists = restoredWorkspaces.any { it.id == currentWsId }
-            if (!exists) {
-                val nextWsId = restoredWorkspaces.firstOrNull()?.id ?: "default"
-                _currentWorkspaceId.value = nextWsId
-                prefs.edit().putString("active_workspace_id", nextWsId).apply()
-            }
-        } else {
-            _currentWorkspaceId.value = "default"
-            prefs.edit().putString("active_workspace_id", "default").apply()
-        }
-        loadProfile(getApplication())
 
         if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
             saveProfile(getApplication(),
@@ -1868,13 +1837,47 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _hasUnsavedChanges = MutableStateFlow(false)
     val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
 
-    private val _unsyncedItems = MutableStateFlow<List<String>>(emptyList())
-    val unsyncedItems: StateFlow<List<String>> = _unsyncedItems.asStateFlow()
-
     fun getUnsyncedItems(): List<String> {
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return emptyList()
-        return _unsyncedItems.value
+
+        val currentData = com.example.data.FinanceBackup(
+            persons = persons.value,
+            transactions = transactions.value,
+            savingsGoals = savingsGoals.value,
+            savingsTransactions = savingsTransactions.value,
+            monthlyBudgets = monthlyBudgets.value,
+            workspaces = workspaces.value
+        )
+
+        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+        val unsynced = mutableListOf<String>()
+        val isBn = _language.value == com.example.ui.AppLanguage.BN
+
+        if (cachedJson == null) {
+            if (currentData.transactions.isNotEmpty()) unsynced.add(if (isBn) "লেনদেন" else "Transactions")
+            if (currentData.persons.isNotEmpty()) unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
+            if (currentData.savingsGoals.isNotEmpty()) unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
+            if (currentData.workspaces.isNotEmpty()) unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
+            return unsynced
+        }
+
+        val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
+        if (cachedData == null) return listOf(if (isBn) "সমস্ত ডাটা" else "All Data")
+
+        if (currentData.transactions.size != cachedData.transactions.size || currentData.transactions != cachedData.transactions) 
+            unsynced.add(if (isBn) "লেনদেন" else "Transactions")
+        if (currentData.persons.size != cachedData.persons.size || currentData.persons != cachedData.persons) 
+            unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
+        if (currentData.savingsGoals.size != cachedData.savingsGoals.size || currentData.savingsGoals != cachedData.savingsGoals) 
+            unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
+        if (currentData.workspaces.size != cachedData.workspaces.size || currentData.workspaces != cachedData.workspaces) 
+            unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
+        if (currentData.monthlyBudgets.size != cachedData.monthlyBudgets.size || currentData.monthlyBudgets != cachedData.monthlyBudgets) 
+            unsynced.add(if (isBn) "বাজেট" else "Budgets")
+
+        return unsynced
     }
 
     private val _isNetworkActive = MutableStateFlow(false)
@@ -2074,7 +2077,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) {
             _hasUnsavedChanges.value = false
-            _unsyncedItems.value = emptyList()
             return
         }
         viewModelScope.launch {
@@ -2082,43 +2084,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val currentData = getFullBackupData()
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                 val cachedJson = prefs.getString("firestore_cached_data_$email", null)
-                val isBn = _language.value == com.example.ui.AppLanguage.BN
-
                 if (cachedJson == null) {
-                    val unsynced = mutableListOf<String>()
-                    if (currentData.transactions.isNotEmpty()) unsynced.add(if (isBn) "লেনদেন" else "Transactions")
-                    if (currentData.persons.isNotEmpty()) unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
-                    if (currentData.savingsGoals.isNotEmpty()) unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
-                    if (currentData.monthlyBudgets.isNotEmpty()) unsynced.add(if (isBn) "বাজেট" else "Budgets")
-                    if (currentData.workspaces.isNotEmpty()) unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
-
-                    _unsyncedItems.value = unsynced
-                    _hasUnsavedChanges.value = unsynced.isNotEmpty()
+                    val hasData = currentData.transactions.isNotEmpty() ||
+                            currentData.persons.isNotEmpty() ||
+                            currentData.savingsGoals.isNotEmpty()
+                    _hasUnsavedChanges.value = hasData
                 } else {
                     val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
                     if (cachedData == null) {
                         _hasUnsavedChanges.value = true
-                        _unsyncedItems.value = listOf(if (isBn) "সমস্ত ডাটা" else "All Data")
                     } else {
-                        val unsynced = mutableListOf<String>()
-                        if (currentData.transactions.size != cachedData.transactions.size || currentData.transactions != cachedData.transactions) {
-                            unsynced.add(if (isBn) "লেনদেন" else "Transactions")
-                        }
-                        if (currentData.persons.size != cachedData.persons.size || currentData.persons != cachedData.persons) {
-                            unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
-                        }
-                        if (currentData.savingsGoals.size != cachedData.savingsGoals.size || currentData.savingsGoals != cachedData.savingsGoals || currentData.savingsTransactions.size != cachedData.savingsTransactions.size || currentData.savingsTransactions != cachedData.savingsTransactions) {
-                            unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
-                        }
-                        if (currentData.monthlyBudgets.size != cachedData.monthlyBudgets.size || currentData.monthlyBudgets != cachedData.monthlyBudgets) {
-                            unsynced.add(if (isBn) "বাজেট" else "Budgets")
-                        }
-                        if (currentData.workspaces.size != cachedData.workspaces.size || currentData.workspaces != cachedData.workspaces) {
-                            unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
-                        }
-
-                        _unsyncedItems.value = unsynced
-                        _hasUnsavedChanges.value = unsynced.isNotEmpty()
+                        val isDifferent = currentData.transactions.size != cachedData.transactions.size ||
+                                currentData.persons.size != cachedData.persons.size ||
+                                currentData.savingsGoals.size != cachedData.savingsGoals.size ||
+                                currentData.savingsTransactions.size != cachedData.savingsTransactions.size ||
+                                backupAdapter.toJson(currentData) != backupAdapter.toJson(cachedData)
+                        _hasUnsavedChanges.value = isDifferent
                     }
                 }
             } catch (e: Exception) {
@@ -2160,7 +2141,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 
                 if (json == cachedJson) {
                     _hasUnsavedChanges.value = false
-                    _unsyncedItems.value = emptyList()
                     _firestoreSyncStatus.value = null
                     onComplete?.invoke()
                     return@launch
@@ -2184,7 +2164,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                 prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
                             } catch (e: Exception) { e.printStackTrace() }
                             _hasUnsavedChanges.value = false
-                            _unsyncedItems.value = emptyList()
                             _firestoreSyncStatus.value = "Synced"
                             updateSyncSuccess(getApplication(), true)
                         }
@@ -2278,54 +2257,69 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             viewModelScope.launch {
                                 try {
                                     val currentLocalData = getFullBackupData()
-                                    val currentJson = backupAdapter.toJson(currentLocalData)
                                     val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                     val cachedJson = prefs.getString("firestore_cached_data_$email", null)
 
-                                    val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                    val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
+                                    var hasUnsaved = false
+                                    if (cachedJson == null) {
+                                        hasUnsaved = currentLocalData.transactions.isNotEmpty() ||
+                                            currentLocalData.persons.isNotEmpty() ||
+                                            currentLocalData.savingsGoals.isNotEmpty()
+                                    } else {
+                                        val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
+                                        if (cachedData == null) {
+                                            hasUnsaved = true
+                                        } else {
+                                            hasUnsaved = currentLocalData.transactions.size != cachedData.transactions.size ||
+                                                    currentLocalData.persons.size != cachedData.persons.size ||
+                                                    currentLocalData.savingsGoals.size != cachedData.savingsGoals.size ||
+                                                    currentLocalData.savingsTransactions.size != cachedData.savingsTransactions.size ||
+                                                    backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(cachedData)
+                                        }
+                                    }
 
-                                    if (currentJson == decryptedJson) {
-                                        // Perfectly in sync
-                                        prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                        _hasUnsavedChanges.value = false
-                                        _unsyncedItems.value = emptyList()
-                                        _firestoreSyncStatus.value = "Synced"
-                                        updateSyncSuccess(getApplication(), true)
-                                    } else if (cachedJson == null) {
-                                        // First sync after sign-in
-                                        if (remoteData != null) {
-                                            val localIsEmpty = currentLocalData.transactions.isEmpty() &&
-                                                    currentLocalData.persons.isEmpty() &&
-                                                    currentLocalData.savingsGoals.isEmpty()
-                                            if (localIsEmpty) {
-                                                restoreFullBackup(remoteData)
-                                                com.example.widget.updateAllWidgets(getApplication())
-                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                                _hasUnsavedChanges.value = false
-                                                _unsyncedItems.value = emptyList()
-                                                _firestoreSyncStatus.value = "Synced"
-                                                updateSyncSuccess(getApplication(), true)
-                                            } else {
+                                    if (hasUnsaved) {
+                                        _hasUnsavedChanges.value = true
+                                        
+                                        // Show dialog ONLY if we have a real conflict (local has data and remote is different)
+                                        // But only if we don't have a cached version yet (first sync after sign-in)
+                                        if (cachedJson == null) {
+                                            val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                            val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
+                                            if (remoteData != null) {
                                                 _pendingCloudData.value = remoteData
                                                 _showCloudDataFoundDialog.value = true
-                                                checkUnsavedChanges()
                                             }
                                         }
-                                    } else if (cachedJson == currentJson) {
-                                        // Local hasn't changed, but remote has updated from another device
-                                        if (remoteData != null) {
-                                            restoreFullBackup(remoteData)
-                                            com.example.widget.updateAllWidgets(getApplication())
-                                            prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                            _hasUnsavedChanges.value = false
-                                            _unsyncedItems.value = emptyList()
-                                            _firestoreSyncStatus.value = "Synced"
-                                            updateSyncSuccess(getApplication(), true)
+                                        return@launch // Do not overwrite local data if we have offline changes
+                                    }
+
+                                    val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                    val remoteData = backupAdapter.fromJson(decryptedJson)
+                                    if (remoteData != null) {
+                                        val localTxCount = currentLocalData.transactions.size
+                                        val remoteTxCount = remoteData.transactions.size
+                                        
+                                        val currentJson = backupAdapter.toJson(currentLocalData)
+                                        if (currentJson != decryptedJson) {
+                                            // Data is different, check if remote is newer or just different
+                                            // For simplicity, if remote is different and local is same as last cached, we restore
+                                            if (cachedJson == null || cachedJson == backupAdapter.toJson(currentLocalData)) {
+                                                restoreFullBackup(remoteData)
+                                                com.example.widget.updateAllWidgets(getApplication())
+                                                _firestoreSyncStatus.value = "Synced"
+                                            } else {
+                                                // Local has changes that are not in cloud yet
+                                                _hasUnsavedChanges.value = true
+                                            }
+                                        } else {
+                                            // No change needed
+                                            _firestoreSyncStatus.value = null // Hide sync status if nothing changed
                                         }
-                                    } else {
-                                        // Local has changes that are not in cloud yet
-                                        checkUnsavedChanges()
+                                        
+                                        try {
+                                            prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                        } catch (e: Exception) { e.printStackTrace() }
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
@@ -2803,9 +2797,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val idToken = account.idToken
                 if (idToken != null) {
                     val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
-                    getFirebaseAuth().signInWithCredential(credential)
+                    firebaseAuth.signInWithCredential(credential)
                         .addOnSuccessListener {
-                            _currentUser.value = getFirebaseAuth().currentUser
+                            _currentUser.value = firebaseAuth.currentUser
                         }
                 }
                 
@@ -3334,7 +3328,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _googleEmail.value = null
         _googleName.value = null
         _googlePhotoUrl.value = null
-        try { getFirebaseAuth().signOut() } catch (e: Exception) { e.printStackTrace() }
+        firebaseAuth.signOut()
         _driveStatusMessage.value = "Signed Out"
         com.example.widget.updateAllWidgets(context)
         stopRealtimeSync()
@@ -3578,7 +3572,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Email and password cannot be empty")
             return
         }
-        getFirebaseAuth().signInWithEmailAndPassword(email, pass)
+        firebaseAuth.signInWithEmailAndPassword(email, pass)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = task.result?.user
@@ -3602,7 +3596,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Email and password cannot be empty")
             return
         }
-        getFirebaseAuth().createUserWithEmailAndPassword(email, pass)
+        firebaseAuth.createUserWithEmailAndPassword(email, pass)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = task.result?.user
@@ -3628,7 +3622,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Please enter your email address")
             return
         }
-        getFirebaseAuth().sendPasswordResetEmail(email)
+        firebaseAuth.sendPasswordResetEmail(email)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     onSuccess()
@@ -3648,13 +3642,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Please enter a valid phone number")
             return
         }
-        val options = PhoneAuthOptions.newBuilder(getFirebaseAuth())
+        val options = PhoneAuthOptions.newBuilder(firebaseAuth)
             .setPhoneNumber(phoneNumber)
             .setTimeout(60L, TimeUnit.SECONDS)
             .setActivity(activity)
             .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
                 override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                    getFirebaseAuth().signInWithCredential(credential)
+                    firebaseAuth.signInWithCredential(credential)
                         .addOnCompleteListener { task ->
                             if (task.isSuccessful) {
                                 val user = task.result?.user
@@ -3692,7 +3686,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
         try {
             val credential = PhoneAuthProvider.getCredential(verificationId, code)
-            getFirebaseAuth().signInWithCredential(credential)
+            firebaseAuth.signInWithCredential(credential)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         val user = task.result?.user
