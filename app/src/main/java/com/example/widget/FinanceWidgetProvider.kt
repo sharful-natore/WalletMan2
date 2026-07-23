@@ -64,20 +64,20 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         ?: prefs.getString("active_workspace_id", "default") 
         ?: "default"
 
-    val txIntent = Intent(context, MainActivity::class.java).apply {
+    val txIntent = Intent(context, com.example.QuickAddActivity::class.java).apply {
         action = "ACTION_ADD_TRANSACTION"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
-    val personIntent = Intent(context, MainActivity::class.java).apply {
+    val personIntent = Intent(context, com.example.QuickAddActivity::class.java).apply {
         action = "ACTION_DEBT_CREDIT"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
-    val savingIntent = Intent(context, MainActivity::class.java).apply {
+    val savingIntent = Intent(context, com.example.QuickAddActivity::class.java).apply {
         action = "ACTION_SAVINGS"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
 
     val incomeViewIntent = Intent(context, MainActivity::class.java).apply {

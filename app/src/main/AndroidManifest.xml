@@ -34,6 +34,12 @@
         </activity>
 
         <activity
+            android:name="com.example.QuickAddActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FinanceNote.Dialog"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>

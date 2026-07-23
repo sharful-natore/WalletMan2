@@ -63,17 +63,17 @@ class FinanceNotificationService : Service() {
     private fun createNotification(): Notification {
         val views = RemoteViews(packageName, R.layout.notification_finance)
 
-        val txIntent = Intent(this, MainActivity::class.java).apply {
+        val txIntent = Intent(this, com.example.QuickAddActivity::class.java).apply {
             action = "ACTION_ADD_TRANSACTION"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
-        val debtIntent = Intent(this, MainActivity::class.java).apply {
+        val debtIntent = Intent(this, com.example.QuickAddActivity::class.java).apply {
             action = "ACTION_DEBT_CREDIT"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
-        val savingsIntent = Intent(this, MainActivity::class.java).apply {
+        val savingsIntent = Intent(this, com.example.QuickAddActivity::class.java).apply {
             action = "ACTION_SAVINGS"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         val backupIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_BACKUP"
