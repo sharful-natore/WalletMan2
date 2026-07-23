@@ -1989,6 +1989,13 @@ fun FinanceNoteApp(
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
     val isAuthenticated by viewModel.isUserSignedInFlow.collectAsStateWithLifecycle()
     
+    var forceDismissLogin by remember { mutableStateOf(false) }
+    LaunchedEffect(isAuthenticated) {
+        if (!isAuthenticated) {
+            forceDismissLogin = false
+        }
+    }
+    
     val currentWorkspace by viewModel.currentWorkspace.collectAsState()
     val workspaceStatsList by viewModel.workspaceStatsList.collectAsState(initial = emptyList())
     
@@ -2056,6 +2063,7 @@ fun FinanceNoteApp(
                         context = context,
                         account = account,
                         onSuccess = {
+                            forceDismissLogin = true
                             viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", isSuccess = true, type = "SUCCESS")
                             viewModel.triggerCustomNotification(
                                 if (language == AppLanguage.BN) "আপনার গুগল অ্যাকাউন্ট সফলভাবে সিস্টেমের সাথে কানেক্ট করা হয়েছে।" else "Your Google account has been successfully connected with the system.",
@@ -2666,7 +2674,7 @@ fun FinanceNoteApp(
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme
     ) {
-        if (!isAuthenticated && !showSplash) {
+        if (!isAuthenticated && !showSplash && !forceDismissLogin) {
             LoginScreen(
                 viewModel = viewModel,
                 language = language,
@@ -5528,6 +5536,7 @@ fun FinanceNoteApp(
                                     context = context,
                                     account = act,
                                     onSuccess = {
+                                        forceDismissLogin = true
                                         viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", isSuccess = true, type = "SUCCESS")
                                         viewModel.triggerCustomNotification(
                                             if (language == AppLanguage.BN) "আপনার নতুন গুগল অ্যাকাউন্টটি সফলভাবে সিঙ্ক করা হয়েছে।" else "Your new Google account has been successfully synced.",

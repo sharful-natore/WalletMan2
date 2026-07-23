@@ -1242,11 +1242,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             prefs.edit().putInt("selected_theme_gradient_index", backup.selectedThemeGradientIndex).apply()
             _selectedThemeGradientIndex.value = backup.selectedThemeGradientIndex
         }
-        
+
         // Restore budgets and check profile photos for each workspace
         backup.workspaces.forEach { ws ->
             restoreProfilePhotoFromCloud(getApplication(), ws.id)
         }
+
+        // Update active workspace ID to a valid one from the restored workspaces
+        val currentWsId = _currentWorkspaceId.value
+        val restoredWorkspaces = backup.workspaces
+        if (restoredWorkspaces.isNotEmpty()) {
+            val exists = restoredWorkspaces.any { it.id == currentWsId }
+            if (!exists) {
+                val nextWsId = restoredWorkspaces.firstOrNull()?.id ?: "default"
+                _currentWorkspaceId.value = nextWsId
+                prefs.edit().putString("active_workspace_id", nextWsId).apply()
+            }
+        } else {
+            _currentWorkspaceId.value = "default"
+            prefs.edit().putString("active_workspace_id", "default").apply()
+        }
+        loadProfile(getApplication())
 
         if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
             saveProfile(getApplication(),
