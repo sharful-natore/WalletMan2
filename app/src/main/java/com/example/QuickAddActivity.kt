@@ -62,12 +62,15 @@ class QuickAddActivity : ComponentActivity() {
                 prefs.getBoolean("is_dark_theme", sysDark)
             }
 
+            val defaultGradient = remember { com.example.ui.theme.ThemeGradient(com.example.ui.theme.GradientsList.firstOrNull() ?: listOf(com.example.ui.theme.FintechBlue, com.example.ui.theme.FintechBlue)) }
             FinanceNoteTheme(darkTheme = isDarkTheme) {
-                QuickAddDialogScreen(
-                    initialAction = initialAction,
-                    targetWorkspaceId = targetWorkspaceId,
-                    onDismiss = { finish() }
-                )
+                androidx.compose.runtime.CompositionLocalProvider(com.example.ui.screens.LocalActiveThemeGradient provides defaultGradient) {
+                    QuickAddDialogScreen(
+                        initialAction = initialAction,
+                        targetWorkspaceId = targetWorkspaceId,
+                        onDismiss = { finish() }
+                    )
+                }
             }
         }
     }

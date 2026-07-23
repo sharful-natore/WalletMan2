@@ -79,7 +79,9 @@ val FintechBlue: Color
     @Composable
     get() = MaterialTheme.colorScheme.primary
 
-val LocalActiveThemeGradient = androidx.compose.runtime.staticCompositionLocalOf<com.example.ui.theme.ThemeGradient> { error("Not provided") }
+val LocalActiveThemeGradient = androidx.compose.runtime.staticCompositionLocalOf<com.example.ui.theme.ThemeGradient> { 
+    com.example.ui.theme.ThemeGradient(com.example.ui.theme.GradientsList.firstOrNull() ?: listOf(com.example.ui.theme.FintechBlue, com.example.ui.theme.FintechBlue)) 
+}
 
 val activeThemeGradientConfig: com.example.ui.theme.ThemeGradient
     @Composable
