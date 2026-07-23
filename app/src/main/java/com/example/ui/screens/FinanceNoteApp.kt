@@ -18108,6 +18108,8 @@ fun EnhancedProfileMenu(
     val profileName by viewModel.profileName.collectAsStateWithLifecycle()
     val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+    val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
+    val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     Dialog(
         onDismissRequest = onDismiss
@@ -18124,7 +18126,14 @@ fun EnhancedProfileMenu(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Header User Info
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onProfileSettings() }
+                        .padding(8.dp)
+                ) {
                     Box(
                         modifier = Modifier
                             .size(56.dp)
@@ -18132,9 +18141,9 @@ fun EnhancedProfileMenu(
                             .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (isGoogleSignedIn && !googlePhotoUrl.isNullOrEmpty()) {
+                        if (!profilePhotoUri.isNullOrEmpty()) {
                             AsyncImage(
-                                model = googlePhotoUrl,
+                                model = profilePhotoUri,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -18146,7 +18155,9 @@ fun EnhancedProfileMenu(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
+                            text = if (profileName.isNotBlank()) profileName 
+                                   else if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) 
+                                   else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black
@@ -18166,7 +18177,7 @@ fun EnhancedProfileMenu(
                 // Menu Items
                 ProfileMenuItem(
                     icon = Icons.Rounded.Workspaces,
-                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস সুইচ করুন" else "Switch Workspace",
+                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস" else "Workspace",
                     isDark = isDark,
                     onClick = onSwitchWorkspace
                 )
