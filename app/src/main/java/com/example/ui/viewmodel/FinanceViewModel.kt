@@ -100,15 +100,55 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val firebaseAuth = FirebaseAuth.getInstance()
     private val _currentUser = MutableStateFlow(firebaseAuth.currentUser)
     val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = _currentUser.asStateFlow()
-    val isUserSignedInFlow = _currentUser.map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null)
+
+    private val _googleName = MutableStateFlow<String?>(null)
+    val googleName: StateFlow<String?> = _googleName.asStateFlow()
+
+    private val _userAddress = MutableStateFlow<String?>(null)
+    val userAddress: StateFlow<String?> = _userAddress.asStateFlow()
+
+    private val _userPhone = MutableStateFlow<String?>(null)
+    val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
+
+    private val _userDOB = MutableStateFlow<String?>(null)
+    val userDOB: StateFlow<String?> = _userDOB.asStateFlow()
+
+    private val _isProfileSetupComplete = MutableStateFlow<Boolean?>(null)
+    val isProfileSetupComplete: StateFlow<Boolean?> = _isProfileSetupComplete.asStateFlow()
+
+    private val _googleEmail = MutableStateFlow<String?>(null)
+    val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
+
+    private val _googlePhotoUrl = MutableStateFlow<String?>(null)
+    val googlePhotoUrl: StateFlow<String?> = _googlePhotoUrl.asStateFlow()
+
+    private val _isGoogleSignedIn = MutableStateFlow(false)
+    val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
+
+    private val _isPhotoLoading = MutableStateFlow(false)
+    val isPhotoLoading: StateFlow<Boolean> = _isPhotoLoading.asStateFlow()
+
+    val isUserSignedInFlow = combine(_currentUser, _isGoogleSignedIn) { user, googleSignedIn ->
+        user != null || googleSignedIn
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null || _isGoogleSignedIn.value)
 
     init {
+        val initialGPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        val savedEmail = initialGPrefs.getString("google_email", null)
+        if (!savedEmail.isNullOrBlank()) {
+            _isGoogleSignedIn.value = true
+            _googleEmail.value = savedEmail
+            _googleName.value = initialGPrefs.getString("google_name", null)
+            _googlePhotoUrl.value = initialGPrefs.getString("google_photo_url", null)
+            _isProfileSetupComplete.value = initialGPrefs.getBoolean("profile_setup_complete", false)
+        }
+
         firebaseAuth.addAuthStateListener { auth ->
             val user = auth.currentUser
             _currentUser.value = user
             
             // Treat any Firebase sign-in as 'signed in' for sync purposes
-            val signedIn = user != null
+            val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
             _isGoogleSignedIn.value = signedIn
             
             if (signedIn && user != null) {
@@ -138,7 +178,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }.apply()
 
                 startRealtimeSync()
-            } else {
+            } else if (!signedIn) {
                 _googleEmail.value = null
                 _googleName.value = null
                 _googlePhotoUrl.value = null
@@ -1378,6 +1418,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
 
+        // 1. Check if local photo file exists and is non-empty on device
+        val localFile = File(context.filesDir, "profile_photo_${workspaceId}.jpg")
+        if (localFile.exists() && localFile.length() > 0) {
+            val localPath = localFile.absolutePath
+            if (_currentWorkspaceId.value == workspaceId) {
+                _profilePhotoUri.value = localPath
+                _googlePhotoUrl.value = localPath
+            }
+            viewModelScope.launch {
+                val existing = repository.getWorkspaceById(workspaceId)
+                if (existing != null && existing.profilePhotoUri != localPath) {
+                    repository.insertWorkspace(existing.copy(profilePhotoUri = localPath))
+                }
+                com.example.widget.updateAllWidgets(context)
+            }
+            onRestored?.invoke(localPath)
+            return
+        }
+
+        // 2. Local photo file missing -> Download photo from cloud
+        _isPhotoLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val db = getFirestore(getApplication())
@@ -1408,14 +1469,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     }
                                     onRestored?.invoke(localPath)
                                     com.example.widget.updateAllWidgets(getApplication())
+                                    _isPhotoLoading.value = false
                                 }
+                            } else {
+                                _isPhotoLoading.value = false
                             }
                         }
 
                         if (!base64.isNullOrBlank()) {
                             applyPhoto(base64)
                         } else {
-                            // Try fallback from profile doc
+                            // Try fallback from user profile doc
                             db.collection("users").document(email)
                                 .collection("profile").document("data")
                                 .get()
@@ -1423,12 +1487,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     val fallbackB64 = pDoc?.getString("photoBase64")
                                     if (!fallbackB64.isNullOrBlank()) {
                                         applyPhoto(fallbackB64)
+                                    } else {
+                                        _isPhotoLoading.value = false
                                     }
+                                }
+                                .addOnFailureListener {
+                                    _isPhotoLoading.value = false
                                 }
                         }
                     }
+                    .addOnFailureListener {
+                        _isPhotoLoading.value = false
+                    }
             } catch (e: Exception) {
                 e.printStackTrace()
+                _isPhotoLoading.value = false
             }
         }
     }
@@ -1450,10 +1523,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun checkAndRestoreProfilePhoto(context: Context, workspaceId: String = _currentWorkspaceId.value) {
-        val currentPhoto = _profilePhotoUri.value
-        val isFileMissing = currentPhoto.isNullOrBlank() || !File(currentPhoto).exists() || File(currentPhoto).length() == 0L
-        if (isFileMissing) {
-            restoreProfilePhotoFromCloud(context, workspaceId)
+        viewModelScope.launch {
+            val existing = repository.getWorkspaceById(workspaceId)
+            val currentPhoto = existing?.profilePhotoUri ?: if (workspaceId == _currentWorkspaceId.value) _profilePhotoUri.value else null
+            val isFileMissing = currentPhoto.isNullOrBlank() || !File(currentPhoto).exists() || File(currentPhoto).length() == 0L
+            if (isFileMissing) {
+                restoreProfilePhotoFromCloud(context, workspaceId)
+            }
+        }
+    }
+
+    fun restoreAllWorkspaceProfilePhotosFromCloud() {
+        viewModelScope.launch {
+            try {
+                val allWs = repository.allWorkspaces.first()
+                val context = getApplication<Application>()
+                allWs.forEach { ws ->
+                    checkAndRestoreProfilePhoto(context, ws.id)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -1711,7 +1801,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             val wsId = _currentWorkspaceId.value
             val existing = repository.getWorkspaceById(wsId) ?: com.example.data.Workspace(id = wsId, name = "ব্যক্তিগত")
-            val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it, wsId) } ?: photoUri
+            val finalPhotoUri = when {
+                photoUri == null -> existing.profilePhotoUri
+                photoUri.isBlank() -> null
+                else -> saveImageToInternalStorage(context, photoUri, wsId) ?: existing.profilePhotoUri ?: photoUri
+            }
             
             repository.insertWorkspace(existing.copy(
                 profileName = name,
@@ -1724,12 +1818,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             
             _profileName.value = name
             _profileEmail.value = email
-            _profilePhotoUri.value = finalPhotoUri
+            if (finalPhotoUri != null || photoUri != null) {
+                _profilePhotoUri.value = finalPhotoUri
+            }
             _profilePhone.value = phone
             _profileSocial.value = social
             _profileAddress.value = address
             
-            syncProfilePhotoToCloud(context, wsId, finalPhotoUri)
+            if (photoUri != null) {
+                syncProfilePhotoToCloud(context, wsId, finalPhotoUri)
+            }
             com.example.widget.updateAllWidgets(context)
             uploadToFirestore()
         }
@@ -2433,31 +2531,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
         }
     }
-
-    // Google Sign-In & Drive Backup properties
-    private val _googleName = MutableStateFlow<String?>(null)
-    val googleName: StateFlow<String?> = _googleName.asStateFlow()
-
-    private val _userAddress = MutableStateFlow<String?>(null)
-    val userAddress: StateFlow<String?> = _userAddress.asStateFlow()
-
-    private val _userPhone = MutableStateFlow<String?>(null)
-    val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
-
-    private val _userDOB = MutableStateFlow<String?>(null)
-    val userDOB: StateFlow<String?> = _userDOB.asStateFlow()
-
-    private val _isProfileSetupComplete = MutableStateFlow<Boolean?>(null)
-    val isProfileSetupComplete: StateFlow<Boolean?> = _isProfileSetupComplete.asStateFlow()
-
-    private val _googleEmail = MutableStateFlow<String?>(null)
-    val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
-
-    private val _googlePhotoUrl = MutableStateFlow<String?>(null)
-    val googlePhotoUrl: StateFlow<String?> = _googlePhotoUrl.asStateFlow()
-
-    private val _isGoogleSignedIn = MutableStateFlow(false)
-    val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
 
     private val _driveStatusMessage = MutableStateFlow<String?>(null)
     val driveStatusMessage: StateFlow<String?> = _driveStatusMessage.asStateFlow()
@@ -3368,17 +3441,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun updateUserProfile(name: String, address: String, phone: String, dob: String, photoUri: String?, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        val context = getApplication<Application>()
+        val wsId = _currentWorkspaceId.value
+        val finalPhotoUri = if (!photoUri.isNullOrBlank()) saveImageToInternalStorage(context, photoUri, wsId) else photoUri
+
         _googleName.value = name
         _userAddress.value = address
         _userPhone.value = phone
         _userDOB.value = dob
-        _googlePhotoUrl.value = photoUri
+        _googlePhotoUrl.value = finalPhotoUri
         _isProfileSetupComplete.value = true
 
-        val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
         gPrefs.edit()
             .putString("google_name", name)
-            .putString("google_photo_url", photoUri)
+            .putString("google_photo_url", finalPhotoUri)
             .putBoolean("profile_setup_complete", true)
             .putString("user_address", address)
             .putString("user_phone", phone)
@@ -3387,28 +3464,29 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
         // Also update the current workspace profile so it reflects in Dashboard and Widget
         viewModelScope.launch {
-            val wsId = _currentWorkspaceId.value
             val existing = repository.getWorkspaceById(wsId) ?: com.example.data.Workspace(id = wsId, name = "ব্যক্তিগত")
             repository.insertWorkspace(existing.copy(
                 profileName = name,
                 profileAddress = address,
                 profilePhone = phone,
-                profilePhotoUri = photoUri
+                profilePhotoUri = finalPhotoUri
             ))
             _profileName.value = name
             _profileAddress.value = address
             _profilePhone.value = phone
-            _profilePhotoUri.value = photoUri
+            _profilePhotoUri.value = finalPhotoUri
 
             // Also save to financenote_prefs for the widget syncing
-            val wPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            val wPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
             val keySuffix = if (wsId == "default") "" else "_$wsId"
             wPrefs.edit()
                 .putString("user_name$keySuffix", name)
-                .putString("user_photo$keySuffix", photoUri)
+                .putString("user_photo$keySuffix", finalPhotoUri)
                 .apply()
 
-            com.example.widget.updateAllWidgets(getApplication())
+            syncProfilePhotoToCloud(context, wsId, finalPhotoUri)
+            com.example.widget.updateAllWidgets(context)
+            uploadToFirestore()
         }
         
         val email = _googleEmail.value
@@ -3421,7 +3499,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         "address" to address,
                         "phone" to phone,
                         "dob" to dob,
-                        "photoUrl" to photoUri,
+                        "photoUrl" to finalPhotoUri,
                         "setupComplete" to true,
                         "updatedAt" to System.currentTimeMillis()
                     )
@@ -3452,9 +3530,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                 _userAddress.value = doc.getString("address")
                                 _userPhone.value = doc.getString("phone") ?: ""
                                 _userDOB.value = doc.getString("dob") ?: ""
-                                _googlePhotoUrl.value = doc.getString("photoUrl") ?: _googlePhotoUrl.value
+                                val cloudPhotoUrl = doc.getString("photoUrl")
+                                val photoBase64 = doc.getString("photoBase64")
                                 _isProfileSetupComplete.value = doc.getBoolean("setupComplete") ?: false
                                 
+                                if (!photoBase64.isNullOrBlank()) {
+                                    saveBase64ToLocalStorage(getApplication(), photoBase64, _currentWorkspaceId.value)?.let { localPath ->
+                                        _googlePhotoUrl.value = localPath
+                                        _profilePhotoUri.value = localPath
+                                    }
+                                } else if (!cloudPhotoUrl.isNullOrBlank()) {
+                                    _googlePhotoUrl.value = cloudPhotoUrl
+                                }
+
                                 val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                                 gPrefs.edit()
                                     .putString("google_name", _googleName.value)
@@ -3467,12 +3555,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             } else {
                                 _isProfileSetupComplete.value = false
                             }
+                            restoreAllWorkspaceProfilePhotosFromCloud()
                         }
                         .addOnFailureListener {
-                            // Keep cached value
+                            restoreAllWorkspaceProfilePhotosFromCloud()
                         }
                 } catch (e: Exception) {
-                    // Keep cached value
+                    restoreAllWorkspaceProfilePhotosFromCloud()
                 }
             }
         }
@@ -3490,6 +3579,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val userEmail = user?.email ?: email
                     _googleEmail.value = userEmail
                     _isGoogleSignedIn.value = true
+                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    gPrefs.edit().putString("google_email", userEmail).apply()
+                    fetchUserProfile()
+                    restoreAllWorkspaceProfilePhotosFromCloud()
                     startRealtimeSync()
                     onSuccess()
                 } else {
@@ -3511,6 +3604,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     _googleEmail.value = userEmail
                     _isGoogleSignedIn.value = true
                     _isProfileSetupComplete.value = false // Explicitly set to false to trigger setup
+                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    gPrefs.edit().putString("google_email", userEmail).apply()
+                    fetchUserProfile()
+                    restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value)
+                    checkAndRestoreProfilePhoto(getApplication(), _currentWorkspaceId.value)
                     startRealtimeSync()
                     onSuccess()
                 } else {
