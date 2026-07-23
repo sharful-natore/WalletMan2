@@ -18,7 +18,7 @@ android {
     applicationId = "com.vibestudio.financenote"
     minSdk = 24
     targetSdk = 34
-    versionCode = 4
+    versionCode = 5
     versionName = "1.4"
     multiDexEnabled = true
 
@@ -63,15 +63,15 @@ android {
 
   buildTypes {
     release {
-      isCrunchPngs = false
-      isMinifyEnabled = false
-      isShrinkResources = false
+      isCrunchPngs = true
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      isMinifyEnabled = false
-      isShrinkResources = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }

@@ -4995,127 +4995,117 @@ fun FinanceNoteApp(
                             )
                         }
 
-                        if (lastMutationAction != null) {
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
 
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isDarkTheme) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.02f))
-                                    .padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = if (hasUnsavedChanges) {
-                                        if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা (সিঙ্ক প্রয়োজন):" else "Unsaved Data (Sync Needed):"
-                                    } else {
-                                        if (language == AppLanguage.BN) "সর্বশেষ সিঙ্কড ডাটা:" else "Last Synced Data:"
-                                    },
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (hasUnsavedChanges) Color(0xFFFFB300) else Color(0xFF4CAF50)
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                val actionText = when (lastMutationAction) {
-                                    "ADD" -> if (language == AppLanguage.BN) "যোগ করা হয়েছে" else "Added"
-                                    "EDIT" -> if (language == AppLanguage.BN) "আপডেট করা হয়েছে" else "Updated"
-                                    "DELETE" -> if (language == AppLanguage.BN) "মুছে ফেলা হয়েছে" else "Deleted"
-                                    else -> lastMutationAction ?: ""
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = if (language == AppLanguage.BN) "কাজ:" else "Action:",
-                                        fontSize = 12.sp,
-                                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
-                                    )
-                                    Text(
-                                        text = actionText,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = if (language == AppLanguage.BN) "ব্যক্তির নাম:" else "Name:",
-                                        fontSize = 12.sp,
-                                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
-                                    )
-                                    Text(
-                                        text = lastMutationName ?: "-",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = if (language == AppLanguage.BN) "ধরণ:" else "Category:",
-                                        fontSize = 12.sp,
-                                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
-                                    )
-                                    val categoryDisplay = when (lastMutationCategory) {
-                                        "PERSON" -> if (language == AppLanguage.BN) "ব্যক্তি/লেনদেন" else "Person/Debt"
-                                        "SAVINGS_GOAL" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্য" else "Savings Goal"
-                                        "SAVINGS_CONTRIBUTION" -> if (language == AppLanguage.BN) "সঞ্চয় লেনদেন" else "Savings Transaction"
-                                        else -> {
-                                            val cat = lastMutationCategory ?: ""
-                                            if (language == AppLanguage.BN) {
-                                                cat.replace("EXPENSE", "ব্যয়").replace("INCOME", "আয়")
-                                            } else {
-                                                cat
-                                            }
-                                        }
-                                    }
-                                    Text(
-                                        text = categoryDisplay,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
-                                    )
-                                }
-                                if (lastMutationAmount != null && lastMutationAmount!! > 0.0) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = if (language == AppLanguage.BN) "পরিমান:" else "Amount:",
-                                            fontSize = 12.sp,
-                                            color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
-                                        )
-                                        Text(
-                                            text = if (language == AppLanguage.BN) "৳${String.format("%,.2f", lastMutationAmount)}" else "$${String.format("%,.2f", lastMutationAmount)}",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isDarkTheme) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.02f))
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Text(
                                 text = if (hasUnsavedChanges) {
-                                    if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা আছে" else "Unsaved data present"
+                                    if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা (সিঙ্ক প্রয়োজন):" else "Unsaved Data (Sync Needed):"
                                 } else {
-                                    if (language == AppLanguage.BN) "সব ডেটা সিঙ্ক হয়েছে" else "All data synced"
+                                    if (language == AppLanguage.BN) "সর্বশেষ সিঙ্কড ডাটা:" else "Last Synced Data:"
                                 },
-                                fontSize = 12.sp,
-                                fontStyle = FontStyle.Italic,
-                                color = if (isDarkTheme) Color.Gray else Color.DarkGray,
-                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasUnsavedChanges) Color(0xFFFFB300) else Color(0xFF4CAF50)
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val actionText = when (lastMutationAction) {
+                                "ADD" -> if (language == AppLanguage.BN) "যোগ করা হয়েছে" else "Added"
+                                "EDIT" -> if (language == AppLanguage.BN) "আপডেট করা হয়েছে" else "Updated"
+                                "DELETE" -> if (language == AppLanguage.BN) "মুছে ফেলা হয়েছে" else "Deleted"
+                                null -> if (language == AppLanguage.BN) "কোনো পরিবর্তন নেই" else "No changes"
+                                else -> lastMutationAction ?: ""
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "কাজ:" else "Action:",
+                                    fontSize = 12.sp,
+                                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                )
+                                Text(
+                                    text = actionText,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "ব্যক্তির নাম:" else "Name:",
+                                    fontSize = 12.sp,
+                                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                )
+                                Text(
+                                    text = lastMutationName ?: "-",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "ধরণ:" else "Category:",
+                                    fontSize = 12.sp,
+                                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                )
+                                val categoryDisplay = when (lastMutationCategory) {
+                                    "PERSON" -> if (language == AppLanguage.BN) "ব্যক্তি/লেনদেন" else "Person/Debt"
+                                    "SAVINGS_GOAL" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্য" else "Savings Goal"
+                                    "SAVINGS_CONTRIBUTION" -> if (language == AppLanguage.BN) "সঞ্চয় লেনদেন" else "Savings Transaction"
+                                    null -> "-"
+                                    else -> {
+                                        val cat = lastMutationCategory ?: ""
+                                        if (language == AppLanguage.BN) {
+                                            cat.replace("EXPENSE", "ব্যয়").replace("INCOME", "আয়")
+                                        } else {
+                                            cat
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = categoryDisplay,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "পরিমান:" else "Amount:",
+                                    fontSize = 12.sp,
+                                    color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                                )
+                                val amountVal = lastMutationAmount
+                                Text(
+                                    text = if (amountVal != null && amountVal > 0.0) {
+                                        if (language == AppLanguage.BN) "৳${String.format("%,.2f", amountVal)}" else "$${String.format("%,.2f", amountVal)}"
+                                    } else {
+                                        "-"
+                                    },
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                                )
+                            }
                         }
 
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
@@ -18108,8 +18098,6 @@ fun EnhancedProfileMenu(
     val profileName by viewModel.profileName.collectAsStateWithLifecycle()
     val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
-    val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
-    val profilePhotoUri = rawProfilePhotoUri ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
 
     Dialog(
         onDismissRequest = onDismiss
@@ -18126,14 +18114,7 @@ fun EnhancedProfileMenu(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Header User Info
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onProfileSettings() }
-                        .padding(8.dp)
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(56.dp)
@@ -18141,9 +18122,9 @@ fun EnhancedProfileMenu(
                             .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!profilePhotoUri.isNullOrEmpty()) {
+                        if (isGoogleSignedIn && !googlePhotoUrl.isNullOrEmpty()) {
                             AsyncImage(
-                                model = profilePhotoUri,
+                                model = googlePhotoUrl,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -18155,9 +18136,7 @@ fun EnhancedProfileMenu(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if (profileName.isNotBlank()) profileName 
-                                   else if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) 
-                                   else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
+                            text = if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black
@@ -18177,7 +18156,7 @@ fun EnhancedProfileMenu(
                 // Menu Items
                 ProfileMenuItem(
                     icon = Icons.Rounded.Workspaces,
-                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস" else "Workspace",
+                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস সুইচ করুন" else "Switch Workspace",
                     isDark = isDark,
                     onClick = onSwitchWorkspace
                 )

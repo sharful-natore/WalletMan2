@@ -1,9 +1,0 @@
-            FintechGradientCard(
-                gradientColors = GradientsList[0],
-                cornerRadius = 24.dp,
-                padding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
-                onClick = { onWorkspaceClick() },
-                modifier = Modifier
-                    .testTag("dashboard_profile_card")
-                    .padding(top = 8.dp)
-            ) {
