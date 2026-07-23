@@ -1470,27 +1470,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun checkAndRestoreProfilePhoto(context: Context, workspaceId: String = _currentWorkspaceId.value) {
-        viewModelScope.launch {
-            val existing = repository.getWorkspaceById(workspaceId)
-            val currentPhoto = existing?.profilePhotoUri ?: if (workspaceId == _currentWorkspaceId.value) _profilePhotoUri.value else null
-            val isFileMissing = currentPhoto.isNullOrBlank() || !File(currentPhoto).exists() || File(currentPhoto).length() == 0L
-            if (isFileMissing) {
-                restoreProfilePhotoFromCloud(context, workspaceId)
-            }
-        }
-    }
-
-    fun restoreAllWorkspaceProfilePhotosFromCloud() {
-        viewModelScope.launch {
-            try {
-                val allWs = repository.allWorkspaces.first()
-                val context = getApplication<Application>()
-                allWs.forEach { ws ->
-                    checkAndRestoreProfilePhoto(context, ws.id)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+        val currentPhoto = _profilePhotoUri.value
+        val isFileMissing = currentPhoto.isNullOrBlank() || !File(currentPhoto).exists() || File(currentPhoto).length() == 0L
+        if (isFileMissing) {
+            restoreProfilePhotoFromCloud(context, workspaceId)
         }
     }
 
@@ -3527,13 +3510,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             } else {
                                 _isProfileSetupComplete.value = false
                             }
-                            restoreAllWorkspaceProfilePhotosFromCloud()
+                            restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value)
                         }
                         .addOnFailureListener {
-                            restoreAllWorkspaceProfilePhotosFromCloud()
+                            restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value)
                         }
                 } catch (e: Exception) {
-                    restoreAllWorkspaceProfilePhotosFromCloud()
+                    restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value)
                 }
             }
         }
@@ -3554,7 +3537,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                     gPrefs.edit().putString("google_email", userEmail).apply()
                     fetchUserProfile()
-                    restoreAllWorkspaceProfilePhotosFromCloud()
+                    restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value)
+                    checkAndRestoreProfilePhoto(getApplication(), _currentWorkspaceId.value)
                     startRealtimeSync()
                     onSuccess()
                 } else {
