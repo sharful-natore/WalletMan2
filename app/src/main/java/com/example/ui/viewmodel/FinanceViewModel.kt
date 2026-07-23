@@ -100,55 +100,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val firebaseAuth = FirebaseAuth.getInstance()
     private val _currentUser = MutableStateFlow(firebaseAuth.currentUser)
     val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = _currentUser.asStateFlow()
-
-    private val _googleName = MutableStateFlow<String?>(null)
-    val googleName: StateFlow<String?> = _googleName.asStateFlow()
-
-    private val _userAddress = MutableStateFlow<String?>(null)
-    val userAddress: StateFlow<String?> = _userAddress.asStateFlow()
-
-    private val _userPhone = MutableStateFlow<String?>(null)
-    val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
-
-    private val _userDOB = MutableStateFlow<String?>(null)
-    val userDOB: StateFlow<String?> = _userDOB.asStateFlow()
-
-    private val _isProfileSetupComplete = MutableStateFlow<Boolean?>(null)
-    val isProfileSetupComplete: StateFlow<Boolean?> = _isProfileSetupComplete.asStateFlow()
-
-    private val _googleEmail = MutableStateFlow<String?>(null)
-    val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
-
-    private val _googlePhotoUrl = MutableStateFlow<String?>(null)
-    val googlePhotoUrl: StateFlow<String?> = _googlePhotoUrl.asStateFlow()
-
-    private val _isGoogleSignedIn = MutableStateFlow(false)
-    val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
-
-    private val _isPhotoLoading = MutableStateFlow(false)
-    val isPhotoLoading: StateFlow<Boolean> = _isPhotoLoading.asStateFlow()
-
-    val isUserSignedInFlow = combine(_currentUser, _isGoogleSignedIn) { user, googleSignedIn ->
-        user != null || googleSignedIn
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null || _isGoogleSignedIn.value)
+    val isUserSignedInFlow = _currentUser.map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null)
 
     init {
-        val initialGPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-        val savedEmail = initialGPrefs.getString("google_email", null)
-        if (!savedEmail.isNullOrBlank()) {
-            _isGoogleSignedIn.value = true
-            _googleEmail.value = savedEmail
-            _googleName.value = initialGPrefs.getString("google_name", null)
-            _googlePhotoUrl.value = initialGPrefs.getString("google_photo_url", null)
-            _isProfileSetupComplete.value = initialGPrefs.getBoolean("profile_setup_complete", false)
-        }
-
         firebaseAuth.addAuthStateListener { auth ->
             val user = auth.currentUser
             _currentUser.value = user
             
             // Treat any Firebase sign-in as 'signed in' for sync purposes
-            val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
+            val signedIn = user != null
             _isGoogleSignedIn.value = signedIn
             
             if (signedIn && user != null) {
@@ -178,7 +138,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }.apply()
 
                 startRealtimeSync()
-            } else if (!signedIn) {
+            } else {
                 _googleEmail.value = null
                 _googleName.value = null
                 _googlePhotoUrl.value = null
@@ -1438,7 +1398,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
 
         // 2. Local photo file missing -> Download photo from cloud
-        _isPhotoLoading.value = true
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val db = getFirestore(getApplication())
@@ -1469,10 +1428,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     }
                                     onRestored?.invoke(localPath)
                                     com.example.widget.updateAllWidgets(getApplication())
-                                    _isPhotoLoading.value = false
                                 }
-                            } else {
-                                _isPhotoLoading.value = false
                             }
                         }
 
@@ -1487,21 +1443,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     val fallbackB64 = pDoc?.getString("photoBase64")
                                     if (!fallbackB64.isNullOrBlank()) {
                                         applyPhoto(fallbackB64)
-                                    } else {
-                                        _isPhotoLoading.value = false
                                     }
-                                }
-                                .addOnFailureListener {
-                                    _isPhotoLoading.value = false
                                 }
                         }
                     }
-                    .addOnFailureListener {
-                        _isPhotoLoading.value = false
-                    }
             } catch (e: Exception) {
                 e.printStackTrace()
-                _isPhotoLoading.value = false
             }
         }
     }
@@ -2531,6 +2478,31 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
         }
     }
+
+    // Google Sign-In & Drive Backup properties
+    private val _googleName = MutableStateFlow<String?>(null)
+    val googleName: StateFlow<String?> = _googleName.asStateFlow()
+
+    private val _userAddress = MutableStateFlow<String?>(null)
+    val userAddress: StateFlow<String?> = _userAddress.asStateFlow()
+
+    private val _userPhone = MutableStateFlow<String?>(null)
+    val userPhone: StateFlow<String?> = _userPhone.asStateFlow()
+
+    private val _userDOB = MutableStateFlow<String?>(null)
+    val userDOB: StateFlow<String?> = _userDOB.asStateFlow()
+
+    private val _isProfileSetupComplete = MutableStateFlow<Boolean?>(null)
+    val isProfileSetupComplete: StateFlow<Boolean?> = _isProfileSetupComplete.asStateFlow()
+
+    private val _googleEmail = MutableStateFlow<String?>(null)
+    val googleEmail: StateFlow<String?> = _googleEmail.asStateFlow()
+
+    private val _googlePhotoUrl = MutableStateFlow<String?>(null)
+    val googlePhotoUrl: StateFlow<String?> = _googlePhotoUrl.asStateFlow()
+
+    private val _isGoogleSignedIn = MutableStateFlow(false)
+    val isGoogleSignedIn: StateFlow<Boolean> = _isGoogleSignedIn.asStateFlow()
 
     private val _driveStatusMessage = MutableStateFlow<String?>(null)
     val driveStatusMessage: StateFlow<String?> = _driveStatusMessage.asStateFlow()

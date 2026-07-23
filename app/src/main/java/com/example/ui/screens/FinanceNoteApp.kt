@@ -62,7 +62,6 @@ import androidx.compose.ui.text.style.*
 import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import coil.compose.SubcomposeAsyncImage
 import com.example.data.*
 import com.example.ui.*
 import com.example.ui.viewmodel.*
@@ -12768,7 +12767,6 @@ fun SettingsScreen(
     val rawProfileName by viewModel.profileName.collectAsState()
     val rawProfileEmail by viewModel.profileEmail.collectAsState()
     val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsState()
-    val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
     val profilePhone by viewModel.profilePhone.collectAsState()
     val profileSocial by viewModel.profileSocial.collectAsState()
     val profileAddress by viewModel.profileAddress.collectAsState()
@@ -13482,33 +13480,12 @@ fun SettingsScreen(
                                 .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isPhotoLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = FintechBlue
-                                )
-                            } else if (isGoogleSignedIn && !profilePhotoUri.isNullOrEmpty()) {
-                                SubcomposeAsyncImage(
+                            if (isGoogleSignedIn && !profilePhotoUri.isNullOrEmpty()) {
+                                AsyncImage(
                                     model = profilePhotoUri,
                                     contentDescription = null,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop,
-                                    loading = {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp).padding(2.dp),
-                                            strokeWidth = 2.dp,
-                                            color = FintechBlue
-                                        )
-                                    },
-                                    error = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.AccountCircle,
-                                            contentDescription = null,
-                                            tint = FintechBlue,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
+                                    contentScale = ContentScale.Crop
                                 )
                             } else {
                                 Icon(
@@ -17964,7 +17941,6 @@ fun ProfileSetupScreen(
     
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -17997,33 +17973,12 @@ fun ProfileSetupScreen(
                         .clickable { photoLauncher.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isPhotoLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(36.dp),
-                            strokeWidth = 3.dp,
-                            color = FintechBlue
-                        )
-                    } else if (photoUri.isNotEmpty()) {
-                        SubcomposeAsyncImage(
+                    if (photoUri.isNotEmpty()) {
+                        AsyncImage(
                             model = photoUri,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            loading = {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp).padding(6.dp),
-                                    strokeWidth = 3.dp,
-                                    color = FintechBlue
-                                )
-                            },
-                            error = {
-                                Icon(
-                                    imageVector = Icons.Rounded.AddAPhoto,
-                                    contentDescription = null,
-                                    tint = if (isDark) Color.LightGray else Color.Gray,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                            }
+                            contentScale = ContentScale.Crop
                         )
                     } else {
                         Icon(
@@ -18154,7 +18109,6 @@ fun EnhancedProfileMenu(
     val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
-    val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
 
     val displayPhotoUri = rawProfilePhotoUri.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
     val displayName = profileName.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"))
@@ -18192,28 +18146,12 @@ fun EnhancedProfileMenu(
                             .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (isPhotoLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = FintechBlue
-                            )
-                        } else if (!displayPhotoUri.isNullOrEmpty()) {
-                            SubcomposeAsyncImage(
+                        if (!displayPhotoUri.isNullOrEmpty()) {
+                            AsyncImage(
                                 model = displayPhotoUri,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                loading = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp).padding(4.dp),
-                                        strokeWidth = 2.dp,
-                                        color = FintechBlue
-                                    )
-                                },
-                                error = {
-                                    Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(32.dp), tint = if (isDark) Color.LightGray else Color.Gray)
-                                }
+                                contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(32.dp), tint = if (isDark) Color.LightGray else Color.Gray)
