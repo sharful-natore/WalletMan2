@@ -97,8 +97,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     val updateManager = UpdateManager()
 
-    private val firebaseAuth = FirebaseAuth.getInstance()
-    private val _currentUser = MutableStateFlow(firebaseAuth.currentUser)
+    private fun getFirebaseAuth(): FirebaseAuth {
+        com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
+        return FirebaseAuth.getInstance()
+    }
+
+    private val _currentUser = MutableStateFlow<com.google.firebase.auth.FirebaseUser?>(null)
     val currentUser: StateFlow<com.google.firebase.auth.FirebaseUser?> = _currentUser.asStateFlow()
 
     private val _googleName = MutableStateFlow<String?>(null)
@@ -130,9 +134,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     val isUserSignedInFlow = combine(_currentUser, _isGoogleSignedIn) { user, googleSignedIn ->
         user != null || googleSignedIn
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), firebaseAuth.currentUser != null || _isGoogleSignedIn.value)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _currentUser.value != null || _isGoogleSignedIn.value)
 
     init {
+        com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
+        try {
+            _currentUser.value = getFirebaseAuth().currentUser
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         val initialGPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
         val savedEmail = initialGPrefs.getString("google_email", null)
         if (!savedEmail.isNullOrBlank()) {
@@ -143,46 +154,50 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _isProfileSetupComplete.value = initialGPrefs.getBoolean("profile_setup_complete", false)
         }
 
-        firebaseAuth.addAuthStateListener { auth ->
-            val user = auth.currentUser
-            _currentUser.value = user
-            
-            // Treat any Firebase sign-in as 'signed in' for sync purposes
-            val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
-            _isGoogleSignedIn.value = signedIn
-            
-            if (signedIn && user != null) {
-                // Use Firebase user details as default profile data
-                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        try {
+            getFirebaseAuth().addAuthStateListener { auth ->
+                val user = auth.currentUser
+                _currentUser.value = user
                 
-                _googleEmail.value = user.email ?: user.uid
+                // Treat any Firebase sign-in as 'signed in' for sync purposes
+                val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
+                _isGoogleSignedIn.value = signedIn
                 
-                if (gPrefs.getBoolean("profile_setup_complete", false)) {
-                    _googleName.value = gPrefs.getString("google_name", user.displayName)
-                    _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
-                    _userAddress.value = gPrefs.getString("user_address", null)
-                    _userPhone.value = gPrefs.getString("user_phone", null)
-                    _userDOB.value = gPrefs.getString("user_dob", null)
-                    _isProfileSetupComplete.value = true
-                } else {
-                    _googleName.value = user.displayName
-                    _googlePhotoUrl.value = user.photoUrl?.toString()
+                if (signedIn && user != null) {
+                    // Use Firebase user details as default profile data
+                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    
+                    _googleEmail.value = user.email ?: user.uid
+                    
+                    if (gPrefs.getBoolean("profile_setup_complete", false)) {
+                        _googleName.value = gPrefs.getString("google_name", user.displayName)
+                        _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
+                        _userAddress.value = gPrefs.getString("user_address", null)
+                        _userPhone.value = gPrefs.getString("user_phone", null)
+                        _userDOB.value = gPrefs.getString("user_dob", null)
+                        _isProfileSetupComplete.value = true
+                    } else {
+                        _googleName.value = user.displayName
+                        _googlePhotoUrl.value = user.photoUrl?.toString()
+                    }
+
+                    // Keep SharedPreferences in sync for Widget
+                    val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                    gPrefs.edit().apply {
+                        putString("google_email", _googleEmail.value)
+                        putString("google_name", _googleName.value)
+                        putString("google_photo_url", _googlePhotoUrl.value)
+                    }.apply()
+
+                    startRealtimeSync()
+                } else if (!signedIn) {
+                    _googleEmail.value = null
+                    _googleName.value = null
+                    _googlePhotoUrl.value = null
                 }
-
-                // Keep SharedPreferences in sync for Widget
-                val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                gPrefs.edit().apply {
-                    putString("google_email", _googleEmail.value)
-                    putString("google_name", _googleName.value)
-                    putString("google_photo_url", _googlePhotoUrl.value)
-                }.apply()
-
-                startRealtimeSync()
-            } else if (!signedIn) {
-                _googleEmail.value = null
-                _googleName.value = null
-                _googlePhotoUrl.value = null
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -2772,9 +2787,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val idToken = account.idToken
                 if (idToken != null) {
                     val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
-                    firebaseAuth.signInWithCredential(credential)
+                    getFirebaseAuth().signInWithCredential(credential)
                         .addOnSuccessListener {
-                            _currentUser.value = firebaseAuth.currentUser
+                            _currentUser.value = getFirebaseAuth().currentUser
                         }
                 }
                 
@@ -3303,7 +3318,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _googleEmail.value = null
         _googleName.value = null
         _googlePhotoUrl.value = null
-        firebaseAuth.signOut()
+        try { getFirebaseAuth().signOut() } catch (e: Exception) { e.printStackTrace() }
         _driveStatusMessage.value = "Signed Out"
         com.example.widget.updateAllWidgets(context)
         stopRealtimeSync()
@@ -3547,7 +3562,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Email and password cannot be empty")
             return
         }
-        firebaseAuth.signInWithEmailAndPassword(email, pass)
+        getFirebaseAuth().signInWithEmailAndPassword(email, pass)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = task.result?.user
@@ -3571,7 +3586,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Email and password cannot be empty")
             return
         }
-        firebaseAuth.createUserWithEmailAndPassword(email, pass)
+        getFirebaseAuth().createUserWithEmailAndPassword(email, pass)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val user = task.result?.user
@@ -3597,7 +3612,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Please enter your email address")
             return
         }
-        firebaseAuth.sendPasswordResetEmail(email)
+        getFirebaseAuth().sendPasswordResetEmail(email)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     onSuccess()
@@ -3617,13 +3632,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Please enter a valid phone number")
             return
         }
-        val options = PhoneAuthOptions.newBuilder(firebaseAuth)
+        val options = PhoneAuthOptions.newBuilder(getFirebaseAuth())
             .setPhoneNumber(phoneNumber)
             .setTimeout(60L, TimeUnit.SECONDS)
             .setActivity(activity)
             .setCallbacks(object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
                 override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                    firebaseAuth.signInWithCredential(credential)
+                    getFirebaseAuth().signInWithCredential(credential)
                         .addOnCompleteListener { task ->
                             if (task.isSuccessful) {
                                 val user = task.result?.user
@@ -3661,7 +3676,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
         try {
             val credential = PhoneAuthProvider.getCredential(verificationId, code)
-            firebaseAuth.signInWithCredential(credential)
+            getFirebaseAuth().signInWithCredential(credential)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
                         val user = task.result?.user

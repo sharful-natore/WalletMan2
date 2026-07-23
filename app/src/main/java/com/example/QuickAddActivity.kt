@@ -47,10 +47,16 @@ class QuickAddActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.setBackgroundDrawableResource(android.R.color.transparent)
 
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-        )
+        FinanceApplication.ensureFirebaseInitialized(this)
+
+        try {
+            enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+                navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         val targetWorkspaceId = intent?.getStringExtra("EXTRA_TARGET_WORKSPACE_ID")
         val initialAction = intent?.action ?: "ACTION_ADD_TRANSACTION"
@@ -223,21 +229,50 @@ fun QuickAddDialogScreen(
                         }
                     }
 
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                CircleShape
-                            )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "Close",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        IconButton(
+                            onClick = {
+                                val mainIntent = android.content.Intent(context, MainActivity::class.java).apply {
+                                    putExtra("EXTRA_TARGET_WORKSPACE_ID", selectedWorkspaceId)
+                                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                }
+                                context.startActivity(mainIntent)
+                                onDismiss()
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.OpenInNew,
+                                contentDescription = "Open Main App",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
 
