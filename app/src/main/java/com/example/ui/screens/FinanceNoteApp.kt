@@ -18108,10 +18108,6 @@ fun EnhancedProfileMenu(
     val profileName by viewModel.profileName.collectAsStateWithLifecycle()
     val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
-    val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
-
-    val displayPhotoUri = rawProfilePhotoUri.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
-    val displayName = profileName.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"))
 
     Dialog(
         onDismissRequest = onDismiss
@@ -18127,18 +18123,8 @@ fun EnhancedProfileMenu(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header User Info - Clickable to open Profile Setup
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            onDismiss()
-                            onProfileSettings()
-                        }
-                        .padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // Header User Info
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
                             .size(56.dp)
@@ -18146,9 +18132,9 @@ fun EnhancedProfileMenu(
                             .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!displayPhotoUri.isNullOrEmpty()) {
+                        if (isGoogleSignedIn && !googlePhotoUrl.isNullOrEmpty()) {
                             AsyncImage(
-                                model = displayPhotoUri,
+                                model = googlePhotoUrl,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
@@ -18158,14 +18144,14 @@ fun EnhancedProfileMenu(
                         }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column {
                         Text(
-                            text = displayName,
+                            text = if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black
                         )
-                        if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) {
+                        if (isGoogleSignedIn) {
                             Text(
                                 text = googleEmail ?: "",
                                 fontSize = 12.sp,
@@ -18180,7 +18166,7 @@ fun EnhancedProfileMenu(
                 // Menu Items
                 ProfileMenuItem(
                     icon = Icons.Rounded.Workspaces,
-                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস" else "Workspace",
+                    label = if (language == AppLanguage.BN) "ওয়ার্কস্পেস সুইচ করুন" else "Switch Workspace",
                     isDark = isDark,
                     onClick = onSwitchWorkspace
                 )
