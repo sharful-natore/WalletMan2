@@ -1837,47 +1837,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _hasUnsavedChanges = MutableStateFlow(false)
     val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
 
+    private val _unsyncedItems = MutableStateFlow<List<String>>(emptyList())
+    val unsyncedItems: StateFlow<List<String>> = _unsyncedItems.asStateFlow()
+
     fun getUnsyncedItems(): List<String> {
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return emptyList()
-
-        val currentData = com.example.data.FinanceBackup(
-            persons = persons.value,
-            transactions = transactions.value,
-            savingsGoals = savingsGoals.value,
-            savingsTransactions = savingsTransactions.value,
-            monthlyBudgets = monthlyBudgets.value,
-            workspaces = workspaces.value
-        )
-
-        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
-        val unsynced = mutableListOf<String>()
-        val isBn = _language.value == com.example.ui.AppLanguage.BN
-
-        if (cachedJson == null) {
-            if (currentData.transactions.isNotEmpty()) unsynced.add(if (isBn) "লেনদেন" else "Transactions")
-            if (currentData.persons.isNotEmpty()) unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
-            if (currentData.savingsGoals.isNotEmpty()) unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
-            if (currentData.workspaces.isNotEmpty()) unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
-            return unsynced
-        }
-
-        val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
-        if (cachedData == null) return listOf(if (isBn) "সমস্ত ডাটা" else "All Data")
-
-        if (currentData.transactions.size != cachedData.transactions.size || currentData.transactions != cachedData.transactions) 
-            unsynced.add(if (isBn) "লেনদেন" else "Transactions")
-        if (currentData.persons.size != cachedData.persons.size || currentData.persons != cachedData.persons) 
-            unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
-        if (currentData.savingsGoals.size != cachedData.savingsGoals.size || currentData.savingsGoals != cachedData.savingsGoals) 
-            unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
-        if (currentData.workspaces.size != cachedData.workspaces.size || currentData.workspaces != cachedData.workspaces) 
-            unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
-        if (currentData.monthlyBudgets.size != cachedData.monthlyBudgets.size || currentData.monthlyBudgets != cachedData.monthlyBudgets) 
-            unsynced.add(if (isBn) "বাজেট" else "Budgets")
-
-        return unsynced
+        return _unsyncedItems.value
     }
 
     private val _isNetworkActive = MutableStateFlow(false)
@@ -2077,6 +2043,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) {
             _hasUnsavedChanges.value = false
+            _unsyncedItems.value = emptyList()
             return
         }
         viewModelScope.launch {
@@ -2084,22 +2051,43 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val currentData = getFullBackupData()
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                 val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+                val isBn = _language.value == com.example.ui.AppLanguage.BN
+
                 if (cachedJson == null) {
-                    val hasData = currentData.transactions.isNotEmpty() ||
-                            currentData.persons.isNotEmpty() ||
-                            currentData.savingsGoals.isNotEmpty()
-                    _hasUnsavedChanges.value = hasData
+                    val unsynced = mutableListOf<String>()
+                    if (currentData.transactions.isNotEmpty()) unsynced.add(if (isBn) "লেনদেন" else "Transactions")
+                    if (currentData.persons.isNotEmpty()) unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
+                    if (currentData.savingsGoals.isNotEmpty()) unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
+                    if (currentData.monthlyBudgets.isNotEmpty()) unsynced.add(if (isBn) "বাজেট" else "Budgets")
+                    if (currentData.workspaces.isNotEmpty()) unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
+
+                    _unsyncedItems.value = unsynced
+                    _hasUnsavedChanges.value = unsynced.isNotEmpty()
                 } else {
                     val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
                     if (cachedData == null) {
                         _hasUnsavedChanges.value = true
+                        _unsyncedItems.value = listOf(if (isBn) "সমস্ত ডাটা" else "All Data")
                     } else {
-                        val isDifferent = currentData.transactions.size != cachedData.transactions.size ||
-                                currentData.persons.size != cachedData.persons.size ||
-                                currentData.savingsGoals.size != cachedData.savingsGoals.size ||
-                                currentData.savingsTransactions.size != cachedData.savingsTransactions.size ||
-                                backupAdapter.toJson(currentData) != backupAdapter.toJson(cachedData)
-                        _hasUnsavedChanges.value = isDifferent
+                        val unsynced = mutableListOf<String>()
+                        if (currentData.transactions.size != cachedData.transactions.size || currentData.transactions != cachedData.transactions) {
+                            unsynced.add(if (isBn) "লেনদেন" else "Transactions")
+                        }
+                        if (currentData.persons.size != cachedData.persons.size || currentData.persons != cachedData.persons) {
+                            unsynced.add(if (isBn) "ব্যক্তি তালিকা" else "Persons")
+                        }
+                        if (currentData.savingsGoals.size != cachedData.savingsGoals.size || currentData.savingsGoals != cachedData.savingsGoals || currentData.savingsTransactions.size != cachedData.savingsTransactions.size || currentData.savingsTransactions != cachedData.savingsTransactions) {
+                            unsynced.add(if (isBn) "সঞ্চয় লক্ষ্য" else "Savings Goals")
+                        }
+                        if (currentData.monthlyBudgets.size != cachedData.monthlyBudgets.size || currentData.monthlyBudgets != cachedData.monthlyBudgets) {
+                            unsynced.add(if (isBn) "বাজেট" else "Budgets")
+                        }
+                        if (currentData.workspaces.size != cachedData.workspaces.size || currentData.workspaces != cachedData.workspaces) {
+                            unsynced.add(if (isBn) "ওয়ার্কস্পেস" else "Workspaces")
+                        }
+
+                        _unsyncedItems.value = unsynced
+                        _hasUnsavedChanges.value = unsynced.isNotEmpty()
                     }
                 }
             } catch (e: Exception) {
@@ -2141,6 +2129,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 
                 if (json == cachedJson) {
                     _hasUnsavedChanges.value = false
+                    _unsyncedItems.value = emptyList()
                     _firestoreSyncStatus.value = null
                     onComplete?.invoke()
                     return@launch
@@ -2164,6 +2153,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                 prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
                             } catch (e: Exception) { e.printStackTrace() }
                             _hasUnsavedChanges.value = false
+                            _unsyncedItems.value = emptyList()
                             _firestoreSyncStatus.value = "Synced"
                             updateSyncSuccess(getApplication(), true)
                         }
@@ -2257,69 +2247,54 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             viewModelScope.launch {
                                 try {
                                     val currentLocalData = getFullBackupData()
+                                    val currentJson = backupAdapter.toJson(currentLocalData)
                                     val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                     val cachedJson = prefs.getString("firestore_cached_data_$email", null)
 
-                                    var hasUnsaved = false
-                                    if (cachedJson == null) {
-                                        hasUnsaved = currentLocalData.transactions.isNotEmpty() ||
-                                            currentLocalData.persons.isNotEmpty() ||
-                                            currentLocalData.savingsGoals.isNotEmpty()
-                                    } else {
-                                        val cachedData = try { backupAdapter.fromJson(cachedJson) } catch (e: Exception) { null }
-                                        if (cachedData == null) {
-                                            hasUnsaved = true
-                                        } else {
-                                            hasUnsaved = currentLocalData.transactions.size != cachedData.transactions.size ||
-                                                    currentLocalData.persons.size != cachedData.persons.size ||
-                                                    currentLocalData.savingsGoals.size != cachedData.savingsGoals.size ||
-                                                    currentLocalData.savingsTransactions.size != cachedData.savingsTransactions.size ||
-                                                    backupAdapter.toJson(currentLocalData) != backupAdapter.toJson(cachedData)
-                                        }
-                                    }
-
-                                    if (hasUnsaved) {
-                                        _hasUnsavedChanges.value = true
-                                        
-                                        // Show dialog ONLY if we have a real conflict (local has data and remote is different)
-                                        // But only if we don't have a cached version yet (first sync after sign-in)
-                                        if (cachedJson == null) {
-                                            val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                            val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
-                                            if (remoteData != null) {
-                                                _pendingCloudData.value = remoteData
-                                                _showCloudDataFoundDialog.value = true
-                                            }
-                                        }
-                                        return@launch // Do not overwrite local data if we have offline changes
-                                    }
-
                                     val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                    val remoteData = backupAdapter.fromJson(decryptedJson)
-                                    if (remoteData != null) {
-                                        val localTxCount = currentLocalData.transactions.size
-                                        val remoteTxCount = remoteData.transactions.size
-                                        
-                                        val currentJson = backupAdapter.toJson(currentLocalData)
-                                        if (currentJson != decryptedJson) {
-                                            // Data is different, check if remote is newer or just different
-                                            // For simplicity, if remote is different and local is same as last cached, we restore
-                                            if (cachedJson == null || cachedJson == backupAdapter.toJson(currentLocalData)) {
+                                    val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
+
+                                    if (currentJson == decryptedJson) {
+                                        // Perfectly in sync
+                                        prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                        _hasUnsavedChanges.value = false
+                                        _unsyncedItems.value = emptyList()
+                                        _firestoreSyncStatus.value = "Synced"
+                                        updateSyncSuccess(getApplication(), true)
+                                    } else if (cachedJson == null) {
+                                        // First sync after sign-in
+                                        if (remoteData != null) {
+                                            val localIsEmpty = currentLocalData.transactions.isEmpty() &&
+                                                    currentLocalData.persons.isEmpty() &&
+                                                    currentLocalData.savingsGoals.isEmpty()
+                                            if (localIsEmpty) {
                                                 restoreFullBackup(remoteData)
                                                 com.example.widget.updateAllWidgets(getApplication())
+                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                _hasUnsavedChanges.value = false
+                                                _unsyncedItems.value = emptyList()
                                                 _firestoreSyncStatus.value = "Synced"
+                                                updateSyncSuccess(getApplication(), true)
                                             } else {
-                                                // Local has changes that are not in cloud yet
-                                                _hasUnsavedChanges.value = true
+                                                _pendingCloudData.value = remoteData
+                                                _showCloudDataFoundDialog.value = true
+                                                checkUnsavedChanges()
                                             }
-                                        } else {
-                                            // No change needed
-                                            _firestoreSyncStatus.value = null // Hide sync status if nothing changed
                                         }
-                                        
-                                        try {
+                                    } else if (cachedJson == currentJson) {
+                                        // Local hasn't changed, but remote has updated from another device
+                                        if (remoteData != null) {
+                                            restoreFullBackup(remoteData)
+                                            com.example.widget.updateAllWidgets(getApplication())
                                             prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                        } catch (e: Exception) { e.printStackTrace() }
+                                            _hasUnsavedChanges.value = false
+                                            _unsyncedItems.value = emptyList()
+                                            _firestoreSyncStatus.value = "Synced"
+                                            updateSyncSuccess(getApplication(), true)
+                                        }
+                                    } else {
+                                        // Local has changes that are not in cloud yet
+                                        checkUnsavedChanges()
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
