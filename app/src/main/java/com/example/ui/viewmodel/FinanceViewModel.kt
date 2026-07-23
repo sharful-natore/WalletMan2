@@ -512,36 +512,46 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun createWorkspace(name: String, profileName: String = "", photoUri: String? = null) {
         viewModelScope.launch {
+            val context = getApplication<Application>()
             val id = "ws_${System.currentTimeMillis()}"
+            val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it, id) } ?: photoUri
             repository.insertWorkspace(com.example.data.Workspace(
                 id = id, 
                 name = name, 
                 profileName = if (profileName.isBlank()) name else profileName,
-                profilePhotoUri = photoUri
+                profilePhotoUri = finalPhotoUri
             ))
+            if (!finalPhotoUri.isNullOrBlank()) {
+                syncProfilePhotoToCloud(context, id, finalPhotoUri)
+            }
             selectWorkspace(id)
+            uploadToFirestore()
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস তৈরি করা হয়েছে" else "Workspace created", isSuccess = true, type = "SUCCESS")
         }
     }
 
     fun editWorkspace(workspaceId: String, name: String, profileName: String = "", photoUri: String? = null) {
         viewModelScope.launch {
+            val context = getApplication<Application>()
             val existing = repository.getWorkspaceById(workspaceId)
             if (existing != null) {
+                val finalPhotoUri = if (photoUri != null) saveImageToInternalStorage(context, photoUri, workspaceId) else existing.profilePhotoUri
                 repository.insertWorkspace(existing.copy(
                     name = name,
                     profileName = if (profileName.isNotBlank()) profileName else existing.profileName,
-                    profilePhotoUri = if (photoUri != null) photoUri else existing.profilePhotoUri
+                    profilePhotoUri = finalPhotoUri
                 ))
                 // If it's current workspace, update local state
                 if (_currentWorkspaceId.value == workspaceId) {
                     if (profileName.isNotBlank()) _profileName.value = profileName
-                    if (photoUri != null) _profilePhotoUri.value = photoUri
+                    if (finalPhotoUri != null) _profilePhotoUri.value = finalPhotoUri
                 }
                 
+                syncProfilePhotoToCloud(context, workspaceId, finalPhotoUri)
                 // trigger refresh
                 _currentWorkspaceId.value = _currentWorkspaceId.value
-                com.example.widget.updateAllWidgets(getApplication())
+                com.example.widget.updateAllWidgets(context)
+                uploadToFirestore()
                 triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস তথ্য পরিবর্তন করা হয়েছে" else "Workspace info updated", isSuccess = true, type = "SUCCESS")
             }
         }
@@ -549,26 +559,29 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun updateWorkspaceProfilePhoto(workspaceId: String, photoUri: String?) {
         viewModelScope.launch {
+            val context = getApplication<Application>()
             val existing = workspaces.value.find { it.id == workspaceId }
+                ?: repository.getWorkspaceById(workspaceId)
             if (existing != null) {
-                repository.insertWorkspace(existing.copy(profilePhotoUri = photoUri))
+                val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it, workspaceId) }
+                repository.insertWorkspace(existing.copy(profilePhotoUri = finalPhotoUri))
                 if (_currentWorkspaceId.value == workspaceId) {
-                    _profilePhotoUri.value = photoUri
+                    _profilePhotoUri.value = finalPhotoUri
                     
                     // Update SharedPreferences for widget
-                    val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                    val cachedPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                     val keySuffix = if (workspaceId == "default") "" else "_$workspaceId"
-                    cachedPrefs.edit().putString("user_photo$keySuffix", photoUri).apply()
+                    cachedPrefs.edit().putString("user_photo$keySuffix", finalPhotoUri).apply()
                 }
-
                 // If updating default workspace photo, also sync with main account photo state
-                if (workspaceId == "default") {
-                    _googlePhotoUrl.value = photoUri
-                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                    gPrefs.edit().putString("google_photo_url", photoUri).apply()
+                if (workspaceId == "default" || workspaceId == _currentWorkspaceId.value) {
+                    _googlePhotoUrl.value = finalPhotoUri
+                    val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                    gPrefs.edit().putString("google_photo_url", finalPhotoUri).apply()
                 }
-
-                com.example.widget.updateAllWidgets(getApplication())
+                syncProfilePhotoToCloud(context, workspaceId, finalPhotoUri)
+                com.example.widget.updateAllWidgets(context)
+                uploadToFirestore()
                 triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "প্রোফাইল ছবি পরিবর্তন করা হয়েছে" else "Profile photo updated", isSuccess = true, type = "SUCCESS")
             }
         }
@@ -1175,10 +1188,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _selectedThemeGradientIndex.value = backup.selectedThemeGradientIndex
         }
         
-        // Restore budgets for each workspace if available
+        // Restore budgets and check profile photos for each workspace
         backup.workspaces.forEach { ws ->
-            // Budget is already in the workspace entity now, so repository.restoreBackupData(backup) 
-            // should have handled it via financeDao.insertWorkspaces(backup.workspaces)
+            restoreProfilePhotoFromCloud(getApplication(), ws.id)
         }
 
         if (backup.profileName.isNotBlank() || backup.profileEmail.isNotBlank()) {
@@ -1234,21 +1246,46 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         onLocalDatabaseChanged()
     }
 
-    private fun saveImageToInternalStorage(context: Context, uriString: String): String? {
+    private fun saveImageToInternalStorage(context: Context, uriString: String, workspaceId: String = _currentWorkspaceId.value): String? {
+        if (uriString.isBlank()) return null
         return try {
-            if (!uriString.startsWith("content://") && !uriString.startsWith("file://")) {
-                return uriString
-            }
-            val uri = Uri.parse(uriString)
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val fileName = "profile_photo_${System.currentTimeMillis()}.jpg"
-            val file = File(context.filesDir, fileName)
-            val outputStream = FileOutputStream(file)
-            inputStream?.use { input ->
-                outputStream.use { output ->
-                    input.copyTo(output)
+            if (uriString.startsWith(context.filesDir.absolutePath)) {
+                val existingFile = File(uriString)
+                if (existingFile.exists() && existingFile.length() > 0) {
+                    return existingFile.absolutePath
                 }
             }
+
+            val inputStream = if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
+                context.contentResolver.openInputStream(Uri.parse(uriString))
+            } else {
+                val f = File(uriString)
+                if (f.exists()) java.io.FileInputStream(f) else null
+            } ?: return if (File(uriString).exists()) uriString else null
+
+            val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (originalBitmap == null) return null
+
+            val maxDim = 512
+            val width = originalBitmap.width
+            val height = originalBitmap.height
+            val scaledBitmap = if (width > maxDim || height > maxDim) {
+                val ratio = width.toFloat() / height.toFloat()
+                val newWidth = if (width >= height) maxDim else (maxDim * ratio).toInt()
+                val newHeight = if (height > width) maxDim else (maxDim / ratio).toInt()
+                android.graphics.Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+            } else {
+                originalBitmap
+            }
+
+            val fileName = "profile_photo_${workspaceId}.jpg"
+            val file = File(context.filesDir, fileName)
+            val outputStream = java.io.FileOutputStream(file)
+            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
+            outputStream.flush()
+            outputStream.close()
+
             file.absolutePath
         } catch (e: Exception) {
             e.printStackTrace()
@@ -1257,6 +1294,166 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             } else {
                 null
             }
+        }
+    }
+
+    fun syncProfilePhotoToCloud(context: Context, workspaceId: String, photoUriOrPath: String?) {
+        val email = _googleEmail.value
+        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = getFirestore(getApplication())
+                val docRef = db.collection("users").document(email)
+                    .collection("profile_photos").document(workspaceId)
+
+                if (photoUriOrPath.isNullOrBlank()) {
+                    docRef.delete()
+                } else {
+                    val file = File(photoUriOrPath)
+                    val base64 = if (file.exists() && file.length() > 0) {
+                        val bytes = file.readBytes()
+                        android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    } else {
+                        compressUriToBase64(context, photoUriOrPath)
+                    }
+
+                    if (!base64.isNullOrBlank()) {
+                        val data = mapOf(
+                            "photoBase64" to base64,
+                            "workspaceId" to workspaceId,
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                        docRef.set(data)
+
+                        if (workspaceId == "default" || workspaceId == _currentWorkspaceId.value) {
+                            val profileDoc = db.collection("users").document(email)
+                                .collection("profile").document("data")
+                            profileDoc.set(mapOf("photoBase64" to base64, "updatedAt" to System.currentTimeMillis()), com.google.firebase.firestore.SetOptions.merge())
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun compressUriToBase64(context: Context, uriString: String): String? {
+        return try {
+            val uri = Uri.parse(uriString)
+            val inputStream = if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
+                context.contentResolver.openInputStream(uri)
+            } else {
+                val f = File(uriString)
+                if (f.exists()) java.io.FileInputStream(f) else null
+            } ?: return null
+
+            val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (originalBitmap == null) return null
+
+            val maxDim = 512
+            val width = originalBitmap.width
+            val height = originalBitmap.height
+            val scaledBitmap = if (width > maxDim || height > maxDim) {
+                val ratio = width.toFloat() / height.toFloat()
+                val newWidth = if (width >= height) maxDim else (maxDim * ratio).toInt()
+                val newHeight = if (height > width) maxDim else (maxDim / ratio).toInt()
+                android.graphics.Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+            } else {
+                originalBitmap
+            }
+
+            val baos = java.io.ByteArrayOutputStream()
+            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, baos)
+            android.util.Base64.encodeToString(baos.toByteArray(), android.util.Base64.NO_WRAP)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun restoreProfilePhotoFromCloud(context: Context, workspaceId: String, onRestored: ((String) -> Unit)? = null) {
+        val email = _googleEmail.value
+        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = getFirestore(getApplication())
+                db.collection("users").document(email)
+                    .collection("profile_photos").document(workspaceId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        val base64 = if (doc != null && doc.exists()) doc.getString("photoBase64") else null
+                        
+                        val applyPhoto = { b64: String ->
+                            val localPath = saveBase64ToLocalStorage(context, b64, workspaceId)
+                            if (!localPath.isNullOrBlank()) {
+                                viewModelScope.launch {
+                                    val existing = repository.getWorkspaceById(workspaceId)
+                                    if (existing != null) {
+                                        repository.insertWorkspace(existing.copy(profilePhotoUri = localPath))
+                                    }
+                                    if (_currentWorkspaceId.value == workspaceId) {
+                                        _profilePhotoUri.value = localPath
+                                        val cachedPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                        val keySuffix = if (workspaceId == "default") "" else "_$workspaceId"
+                                        cachedPrefs.edit().putString("user_photo$keySuffix", localPath).apply()
+                                    }
+                                    if (workspaceId == "default" || workspaceId == _currentWorkspaceId.value) {
+                                        _googlePhotoUrl.value = localPath
+                                        val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                                        gPrefs.edit().putString("google_photo_url", localPath).apply()
+                                    }
+                                    onRestored?.invoke(localPath)
+                                    com.example.widget.updateAllWidgets(getApplication())
+                                }
+                            }
+                        }
+
+                        if (!base64.isNullOrBlank()) {
+                            applyPhoto(base64)
+                        } else {
+                            // Try fallback from profile doc
+                            db.collection("users").document(email)
+                                .collection("profile").document("data")
+                                .get()
+                                .addOnSuccessListener { pDoc ->
+                                    val fallbackB64 = pDoc?.getString("photoBase64")
+                                    if (!fallbackB64.isNullOrBlank()) {
+                                        applyPhoto(fallbackB64)
+                                    }
+                                }
+                        }
+                    }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun saveBase64ToLocalStorage(context: Context, base64Str: String, workspaceId: String): String? {
+        return try {
+            val bytes = android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
+            val fileName = "profile_photo_${workspaceId}.jpg"
+            val file = File(context.filesDir, fileName)
+            val fos = java.io.FileOutputStream(file)
+            fos.write(bytes)
+            fos.flush()
+            fos.close()
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    fun checkAndRestoreProfilePhoto(context: Context, workspaceId: String = _currentWorkspaceId.value) {
+        val currentPhoto = _profilePhotoUri.value
+        val isFileMissing = currentPhoto.isNullOrBlank() || !File(currentPhoto).exists() || File(currentPhoto).length() == 0L
+        if (isFileMissing) {
+            restoreProfilePhotoFromCloud(context, workspaceId)
         }
     }
 
@@ -1301,6 +1498,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _profileName.value = prefs.getString(getProfileKey("user_name", wsId), "") ?: ""
         _profileEmail.value = prefs.getString(getProfileKey("user_email", wsId), "") ?: ""
         _profilePhotoUri.value = prefs.getString(getProfileKey("user_photo", wsId), null)
+        checkAndRestoreProfilePhoto(context, wsId)
         _profilePhone.value = prefs.getString(getProfileKey("user_phone", wsId), "") ?: ""
         _profileSocial.value = prefs.getString(getProfileKey("user_social", wsId), "") ?: ""
         _profileAddress.value = prefs.getString(getProfileKey("user_address", wsId), "") ?: ""
@@ -1513,7 +1711,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             val wsId = _currentWorkspaceId.value
             val existing = repository.getWorkspaceById(wsId) ?: com.example.data.Workspace(id = wsId, name = "ব্যক্তিগত")
-            val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it) } ?: photoUri
+            val finalPhotoUri = photoUri?.let { saveImageToInternalStorage(context, it, wsId) } ?: photoUri
             
             repository.insertWorkspace(existing.copy(
                 profileName = name,
@@ -1531,6 +1729,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _profileSocial.value = social
             _profileAddress.value = address
             
+            syncProfilePhotoToCloud(context, wsId, finalPhotoUri)
             com.example.widget.updateAllWidgets(context)
             uploadToFirestore()
         }
