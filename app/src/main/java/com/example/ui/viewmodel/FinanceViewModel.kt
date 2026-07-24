@@ -2122,6 +2122,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         com.example.widget.updateAllWidgets(getApplication())
     }
 
+    private var isInitialSyncChecked = false
     private var uploadJob: kotlinx.coroutines.Job? = null
     
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
@@ -2129,6 +2130,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
             _firestoreSyncStatus.value = "Sign-in required"
             onError?.invoke("Not signed in to Google")
+            return
+        }
+        if (!isInitialSyncChecked) {
+            _firestoreSyncStatus.value = "Checking cloud..."
+            onError?.invoke("Initial cloud check not completed yet")
             return
         }
         uploadJob?.cancel()
@@ -2254,8 +2260,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         error.printStackTrace()
+                        isInitialSyncChecked = true // Allow upload attempt anyway if listener fails to prevent blocking user offline edits
                         return@addSnapshotListener
                     }
+                    isInitialSyncChecked = true // First fetch complete!
                     if (snapshot != null && snapshot.exists()) {
                         val remoteJson = snapshot.getString("backupJson") ?: ""
                         if (remoteJson.isNotEmpty()) {
@@ -2276,13 +2284,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                         _unsyncedItems.value = emptyList()
                                         _firestoreSyncStatus.value = "Synced"
                                         updateSyncSuccess(getApplication(), true)
-                                    } else if (cachedJson == null) {
-                                        // First sync after sign-in
-                                        if (remoteData != null) {
-                                            val localIsEmpty = currentLocalData.transactions.isEmpty() &&
-                                                    currentLocalData.persons.isEmpty() &&
-                                                    currentLocalData.savingsGoals.isEmpty()
-                                            if (localIsEmpty) {
+                                    } else {
+                                        // They are different! Let's check local database empty status
+                                        val localIsEmpty = currentLocalData.transactions.isEmpty() &&
+                                                currentLocalData.persons.isEmpty() &&
+                                                currentLocalData.savingsGoals.isEmpty()
+
+                                        if (localIsEmpty) {
+                                            // Local is empty! Restore from cloud immediately to get user's data back!
+                                            if (remoteData != null) {
                                                 restoreFullBackup(remoteData)
                                                 com.example.widget.updateAllWidgets(getApplication())
                                                 prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
@@ -2290,26 +2300,29 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                                 _unsyncedItems.value = emptyList()
                                                 _firestoreSyncStatus.value = "Synced"
                                                 updateSyncSuccess(getApplication(), true)
-                                            } else {
+                                            }
+                                        } else if (cachedJson == null) {
+                                            // First sync after sign-in, local is NOT empty, cloud has data
+                                            if (remoteData != null) {
                                                 _pendingCloudData.value = remoteData
                                                 _showCloudDataFoundDialog.value = true
                                                 checkUnsavedChanges()
                                             }
+                                        } else if (cachedJson == currentJson) {
+                                            // Local hasn't changed from last sync, but remote has updated from another device
+                                            if (remoteData != null) {
+                                                restoreFullBackup(remoteData)
+                                                com.example.widget.updateAllWidgets(getApplication())
+                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                _hasUnsavedChanges.value = false
+                                                _unsyncedItems.value = emptyList()
+                                                _firestoreSyncStatus.value = "Synced"
+                                                updateSyncSuccess(getApplication(), true)
+                                            }
+                                        } else {
+                                            // Local has changes that are not in cloud yet
+                                            checkUnsavedChanges()
                                         }
-                                    } else if (cachedJson == currentJson) {
-                                        // Local hasn't changed, but remote has updated from another device
-                                        if (remoteData != null) {
-                                            restoreFullBackup(remoteData)
-                                            com.example.widget.updateAllWidgets(getApplication())
-                                            prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                            _hasUnsavedChanges.value = false
-                                            _unsyncedItems.value = emptyList()
-                                            _firestoreSyncStatus.value = "Synced"
-                                            updateSyncSuccess(getApplication(), true)
-                                        }
-                                    } else {
-                                        // Local has changes that are not in cloud yet
-                                        checkUnsavedChanges()
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
@@ -3278,6 +3291,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         
         if (!currentEmail.isNullOrBlank()) {
             googlePrefs.edit().putString("last_google_email", currentEmail).apply()
+            
+            // Clear Firestore cached data for this email on sign out
+            val profilePrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            profilePrefs.edit().remove("firestore_cached_data_$currentEmail").apply()
         }
         
         // Clear main profile data as well
@@ -3318,6 +3335,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _googleEmail.value = null
         _googleName.value = null
         _googlePhotoUrl.value = null
+        isInitialSyncChecked = false
         try { getFirebaseAuth().signOut() } catch (e: Exception) { e.printStackTrace() }
         _driveStatusMessage.value = "Signed Out"
         com.example.widget.updateAllWidgets(context)
