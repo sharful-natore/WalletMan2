@@ -11,8 +11,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
+        android:name=".FinanceApplication"
         android:allowBackup="true"
-        android:largeHeap="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -33,6 +33,12 @@
             <meta-data android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+
+        <activity
+            android:name="com.example.QuickAddActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FinanceNote.Dialog"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"

@@ -18,8 +18,8 @@ android {
     applicationId = "com.vibestudio.financenote"
     minSdk = 24
     targetSdk = 34
-    versionCode = 5
-    versionName = "1.5"
+    versionCode = 4
+    versionName = "1.4"
     multiDexEnabled = true
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -70,8 +70,8 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      isMinifyEnabled = false
-      isShrinkResources = false
+      isMinifyEnabled = true
+      isShrinkResources = true
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }

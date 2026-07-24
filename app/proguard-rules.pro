@@ -13,14 +13,3 @@
 # Preserve attributes for debugging and reflection if needed
 -keepattributes *Annotation*,Signature
 -keepattributes SourceFile,LineNumberTable
-
-# Keep Room database and entity classes from being renamed or stripped
--keep class * extends androidx.room.RoomDatabase { *; }
--keep class com.example.data.** { *; }
--dontwarn androidx.room.**
-
-# Keep serializable and data model classes
--keep class * implements java.io.Serializable { *; }
-
-# Keep ViewModels
--keep class * extends androidx.lifecycle.ViewModel { *; }
