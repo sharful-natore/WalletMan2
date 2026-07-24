@@ -5141,7 +5141,7 @@ fun FinanceNoteApp(
                     Button(
                         onClick = {
                             val syncAction = {
-                                viewModel.uploadToFirestore(
+                                viewModel.syncNow(
                                     onComplete = {
                                         viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "ক্লাউড সিঙ্ক সফলভাবে সম্পন্ন হয়েছে!" else "Cloud sync completed successfully!", isSuccess = true, type = "SUCCESS")
                                     },

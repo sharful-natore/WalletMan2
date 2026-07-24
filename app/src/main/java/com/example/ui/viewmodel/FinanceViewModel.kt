@@ -2125,6 +2125,33 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private var isInitialSyncChecked = false
     private var uploadJob: kotlinx.coroutines.Job? = null
     
+    fun syncNow(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
+        viewModelScope.launch {
+            val currentData = getFullBackupData()
+            val localIsEmpty = currentData.transactions.isEmpty() &&
+                    currentData.persons.isEmpty() &&
+                    currentData.savingsGoals.isEmpty()
+                    
+            if (localIsEmpty) {
+                // If local is empty, attempt to pull first to avoid showing false "Synced" status
+                pullFromFirestore(
+                    onSuccess = { onComplete?.invoke() },
+                    onError = { err -> 
+                        if (err == "No backup data found on server" || err == "No Firestore document found") {
+                            // If cloud is also empty, then we are truly synced (empty)
+                            _firestoreSyncStatus.value = "Synced"
+                            onComplete?.invoke()
+                        } else {
+                            onError?.invoke(err)
+                        }
+                    }
+                )
+            } else {
+                uploadToFirestore(onComplete, onError)
+            }
+        }
+    }
+
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
         val email = _googleEmail.value
         if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
@@ -2148,6 +2175,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                 val cachedJson = prefs.getString("firestore_cached_data_$email", null)
                 
+                val localIsEmpty = backupData.transactions.isEmpty() &&
+                        backupData.persons.isEmpty() &&
+                        backupData.savingsGoals.isEmpty()
+                
+                if (localIsEmpty && cachedJson == null) {
+                    // Safe guard: Do not upload an empty database if we haven't synced yet.
+                    // This prevents blank local state from overwriting existing cloud data.
+                    _hasUnsavedChanges.value = false
+                    _unsyncedItems.value = emptyList()
+                    _firestoreSyncStatus.value = "Synced"
+                    onComplete?.invoke()
+                    return@launch
+                }
+
                 if (json == cachedJson) {
                     _hasUnsavedChanges.value = false
                     _unsyncedItems.value = emptyList()
@@ -2263,75 +2304,81 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         isInitialSyncChecked = true // Allow upload attempt anyway if listener fails to prevent blocking user offline edits
                         return@addSnapshotListener
                     }
-                    isInitialSyncChecked = true // First fetch complete!
-                    if (snapshot != null && snapshot.exists()) {
-                        val remoteJson = snapshot.getString("backupJson") ?: ""
-                        if (remoteJson.isNotEmpty()) {
-                            viewModelScope.launch {
-                                try {
-                                    val currentLocalData = getFullBackupData()
-                                    val currentJson = backupAdapter.toJson(currentLocalData)
-                                    val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                                    val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+                    if (snapshot != null) {
+                        if (snapshot.exists()) {
+                            isInitialSyncChecked = true // First fetch complete!
+                            val remoteJson = snapshot.getString("backupJson") ?: ""
+                            if (remoteJson.isNotEmpty()) {
+                                viewModelScope.launch {
+                                    try {
+                                        val currentLocalData = getFullBackupData()
+                                        val currentJson = backupAdapter.toJson(currentLocalData)
+                                        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
 
-                                    val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                    val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
+                                        val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                        val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
 
-                                    if (currentJson == decryptedJson) {
-                                        // Perfectly in sync
-                                        prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                        _hasUnsavedChanges.value = false
-                                        _unsyncedItems.value = emptyList()
-                                        _firestoreSyncStatus.value = "Synced"
-                                        updateSyncSuccess(getApplication(), true)
-                                    } else {
-                                        // They are different! Let's check local database empty status
-                                        val localIsEmpty = currentLocalData.transactions.isEmpty() &&
-                                                currentLocalData.persons.isEmpty() &&
-                                                currentLocalData.savingsGoals.isEmpty()
+                                        if (currentJson == decryptedJson) {
+                                            // Perfectly in sync
+                                            prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                            _hasUnsavedChanges.value = false
+                                            _unsyncedItems.value = emptyList()
+                                            _firestoreSyncStatus.value = "Synced"
+                                            updateSyncSuccess(getApplication(), true)
+                                        } else {
+                                            // They are different! Let's check local database empty status
+                                            val localIsEmpty = currentLocalData.transactions.isEmpty() &&
+                                                    currentLocalData.persons.isEmpty() &&
+                                                    currentLocalData.savingsGoals.isEmpty()
 
-                                        if (localIsEmpty) {
-                                            // Local is empty! Restore from cloud immediately to get user's data back!
-                                            if (remoteData != null) {
-                                                restoreFullBackup(remoteData)
-                                                com.example.widget.updateAllWidgets(getApplication())
-                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                                _hasUnsavedChanges.value = false
-                                                _unsyncedItems.value = emptyList()
-                                                _firestoreSyncStatus.value = "Synced"
-                                                updateSyncSuccess(getApplication(), true)
-                                            }
-                                        } else if (cachedJson == null) {
-                                            // First sync after sign-in, local is NOT empty, cloud has data
-                                            if (remoteData != null) {
-                                                _pendingCloudData.value = remoteData
-                                                _showCloudDataFoundDialog.value = true
+                                            if (localIsEmpty) {
+                                                // Local is empty! Restore from cloud immediately to get user's data back!
+                                                if (remoteData != null) {
+                                                    restoreFullBackup(remoteData)
+                                                    com.example.widget.updateAllWidgets(getApplication())
+                                                    prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                    _hasUnsavedChanges.value = false
+                                                    _unsyncedItems.value = emptyList()
+                                                    _firestoreSyncStatus.value = "Synced"
+                                                    updateSyncSuccess(getApplication(), true)
+                                                }
+                                            } else if (cachedJson == null) {
+                                                // First sync after sign-in, local is NOT empty, cloud has data
+                                                if (remoteData != null) {
+                                                    _pendingCloudData.value = remoteData
+                                                    _showCloudDataFoundDialog.value = true
+                                                    checkUnsavedChanges()
+                                                }
+                                            } else if (cachedJson == currentJson) {
+                                                // Local hasn't changed from last sync, but remote has updated from another device
+                                                if (remoteData != null) {
+                                                    restoreFullBackup(remoteData)
+                                                    com.example.widget.updateAllWidgets(getApplication())
+                                                    prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                    _hasUnsavedChanges.value = false
+                                                    _unsyncedItems.value = emptyList()
+                                                    _firestoreSyncStatus.value = "Synced"
+                                                    updateSyncSuccess(getApplication(), true)
+                                                }
+                                            } else {
+                                                // Local has changes that are not in cloud yet
                                                 checkUnsavedChanges()
                                             }
-                                        } else if (cachedJson == currentJson) {
-                                            // Local hasn't changed from last sync, but remote has updated from another device
-                                            if (remoteData != null) {
-                                                restoreFullBackup(remoteData)
-                                                com.example.widget.updateAllWidgets(getApplication())
-                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                                _hasUnsavedChanges.value = false
-                                                _unsyncedItems.value = emptyList()
-                                                _firestoreSyncStatus.value = "Synced"
-                                                updateSyncSuccess(getApplication(), true)
-                                            }
-                                        } else {
-                                            // Local has changes that are not in cloud yet
-                                            checkUnsavedChanges()
                                         }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
                                     }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
                                 }
                             }
+                        } else {
+                            // Only assume it doesn't exist if metadata is not from cache (meaning the server itself returned a non-existent document)
+                            if (!snapshot.metadata.isFromCache) {
+                                isInitialSyncChecked = true // Server confirmed no document exists
+                                // Document doesn't exist on server yet (new signed-in user), upload current local DB as initial backup
+                                uploadToFirestore()
+                            }
                         }
-                    } else {
-                        // Document doesn't exist on server yet (new signed-in user), upload current local DB as initial backup
-                        uploadToFirestore()
                     }
                 }
         } catch (e: Exception) {
