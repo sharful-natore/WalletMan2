@@ -33,14 +33,6 @@ class FinanceNotificationService : Service() {
         super.onCreate()
         isRunning = true
         createNotificationChannel()
-    }
-    
-    override fun onDestroy() {
-        isRunning = false
-        super.onDestroy()
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
             val notification = createNotification()
             if (Build.VERSION.SDK_INT >= 34) {
@@ -57,6 +49,14 @@ class FinanceNotificationService : Service() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+    
+    override fun onDestroy() {
+        isRunning = false
+        super.onDestroy()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         return START_STICKY
     }
 
