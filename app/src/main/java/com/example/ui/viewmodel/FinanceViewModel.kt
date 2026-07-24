@@ -2039,20 +2039,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val options = com.google.firebase.FirebaseOptions.Builder()
                         .setProjectId(BuildConfig.Firestore_Project_ID.ifBlank { "financenote-dc6f8" })
                         .setApplicationId(BuildConfig.Firestore_APP_ID.ifBlank { "1:549900777284:android:b661159d57ed30542bc911" })
+                        .setGcmSenderId("549900777284")
+                        .setStorageBucket("financenote-dc6f8.firebasestorage.app")
                         .setApiKey("AIzaSyCngAmaOYL3jzyZj9JFKrmaYSkaNA5uIHQ")
                         .build()
                     com.google.firebase.FirebaseApp.initializeApp(context, options)
                 }
-                val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                try {
-                    val settings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
-                        .setPersistenceEnabled(true)
-                        .build()
-                    db.firestoreSettings = settings
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                firestore = db
+                firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
             } catch (e: Exception) {
                 e.printStackTrace()
                 try {
@@ -2062,13 +2055,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
             }
         }
-        val instance = firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
-        try {
-            instance.enableNetwork()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        return instance
+        return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
     }
 
     private fun formatFirestoreError(e: Exception): String {
@@ -2163,6 +2150,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private var uploadJob: kotlinx.coroutines.Job? = null
     
     fun syncNow(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
+        isInitialSyncChecked = true
         viewModelScope.launch {
             val currentData = getFullBackupData()
             val localIsEmpty = currentData.transactions.isEmpty() &&
@@ -2174,12 +2162,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 pullFromFirestore(
                     onSuccess = { onComplete?.invoke() },
                     onError = { err -> 
-                        if (err == "No backup data found on server" || err == "No Firestore document found") {
+                        if (err.contains("No backup data found") || err.contains("No Firestore document found") ||
+                            err.contains("সার্ভারে কোনো ব্যাকআপ ডেটা") || err.contains("ক্লাউডে ডেটা ডকুমেন্ট")) {
                             // If cloud is also empty, then we are truly synced (empty)
                             _firestoreSyncStatus.value = "Synced"
+                            updateSyncSuccess(getApplication(), false)
                             onComplete?.invoke()
                         } else {
-                            onError?.invoke(err)
+                            // Try uploading if pull errored out
+                            uploadToFirestore(onComplete, onError)
                         }
                     }
                 )
@@ -2196,15 +2187,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError?.invoke("Not signed in to Google")
             return
         }
-        if (!isInitialSyncChecked) {
-            _firestoreSyncStatus.value = "Checking cloud..."
-            onError?.invoke("Initial cloud check not completed yet")
-            return
-        }
+        isInitialSyncChecked = true
         uploadJob?.cancel()
         uploadJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(1000) // Debounce rapid edits
-            
             try {
                 val backupData = getFullBackupData()
                 val json = backupAdapter.toJson(backupData)
@@ -2222,14 +2207,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     _hasUnsavedChanges.value = false
                     _unsyncedItems.value = emptyList()
                     _firestoreSyncStatus.value = "Synced"
-                    onComplete?.invoke()
-                    return@launch
-                }
-
-                if (json == cachedJson) {
-                    _hasUnsavedChanges.value = false
-                    _unsyncedItems.value = emptyList()
-                    _firestoreSyncStatus.value = null
+                    updateSyncSuccess(getApplication(), true)
                     onComplete?.invoke()
                     return@launch
                 }
@@ -2248,13 +2226,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             try {
                                 val currentData = getFullBackupData()
                                 val currentJson = backupAdapter.toJson(currentData)
-                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                                 prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
                             } catch (e: Exception) { e.printStackTrace() }
                             _hasUnsavedChanges.value = false
                             _unsyncedItems.value = emptyList()
                             _firestoreSyncStatus.value = "Synced"
                             updateSyncSuccess(getApplication(), true)
+                            onComplete?.invoke()
                         }
                     }
                     .addOnFailureListener { e ->
@@ -2275,6 +2253,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Not signed in to Google")
             return
         }
+        isInitialSyncChecked = true
         viewModelScope.launch {
             _firestoreSyncStatus.value = "Downloading..."
             try {
@@ -2314,6 +2293,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         }
                     }
                     .addOnFailureListener { e ->
+                        // Fallback: check cached backup if available
+                        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+                        if (cachedJson != null) {
+                            try {
+                                val backupData = backupAdapter.fromJson(cachedJson)
+                                if (backupData != null) {
+                                    viewModelScope.launch {
+                                        restoreFullBackup(backupData)
+                                        _hasUnsavedChanges.value = false
+                                        _firestoreSyncStatus.value = "Synced"
+                                        onSuccess()
+                                    }
+                                    return@addOnFailureListener
+                                }
+                            } catch (_: Exception) {}
+                        }
                         _firestoreSyncStatus.value = "Failed"
                         onError(formatFirestoreError(e))
                     }
