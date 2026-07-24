@@ -53,7 +53,12 @@ object BackupEncryptionHelper {
         }
         
         return try {
-            val combined = Base64.decode(trimmed, Base64.NO_WRAP)
+            val cleaned = trimmed.replace("\\s".toRegex(), "")
+            val combined = try {
+                Base64.decode(cleaned, Base64.NO_WRAP)
+            } catch (e: Exception) {
+                Base64.decode(cleaned, Base64.DEFAULT)
+            }
             if (combined.size < 16) {
                 return trimmed // invalid encrypted content, return as is
             }

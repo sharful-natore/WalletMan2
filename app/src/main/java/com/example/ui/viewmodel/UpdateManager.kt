@@ -28,42 +28,52 @@ class UpdateManager {
 
     fun checkForUpdates(context: Context, onComplete: ((Boolean) -> Unit)? = null) {
         _isChecking.value = true
-        val remoteConfig = FirebaseRemoteConfig.getInstance()
-        val configSettings = FirebaseRemoteConfigSettings.Builder()
-            .setMinimumFetchIntervalInSeconds(0)
-            .build()
-        remoteConfig.setConfigSettingsAsync(configSettings)
-        
-        remoteConfig.setDefaultsAsync(mapOf(
-            "is_force_update" to false,
-            "latest_version_code" to 1.0,
-            "update_url" to ""
-        ))
-        
-        remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
-            _isChecking.value = false
-            if (task.isSuccessful) {
-                val isForceUpdate = remoteConfig.getBoolean("is_force_update")
-                val latestVersionCode = remoteConfig.getDouble("latest_version_code")
-                val updateUrl = remoteConfig.getString("update_url")
-                val updateDetails = remoteConfig.getString("Update_Details")
-                
-                val currentVersionCode = getAppVersionCode(context)
-                val currentVersionName = getAppVersionName(context)
-                
-                val isAvailable = latestVersionCode > currentVersionCode
-                
-                _updateInfo.value = UpdateInfo(
-                    isUpdateAvailable = isAvailable,
-                    isForceUpdate = isForceUpdate,
-                    updateUrl = updateUrl,
-                    updateDetails = updateDetails,
-                    latestVersion = latestVersionCode.toString()
-                )
-                onComplete?.invoke(isAvailable)
-            } else {
+        try {
+            com.example.FinanceApplication.ensureFirebaseInitialized(context)
+            val remoteConfig = FirebaseRemoteConfig.getInstance()
+            val configSettings = FirebaseRemoteConfigSettings.Builder()
+                .setMinimumFetchIntervalInSeconds(0)
+                .build()
+            remoteConfig.setConfigSettingsAsync(configSettings)
+            
+            remoteConfig.setDefaultsAsync(mapOf(
+                "is_force_update" to false,
+                "latest_version_code" to 1.0,
+                "update_url" to ""
+            ))
+            
+            remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
+                _isChecking.value = false
+                if (task.isSuccessful) {
+                    val isForceUpdate = remoteConfig.getBoolean("is_force_update")
+                    val latestVersionCode = remoteConfig.getDouble("latest_version_code")
+                    val updateUrl = remoteConfig.getString("update_url")
+                    val updateDetails = remoteConfig.getString("Update_Details")
+                    
+                    val currentVersionCode = getAppVersionCode(context)
+                    val currentVersionName = getAppVersionName(context)
+                    
+                    val isAvailable = latestVersionCode > currentVersionCode
+                    
+                    _updateInfo.value = UpdateInfo(
+                        isUpdateAvailable = isAvailable,
+                        isForceUpdate = isForceUpdate,
+                        updateUrl = updateUrl,
+                        updateDetails = updateDetails,
+                        latestVersion = latestVersionCode.toString()
+                    )
+                    onComplete?.invoke(isAvailable)
+                } else {
+                    onComplete?.invoke(false)
+                }
+            }.addOnFailureListener {
+                _isChecking.value = false
                 onComplete?.invoke(false)
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            _isChecking.value = false
+            onComplete?.invoke(false)
         }
     }
     
