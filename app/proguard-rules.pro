@@ -38,7 +38,7 @@
 # Keep UCrop
 -keep class com.yalantis.ucrop.** { *; }
 
-# Keep Coroutines
+# Keep Coroutines volatile fields
 -keepclassmembers class * {
-    *** volatile ***;
+    volatile <fields>;
 }
