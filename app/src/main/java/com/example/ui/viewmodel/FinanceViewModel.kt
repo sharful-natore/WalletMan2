@@ -2228,6 +2228,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         uploadJob?.cancel()
         uploadJob = viewModelScope.launch {
             try {
+                _firestoreSyncStatus.value = "Syncing..."
                 val backupData = getFullBackupData()
                 val json = backupAdapter.toJson(backupData)
                 
@@ -2236,28 +2237,36 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 
                 val localIsEmpty = backupData.transactions.isEmpty() &&
                         backupData.persons.isEmpty() &&
-                        backupData.savingsGoals.isEmpty()
+                        backupData.savingsGoals.isEmpty() &&
+                        backupData.monthlyBudgets.isEmpty()
                 
                 if (localIsEmpty && cachedJson == null) {
-                    // Safe guard: Do not upload an empty database if we haven't synced yet.
-                    // This prevents blank local state from overwriting existing cloud data.
-                    _hasUnsavedChanges.value = false
-                    _unsyncedItems.value = emptyList()
-                    _firestoreSyncStatus.value = "Synced"
-                    updateSyncSuccess(getApplication(), true)
-                    onComplete?.invoke()
+                    // Do not overwrite existing cloud data if local is empty on fresh login.
+                    pullFromFirestore(
+                        onSuccess = {
+                            onComplete?.invoke()
+                        },
+                        onError = {
+                            // Safe to mark as synced empty database
+                            _hasUnsavedChanges.value = false
+                            _unsyncedItems.value = emptyList()
+                            _firestoreSyncStatus.value = "Synced"
+                            updateSyncSuccess(getApplication(), true)
+                            onComplete?.invoke()
+                        }
+                    )
                     return@launch
                 }
 
-                _firestoreSyncStatus.value = "Syncing..."
                 val encryptedJson = BackupEncryptionHelper.encrypt(json)
                 val db = getFirestore(getApplication())
                 val data = mapOf(
                     "backupJson" to encryptedJson,
-                    "updatedAt" to System.currentTimeMillis()
+                    "updatedAt" to System.currentTimeMillis(),
+                    "email" to email
                 )
 
-                db.collection("users").document(email).set(data)
+                db.collection("users").document(email).set(data, com.google.firebase.firestore.SetOptions.merge())
                     .addOnSuccessListener {
                         viewModelScope.launch {
                             try {
@@ -2367,18 +2376,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             return
         }
         val email = rawEmail.lowercase().trim()
+        _firestoreSyncStatus.value = "Syncing..."
         try {
             val db = getFirestore(getApplication())
             firestoreListener = db.collection("users").document(email)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
                         error.printStackTrace()
-                        isInitialSyncChecked = true // Allow upload attempt anyway if listener fails to prevent blocking user offline edits
+                        _firestoreSyncStatus.value = formatFirestoreError(error)
+                        isInitialSyncChecked = true
                         return@addSnapshotListener
                     }
                     if (snapshot != null) {
                         if (snapshot.exists()) {
-                            isInitialSyncChecked = true // First fetch complete!
+                            isInitialSyncChecked = true
                             val remoteJson = snapshot.getString("backupJson") ?: ""
                             if (remoteJson.isNotEmpty()) {
                                 viewModelScope.launch {
@@ -2391,22 +2402,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                         val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
                                         val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
 
-                                        if (currentJson == decryptedJson) {
-                                            // Perfectly in sync
-                                            prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                            _hasUnsavedChanges.value = false
-                                            _unsyncedItems.value = emptyList()
-                                            _firestoreSyncStatus.value = "Synced"
-                                            updateSyncSuccess(getApplication(), true)
-                                        } else {
-                                            // They are different! Let's check local database empty status
-                                            val localIsEmpty = currentLocalData.transactions.isEmpty() &&
-                                                    currentLocalData.persons.isEmpty() &&
-                                                    currentLocalData.savingsGoals.isEmpty()
+                                        if (remoteData != null) {
+                                            if (currentJson == decryptedJson) {
+                                                // Perfectly in sync
+                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                _hasUnsavedChanges.value = false
+                                                _unsyncedItems.value = emptyList()
+                                                _firestoreSyncStatus.value = "Synced"
+                                                updateSyncSuccess(getApplication(), true)
+                                            } else {
+                                                val localIsEmpty = currentLocalData.transactions.isEmpty() &&
+                                                        currentLocalData.persons.isEmpty() &&
+                                                        currentLocalData.savingsGoals.isEmpty() &&
+                                                        currentLocalData.monthlyBudgets.isEmpty()
 
-                                            if (localIsEmpty) {
-                                                // Local is empty! Restore from cloud immediately to get user's data back!
-                                                if (remoteData != null) {
+                                                if (localIsEmpty) {
+                                                    // Local is empty! Restore from cloud immediately to retrieve user data
                                                     restoreFullBackup(remoteData)
                                                     com.example.widget.updateAllWidgets(getApplication())
                                                     prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
@@ -2414,17 +2425,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                                     _unsyncedItems.value = emptyList()
                                                     _firestoreSyncStatus.value = "Synced"
                                                     updateSyncSuccess(getApplication(), true)
-                                                }
-                                            } else if (cachedJson == null) {
-                                                // First sync after sign-in, local is NOT empty, cloud has data
-                                                if (remoteData != null) {
+                                                } else if (cachedJson == null) {
+                                                    // First sync after sign-in, both local and cloud have data
                                                     _pendingCloudData.value = remoteData
                                                     _showCloudDataFoundDialog.value = true
                                                     checkUnsavedChanges()
-                                                }
-                                            } else if (cachedJson == currentJson) {
-                                                // Local hasn't changed from last sync, but remote has updated from another device
-                                                if (remoteData != null) {
+                                                } else if (cachedJson == currentJson) {
+                                                    // Local hasn't changed from last sync, but remote has updated from another device
                                                     restoreFullBackup(remoteData)
                                                     com.example.widget.updateAllWidgets(getApplication())
                                                     prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
@@ -2432,22 +2439,26 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                                     _unsyncedItems.value = emptyList()
                                                     _firestoreSyncStatus.value = "Synced"
                                                     updateSyncSuccess(getApplication(), true)
+                                                } else {
+                                                    // Local has changes that need to be uploaded
+                                                    checkUnsavedChanges()
+                                                    uploadToFirestore()
                                                 }
-                                            } else {
-                                                // Local has changes that are not in cloud yet
-                                                checkUnsavedChanges()
                                             }
+                                        } else {
+                                            _firestoreSyncStatus.value = "Synced"
                                         }
                                     } catch (e: Exception) {
                                         e.printStackTrace()
+                                        _firestoreSyncStatus.value = "Error"
                                     }
                                 }
+                            } else {
+                                uploadToFirestore()
                             }
                         } else {
-                            // Only assume it doesn't exist if metadata is not from cache (meaning the server itself returned a non-existent document)
                             if (!snapshot.metadata.isFromCache) {
-                                isInitialSyncChecked = true // Server confirmed no document exists
-                                // Document doesn't exist on server yet (new signed-in user), upload current local DB as initial backup
+                                isInitialSyncChecked = true
                                 uploadToFirestore()
                             }
                         }
@@ -2455,6 +2466,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
         } catch (e: Exception) {
             e.printStackTrace()
+            _firestoreSyncStatus.value = formatFirestoreError(e)
         }
     }
 
@@ -2925,15 +2937,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (idToken != null) {
                     val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
                     getFirebaseAuth().signInWithCredential(credential)
-                        .addOnSuccessListener {
-                            _currentUser.value = getFirebaseAuth().currentUser
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                _currentUser.value = getFirebaseAuth().currentUser
+                            }
+                            startRealtimeSync()
+                            checkAndTriggerAutoBackup(context)
+                            onSuccess()
                         }
+                } else {
+                    startRealtimeSync()
+                    checkAndTriggerAutoBackup(context)
+                    onSuccess()
                 }
-                
-                // Proceed normally with automatic realtime sync
-                startRealtimeSync()
-                checkAndTriggerAutoBackup(context)
-                onSuccess()
             } catch (e: Exception) {
                 _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
                 onError(e.localizedMessage ?: "Unknown error")
