@@ -12776,6 +12776,9 @@ fun SettingsScreen(
     val profileAddress by viewModel.profileAddress.collectAsState()
 
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
+    val isGoogleDriveSignedIn by viewModel.isGoogleDriveSignedIn.collectAsState()
+    val authProvider by viewModel.authProvider.collectAsState()
+    val firestoreSyncStatus by viewModel.firestoreSyncStatus.collectAsState()
     val googleName by viewModel.googleName.collectAsState()
     val googleEmail by viewModel.googleEmail.collectAsState()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
@@ -13524,18 +13527,36 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isGoogleSignedIn) (googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল ইউজার" else "Google User" }) else (if (language == AppLanguage.BN) "লগইন করা নেই" else "Not Signed In"),
+                                text = if (isGoogleSignedIn) {
+                                    if (isGoogleDriveSignedIn || authProvider == "google") {
+                                        googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট" else "Google Account" }
+                                    } else {
+                                        googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "ইমেইল অ্যাকাউন্ট" else "Email Account" }
+                                    }
+                                } else (if (language == AppLanguage.BN) "লগইন করা নেই" else "Not Signed In"),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 color = if (isDark) Color.White else Color(0xFF1E293B)
                             )
                             Text(
-                                text = if (isGoogleSignedIn) (googleEmail.orEmpty().ifBlank { "drive.user@gmail.com" }) else (if (language == AppLanguage.BN) "ব্যাকআপ রাখতে অনুগ্রহ করে সাইন-ইন করুন" else "Please sign-in to backup your data"),
+                                text = if (isGoogleSignedIn) (googleEmail.orEmpty().ifBlank { "user@cloud.com" }) else (if (language == AppLanguage.BN) "অটো-সিঙ্ক করতে অনুগ্রহ করে সাইন-ইন করুন" else "Please sign-in to auto-sync your data"),
                                 fontSize = 11.sp,
                                 color = if (isDark) Color.Gray else Color(0xFF64748B),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            if (isGoogleSignedIn) {
+                                Text(
+                                    text = if (isGoogleDriveSignedIn || authProvider == "google") {
+                                        if (language == AppLanguage.BN) "✓ ড্রাইভ ও ফায়ারস্টোর অটো-সিঙ্ক সক্রিয়" else "✓ Drive & Firestore Auto-Sync Active"
+                                    } else {
+                                        if (language == AppLanguage.BN) "✓ ফায়ারস্টোর ক্লাউড সিঙ্ক সক্রিয়" else "✓ Firestore Cloud Sync Active"
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = FintechGreen
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
@@ -13576,15 +13597,7 @@ fun SettingsScreen(
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )
                     }
-                    Text(
-                        text = if (language == AppLanguage.BN) 
-                            "আপনার সমস্ত লেনদেন, সঞ্চয় এবং হিসাবের তথ্য সম্পূর্ণ নিরাপদ রাখতে সরাসরি গুগল ড্রাইভে ব্যাকআপ রাখুন।" 
-                            else "To keep all your transaction, savings, and account data safe, backup directly to Google Drive.",
-                        fontSize = 12.sp,
-                        color = if (isDark) Color.Gray else Color(0xFF64748B)
-                    )
 
-                    // Last Backup Time Info Row & Auto Backup Setting
                     if (isGoogleSignedIn) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
@@ -13592,138 +13605,196 @@ fun SettingsScreen(
                         ) {
                             HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
                             
+                            // Realtime Firestore Database Sync Row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "সর্বশেষ ক্লাউড ব্যাকআপ:" else "Last Cloud Backup:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color.LightGray else Color(0xFF475569)
-                                )
-                                Text(
-                                    text = formatSyncTime(lastGDriveBackupTime, language),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = FintechBlue
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "ক্লাউড ডাটাবেস অটো-সিঙ্ক:" else "Cloud Database Sync:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.LightGray else Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "স্ট্যাটাস: ${firestoreSyncStatus ?: "Synced"}" else "Status: ${firestoreSyncStatus ?: "Synced"}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = FintechBlue
+                                    )
+                                }
+                                Button(
+                                    onClick = { viewModel.syncNow() },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = if (language == AppLanguage.BN) "এখনই সিঙ্ক" else "Sync Now", fontSize = 11.sp, color = Color.White)
+                                }
                             }
 
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "স্বয়ংক্রিয় ব্যাকআপের সময়কাল:" else "Auto Backup Interval:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color.LightGray else Color(0xFF475569)
-                                )
-                                
-                                val intervalOptions = listOf(-1, 1, 2, 5, 7, 15, 30)
-                                val selectedText = when (autoBackupIntervalDays) {
-                                    -1 -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
-                                    1 -> if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"
-                                    2 -> if (language == AppLanguage.BN) "২ দিন পর পর" else "Every 2 Days"
-                                    5 -> if (language == AppLanguage.BN) "৫ দিন পর পর" else "Every 5 Days"
-                                    7 -> if (language == AppLanguage.BN) "৭ দিন পর পর" else "Every 7 Days"
-                                    15 -> if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"
-                                    30 -> if (language == AppLanguage.BN) "৩০ দিন পর পর" else "Every 30 Days"
-                                    else -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                            HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
+
+                            if (isGoogleDriveSignedIn || authProvider == "google") {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "সর্বশেষ ড্রাইভ ব্যাকআপ:" else "Last Drive Backup:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.LightGray else Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = formatSyncTime(lastGDriveBackupTime, language),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = FintechBlue
+                                    )
                                 }
 
-                                ExposedDropdownMenuBox(
-                                    expanded = autoBackupDropdownExpanded,
-                                    onExpandedChange = { autoBackupDropdownExpanded = !autoBackupDropdownExpanded },
-                                    modifier = Modifier.fillMaxWidth()
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    OutlinedTextField(
-                                        value = selectedText,
-                                        onValueChange = {},
-                                        readOnly = true,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            unfocusedBorderColor = if (isDark) Color(0xFF262626) else Color(0xFFCBD5E1),
-                                            focusedBorderColor = FintechBlue,
-                                            unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                            focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                            unfocusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC),
-                                            focusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = autoBackupDropdownExpanded) }
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "স্বয়ংক্রিয় ব্যাকআপের সময়কাল:" else "Auto Backup Interval:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.LightGray else Color(0xFF475569)
                                     )
-                                    ExposedDropdownMenu(
+                                    
+                                    val intervalOptions = listOf(-1, 1, 2, 5, 7, 15, 30)
+                                    val selectedText = when (autoBackupIntervalDays) {
+                                        -1 -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                                        1 -> if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"
+                                        2 -> if (language == AppLanguage.BN) "২ দিন পর পর" else "Every 2 Days"
+                                        5 -> if (language == AppLanguage.BN) "৫ দিন পর পর" else "Every 5 Days"
+                                        7 -> if (language == AppLanguage.BN) "৭ দিন পর পর" else "Every 7 Days"
+                                        15 -> if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"
+                                        30 -> if (language == AppLanguage.BN) "৩০ দিন পর পর" else "Every 30 Days"
+                                        else -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                                    }
+
+                                    ExposedDropdownMenuBox(
                                         expanded = autoBackupDropdownExpanded,
-                                        onDismissRequest = { autoBackupDropdownExpanded = false }
+                                        onExpandedChange = { autoBackupDropdownExpanded = !autoBackupDropdownExpanded },
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        intervalOptions.forEach { days ->
-                                            val itemText = when (days) {
-                                                -1 -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
-                                                1 -> if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"
-                                                2 -> if (language == AppLanguage.BN) "২ দিন পর পর" else "Every 2 Days"
-                                                5 -> if (language == AppLanguage.BN) "৫ দিন পর পর" else "Every 5 Days"
-                                                7 -> if (language == AppLanguage.BN) "৭ দিন পর পর" else "Every 7 Days"
-                                                15 -> if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"
-                                                30 -> if (language == AppLanguage.BN) "৩০ দিন পর পর" else "Every 30 Days"
-                                                else -> ""
-                                            }
-                                            DropdownMenuItem(
-                                                text = { Text(itemText, fontSize = 13.sp) },
-                                                onClick = {
-                                                    viewModel.setAutoBackupIntervalDays(context, days)
-                                                    autoBackupDropdownExpanded = false
+                                        OutlinedTextField(
+                                            value = selectedText,
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                unfocusedBorderColor = if (isDark) Color(0xFF262626) else Color(0xFFCBD5E1),
+                                                focusedBorderColor = FintechBlue,
+                                                unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                                focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
+                                                unfocusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC),
+                                                focusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp),
+                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = autoBackupDropdownExpanded) }
+                                        )
+                                        ExposedDropdownMenu(
+                                            expanded = autoBackupDropdownExpanded,
+                                            onDismissRequest = { autoBackupDropdownExpanded = false }
+                                        ) {
+                                            intervalOptions.forEach { days ->
+                                                val itemText = when (days) {
+                                                    -1 -> if (language == AppLanguage.BN) "বন্ধ (Never)" else "Never"
+                                                    1 -> if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"
+                                                    2 -> if (language == AppLanguage.BN) "২ দিন পর পর" else "Every 2 Days"
+                                                    5 -> if (language == AppLanguage.BN) "৫ দিন পর পর" else "Every 5 Days"
+                                                    7 -> if (language == AppLanguage.BN) "৭ দিন পর পর" else "Every 7 Days"
+                                                    15 -> if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"
+                                                    30 -> if (language == AppLanguage.BN) "৩০ দিন পর পর" else "Every 30 Days"
+                                                    else -> ""
                                                 }
-                                            )
+                                                DropdownMenuItem(
+                                                    text = { Text(itemText, fontSize = 13.sp) },
+                                                    onClick = {
+                                                        viewModel.setAutoBackupIntervalDays(context, days)
+                                                        autoBackupDropdownExpanded = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
-                        }
-                    }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                if (!isGoogleSignedIn) {
-                                    onSignInClick()
-                                } else {
-                                    onBackupClick()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Button(
+                                        onClick = { onBackupClick() },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                                    ) {
+                                        Icon(Icons.Rounded.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(text = if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ" else "Drive Backup", fontSize = 11.sp, color = Color.White)
+                                    }
+                                    Button(
+                                        onClick = { onRestoreClick() },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFE2E8F0)),
+                                        border = BorderStroke(1.dp, if (isDark) Color(0xFF262626) else Color(0xFFCBD5E1))
+                                    ) {
+                                        Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(text = if (language == AppLanguage.BN) "ড্রাইভ রিস্টোর" else "Drive Restore", fontSize = 11.sp, color = FintechBlue)
+                                    }
                                 }
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
-                        ) {
-                            Icon(Icons.Rounded.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (language == AppLanguage.BN) "ক্লাউড ব্যাকআপ" else "Cloud Backup", fontSize = 11.sp, color = Color.White)
-                        }
-                        Button(
-                            onClick = {
-                                if (!isGoogleSignedIn) {
-                                    onSignInClick()
-                                } else {
-                                    onRestoreClick()
+                            } else {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) 
+                                            "গুগল ড্রাইভ ফাইল ব্যাকআপ:" 
+                                            else "Google Drive File Backup:",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.LightGray else Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = if (language == AppLanguage.BN)
+                                            "আপনি ইমেইল দিয়ে লগইন আছেন। আপনার তথ্য ফায়ারস্টোর ক্লাউড ডাটাবেসে রিয়েলটাইমে অটো-সিঙ্ক হচ্ছে। ড্রাইভে ম্যানুয়াল ফাইল ব্যাকআপ রাখতে চাইলে গুগল অ্যাকাউন্ট সংযুক্ত করুন।"
+                                            else "You are signed in via Email. Your data auto-syncs to Firestore Cloud Database. To store extra Drive file backups, connect Google Drive.",
+                                        fontSize = 11.sp,
+                                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+                                    )
+                                    Button(
+                                        onClick = { onSignInClick() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Rounded.CloudUpload, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট করুন" else "Connect Google Drive",
+                                            fontSize = 11.sp,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFE2E8F0)),
-                            border = BorderStroke(1.dp, if (isDark) Color(0xFF262626) else Color(0xFFCBD5E1))
-                        ) {
-                            Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (language == AppLanguage.BN) "ক্লাউড রিস্টোর" else "Cloud Restore", fontSize = 11.sp, color = FintechBlue)
+                            }
                         }
                     }
                 }
