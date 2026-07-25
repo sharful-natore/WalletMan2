@@ -98,8 +98,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val updateManager = UpdateManager()
 
     private fun getFirebaseAuth(): FirebaseAuth {
-        com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
-        return FirebaseAuth.getInstance()
+        val app = com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
+        return if (app != null) {
+            try { FirebaseAuth.getInstance(app) } catch (e: Exception) { FirebaseAuth.getInstance() }
+        } else {
+            FirebaseAuth.getInstance()
+        }
     }
 
     private val _currentUser = MutableStateFlow<com.google.firebase.auth.FirebaseUser?>(null)
@@ -2045,18 +2049,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private fun getFirestore(context: Context): com.google.firebase.firestore.FirebaseFirestore {
         if (firestore == null) {
             try {
-                com.example.FinanceApplication.ensureFirebaseInitialized(context)
-                firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                val app = com.example.FinanceApplication.ensureFirebaseInitialized(context)
+                firestore = if (app != null) {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance(app)
+                } else {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                try {
-                    firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                } catch (ex: Exception) {
-                    ex.printStackTrace()
-                }
             }
         }
-        return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
+        return firestore ?: try { com.google.firebase.firestore.FirebaseFirestore.getInstance() } catch (e: Exception) { com.google.firebase.firestore.FirebaseFirestore.getInstance() }
     }
 
     private suspend fun getFullBackupData(): FinanceBackup {
