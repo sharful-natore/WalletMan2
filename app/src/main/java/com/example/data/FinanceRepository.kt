@@ -80,6 +80,24 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     }
 
     suspend fun restoreBackupData(backup: FinanceBackup) {
+        val isBackupEmpty = backup.persons.isEmpty() &&
+                backup.transactions.isEmpty() &&
+                backup.savingsGoals.isEmpty() &&
+                backup.savingsTransactions.isEmpty() &&
+                backup.workspaces.isEmpty() &&
+                backup.monthlyBudgets.isEmpty()
+        
+        val currentLocalData = getBackupData()
+        val isLocalEmpty = currentLocalData.persons.isEmpty() &&
+                currentLocalData.transactions.isEmpty() &&
+                currentLocalData.savingsGoals.isEmpty() &&
+                currentLocalData.savingsTransactions.isEmpty()
+
+        // Protect local database from being wiped out by a blank or corrupt cloud backup
+        if (isBackupEmpty && !isLocalEmpty) {
+            return
+        }
+
         financeDao.deleteAllPersons()
         financeDao.deleteAllTransactions()
         financeDao.deleteAllSavingsGoals()
@@ -88,9 +106,9 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         financeDao.deleteAllTrashItems()
         financeDao.deleteAllMonthlyBudgets()
 
-        financeDao.insertPersons(backup.persons)
-        financeDao.insertTransactions(backup.transactions)
-        financeDao.insertSavingsGoals(backup.savingsGoals)
+        if (backup.persons.isNotEmpty()) financeDao.insertPersons(backup.persons)
+        if (backup.transactions.isNotEmpty()) financeDao.insertTransactions(backup.transactions)
+        if (backup.savingsGoals.isNotEmpty()) financeDao.insertSavingsGoals(backup.savingsGoals)
         if (backup.savingsTransactions.isNotEmpty()) {
             financeDao.insertSavingsTransactions(backup.savingsTransactions)
         }

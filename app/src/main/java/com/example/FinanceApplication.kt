@@ -16,12 +16,18 @@ class FinanceApplication : Application() {
             try {
                 val appContext = context.applicationContext ?: context
                 if (FirebaseApp.getApps(appContext).isEmpty()) {
-                    val options = FirebaseOptions.Builder()
-                        .setProjectId(BuildConfig.Firestore_Project_ID.ifBlank { "financenote-dc6f8" })
-                        .setApplicationId(BuildConfig.Firestore_APP_ID.ifBlank { "1:549900777284:android:b661159d57ed30542bc911" })
-                        .setApiKey("AIzaSyCngAmaOYL3jzyZj9JFKrmaYSkaNA5uIHQ")
-                        .build()
-                    FirebaseApp.initializeApp(appContext, options)
+                    try {
+                        FirebaseApp.initializeApp(appContext)
+                    } catch (e: Exception) {
+                        val options = FirebaseOptions.Builder()
+                            .setProjectId("financenote-dc6f8")
+                            .setApplicationId("1:549900777284:android:b661159d57ed30542bc911")
+                            .setApiKey("AIzaSyCngAmaOYL3jzyZj9JFKrmaYSkaNA5uIHQ")
+                            .setDatabaseUrl("https://financenote-dc6f8-default-rtdb.firebaseio.com")
+                            .setStorageBucket("financenote-dc6f8.firebasestorage.app")
+                            .build()
+                        FirebaseApp.initializeApp(appContext, options)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

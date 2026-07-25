@@ -1,35 +1,48 @@
 # Project specific ProGuard rules
 
-# General optimizations
--optimizationpasses 5
--allowaccessmodification
--mergeinterfacesaggressively
+# General attributes preservation for reflection, generics, annotations
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
 
-# Preserve attributes for debugging and reflection if needed
--keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
--keepattributes SourceFile,LineNumberTable
-
-# Keep all data models to prevent them and their fields from being renamed or stripped
--keep class com.example.data.** { *; }
--keepclassmembers class com.example.data.** { *; }
-
-# Keep all generated Moshi adapters
+# Preserve Kotlin reflection used by Moshi KotlinJsonAdapterFactory
+-keep class kotlin.reflect.** { *; }
 -keep class com.squareup.moshi.** { *; }
 -keepclassmembers class com.squareup.moshi.** { *; }
+-keep class com.squareup.moshi.kotlin.reflect.** { *; }
+-keepclassmembers class com.squareup.moshi.kotlin.reflect.** { *; }
+
+# Keep all Moshi JSON Adapters & Annotated classes
 -keep class *JsonAdapter { *; }
--keep class com.example.data.*JsonAdapter { *; }
+-keep class com.example.**.*JsonAdapter { *; }
 -keep @com.squareup.moshi.JsonClass class * { *; }
+-keepclassmembers class * {
+    @com.squareup.moshi.Json <fields>;
+}
+
+# Keep all data models & data classes in com.example
+-keep class com.example.data.** { *; }
+-keepclassmembers class com.example.data.** { *; }
+-keep class com.example.ui.viewmodel.** { *; }
+-keepclassmembers class com.example.ui.viewmodel.** { *; }
+
+# Keep BackupEncryptionHelper
+-keep class com.example.ui.viewmodel.BackupEncryptionHelper { *; }
 
 # Keep Room compiler-generated and database classes
 -keep class androidx.room.** { *; }
+-keepclassmembers class androidx.room.** { *; }
 -keep class * extends androidx.room.RoomDatabase { *; }
 -keep class * extends androidx.room.Dao { *; }
 
-# Keep Firebase and Firestore related classes to ensure reflection-based mapping works
+# Keep Firebase and Firestore related classes
 -keep class com.google.firebase.** { *; }
 -keepclassmembers class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
 
 # Keep Google Play Services and sign-in components
 -keep class com.google.android.gms.** { *; }
 -keepclassmembers class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
 
+# Keep Kotlin Coroutines
+-keep class kotlinx.coroutines.** { *; }
+-keepclassmembers class kotlinx.coroutines.** { *; }

@@ -2045,14 +2045,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private fun getFirestore(context: Context): com.google.firebase.firestore.FirebaseFirestore {
         if (firestore == null) {
             try {
-                if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
-                    val options = com.google.firebase.FirebaseOptions.Builder()
-                        .setProjectId(BuildConfig.Firestore_Project_ID.ifBlank { "financenote-dc6f8" })
-                        .setApplicationId(BuildConfig.Firestore_APP_ID.ifBlank { "1:549900777284:android:b661159d57ed30542bc911" })
-                        .setApiKey("AIzaSyCngAmaOYL3jzyZj9JFKrmaYSkaNA5uIHQ")
-                        .build()
-                    com.google.firebase.FirebaseApp.initializeApp(context, options)
-                }
+                com.example.FinanceApplication.ensureFirebaseInitialized(context)
                 firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
             } catch (e: Exception) {
                 e.printStackTrace()
