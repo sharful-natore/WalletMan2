@@ -5135,11 +5135,17 @@ fun FinanceNoteApp(
 
                         // Sync status description if syncing
                         if (!syncStatus.isNullOrEmpty()) {
+                            val statusText = syncStatus ?: ""
+                            val isErrorStatus: Boolean = statusText.contains("Failed", ignoreCase = true) ||
+                                    statusText.contains("Error", ignoreCase = true) ||
+                                    statusText.contains("denied", ignoreCase = true) ||
+                                    statusText.contains("ব্যর্থ", ignoreCase = true)
                             Text(
                                 text = "${if (language == AppLanguage.BN) "স্ট্যাটাস: " else "Status: "}$syncStatus",
                                 fontSize = 13.sp,
                                 fontStyle = FontStyle.Italic,
-                                color = if (isDarkTheme) Color.LightGray else Color.Gray,
+                                fontWeight = if (isErrorStatus) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isErrorStatus) Color(0xFFFF5252) else if (isDarkTheme) Color.LightGray else Color.Gray,
                                 modifier = Modifier.align(Alignment.CenterHorizontally)
                             )
                         }

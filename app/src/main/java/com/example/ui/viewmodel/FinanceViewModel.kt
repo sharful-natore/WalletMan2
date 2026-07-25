@@ -142,6 +142,127 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         user != null || googleSignedIn
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _currentUser.value != null || _isGoogleSignedIn.value)
 
+    // Preferences & UI State
+    private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
+    val language: StateFlow<AppLanguage> = _language.asStateFlow()
+
+    private val _isDarkTheme = MutableStateFlow(false) // Default to light theme as requested
+    val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
+
+    private val _selectedThemeGradientIndex = MutableStateFlow(0)
+    val selectedThemeGradientIndex: StateFlow<Int> = _selectedThemeGradientIndex.asStateFlow()
+
+    private val _customGradients = MutableStateFlow<List<List<Color>>>(emptyList())
+    val customGradients: StateFlow<List<List<Color>>> = _customGradients.asStateFlow()
+
+    private val _customGradientsConfig = MutableStateFlow<List<ThemeGradient>>(emptyList())
+    val customGradientsConfig: StateFlow<List<ThemeGradient>> = _customGradientsConfig.asStateFlow()
+
+    private val _staticGradientOverrides = MutableStateFlow<Map<Int, ThemeGradient>>(emptyMap())
+
+    val allGradientsConfig: StateFlow<List<ThemeGradient>> = combine(_staticGradientOverrides, _customGradientsConfig) { overrides, custom ->
+        com.example.ui.theme.GradientsList.mapIndexed { index, defaultGrad ->
+            overrides[index] ?: ThemeGradient(defaultGrad)
+        } + custom
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList.map { ThemeGradient(it) })
+
+    val allGradients: StateFlow<List<List<Color>>> = allGradientsConfig.map { list ->
+        list.map { it.colors }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList)
+
+    private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
+    val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
+
+    // Profile Settings States
+    private val _profileName = MutableStateFlow("")
+    val profileName: StateFlow<String> = _profileName.asStateFlow()
+
+    private val _profileEmail = MutableStateFlow("")
+    val profileEmail: StateFlow<String> = _profileEmail.asStateFlow()
+
+    private val _profilePhotoUri = MutableStateFlow<String?>(null)
+    val profilePhotoUri: StateFlow<String?> = _profilePhotoUri.asStateFlow()
+
+    private val _profilePhone = MutableStateFlow("")
+    val profilePhone: StateFlow<String> = _profilePhone.asStateFlow()
+
+    private val _profileSocial = MutableStateFlow("")
+    val profileSocial: StateFlow<String> = _profileSocial.asStateFlow()
+
+    private val _profileAddress = MutableStateFlow("")
+    val profileAddress: StateFlow<String> = _profileAddress.asStateFlow()
+
+    // Firestore Sync States
+    private val _hasUnsavedChanges = MutableStateFlow(false)
+    val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+
+    private val _unsyncedItems = MutableStateFlow<List<String>>(emptyList())
+    val unsyncedItems: StateFlow<List<String>> = _unsyncedItems.asStateFlow()
+
+    private val _isNetworkActive = MutableStateFlow(false)
+    val isNetworkActive: StateFlow<Boolean> = _isNetworkActive.asStateFlow()
+
+    private val _firestoreSyncStatus = MutableStateFlow<String?>(null)
+    val firestoreSyncStatus: StateFlow<String?> = _firestoreSyncStatus.asStateFlow()
+
+    private val _showCloudDataFoundDialog = MutableStateFlow(false)
+    val showCloudDataFoundDialog: StateFlow<Boolean> = _showCloudDataFoundDialog.asStateFlow()
+
+    private val _pendingCloudData = MutableStateFlow<FinanceBackup?>(null)
+    val pendingCloudData: StateFlow<FinanceBackup?> = _pendingCloudData.asStateFlow()
+
+    private val _lastSyncTime = MutableStateFlow<Long?>(null)
+    val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
+
+    private val _lastMutationAction = MutableStateFlow<String?>(null)
+    val lastMutationAction: StateFlow<String?> = _lastMutationAction.asStateFlow()
+
+    private val _lastMutationName = MutableStateFlow<String?>(null)
+    val lastMutationName: StateFlow<String?> = _lastMutationName.asStateFlow()
+
+    private val _lastMutationCategory = MutableStateFlow<String?>(null)
+    val lastMutationCategory: StateFlow<String?> = _lastMutationCategory.asStateFlow()
+
+    private val _lastMutationAmount = MutableStateFlow<Double?>(null)
+    val lastMutationAmount: StateFlow<Double?> = _lastMutationAmount.asStateFlow()
+
+    // Google Drive States
+    private val _driveStatusMessage = MutableStateFlow<String?>(null)
+    val driveStatusMessage: StateFlow<String?> = _driveStatusMessage.asStateFlow()
+
+    private val _googleDriveFiles = MutableStateFlow<List<GoogleDriveFile>>(emptyList())
+    val googleDriveFiles: StateFlow<List<GoogleDriveFile>> = _googleDriveFiles.asStateFlow()
+
+    private val _isFetchingFiles = MutableStateFlow(false)
+    val isFetchingFiles: StateFlow<Boolean> = _isFetchingFiles.asStateFlow()
+
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _lastGDriveBackupTime = MutableStateFlow<Long?>(null)
+    val lastGDriveBackupTime: StateFlow<Long?> = _lastGDriveBackupTime.asStateFlow()
+
+    private val _autoBackupIntervalDays = MutableStateFlow(-1)
+    val autoBackupIntervalDays: StateFlow<Int> = _autoBackupIntervalDays.asStateFlow()
+
+    private val _customNotifications = MutableStateFlow<List<CustomNotification>>(emptyList())
+    val customNotifications: StateFlow<List<CustomNotification>> = _customNotifications.asStateFlow()
+
+    // Moshi JSON adapter configuration
+    private val moshi = Moshi.Builder()
+        .addLast(KotlinJsonAdapterFactory())
+        .build()
+    private val backupAdapter = moshi.adapter(FinanceBackup::class.java)
+
+    private val personAdapter = moshi.adapter(Person::class.java)
+    private val transactionAdapter = moshi.adapter(Transaction::class.java)
+    private val savingsGoalAdapter = moshi.adapter(SavingsGoal::class.java)
+    private val savingsTransactionAdapter = moshi.adapter(SavingsTransaction::class.java)
+
+    private val personWithTxAdapter = moshi.adapter(com.example.data.PersonWithTransactions::class.java)
+    private val goalWithTxAdapter = moshi.adapter(com.example.data.GoalWithTransactions::class.java)
+    private val deletedBackupAdapter = moshi.adapter(com.example.data.DeletedGDriveBackup::class.java)
+
     init {
         com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
         try {
@@ -221,71 +342,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             e.printStackTrace()
         }
     }
-
-    // Preferences & UI State
-    private val _language = MutableStateFlow(AppLanguage.BN) // Default to Bengali
-    val language: StateFlow<AppLanguage> = _language.asStateFlow()
-
-    private val _isDarkTheme = MutableStateFlow(false) // Default to light theme as requested
-    val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
-
-    private val _selectedThemeGradientIndex = MutableStateFlow(0)
-    val selectedThemeGradientIndex: StateFlow<Int> = _selectedThemeGradientIndex.asStateFlow()
-
-    private val _customGradients = MutableStateFlow<List<List<Color>>>(emptyList())
-    val customGradients: StateFlow<List<List<Color>>> = _customGradients.asStateFlow()
-
-    private val _customGradientsConfig = MutableStateFlow<List<ThemeGradient>>(emptyList())
-    val customGradientsConfig: StateFlow<List<ThemeGradient>> = _customGradientsConfig.asStateFlow()
-
-    private val _staticGradientOverrides = MutableStateFlow<Map<Int, ThemeGradient>>(emptyMap())
-
-    val allGradientsConfig: StateFlow<List<ThemeGradient>> = combine(_staticGradientOverrides, _customGradientsConfig) { overrides, custom ->
-        com.example.ui.theme.GradientsList.mapIndexed { index, defaultGrad ->
-            overrides[index] ?: ThemeGradient(defaultGrad)
-        } + custom
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList.map { ThemeGradient(it) })
-
-    val allGradients: StateFlow<List<List<Color>>> = allGradientsConfig.map { list ->
-        list.map { it.colors }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, com.example.ui.theme.GradientsList)
-
-    private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
-    val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
-
-    // Profile Settings States
-    private val _profileName = MutableStateFlow("")
-    val profileName: StateFlow<String> = _profileName.asStateFlow()
-
-    private val _profileEmail = MutableStateFlow("")
-    val profileEmail: StateFlow<String> = _profileEmail.asStateFlow()
-
-    private val _profilePhotoUri = MutableStateFlow<String?>(null)
-    val profilePhotoUri: StateFlow<String?> = _profilePhotoUri.asStateFlow()
-
-    private val _profilePhone = MutableStateFlow("")
-    val profilePhone: StateFlow<String> = _profilePhone.asStateFlow()
-
-    private val _profileSocial = MutableStateFlow("")
-    val profileSocial: StateFlow<String> = _profileSocial.asStateFlow()
-
-    private val _profileAddress = MutableStateFlow("")
-    val profileAddress: StateFlow<String> = _profileAddress.asStateFlow()
-
-    // Moshi JSON adapter configuration
-    private val moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
-        .build()
-    private val backupAdapter = moshi.adapter(FinanceBackup::class.java)
-
-    private val personAdapter = moshi.adapter(Person::class.java)
-    private val transactionAdapter = moshi.adapter(Transaction::class.java)
-    private val savingsGoalAdapter = moshi.adapter(SavingsGoal::class.java)
-    private val savingsTransactionAdapter = moshi.adapter(SavingsTransaction::class.java)
-
-    private val personWithTxAdapter = moshi.adapter(com.example.data.PersonWithTransactions::class.java)
-    private val goalWithTxAdapter = moshi.adapter(com.example.data.GoalWithTransactions::class.java)
-    private val deletedBackupAdapter = moshi.adapter(com.example.data.DeletedGDriveBackup::class.java)
 
     
     val allTrashItems = repository.allTrashItems.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -1885,49 +1941,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     // Firestore Sync States
-    private val _hasUnsavedChanges = MutableStateFlow(false)
-    val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
-
-    private val _unsyncedItems = MutableStateFlow<List<String>>(emptyList())
-    val unsyncedItems: StateFlow<List<String>> = _unsyncedItems.asStateFlow()
-
     fun getUnsyncedItems(): List<String> {
         val email = _googleEmail.value
         if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return emptyList()
         return _unsyncedItems.value
     }
 
-    private val _isNetworkActive = MutableStateFlow(false)
-    val isNetworkActive: StateFlow<Boolean> = _isNetworkActive.asStateFlow()
-
-    private val _firestoreSyncStatus = MutableStateFlow<String?>(null)
-    val firestoreSyncStatus: StateFlow<String?> = _firestoreSyncStatus.asStateFlow()
-
-    private val _showCloudDataFoundDialog = MutableStateFlow(false)
-    val showCloudDataFoundDialog: StateFlow<Boolean> = _showCloudDataFoundDialog.asStateFlow()
-
-    private val _pendingCloudData = MutableStateFlow<FinanceBackup?>(null)
-    val pendingCloudData: StateFlow<FinanceBackup?> = _pendingCloudData.asStateFlow()
-
     fun dismissCloudDataFoundDialog() {
         _showCloudDataFoundDialog.value = false
         _pendingCloudData.value = null
     }
-
-    private val _lastSyncTime = MutableStateFlow<Long?>(null)
-    val lastSyncTime: StateFlow<Long?> = _lastSyncTime.asStateFlow()
-
-    private val _lastMutationAction = MutableStateFlow<String?>(null)
-    val lastMutationAction: StateFlow<String?> = _lastMutationAction.asStateFlow()
-
-    private val _lastMutationName = MutableStateFlow<String?>(null)
-    val lastMutationName: StateFlow<String?> = _lastMutationName.asStateFlow()
-
-    private val _lastMutationCategory = MutableStateFlow<String?>(null)
-    val lastMutationCategory: StateFlow<String?> = _lastMutationCategory.asStateFlow()
-
-    private val _lastMutationAmount = MutableStateFlow<Double?>(null)
-    val lastMutationAmount: StateFlow<Double?> = _lastMutationAmount.asStateFlow()
 
     fun recordDatabaseMutation(action: String, name: String, category: String, amount: Double) {
         val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -2094,19 +2117,28 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return firestore ?: com.google.firebase.firestore.FirebaseFirestore.getInstance()
     }
 
-    private fun formatFirestoreError(e: Exception): String {
-        val msg = e.message ?: ""
+    private fun formatFirestoreError(e: Throwable): String {
+        val cause = if (e is java.util.concurrent.ExecutionException) e.cause ?: e else e
+        val msg = cause.message ?: ""
         val isBn = _language.value == AppLanguage.BN
         return when {
-            msg.contains("offline", ignoreCase = true) || msg.contains("UNAVAILABLE", ignoreCase = true) -> {
-                if (isBn) "ইন্টারনেট বা ফায়ারবেস সার্ভারের সাথে সংযোগ পাওয়া যায়নি। নেটওয়ার্ক চেক করুন।"
-                else "Could not connect to server. Please check your network connection."
+            cause is java.util.concurrent.TimeoutException || msg.contains("Timeout", ignoreCase = true) -> {
+                if (isBn) "সার্ভারের সময়সীমা পার হয়ে গেছে (Timeout)"
+                else "Server response timed out (Timeout)"
+            }
+            msg.contains("offline", ignoreCase = true) || msg.contains("UNAVAILABLE", ignoreCase = true) || msg.contains("network", ignoreCase = true) -> {
+                if (isBn) "ইন্টারনেট বা ফায়ারবেস সার্ভারের সাথে সংযোগ পাওয়া যায়নি"
+                else "Could not connect to server. Check network connection."
             }
             msg.contains("PERMISSION_DENIED", ignoreCase = true) -> {
-                if (isBn) "সার্ভারে এক্সেসের অনুমতি নেই।"
-                else "Permission denied to access cloud database."
+                if (isBn) "ফায়ারস্টোর এক্সেসের অনুমতি নেই (PERMISSION_DENIED)"
+                else "Firestore permission denied (PERMISSION_DENIED)"
             }
-            else -> e.localizedMessage ?: msg.ifBlank { "Cloud operation failed" }
+            msg.contains("UNAUTHENTICATED", ignoreCase = true) -> {
+                if (isBn) "পুনরায় লগইন প্রয়োজন (UNAUTHENTICATED)"
+                else "Authentication required. Please sign in again."
+            }
+            else -> cause.localizedMessage ?: msg.ifBlank { "Cloud operation failed" }
         }
     }
 
@@ -2121,7 +2153,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _unsyncedItems.value = emptyList()
             return
         }
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val currentData = getFullBackupData()
                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -2187,16 +2219,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     
     fun syncNow(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
         isInitialSyncChecked = true
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সিঙ্ক হচ্ছে..." else "Syncing..."
             val currentData = getFullBackupData()
             val localIsEmpty = currentData.transactions.isEmpty() &&
                     currentData.persons.isEmpty() &&
-                    currentData.savingsGoals.isEmpty()
+                    currentData.savingsGoals.isEmpty() &&
+                    currentData.monthlyBudgets.isEmpty()
                     
             if (localIsEmpty) {
                 // If local is empty, attempt to pull first to avoid showing false "Synced" status
                 pullFromFirestore(
-                    onSuccess = { onComplete?.invoke() },
+                    onSuccess = {
+                        onComplete?.invoke()
+                    },
                     onError = { err -> 
                         if (err.contains("No backup data found") || err.contains("No Firestore document found") ||
                             err.contains("সার্ভারে কোনো ব্যাকআপ ডেটা") || err.contains("ক্লাউডে ডেটা ডকুমেন্ট")) {
@@ -2219,16 +2255,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
         val rawEmail = _googleEmail.value
         if (rawEmail.isNullOrBlank() || !_isGoogleSignedIn.value) {
-            _firestoreSyncStatus.value = "Sign-in required"
+            _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সাইন-ইন আবশ্যক" else "Sign-in required"
             onError?.invoke("Not signed in to Google")
             return
         }
         val email = rawEmail.lowercase().trim()
         isInitialSyncChecked = true
         uploadJob?.cancel()
-        uploadJob = viewModelScope.launch {
+        uploadJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                _firestoreSyncStatus.value = "Syncing..."
+                _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সিঙ্ক হচ্ছে..." else "Syncing..."
                 val backupData = getFullBackupData()
                 val json = backupAdapter.toJson(backupData)
                 
@@ -2266,28 +2302,32 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     "email" to email
                 )
 
-                db.collection("users").document(email).set(data, com.google.firebase.firestore.SetOptions.merge())
-                    .addOnSuccessListener {
-                        viewModelScope.launch {
-                            try {
-                                val currentData = getFullBackupData()
-                                val currentJson = backupAdapter.toJson(currentData)
-                                prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
-                            } catch (e: Exception) { e.printStackTrace() }
-                            _hasUnsavedChanges.value = false
-                            _unsyncedItems.value = emptyList()
-                            _firestoreSyncStatus.value = "Synced"
-                            updateSyncSuccess(getApplication(), true)
-                            onComplete?.invoke()
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        _firestoreSyncStatus.value = "Failed"
-                        onError?.invoke(formatFirestoreError(e))
-                    }
+                val task = db.collection("users").document(email)
+                    .set(data, com.google.firebase.firestore.SetOptions.merge())
+
+                // Wait up to 10 seconds for Firestore set task
+                com.google.android.gms.tasks.Tasks.await(task, 10, java.util.concurrent.TimeUnit.SECONDS)
+
+                try {
+                    val currentData = getFullBackupData()
+                    val currentJson = backupAdapter.toJson(currentData)
+                    prefs.edit().putString("firestore_cached_data_$email", currentJson).apply()
+                } catch (e: Exception) { e.printStackTrace() }
+
+                _hasUnsavedChanges.value = false
+                _unsyncedItems.value = emptyList()
+                _firestoreSyncStatus.value = "Synced"
+                updateSyncSuccess(getApplication(), true)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onComplete?.invoke()
+                }
             } catch (e: Exception) {
-                _firestoreSyncStatus.value = "Error"
-                onError?.invoke(formatFirestoreError(e))
+                val errStr = formatFirestoreError(e)
+                val statusMsg = if (_language.value == AppLanguage.BN) "সিঙ্ক ব্যর্থ: $errStr" else "Sync Failed: $errStr"
+                _firestoreSyncStatus.value = statusMsg
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError?.invoke(errStr)
+                }
             }
         }
     }
@@ -2295,184 +2335,224 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun pullFromFirestore(onSuccess: () -> Unit, onError: (String) -> Unit) {
         val rawEmail = _googleEmail.value
         if (rawEmail.isNullOrBlank() || !_isGoogleSignedIn.value) {
-            _firestoreSyncStatus.value = "Sign-in required"
+            _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সাইন-ইন আবশ্যক" else "Sign-in required"
             onError("Not signed in to Google")
             return
         }
         val email = rawEmail.lowercase().trim()
         isInitialSyncChecked = true
-        viewModelScope.launch {
-            _firestoreSyncStatus.value = "Downloading..."
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "ডাউনলোড হচ্ছে..." else "Downloading..."
             try {
                 val db = getFirestore(getApplication())
-                db.collection("users").document(email).get()
-                    .addOnSuccessListener { document ->
-                        if (document != null && document.exists()) {
-                            val json = document.getString("backupJson") ?: ""
-                            if (json.isNotEmpty()) {
-                                viewModelScope.launch {
-                                    try {
-                                        val decryptedJson = BackupEncryptionHelper.decrypt(json)
-                                        val backupData = backupAdapter.fromJson(decryptedJson)
-                                        if (backupData != null) {
-                                            restoreFullBackup(backupData)
-                                            com.example.widget.updateAllWidgets(getApplication())
-                                            try {
-                                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                            } catch (e: Exception) { e.printStackTrace() }
-                                            _hasUnsavedChanges.value = false
-                                            _firestoreSyncStatus.value = "Synced"
-                                            updateSyncSuccess(getApplication(), false)
-                                            onSuccess()
-                                        } else {
-                                            onError("Invalid backup format")
-                                        }
-                                    } catch (e: Exception) {
-                                        onError(formatFirestoreError(e))
-                                    }
-                                }
-                            } else {
-                                onError(if (_language.value == AppLanguage.BN) "সার্ভারে কোনো ব্যাকআপ ডেটা পাওয়া যায়নি" else "No backup data found on server")
+                val task = db.collection("users").document(email).get()
+                
+                // Wait up to 10 seconds for Firestore get task
+                val document = com.google.android.gms.tasks.Tasks.await(task, 10, java.util.concurrent.TimeUnit.SECONDS)
+
+                if (document != null && document.exists()) {
+                    val json = document.getString("backupJson") ?: ""
+                    if (json.isNotEmpty()) {
+                        val decryptedJson = BackupEncryptionHelper.decrypt(json)
+                        val backupData = backupAdapter.fromJson(decryptedJson)
+                        if (backupData != null) {
+                            restoreFullBackup(backupData)
+                            com.example.widget.updateAllWidgets(getApplication())
+                            try {
+                                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                            } catch (e: Exception) { e.printStackTrace() }
+                            _hasUnsavedChanges.value = false
+                            _firestoreSyncStatus.value = "Synced"
+                            updateSyncSuccess(getApplication(), false)
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                onSuccess()
                             }
                         } else {
-                            onError(if (_language.value == AppLanguage.BN) "ক্লাউডে ডেটা ডকুমেন্ট পাওয়া যায়নি" else "No Firestore document found")
+                            val errMsg = if (_language.value == AppLanguage.BN) "ব্যাকআপ ফরম্যাট সঠিক নয়" else "Invalid backup format"
+                            _firestoreSyncStatus.value = "Sync Failed: $errMsg"
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                onError(errMsg)
+                            }
+                        }
+                    } else {
+                        val errMsg = if (_language.value == AppLanguage.BN) "সার্ভারে কোনো ব্যাকআপ ডেটা পাওয়া যায়নি" else "No backup data found on server"
+                        _firestoreSyncStatus.value = "Sync Failed: $errMsg"
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            onError(errMsg)
                         }
                     }
-                    .addOnFailureListener { e ->
-                        // Fallback: check cached backup if available
-                        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
-                        if (cachedJson != null) {
-                            try {
-                                val backupData = backupAdapter.fromJson(cachedJson)
-                                if (backupData != null) {
-                                    viewModelScope.launch {
-                                        restoreFullBackup(backupData)
-                                        _hasUnsavedChanges.value = false
-                                        _firestoreSyncStatus.value = "Synced"
-                                        onSuccess()
-                                    }
-                                    return@addOnFailureListener
-                                }
-                            } catch (_: Exception) {}
-                        }
-                        _firestoreSyncStatus.value = "Failed"
-                        onError(formatFirestoreError(e))
+                } else {
+                    val errMsg = if (_language.value == AppLanguage.BN) "ক্লাউডে ডেটা ডকুমেন্ট পাওয়া যায়নি" else "No Firestore document found"
+                    _firestoreSyncStatus.value = "Sync Failed: $errMsg"
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError(errMsg)
                     }
+                }
             } catch (e: Exception) {
-                onError(formatFirestoreError(e))
+                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+                if (cachedJson != null) {
+                    try {
+                        val backupData = backupAdapter.fromJson(cachedJson)
+                        if (backupData != null) {
+                            restoreFullBackup(backupData)
+                            _hasUnsavedChanges.value = false
+                            _firestoreSyncStatus.value = "Synced"
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                onSuccess()
+                            }
+                            return@launch
+                        }
+                    } catch (_: Exception) {}
+                }
+                val errStr = formatFirestoreError(e)
+                val statusMsg = if (_language.value == AppLanguage.BN) "সিঙ্ক ব্যর্থ: $errStr" else "Sync Failed: $errStr"
+                _firestoreSyncStatus.value = statusMsg
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(errStr)
+                }
             }
         }
     }
 
     private var firestoreListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var realtimeSyncJob: kotlinx.coroutines.Job? = null
 
     fun startRealtimeSync() {
         firestoreListener?.remove()
+        firestoreListener = null
+        realtimeSyncJob?.cancel()
+
         val rawEmail = _googleEmail.value
         if (rawEmail.isNullOrBlank() || !_isGoogleSignedIn.value) {
             _firestoreSyncStatus.value = null
             return
         }
         val email = rawEmail.lowercase().trim()
-        _firestoreSyncStatus.value = "Syncing..."
-        try {
-            val db = getFirestore(getApplication())
-            firestoreListener = db.collection("users").document(email)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        error.printStackTrace()
-                        _firestoreSyncStatus.value = formatFirestoreError(error)
-                        isInitialSyncChecked = true
-                        return@addSnapshotListener
+        _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সিঙ্ক হচ্ছে..." else "Syncing..."
+
+        realtimeSyncJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val db = getFirestore(getApplication())
+                var snapshotReceived = false
+
+                // 10-second timeout safety guard for initial snapshot
+                val timeoutJob = launch {
+                    kotlinx.coroutines.delay(10000L)
+                    if (!snapshotReceived && _firestoreSyncStatus.value?.contains("Syncing", ignoreCase = true) == true) {
+                        val timeoutMsg = if (_language.value == AppLanguage.BN) 
+                            "সিঙ্ক ব্যর্থ: সার্ভারের সময়সীমা পার হয়ে গেছে (Timeout)" 
+                        else 
+                            "Sync Failed: Server connection timed out"
+                        _firestoreSyncStatus.value = timeoutMsg
                     }
-                    if (snapshot != null) {
-                        if (snapshot.exists()) {
+                }
+
+                firestoreListener = db.collection("users").document(email)
+                    .addSnapshotListener { snapshot, error ->
+                        snapshotReceived = true
+                        timeoutJob.cancel()
+
+                        if (error != null) {
+                            error.printStackTrace()
+                            val errStr = formatFirestoreError(error)
+                            _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সিঙ্ক ব্যর্থ: $errStr" else "Sync Failed: $errStr"
                             isInitialSyncChecked = true
-                            val remoteJson = snapshot.getString("backupJson") ?: ""
-                            if (remoteJson.isNotEmpty()) {
-                                viewModelScope.launch {
-                                    try {
-                                        val currentLocalData = getFullBackupData()
-                                        val currentJson = backupAdapter.toJson(currentLocalData)
-                                        val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                                        val cachedJson = prefs.getString("firestore_cached_data_$email", null)
+                            return@addSnapshotListener
+                        }
 
-                                        val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
-                                        val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
+                        if (snapshot != null) {
+                            if (snapshot.exists()) {
+                                isInitialSyncChecked = true
+                                val remoteJson = snapshot.getString("backupJson") ?: ""
+                                if (remoteJson.isNotEmpty()) {
+                                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                        try {
+                                            val currentLocalData = getFullBackupData()
+                                            val currentJson = backupAdapter.toJson(currentLocalData)
+                                            val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                                            val cachedJson = prefs.getString("firestore_cached_data_$email", null)
 
-                                        if (remoteData != null) {
-                                            if (currentJson == decryptedJson) {
-                                                // Perfectly in sync
-                                                prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                                _hasUnsavedChanges.value = false
-                                                _unsyncedItems.value = emptyList()
-                                                _firestoreSyncStatus.value = "Synced"
-                                                updateSyncSuccess(getApplication(), true)
-                                            } else {
-                                                val localIsEmpty = currentLocalData.transactions.isEmpty() &&
-                                                        currentLocalData.persons.isEmpty() &&
-                                                        currentLocalData.savingsGoals.isEmpty() &&
-                                                        currentLocalData.monthlyBudgets.isEmpty()
+                                            val decryptedJson = BackupEncryptionHelper.decrypt(remoteJson)
+                                            val remoteData = try { backupAdapter.fromJson(decryptedJson) } catch (e: Exception) { null }
 
-                                                if (localIsEmpty) {
-                                                    // Local is empty! Restore from cloud immediately to retrieve user data
-                                                    restoreFullBackup(remoteData)
-                                                    com.example.widget.updateAllWidgets(getApplication())
-                                                    prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
-                                                    _hasUnsavedChanges.value = false
-                                                    _unsyncedItems.value = emptyList()
-                                                    _firestoreSyncStatus.value = "Synced"
-                                                    updateSyncSuccess(getApplication(), true)
-                                                } else if (cachedJson == null) {
-                                                    // First sync after sign-in, both local and cloud have data
-                                                    _pendingCloudData.value = remoteData
-                                                    _showCloudDataFoundDialog.value = true
-                                                    checkUnsavedChanges()
-                                                } else if (cachedJson == currentJson) {
-                                                    // Local hasn't changed from last sync, but remote has updated from another device
-                                                    restoreFullBackup(remoteData)
-                                                    com.example.widget.updateAllWidgets(getApplication())
+                                            if (remoteData != null) {
+                                                if (currentJson == decryptedJson) {
+                                                    // Perfectly in sync
                                                     prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
                                                     _hasUnsavedChanges.value = false
                                                     _unsyncedItems.value = emptyList()
                                                     _firestoreSyncStatus.value = "Synced"
                                                     updateSyncSuccess(getApplication(), true)
                                                 } else {
-                                                    // Local has changes that need to be uploaded
-                                                    checkUnsavedChanges()
-                                                    uploadToFirestore()
+                                                    val localIsEmpty = currentLocalData.transactions.isEmpty() &&
+                                                            currentLocalData.persons.isEmpty() &&
+                                                            currentLocalData.savingsGoals.isEmpty() &&
+                                                            currentLocalData.monthlyBudgets.isEmpty()
+
+                                                    if (localIsEmpty) {
+                                                        // Local is empty! Restore from cloud immediately to retrieve user data
+                                                        restoreFullBackup(remoteData)
+                                                        com.example.widget.updateAllWidgets(getApplication())
+                                                        prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                        _hasUnsavedChanges.value = false
+                                                        _unsyncedItems.value = emptyList()
+                                                        _firestoreSyncStatus.value = "Synced"
+                                                        updateSyncSuccess(getApplication(), true)
+                                                    } else if (cachedJson == null) {
+                                                        // First sync after sign-in, both local and cloud have data
+                                                        _pendingCloudData.value = remoteData
+                                                        _showCloudDataFoundDialog.value = true
+                                                        checkUnsavedChanges()
+                                                    } else if (cachedJson == currentJson) {
+                                                        // Local hasn't changed from last sync, but remote has updated from another device
+                                                        restoreFullBackup(remoteData)
+                                                        com.example.widget.updateAllWidgets(getApplication())
+                                                        prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
+                                                        _hasUnsavedChanges.value = false
+                                                        _unsyncedItems.value = emptyList()
+                                                        _firestoreSyncStatus.value = "Synced"
+                                                        updateSyncSuccess(getApplication(), true)
+                                                    } else {
+                                                        // Local has changes that need to be uploaded
+                                                        checkUnsavedChanges()
+                                                        uploadToFirestore()
+                                                    }
                                                 }
+                                            } else {
+                                                _firestoreSyncStatus.value = "Synced"
                                             }
-                                        } else {
-                                            _firestoreSyncStatus.value = "Synced"
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                            val errStr = formatFirestoreError(e)
+                                            _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সিঙ্ক ব্যর্থ: $errStr" else "Sync Failed: $errStr"
                                         }
-                                    } catch (e: Exception) {
-                                        e.printStackTrace()
-                                        _firestoreSyncStatus.value = "Error"
                                     }
+                                } else {
+                                    uploadToFirestore()
                                 }
                             } else {
-                                uploadToFirestore()
-                            }
-                        } else {
-                            if (!snapshot.metadata.isFromCache) {
-                                isInitialSyncChecked = true
-                                uploadToFirestore()
+                                if (!snapshot.metadata.isFromCache) {
+                                    isInitialSyncChecked = true
+                                    uploadToFirestore()
+                                }
                             }
                         }
                     }
-                }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            _firestoreSyncStatus.value = formatFirestoreError(e)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                val errStr = formatFirestoreError(e)
+                _firestoreSyncStatus.value = if (_language.value == AppLanguage.BN) "সিঙ্ক ব্যর্থ: $errStr" else "Sync Failed: $errStr"
+            }
         }
     }
 
     fun stopRealtimeSync() {
         firestoreListener?.remove()
         firestoreListener = null
+        realtimeSyncJob?.cancel()
+        realtimeSyncJob = null
         _firestoreSyncStatus.value = null
     }
 
@@ -2665,27 +2745,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
         }
     }
-
-    private val _driveStatusMessage = MutableStateFlow<String?>(null)
-    val driveStatusMessage: StateFlow<String?> = _driveStatusMessage.asStateFlow()
-
-    private val _googleDriveFiles = MutableStateFlow<List<GoogleDriveFile>>(emptyList())
-    val googleDriveFiles: StateFlow<List<GoogleDriveFile>> = _googleDriveFiles.asStateFlow()
-
-    private val _isFetchingFiles = MutableStateFlow(false)
-    val isFetchingFiles: StateFlow<Boolean> = _isFetchingFiles.asStateFlow()
-    
-    private val _isSyncing = MutableStateFlow(false)
-    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
-
-    private val _lastGDriveBackupTime = MutableStateFlow<Long?>(null)
-    val lastGDriveBackupTime: StateFlow<Long?> = _lastGDriveBackupTime.asStateFlow()
-
-    private val _autoBackupIntervalDays = MutableStateFlow(-1)
-    val autoBackupIntervalDays: StateFlow<Int> = _autoBackupIntervalDays.asStateFlow()
-
-    private val _customNotifications = MutableStateFlow<List<CustomNotification>>(emptyList())
-    val customNotifications: StateFlow<List<CustomNotification>> = _customNotifications.asStateFlow()
 
     fun triggerCustomNotification(message: String, isSuccess: Boolean = true, type: String = "INFO") {
         val newNotification = CustomNotification(message = message, isSuccess = isSuccess, type = type)
