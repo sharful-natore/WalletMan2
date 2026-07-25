@@ -557,16 +557,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         loadProfile(getApplication())
         loadBudgets()
         com.example.widget.updateAllWidgets(getApplication())
-        
-        if (oldId != workspaceId) {
-            triggerCustomNotification(
-                if (_language.value == com.example.ui.AppLanguage.BN) 
-                    "ওয়ার্কস্পেস পরিবর্তন করা হয়েছে" 
-                else "Workspace changed", 
-                isSuccess = true, 
-                type = "SUCCESS"
-            )
-        }
     }
 
     fun createWorkspace(name: String, profileName: String = "", photoUri: String? = null) {
@@ -2806,6 +2796,53 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
                 
                 // Proceed normally with automatic realtime sync
+                try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
+                try { restoreAllWorkspaceProfilePhotosFromCloud() } catch (e: Exception) { e.printStackTrace() }
+                startRealtimeSync()
+                checkAndTriggerAutoBackup(context)
+                onSuccess()
+            } catch (e: Exception) {
+                _driveStatusMessage.value = "Sign-In Failed: ${e.localizedMessage}"
+                onError(e.localizedMessage ?: "Unknown error")
+            }
+        }
+    }
+
+    fun handleGoogleSignInByEmail(
+        context: Context,
+        email: String,
+        name: String? = null,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                if (email.isBlank() || !email.contains("@")) {
+                    throw Exception("Please enter a valid Google email address")
+                }
+                selectWorkspace("default")
+                val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                val finalName = if (!name.isNullOrBlank()) name else email.substringBefore("@").replace(".", " ")
+                prefs.edit()
+                    .putString("google_email", email)
+                    .putString("google_name", finalName)
+                    .putString("last_google_email", email)
+                    .apply()
+
+                _googleEmail.value = email
+                _googleName.value = finalName
+                _isGoogleSignedIn.value = true
+
+                saveProfile(
+                    getApplication(),
+                    name = finalName,
+                    email = email,
+                    photoUri = _profilePhotoUri.value,
+                    phone = _profilePhone.value,
+                    social = _profileSocial.value,
+                    address = _profileAddress.value
+                )
+
                 try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
                 try { restoreAllWorkspaceProfilePhotosFromCloud() } catch (e: Exception) { e.printStackTrace() }
                 startRealtimeSync()

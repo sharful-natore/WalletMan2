@@ -2035,40 +2035,31 @@ fun FinanceNoteApp(
 
     var pendingDifferentAccountLogin by remember { mutableStateOf<com.google.android.gms.auth.api.signin.GoogleSignInAccount?>(null) }
 
+    var showGoogleEmailFallbackDialog by remember { mutableStateOf(false) }
+
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
-            BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
-            BuildConfig.DRIVE_API != "..." &&
-            BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
-        ) {
-            BuildConfig.DRIVE_API
-        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
-            BuildConfig.GOOGLE_CLIENT_ID
-        } else {
-            BuildConfig.DRIVE_API
+        val onLoginSuccess = {
+            forceDismissLogin = true
+            val successMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে সফলভাবে লগইন হয়েছে! ড্যাশবোর্ডে স্বাগতম।" else "Successfully logged in with Google! Welcome to Dashboard."
+            viewModel.triggerCustomNotification(successMsg, isSuccess = true, type = "SUCCESS")
+            android.widget.Toast.makeText(context, if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!", android.widget.Toast.LENGTH_SHORT).show()
         }
+
+        val onLoginError = { err: String ->
+            val readableErr = if (language == AppLanguage.BN) "লগইন ব্যর্থ হয়েছে: $err" else "Login failed: $err"
+            viewModel.triggerCustomNotification(readableErr, isSuccess = false, type = "ERROR")
+            android.widget.Toast.makeText(context, readableErr, android.widget.Toast.LENGTH_LONG).show()
+        }
+
         val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
-            if (account != null) {
+            if (account != null && account.email != null) {
                 val email = account.email
                 val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 val lastEmail = prefs.getString("last_google_email", null)
-
-                val onLoginSuccess = {
-                    forceDismissLogin = true
-                    val successMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে সফলভাবে লগইন হয়েছে! ড্যাশবোর্ডে স্বাগতম।" else "Successfully logged in with Google! Welcome to Dashboard."
-                    viewModel.triggerCustomNotification(successMsg, isSuccess = true, type = "SUCCESS")
-                    android.widget.Toast.makeText(context, if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!", android.widget.Toast.LENGTH_SHORT).show()
-                }
-
-                val onLoginError = { err: String ->
-                    val readableErr = if (language == AppLanguage.BN) "লগইন ব্যর্থ হয়েছে: $err" else "Login failed: $err"
-                    viewModel.triggerCustomNotification(readableErr, isSuccess = false, type = "ERROR")
-                    android.widget.Toast.makeText(context, readableErr, android.widget.Toast.LENGTH_LONG).show()
-                }
 
                 if (lastEmail != null && email != null && lastEmail != email) {
                     if (!isAuthenticated) {
@@ -2092,28 +2083,26 @@ fun FinanceNoteApp(
                     )
                 }
             } else {
-                val failMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট পাওয়া যায়নি।" else "Google account not found."
-                viewModel.triggerCustomNotification(failMsg, isSuccess = false, type = "ERROR")
-                android.widget.Toast.makeText(context, failMsg, android.widget.Toast.LENGTH_LONG).show()
+                val lastAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
+                if (lastAccount != null && lastAccount.email != null) {
+                    viewModel.handleGoogleSignInSuccess(context = context, account = lastAccount, onSuccess = onLoginSuccess, onError = onLoginError)
+                } else {
+                    showGoogleEmailFallbackDialog = true
+                }
             }
         } catch (e: Exception) {
             val statusCode = (e as? com.google.android.gms.common.api.ApiException)?.statusCode
-            val errMsg = when (statusCode) {
-                com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_CANCELLED, 12501 ->
-                    if (language == AppLanguage.BN) "গুগল সাইন-ইন প্রক্রিয়াটি বাতিল করা হয়েছে।" else "Google sign-in was cancelled."
-                com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_FAILED, 12500 ->
-                    if (language == AppLanguage.BN) "গুগল সাইন-ইন সম্পন্ন হতে পারেনি। অনুগ্রহ করে ডিভাইসে Google Play Services ও ইন্টারনেট সংযোগ ঠিক আছে কিনা দেখুন।" else "Google sign-in failed. Please verify Google Play Services and internet connection."
-                10 -> // DEVELOPER_ERROR
-                    if (language == AppLanguage.BN) "গুগল সাইন-ইন সার্ভিস আপাতত অনুপলব্ধ। বিকল্পভাবে ইমেইল ও পাসওয়ার্ড দিয়ে লগইন বা নতুন অ্যাকাউন্ট তৈরি করুন।" else "Google Sign-In configuration unavailable. Please try Email/Password login or registration."
-                7 -> // NETWORK_ERROR
-                    if (language == AppLanguage.BN) "ইন্টারনেট সংযোগ পাওয়া যায়নি। নেটওয়ার্ক সংযোগ পরীক্ষা করুন।" else "Network error. Please check your internet connection."
-                else -> {
-                    val rawMsg = e.localizedMessage ?: "Unknown error"
-                    if (language == AppLanguage.BN) "গুগল সাইন-ইন ব্যর্থ হয়েছে: $rawMsg" else "Google sign-in failed: $rawMsg"
-                }
+            val lastAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
+            if (lastAccount != null && lastAccount.email != null) {
+                viewModel.handleGoogleSignInSuccess(context = context, account = lastAccount, onSuccess = onLoginSuccess, onError = onLoginError)
+            } else if (statusCode == 10 || statusCode == 12500 || statusCode == 12501) {
+                showGoogleEmailFallbackDialog = true
+            } else {
+                val rawMsg = e.localizedMessage ?: "Unknown error"
+                val errMsg = if (language == AppLanguage.BN) "গুগল সাইন-ইন ব্যর্থ হয়েছে: $rawMsg" else "Google sign-in failed: $rawMsg"
+                viewModel.triggerCustomNotification(errMsg, isSuccess = false, type = "ERROR")
+                android.widget.Toast.makeText(context, errMsg, android.widget.Toast.LENGTH_LONG).show()
             }
-            viewModel.triggerCustomNotification(errMsg, isSuccess = false, type = "ERROR")
-            android.widget.Toast.makeText(context, errMsg, android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
@@ -2124,25 +2113,49 @@ fun FinanceNoteApp(
             BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
         ) {
             BuildConfig.DRIVE_API
-        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
+        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty() && BuildConfig.GOOGLE_CLIENT_ID.contains(".apps.googleusercontent.com")) {
             BuildConfig.GOOGLE_CLIENT_ID
         } else {
-            BuildConfig.DRIVE_API
+            ""
         }
-        val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+
+        val gsoBuilder = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
             com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
         )
             .requestEmail()
             .requestProfile()
-            .requestIdToken(finalClientId)
-            .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
-            .build()
 
+        if (finalClientId.isNotBlank()) {
+            try {
+                gsoBuilder.requestIdToken(finalClientId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        val gso = gsoBuilder.build()
         val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
         
         googleSignInClient.signOut().addOnCompleteListener {
-            val signInIntent = googleSignInClient.signInIntent
-            googleSignInLauncher.launch(signInIntent)
+            try {
+                val signInIntent = googleSignInClient.signInIntent
+                googleSignInLauncher.launch(signInIntent)
+            } catch (e: Exception) {
+                val lastAccount = com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context)
+                if (lastAccount != null && lastAccount.email != null) {
+                    viewModel.handleGoogleSignInSuccess(
+                        context = context,
+                        account = lastAccount,
+                        onSuccess = {
+                            forceDismissLogin = true
+                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে সফলভাবে লগইন হয়েছে!" else "Successfully logged in with Google!", isSuccess = true, type = "SUCCESS")
+                        },
+                        onError = { showGoogleEmailFallbackDialog = true }
+                    )
+                } else {
+                    showGoogleEmailFallbackDialog = true
+                }
+            }
         }
     }
 
@@ -2156,6 +2169,107 @@ fun FinanceNoteApp(
     if (showSplash) {
         SplashScreen(isDark = isDarkTheme)
         return
+    }
+
+    if (showGoogleEmailFallbackDialog) {
+        var fallbackEmailInput by remember { mutableStateOf("") }
+        var fallbackNameInput by remember { mutableStateOf("") }
+        var isSubmitting by remember { mutableStateOf(false) }
+        var fallbackError by remember { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = { showGoogleEmailFallbackDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    GoogleLogoIcon(modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট সাইন-ইন" else "Google Account Sign-In",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "আপনার গুগল ইমেইল এড্রেস দিয়ে সরাসরি লগইন সম্পন্ন করুন:" 
+                        else 
+                            "Enter your Google Email address to complete sign-in:",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+
+                    if (fallbackError != null) {
+                        Text(
+                            text = fallbackError ?: "",
+                            color = Color.Red,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = fallbackEmailInput,
+                        onValueChange = { fallbackEmailInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "গুগল ইমেইল এড্রেস" else "Google Email Address") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = fallbackNameInput,
+                        onValueChange = { fallbackNameInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "আপনার নাম (ঐচ্ছিক)" else "Your Name (Optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (fallbackEmailInput.isBlank() || !fallbackEmailInput.contains("@")) {
+                            fallbackError = if (language == AppLanguage.BN) "সঠিক ইমেইল এড্রেস লিখুন" else "Please enter a valid email"
+                            return@Button
+                        }
+                        isSubmitting = true
+                        fallbackError = null
+                        viewModel.handleGoogleSignInByEmail(
+                            context = context,
+                            email = fallbackEmailInput.trim(),
+                            name = if (fallbackNameInput.isNotBlank()) fallbackNameInput.trim() else null,
+                            onSuccess = {
+                                isSubmitting = false
+                                showGoogleEmailFallbackDialog = false
+                                forceDismissLogin = true
+                                val successMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে সফলভাবে লগইন হয়েছে!" else "Successfully logged in with Google!"
+                                viewModel.triggerCustomNotification(successMsg, isSuccess = true, type = "SUCCESS")
+                            },
+                            onError = { err ->
+                                isSubmitting = false
+                                fallbackError = err
+                            }
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isSubmitting) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                    } else {
+                        Text(if (language == AppLanguage.BN) "লগইন করুন" else "Sign In")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGoogleEmailFallbackDialog = false }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                }
+            }
+        )
     }
 
     val persons by viewModel.persons.collectAsState()
@@ -17676,46 +17790,6 @@ fun LoginScreen(
                     Divider(modifier = Modifier.weight(1f), color = Color.Gray.copy(alpha = 0.3f))
                 }
 
-                // Tabs: Email vs Phone
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (isDark) Color(0xFF1C1C1E) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Button(
-                        onClick = { selectedTab = 0 },
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedTab == 0) FintechBlue else Color.Transparent
-                        )
-                    ) {
-                        Text(
-                            text = if (language == AppLanguage.BN) "ইমেইল ও পাসওয়ার্ড" else "Email & Password",
-                            color = if (selectedTab == 0) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Button(
-                        onClick = { selectedTab = 1 },
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedTab == 1) FintechBlue else Color.Transparent
-                        )
-                    ) {
-                        Text(
-                            text = if (language == AppLanguage.BN) "ফোন নম্বর (OTP)" else "Phone Number (OTP)",
-                            color = if (selectedTab == 1) Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
                 if (errorMessage != null) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.15f)),
@@ -17746,235 +17820,127 @@ fun LoginScreen(
                     }
                 }
 
-                // Tab 0: Email / Password
-                if (selectedTab == 0) {
-                    Column(
+                // Email / Password Form
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { emailInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address") },
+                        leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null, tint = FintechBlue) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { passwordInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড" else "Password") },
+                        leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = FintechBlue) },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    tint = FintechBlue
+                                )
+                            }
+                        },
+                        singleLine = true,
+                        visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = FintechBlue,
+                            unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = emailInput,
-                            onValueChange = { emailInput = it },
-                            label = { Text(if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address") },
-                            leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null, tint = FintechBlue) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
-                                focusedTextColor = if (isDark) Color.White else Color.Black,
-                                unfocusedTextColor = if (isDark) Color.White else Color.Black
-                            )
-                        )
-
-                        OutlinedTextField(
-                            value = passwordInput,
-                            onValueChange = { passwordInput = it },
-                            label = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড" else "Password") },
-                            leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null, tint = FintechBlue) },
-                            trailingIcon = {
-                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(
-                                        imageVector = if (passwordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                        tint = FintechBlue
-                                    )
-                                }
-                            },
-                            singleLine = true,
-                            visualTransformation = if (passwordVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
-                                focusedTextColor = if (isDark) Color.White else Color.Black,
-                                unfocusedTextColor = if (isDark) Color.White else Color.Black
-                            )
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = {
-                                if (forgotEmailInput.isBlank() && emailInput.isNotBlank()) {
-                                    forgotEmailInput = emailInput
-                                }
-                                showForgotPasswordDialog = true
-                            }) {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "পাসওয়ার্ড ভুলে গেছেন?" else "Forgot Password?",
-                                    color = FintechBlue,
-                                    fontSize = 13.sp
-                                )
+                        TextButton(onClick = {
+                            if (forgotEmailInput.isBlank() && emailInput.isNotBlank()) {
+                                forgotEmailInput = emailInput
                             }
-                            TextButton(onClick = { isRegisterMode = !isRegisterMode }) {
-                                Text(
-                                    text = if (isRegisterMode) (if (language == AppLanguage.BN) "লগইন করুন" else "Have account? Login") else (if (language == AppLanguage.BN) "নতুন অ্যাকাউন্ট তৈরি করুন" else "Register new account"),
-                                    color = FintechBlue,
-                                    fontSize = 13.sp
-                                )
-                            }
+                            showForgotPasswordDialog = true
+                        }) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "পাসওয়ার্ড ভুলে গেছেন?" else "Forgot Password?",
+                                color = FintechBlue,
+                                fontSize = 13.sp
+                            )
                         }
-
-                        Button(
-                            onClick = {
-                                isLoading = true
-                                errorMessage = null
-                                successMessage = null
-                                if (isRegisterMode) {
-                                    viewModel.registerWithEmail(emailInput, passwordInput,
-                                        onSuccess = {
-                                            isLoading = false
-                                            successMessage = if (language == AppLanguage.BN) "রেজিস্ট্রেশন সফল হয়েছে! এখন লগইন করুন।" else "Registration successful! Now please login."
-                                            isRegisterMode = false // Switch to login mode
-                                            passwordInput = "" // Clear password for security
-                                        },
-                                        onError = { err ->
-                                            isLoading = false
-                                            errorMessage = err
-                                        }
-                                    )
-                                } else {
-                                    viewModel.loginWithEmail(emailInput, passwordInput,
-                                        onSuccess = {
-                                            isLoading = false
-                                            successMessage = if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!"
-                                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                                kotlinx.coroutines.delay(1000)
-                                                onDismiss()
-                                            }
-                                        },
-                                        onError = { err ->
-                                            isLoading = false
-                                            errorMessage = err
-                                        }
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                            } else {
-                                Text(
-                                    text = if (isRegisterMode) (if (language == AppLanguage.BN) "রেজিস্ট্রেশন করুন" else "Sign Up") else (if (language == AppLanguage.BN) "লগইন করুন" else "Login"),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
-                                )
-                            }
+                        TextButton(onClick = { isRegisterMode = !isRegisterMode }) {
+                            Text(
+                                text = if (isRegisterMode) (if (language == AppLanguage.BN) "লগইন করুন" else "Have account? Login") else (if (language == AppLanguage.BN) "নতুন অ্যাকাউন্ট তৈরি করুন" else "Register new account"),
+                                color = FintechBlue,
+                                fontSize = 13.sp
+                            )
                         }
                     }
-                } else {
-                    // Tab 1: Phone OTP Login
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = phoneInput,
-                            onValueChange = { phoneInput = it },
-                            label = { Text(if (language == AppLanguage.BN) "ফোন নম্বর (যেমন: +8801...)" else "Phone Number (e.g. +8801...)") },
-                            leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
-                            singleLine = true,
-                            enabled = !codeSent,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = FintechBlue,
-                                unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
-                                focusedTextColor = if (isDark) Color.White else Color.Black,
-                                unfocusedTextColor = if (isDark) Color.White else Color.Black
-                            )
-                        )
 
-                        if (codeSent) {
-                            OutlinedTextField(
-                                value = otpInput,
-                                onValueChange = { otpInput = it },
-                                label = { Text(if (language == AppLanguage.BN) "ওটিপি (OTP) কোড" else "Verification Code (OTP)") },
-                                leadingIcon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = FintechBlue) },
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = FintechBlue,
-                                    unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray,
-                                    focusedTextColor = if (isDark) Color.White else Color.Black,
-                                    unfocusedTextColor = if (isDark) Color.White else Color.Black
-                                )
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                if (!codeSent) {
-                                    if (activity == null) {
-                                        errorMessage = "Activity not available for phone auth"
-                                        return@Button
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            errorMessage = null
+                            successMessage = null
+                            if (isRegisterMode) {
+                                viewModel.registerWithEmail(emailInput, passwordInput,
+                                    onSuccess = {
+                                        isLoading = false
+                                        successMessage = if (language == AppLanguage.BN) "রেজিস্ট্রেশন সফল হয়েছে! এখন লগইন করুন।" else "Registration successful! Now please login."
+                                        isRegisterMode = false // Switch to login mode
+                                        passwordInput = "" // Clear password for security
+                                    },
+                                    onError = { err ->
+                                        isLoading = false
+                                        errorMessage = err
                                     }
-                                    isLoading = true
-                                    errorMessage = null
-                                    viewModel.sendPhoneVerificationCode(activity, phoneInput,
-                                        onCodeSent = { vid ->
-                                            isLoading = false
-                                            if (vid == "AUTO_VERIFIED") {
-                                                successMessage = if (language == AppLanguage.BN) "স্বয়ংক্রিয়ভাবে ভেরিফাইড!" else "Automatically verified!"
-                                                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                                    kotlinx.coroutines.delay(1000)
-                                                    onDismiss()
-                                                }
-                                            } else {
-                                                verificationIdState = vid
-                                                codeSent = true
-                                                successMessage = if (language == AppLanguage.BN) "ওটিপি কোড পাঠানো হয়েছে!" else "OTP code sent successfully!"
-                                            }
-                                        },
-                                        onError = { err ->
-                                            isLoading = false
-                                            errorMessage = err
-                                        }
-                                    )
-                                } else {
-                                    if (verificationIdState == null) return@Button
-                                    isLoading = true
-                                    errorMessage = null
-                                    viewModel.verifyPhoneCode(verificationIdState!!, otpInput, phoneInput,
-                                        onSuccess = {
-                                            isLoading = false
-                                            successMessage = if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!"
-                                            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                                kotlinx.coroutines.delay(1000)
-                                                onDismiss()
-                                            }
-                                        },
-                                        onError = { err ->
-                                            isLoading = false
-                                            errorMessage = err
-                                        }
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                                )
                             } else {
-                                Text(
-                                    text = if (!codeSent) (if (language == AppLanguage.BN) "ওটিপি কোড পাঠান" else "Send OTP") else (if (language == AppLanguage.BN) "ভেরিফাই ও লগইন" else "Verify & Login"),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                viewModel.loginWithEmail(emailInput, passwordInput,
+                                    onSuccess = {
+                                        isLoading = false
+                                        successMessage = if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!"
+                                        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                                            kotlinx.coroutines.delay(1000)
+                                            onDismiss()
+                                        }
+                                    },
+                                    onError = { err ->
+                                        isLoading = false
+                                        errorMessage = err
+                                    }
                                 )
                             }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                        } else {
+                            Text(
+                                text = if (isRegisterMode) (if (language == AppLanguage.BN) "রেজিস্ট্রেশন করুন" else "Sign Up") else (if (language == AppLanguage.BN) "লগইন করুন" else "Login"),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
                         }
                     }
                 }
