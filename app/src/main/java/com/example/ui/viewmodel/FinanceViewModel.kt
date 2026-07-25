@@ -3572,17 +3572,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun loginWithEmail(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        if (email.isBlank() || pass.isBlank()) {
-            onError("Email and password cannot be empty")
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || pass.isBlank()) {
+            onError("ইমেইল এবং পাসওয়ার্ড ঘর দুটি পূরণ করুন")
             return
         }
         try {
-            getFirebaseAuth().signInWithEmailAndPassword(email, pass)
+            getFirebaseAuth().signInWithEmailAndPassword(trimmedEmail, pass)
                 .addOnCompleteListener { task ->
                     try {
                         if (task.isSuccessful) {
                             val user = task.result?.user
-                            val userEmail = user?.email ?: email
+                            val userEmail = user?.email ?: trimmedEmail
                             _googleEmail.value = userEmail
                             _isGoogleSignedIn.value = true
                             val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
@@ -3592,31 +3593,54 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             try { startRealtimeSync() } catch (e: Exception) { e.printStackTrace() }
                             onSuccess()
                         } else {
-                            onError(task.exception?.localizedMessage ?: "Login failed")
+                            val ex = task.exception
+                            val msg = when {
+                                ex?.message?.contains("invalid-credential", ignoreCase = true) == true ||
+                                ex?.message?.contains("wrong-password", ignoreCase = true) == true ||
+                                ex?.message?.contains("user-not-found", ignoreCase = true) == true ->
+                                    "ইমেইল বা পাসওয়ার্ড সঠিক নয়। দয়া করে সঠিক তথ্য দিয়ে চেষ্টা করুন।"
+                                ex?.message?.contains("invalid-email", ignoreCase = true) == true ->
+                                    "ইমেইল এড্রেসটির ফরম্যাট সঠিক নয়।"
+                                ex?.message?.contains("too-many-requests", ignoreCase = true) == true ->
+                                    "অনেকবার ভুল চেষ্টা করা হয়েছে। অনুগ্রহ করে কিছুক্ষণ পর চেষ্টা করুন।"
+                                ex?.message?.contains("network", ignoreCase = true) == true ->
+                                    "ইন্টারনেট সংযোগ নেই। নেটওয়ার্ক সংযোগ পরীক্ষা করুন।"
+                                else -> ex?.localizedMessage ?: "লগইন সফল হয়নি।"
+                            }
+                            onError(msg)
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        onError(e.localizedMessage ?: "Login error occurred")
+                        onError(e.localizedMessage ?: "লগইন ত্রুটি ঘটেছে")
                     }
                 }
         } catch (e: Exception) {
             e.printStackTrace()
-            onError(e.localizedMessage ?: "Firebase Auth unavailable")
+            onError(e.localizedMessage ?: "ফায়ারবেস অথেনটিকেশন সার্ভিস পাওয়া যায়নি")
         }
     }
 
     fun registerWithEmail(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        if (email.isBlank() || pass.isBlank()) {
-            onError("Email and password cannot be empty")
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || pass.isBlank()) {
+            onError("ইমেইল এবং পাসওয়ার্ড ঘর দুটি পূরণ করুন")
+            return
+        }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+            onError("সঠিক ইমেইল এড্রেস প্রদান করুন")
+            return
+        }
+        if (pass.length < 6) {
+            onError("পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে")
             return
         }
         try {
-            getFirebaseAuth().createUserWithEmailAndPassword(email, pass)
+            getFirebaseAuth().createUserWithEmailAndPassword(trimmedEmail, pass)
                 .addOnCompleteListener { task ->
                     try {
                         if (task.isSuccessful) {
                             val user = task.result?.user
-                            val userEmail = user?.email ?: email
+                            val userEmail = user?.email ?: trimmedEmail
                             _googleEmail.value = userEmail
                             _isGoogleSignedIn.value = true
                             _isProfileSetupComplete.value = false // Explicitly set to false to trigger setup
@@ -3628,16 +3652,28 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                             try { startRealtimeSync() } catch (e: Exception) { e.printStackTrace() }
                             onSuccess()
                         } else {
-                            onError(task.exception?.localizedMessage ?: "Registration failed")
+                            val ex = task.exception
+                            val msg = when {
+                                ex?.message?.contains("email-already-in-use", ignoreCase = true) == true ->
+                                    "এই ইমেইল দিয়ে ইতোমধ্যে একটি অ্যাকাউন্ট নিবন্ধিত আছে। ইমেইল/পাসওয়ার্ড দিয়ে সরাসরি লগইন করুন।"
+                                ex?.message?.contains("weak-password", ignoreCase = true) == true ->
+                                    "পাসওয়ার্ডটি অন্তত ৬ অক্ষরের হতে হবে।"
+                                ex?.message?.contains("invalid-email", ignoreCase = true) == true ->
+                                    "ইমেইল এড্রেসটির ফরম্যাট সঠিক নয়।"
+                                ex?.message?.contains("network", ignoreCase = true) == true ->
+                                    "ইন্টারনেট সংযোগ নেই। নেটওয়ার্ক চেক করুন।"
+                                else -> ex?.localizedMessage ?: "রেজিস্ট্রেশন ব্যর্থ হয়েছে।"
+                            }
+                            onError(msg)
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
-                        onError(e.localizedMessage ?: "Registration error occurred")
+                        onError(e.localizedMessage ?: "রেজিস্ট্রেশন ত্রুটি ঘটেছে")
                     }
                 }
         } catch (e: Exception) {
             e.printStackTrace()
-            onError(e.localizedMessage ?: "Firebase Auth unavailable")
+            onError(e.localizedMessage ?: "ফায়ারবেস অথেনটিকেশন সার্ভিস পাওয়া যায়নি")
         }
     }
 

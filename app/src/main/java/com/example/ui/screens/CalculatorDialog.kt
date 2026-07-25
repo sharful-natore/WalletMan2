@@ -23,6 +23,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.AppLanguage
 
+fun parseAmountOrExpression(input: String): Double? {
+    val trimmed = input.trim().replace(",", "").replace("×", "*").replace("÷", "/")
+    if (trimmed.isBlank()) return null
+    trimmed.toDoubleOrNull()?.let { return it }
+    return try {
+        evaluateExpression(trimmed)
+    } catch (e: Exception) {
+        null
+    }
+}
+
 fun evaluateExpression(expr: String): Double {
     return object : Any() {
         var pos = -1

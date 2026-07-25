@@ -2056,19 +2056,28 @@ fun FinanceNoteApp(
                 val email = account.email
                 val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 val lastEmail = prefs.getString("last_google_email", null)
+
+                val onLoginSuccess = {
+                    forceDismissLogin = true
+                    val successMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে সফলভাবে লগইন হয়েছে! ড্যাশবোর্ডে স্বাগতম।" else "Successfully logged in with Google! Welcome to Dashboard."
+                    viewModel.triggerCustomNotification(successMsg, isSuccess = true, type = "SUCCESS")
+                    android.widget.Toast.makeText(context, if (language == AppLanguage.BN) "লগইন সফল হয়েছে!" else "Login successful!", android.widget.Toast.LENGTH_SHORT).show()
+                }
+
+                val onLoginError = { err: String ->
+                    val readableErr = if (language == AppLanguage.BN) "লগইন ব্যর্থ হয়েছে: $err" else "Login failed: $err"
+                    viewModel.triggerCustomNotification(readableErr, isSuccess = false, type = "ERROR")
+                    android.widget.Toast.makeText(context, readableErr, android.widget.Toast.LENGTH_LONG).show()
+                }
+
                 if (lastEmail != null && email != null && lastEmail != email) {
                     if (!isAuthenticated) {
                         viewModel.clearAllDataLocal {
                             viewModel.handleGoogleSignInSuccess(
                                 context = context,
                                 account = account,
-                                onSuccess = {
-                                    forceDismissLogin = true
-                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে লগইন সফল হয়েছে!" else "Google login successful!", isSuccess = true, type = "SUCCESS")
-                                },
-                                onError = { err ->
-                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "লগইন ব্যর্থ হয়েছে: " else "Login failed: "}$err", isSuccess = false, type = "ERROR")
-                                }
+                                onSuccess = onLoginSuccess,
+                                onError = onLoginError
                             )
                         }
                     } else {
@@ -2078,26 +2087,33 @@ fun FinanceNoteApp(
                     viewModel.handleGoogleSignInSuccess(
                         context = context,
                         account = account,
-                        onSuccess = {
-                            forceDismissLogin = true
-                            viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্ট সফল হয়েছে!" else "Google Drive connected successfully!", isSuccess = true, type = "SUCCESS")
-                            viewModel.triggerCustomNotification(
-                                if (language == AppLanguage.BN) "আপনার গুগল অ্যাকাউন্ট সফলভাবে সিস্টেমের সাথে কানেক্ট করা হয়েছে।" else "Your Google account has been successfully connected with the system.",
-                                isSuccess = true,
-                                type = "SIGN_IN"
-                            )
-                        },
-                        onError = { err ->
-                            viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "কানেক্ট ব্যর্থ হয়েছে: " else "Connection failed: "}$err", isSuccess = false, type = "ERROR")
-                        }
+                        onSuccess = onLoginSuccess,
+                        onError = onLoginError
                     )
                 }
             } else {
-                viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে।" else "Sign-in failed.", isSuccess = false, type = "ERROR")
+                val failMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট পাওয়া যায়নি।" else "Google account not found."
+                viewModel.triggerCustomNotification(failMsg, isSuccess = false, type = "ERROR")
+                android.widget.Toast.makeText(context, failMsg, android.widget.Toast.LENGTH_LONG).show()
             }
         } catch (e: Exception) {
-            val errMsg = e.localizedMessage ?: "Unknown error"
-            viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে: " else "Sign-in failed: "}$errMsg", isSuccess = false, type = "ERROR")
+            val statusCode = (e as? com.google.android.gms.common.api.ApiException)?.statusCode
+            val errMsg = when (statusCode) {
+                com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_CANCELLED, 12501 ->
+                    if (language == AppLanguage.BN) "গুগল সাইন-ইন প্রক্রিয়াটি বাতিল করা হয়েছে।" else "Google sign-in was cancelled."
+                com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes.SIGN_IN_FAILED, 12500 ->
+                    if (language == AppLanguage.BN) "গুগল সাইন-ইন সম্পন্ন হতে পারেনি। অনুগ্রহ করে ডিভাইসে Google Play Services ও ইন্টারনেট সংযোগ ঠিক আছে কিনা দেখুন।" else "Google sign-in failed. Please verify Google Play Services and internet connection."
+                10 -> // DEVELOPER_ERROR
+                    if (language == AppLanguage.BN) "গুগল সাইন-ইন সার্ভিস আপাতত অনুপলব্ধ। বিকল্পভাবে ইমেইল ও পাসওয়ার্ড দিয়ে লগইন বা নতুন অ্যাকাউন্ট তৈরি করুন।" else "Google Sign-In configuration unavailable. Please try Email/Password login or registration."
+                7 -> // NETWORK_ERROR
+                    if (language == AppLanguage.BN) "ইন্টারনেট সংযোগ পাওয়া যায়নি। নেটওয়ার্ক সংযোগ পরীক্ষা করুন।" else "Network error. Please check your internet connection."
+                else -> {
+                    val rawMsg = e.localizedMessage ?: "Unknown error"
+                    if (language == AppLanguage.BN) "গুগল সাইন-ইন ব্যর্থ হয়েছে: $rawMsg" else "Google sign-in failed: $rawMsg"
+                }
+            }
+            viewModel.triggerCustomNotification(errMsg, isSuccess = false, type = "ERROR")
+            android.widget.Toast.makeText(context, errMsg, android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
@@ -6265,29 +6281,13 @@ fun DashboardScreen(
                                 .padding(vertical = 1.dp)
                                 .basicMarquee()
                         )
-                        
-                        // Net Worth Display
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (language == AppLanguage.BN) "নীট সম্পদ: " else "Net Worth: ",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = formatCurrency(currentNetWorth, language),
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
 
                     // Bottom-right decorative card chip icon with matching border and pulsing scale applied to both container and image
                     Box(
                         modifier = Modifier
                             .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
-                            .size(46.dp)
+                            .size(41.4.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
@@ -6298,7 +6298,7 @@ fun DashboardScreen(
                             painter = painterResource(id = R.drawable.ic_custom_pie_chart),
                             contentDescription = "Charts",
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(21.6.dp)
                                 .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale),
                             colorFilter = ColorFilter.tint(Color.White)
                         )
@@ -7009,7 +7009,7 @@ fun DashboardScreen(
                                     OutlinedTextField(
                                         value = localBudgetInput,
                                         onValueChange = { input -> 
-                                            if (input.all { it.isDigit() || it == '.' }) localBudgetInput = input
+                                            localBudgetInput = input
                                         },
                                         label = {
                                             Text(
@@ -7020,7 +7020,7 @@ fun DashboardScreen(
                                         shape = RoundedCornerShape(8.dp),
                                         singleLine = true,
                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Text
                                         ),
                                         trailingIcon = {
                                             IconButton(onClick = { showInplaceBudgetCalculator = true }) {
@@ -7062,7 +7062,7 @@ fun DashboardScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Button(
                                             onClick = {
-                                                val newAmount = localBudgetInput.toDoubleOrNull() ?: 0.0
+                                                val newAmount = parseAmountOrExpression(localBudgetInput) ?: 0.0
                                                 if (ym != null) {
                                                     when (categoryType) {
                                                         "INCOME" -> viewModel?.setMonthlyBudget(ym.first, ym.second, newAmount, null, null)
@@ -7304,7 +7304,7 @@ fun DashboardScreen(
                     OutlinedTextField(
                         value = tempAmount,
                         onValueChange = { input -> 
-                            if (input.all { it.isDigit() }) tempAmount = input
+                            tempAmount = input
                         },
                         label = {
                             Text(
@@ -7322,7 +7322,7 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Text
                         ),
                         trailingIcon = {
                             IconButton(onClick = { showTempAmountCalculator = true }) {
@@ -7376,7 +7376,7 @@ fun DashboardScreen(
 
                     Button(
                         onClick = {
-                            val finalVal = tempAmount.toDoubleOrNull() ?: 0.0
+                            val finalVal = parseAmountOrExpression(tempAmount) ?: 0.0
                             when (category) {
                                 "INCOME" -> viewModel?.setBudgetIncome(finalVal)
                                 "EXPENSE" -> viewModel?.setBudgetExpense(finalVal)
@@ -10437,7 +10437,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         value = amountInputState,
                         onValueChange = { amountInputState = it },
                         label = { Text(Translation.get("amount", language)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         trailingIcon = {
                             IconButton(onClick = { showTxCalculator = true }) {
                                 Icon(
@@ -10555,7 +10555,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                         fontWeight = FontWeight.Medium
                                     )
 
-                                    val enteredAmount = amountInputState.toDoubleOrNull() ?: 0.0
+                                    val enteredAmount = parseAmountOrExpression(amountInputState) ?: 0.0
                                     if (enteredAmount > 0.0 && netBalance != 0.0) {
                                         val netBalanceAbs = kotlin.math.abs(netBalance)
                                         val isIncreasing = if (netBalance > 0) {
@@ -10792,7 +10792,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
                         Button(
                             onClick = {
-                                val amount = amountInputState.toDoubleOrNull() ?: 0.0
+                                val amount = parseAmountOrExpression(amountInputState) ?: 0.0
                                 if (amount <= 0) {
                                     viewModel.triggerCustomNotification(Translation.get("error_empty_amount", language), isSuccess = false, type = "ERROR")
                                 } else if (isPersonRequired && selectedPersonId == null) {
@@ -11098,7 +11098,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         value = targetStr,
                         onValueChange = { targetStr = it },
                         label = { Text(Translation.get("target", language)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         trailingIcon = {
                             IconButton(onClick = { showTargetCalculator = true }) {
                                 Icon(
@@ -11269,7 +11269,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
                         Button(
                             onClick = {
-                                val target = targetStr.toDoubleOrNull() ?: 0.0
+                                val target = parseAmountOrExpression(targetStr) ?: 0.0
                                 val finalSector = if (sector == "Other" && customSectorName.isNotBlank()) customSectorName else sector
                                 if (title.trim().isNotEmpty()) {
                                     onConfirm(title.trim().uppercase(), target, finalSector, colorIndex, cardholderName.trim().uppercase())
@@ -11366,7 +11366,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                     value = amountStr,
                     onValueChange = { amountStr = it },
                     label = { Text(Translation.get("amount", language)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     trailingIcon = {
                         IconButton(onClick = { showSavTxCalculator = true }) {
                             Icon(
@@ -11497,7 +11497,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
 
                     Button(
                         onClick = {
-                            val amount = amountStr.toDoubleOrNull() ?: 0.0
+                            val amount = parseAmountOrExpression(amountStr) ?: 0.0
                             if (amount > 0) {
                                 if (isWithdraw && amount > savingsGoal.savedAmount) {
                                     viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "পর্যাপ্ত ব্যালেন্স নেই!" else "Insufficient balance!", isSuccess = false, type = "ERROR")
@@ -12330,7 +12330,7 @@ fun PersonDetailOverlay(
                                 value = actionAmountStr,
                                 onValueChange = { actionAmountStr = it },
                                 label = { Text(Translation.get("amount", language)) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                                 trailingIcon = {
                                     IconButton(onClick = { showActionCalculator = true }) {
                                         Icon(
@@ -12513,7 +12513,7 @@ fun PersonDetailOverlay(
                                 }
                                 Button(
                                     onClick = {
-                                        val amt = actionAmountStr.toDoubleOrNull() ?: 0.0
+                                        val amt = parseAmountOrExpression(actionAmountStr) ?: 0.0
                                         if (amt > 0) {
                                             val finalTimestamp = customActionTimestamp ?: System.currentTimeMillis()
                                             when (actType) {
@@ -17546,10 +17546,10 @@ fun LoginScreen(
         if (activity != null) {
             val window = activity.window
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            window.statusBarColor = android.graphics.Color.WHITE
-            window.navigationBarColor = android.graphics.Color.WHITE
-            insetsController.isAppearanceLightStatusBars = true
-            insetsController.isAppearanceLightNavigationBars = true
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            insetsController.isAppearanceLightStatusBars = false
+            insetsController.isAppearanceLightNavigationBars = false
         }
         onDispose {
             if (activity != null) {
@@ -17557,8 +17557,8 @@ fun LoginScreen(
                 val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
                 window.statusBarColor = android.graphics.Color.TRANSPARENT
                 window.navigationBarColor = android.graphics.Color.TRANSPARENT
-                insetsController.isAppearanceLightStatusBars = !isDark
-                insetsController.isAppearanceLightNavigationBars = !isDark
+                insetsController.isAppearanceLightStatusBars = false
+                insetsController.isAppearanceLightNavigationBars = false
             }
         }
     }

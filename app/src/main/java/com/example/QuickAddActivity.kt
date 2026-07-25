@@ -37,6 +37,7 @@ import com.example.data.*
 import com.example.ui.AppLanguage
 import com.example.ui.screens.CalculatorDialog
 import com.example.ui.screens.evaluateExpression
+import com.example.ui.screens.parseAmountOrExpression
 import com.example.ui.theme.FinanceNoteTheme
 import com.example.widget.updateAllWidgets
 import kotlinx.coroutines.CoroutineScope
@@ -580,11 +581,7 @@ fun QuickAddDialogScreen(
 
                     Button(
                         onClick = {
-                            val amount = amountText.toDoubleOrNull() ?: try {
-                                evaluateExpression(amountText.replace("×", "*").replace("÷", "/"))
-                            } catch (e: Exception) {
-                                null
-                            }
+                            val amount = parseAmountOrExpression(amountText)
                             if (amount == null || amount <= 0) {
                                 Toast.makeText(context, if (isBn) "সঠিক পরিমাণ লিখুন" else "Enter valid amount", Toast.LENGTH_SHORT).show()
                                 return@Button
