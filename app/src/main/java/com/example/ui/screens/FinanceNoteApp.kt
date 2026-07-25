@@ -1311,33 +1311,55 @@ fun WorkspaceManagementDialog(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    if (!ws.profilePhoto.isNullOrBlank()) {
-                                        AsyncImage(
-                                            model = ws.profilePhoto,
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(CircleShape)
-                                                .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") }
-                                                .border(1.5.dp, if (isSelected) FintechBlue else Color.Gray, CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        val initials = ws.profileName.take(1).uppercase()
+                                    Box(
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        if (!ws.profilePhoto.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = ws.profilePhoto,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape)
+                                                    .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") }
+                                                    .border(1.5.dp, if (isSelected) FintechBlue else Color.Gray, CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            val initials = ws.profileName.take(1).uppercase()
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .clip(CircleShape)
+                                                    .background(if (isSelected) FintechBlue.copy(alpha = 0.2f) else (if (isDark) Color(0xFF2E344A) else Color(0xFFE2E8F0)))
+                                                    .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape)
+                                                    .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.AddAPhoto,
+                                                    contentDescription = "Add photo",
+                                                    tint = if (isSelected) FintechBlue else textColor,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Edit Pen Icon Overlay
                                         Box(
                                             modifier = Modifier
-                                                .size(40.dp)
+                                                .align(Alignment.BottomEnd)
+                                                .size(14.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isSelected) FintechBlue.copy(alpha = 0.2f) else (if (isDark) Color(0xFF2E344A) else Color(0xFFE2E8F0)))
-                                                .border(1.5.dp, if (isSelected) FintechBlue else borderCol, CircleShape)
-                                                .clickable { pickingPhotoForWorkspaceId = ws.workspace.id; workspacePhotoPicker.launch("image/*") },
+                                                .background(FintechBlue)
+                                                .border(1.dp, if (isDark) Color(0xFF1E1E1E) else Color.White, CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Rounded.AddAPhoto,
-                                                contentDescription = "Add photo",
-                                                tint = if (isSelected) FintechBlue else textColor,
-                                                modifier = Modifier.size(20.dp)
+                                                imageVector = Icons.Rounded.Edit,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(8.dp)
                                             )
                                         }
                                     }
@@ -2207,37 +2229,11 @@ fun FinanceNoteApp(
         (cashExpense + cashLent + repaidPaid + savingsDeposits)
     }
 
-    // Filter personDebts by time locally for UI if needed
-    val filteredPersonDebts = remember(personDebts, transactions, timeFilter, persons) {
-        if (timeFilter == "ALL") {
-            personDebts
-        } else {
-            val filteredTxs = filterTransactionsByTime(transactions, timeFilter)
-            persons.map { person ->
-                val personTx = filteredTxs.filter { it.personId == person.id }
-                val lent = personTx.filter { it.type == "LEND" }.sumOf { it.amount }
-                val borrowed = personTx.filter { it.type == "BORROW" }.sumOf { it.amount }
-                val repaidPaid = personTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
-                val repaidReceived = personTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
-                
-                val net = (lent + repaidPaid) - (borrowed + repaidReceived)
-                PersonDebt(
-                    person = person,
-                    netBalance = net,
-                    totalLent = lent,
-                    totalBorrowed = borrowed,
-                    totalRepaidPaid = repaidPaid,
-                    totalRepaidReceived = repaidReceived
-                )
-            }
-        }
+    val currentTotalOwedToMe = remember(personDebts) {
+        personDebts.filter { it.netBalance > 0 }.sumOf { it.netBalance }
     }
-
-    val currentTotalOwedToMe = remember(filteredPersonDebts) {
-        filteredPersonDebts.filter { it.netBalance > 0 }.sumOf { it.netBalance }
-    }
-    val currentTotalIOwe = remember(filteredPersonDebts) {
-        filteredPersonDebts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
+    val currentTotalIOwe = remember(personDebts) {
+        personDebts.filter { it.netBalance < 0 }.sumOf { -it.netBalance }
     }
 
     var activeTab by remember { mutableStateOf("dashboard") }
@@ -2633,6 +2629,7 @@ fun FinanceNoteApp(
             },
             onLogout = {
                 showEnhancedProfileMenu = false
+                activeTab = "settings"
                 composeCoroutineScope.launch {
                     kotlinx.coroutines.delay(300)
                     showLogoutConfirm = true
@@ -2651,8 +2648,12 @@ fun FinanceNoteApp(
 
     LaunchedEffect(isAuthenticated, isProfileSetupComplete) {
         if (isAuthenticated) {
-            if (isProfileSetupComplete == false) {
+            val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+            val hasPrompted = gPrefs.getBoolean("has_prompted_profile_setup", false)
+            
+            if (isProfileSetupComplete == false && !hasPrompted) {
                 showProfileSetup = true
+                gPrefs.edit().putBoolean("has_prompted_profile_setup", true).apply()
             } else if (isProfileSetupComplete == true) {
                 showProfileSetup = false
             }
@@ -3300,7 +3301,7 @@ fun FinanceNoteApp(
                                             },
                                             viewModel = viewModel,
                                             onPersonClick = { person ->
-                                                val foundDebt = filteredPersonDebts.find { it.person.id == person.id }
+                                                val foundDebt = personDebts.find { it.person.id == person.id }
                                                 if (foundDebt != null) {
                                                     selectedPersonDetail = foundDebt
                                                     activeTab = "debts"
@@ -3330,7 +3331,7 @@ fun FinanceNoteApp(
                                                 if (tab == "settings") settingsFilter = filter
                                             },
                                             onPersonClick = { person ->
-                                                val foundDebt = filteredPersonDebts.find { it.person.id == person.id }
+                                                val foundDebt = personDebts.find { it.person.id == person.id }
                                                 if (foundDebt != null) {
                                                     selectedPersonDetail = foundDebt
                                                     activeTab = "debts"
@@ -3341,7 +3342,7 @@ fun FinanceNoteApp(
                                         2 -> DebtsScreen(
                                             language = language,
                                             isDark = isDarkTheme,
-                                            personDebts = filteredPersonDebts,
+                                            personDebts = personDebts,
                                             onAddPersonClick = { showAddPersonDialog = true },
                                             onPersonClick = { selectedPersonDetail = it },
                                             onDeletePerson = { showDeletePersonConfirmId = it },
@@ -3900,7 +3901,7 @@ fun FinanceNoteApp(
                 ) {
                     val debtInfoSnapshot = selectedPersonDetail
                     if (debtInfoSnapshot != null) {
-                        val debtInfo = filteredPersonDebts.find { it.person.id == debtInfoSnapshot.person.id } ?: debtInfoSnapshot
+                        val debtInfo = personDebts.find { it.person.id == debtInfoSnapshot.person.id } ?: debtInfoSnapshot
                         PersonDetailOverlay(
                             language = language,
                             isDark = isDarkTheme,
@@ -4931,6 +4932,7 @@ fun FinanceNoteApp(
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
 
                         // Unsaved Changes Row
+                        // Unsaved Changes Row
                         if (hasUnsavedChanges) {
                             val unsyncedItems = viewModel.getUnsyncedItems()
                             Column(
@@ -4963,7 +4965,7 @@ fun FinanceNoteApp(
                                     color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
                                 )
                                 Text(
-                                    text = if (language == AppLanguage.BN) "না (সব সংরক্ষিত)" else "No (Fully saved)",
+                                    text = if (language == AppLanguage.BN) "হ্যাঁ (সব সংরক্ষিত)" else "Yes (Fully saved)",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF4CAF50)
@@ -4992,7 +4994,7 @@ fun FinanceNoteApp(
                                 color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
                             )
                         }
-                        
+
                         if (lastMutationAction != null) {
                             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
 
@@ -5014,16 +5016,13 @@ fun FinanceNoteApp(
                                     fontWeight = FontWeight.Bold,
                                     color = if (hasUnsavedChanges) Color(0xFFFFB300) else Color(0xFF4CAF50)
                                 )
-
                                 Spacer(modifier = Modifier.height(2.dp))
-
                                 val actionText = when (lastMutationAction) {
                                     "ADD" -> if (language == AppLanguage.BN) "যোগ করা হয়েছে" else "Added"
                                     "EDIT" -> if (language == AppLanguage.BN) "আপডেট করা হয়েছে" else "Updated"
                                     "DELETE" -> if (language == AppLanguage.BN) "মুছে ফেলা হয়েছে" else "Deleted"
                                     else -> lastMutationAction ?: ""
                                 }
-
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -5040,13 +5039,12 @@ fun FinanceNoteApp(
                                         color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
                                     )
                                 }
-
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = if (language == AppLanguage.BN) "নাম:" else "Name:",
+                                        text = if (language == AppLanguage.BN) "ব্যক্তির নাম:" else "Name:",
                                         fontSize = 12.sp,
                                         color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
                                     )
@@ -5057,17 +5055,15 @@ fun FinanceNoteApp(
                                         color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
                                     )
                                 }
-
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = if (language == AppLanguage.BN) "খাত:" else "Category:",
+                                        text = if (language == AppLanguage.BN) "ধরণ:" else "Category:",
                                         fontSize = 12.sp,
                                         color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
                                     )
-                                    
                                     val categoryDisplay = when (lastMutationCategory) {
                                         "PERSON" -> if (language == AppLanguage.BN) "ব্যক্তি/লেনদেন" else "Person/Debt"
                                         "SAVINGS_GOAL" -> if (language == AppLanguage.BN) "সঞ্চয় লক্ষ্য" else "Savings Goal"
@@ -5081,7 +5077,6 @@ fun FinanceNoteApp(
                                             }
                                         }
                                     }
-                                    
                                     Text(
                                         text = categoryDisplay,
                                         fontSize = 12.sp,
@@ -5089,7 +5084,6 @@ fun FinanceNoteApp(
                                         color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
                                     )
                                 }
-
                                 if (lastMutationAmount != null && lastMutationAmount!! > 0.0) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -5111,7 +5105,6 @@ fun FinanceNoteApp(
                             }
                         } else {
                             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)))
-                            
                             Text(
                                 text = if (hasUnsavedChanges) {
                                     if (language == AppLanguage.BN) "অসংরক্ষিত ডাটা আছে" else "Unsaved data present"
@@ -8626,14 +8619,6 @@ fun DebtsScreen(
                     }
                 }
             }
-
-            // Time Filter Row
-            TimeFilterRow(
-                timeFilter = timeFilter,
-                language = language,
-                onTimeFilterChange = onTimeFilterChange,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-            )
 
             // Filter Tabs & Sort Button
             Row(
@@ -17932,6 +17917,14 @@ fun ProfileSetupScreen(
     var phone by remember { mutableStateOf(userPhone ?: "") }
     var dob by remember { mutableStateOf(userDOB ?: "") }
     var photoUri by remember { mutableStateOf(googlePhotoUrl ?: "") }
+    
+    LaunchedEffect(googleName, userAddress, userPhone, userDOB, googlePhotoUrl) {
+        if (name.isBlank() && !googleName.isNullOrBlank()) name = googleName!!
+        if (address.isBlank() && !userAddress.isNullOrBlank()) address = userAddress!!
+        if (phone.isBlank() && !userPhone.isNullOrBlank()) phone = userPhone!!
+        if (dob.isBlank() && !userDOB.isNullOrBlank()) dob = userDOB!!
+        if (photoUri.isBlank() && !googlePhotoUrl.isNullOrBlank()) photoUri = googlePhotoUrl!!
+    }
     
     val context = LocalContext.current
     val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->

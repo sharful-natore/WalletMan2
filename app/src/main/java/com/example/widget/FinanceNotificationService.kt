@@ -33,7 +33,6 @@ class FinanceNotificationService : Service() {
         super.onCreate()
         isRunning = true
         createNotificationChannel()
-        startForegroundInternal()
     }
     
     override fun onDestroy() {
@@ -42,11 +41,6 @@ class FinanceNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForegroundInternal()
-        return START_STICKY
-    }
-
-    private fun startForegroundInternal() {
         try {
             val notification = createNotification()
             if (Build.VERSION.SDK_INT >= 34) {
@@ -54,6 +48,7 @@ class FinanceNotificationService : Service() {
                     startForeground(101, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    // Fallback to normal if specialUse fails (might need different type)
                     startForeground(101, notification)
                 }
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -62,6 +57,7 @@ class FinanceNotificationService : Service() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        return START_STICKY
     }
 
     private fun createNotification(): Notification {

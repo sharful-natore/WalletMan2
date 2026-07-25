@@ -113,17 +113,28 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             
             if (signedIn && user != null) {
                 // Use Firebase user details as default profile data
-                _googleEmail.value = user.email ?: user.uid
-                _googleName.value = user.displayName
-                _googlePhotoUrl.value = user.photoUrl?.toString()
+                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 
+                _googleEmail.value = user.email ?: user.uid
+                
+                if (gPrefs.getBoolean("profile_setup_complete", false)) {
+                    _googleName.value = gPrefs.getString("google_name", user.displayName)
+                    _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
+                    _userAddress.value = gPrefs.getString("user_address", null)
+                    _userPhone.value = gPrefs.getString("user_phone", null)
+                    _userDOB.value = gPrefs.getString("user_dob", null)
+                    _isProfileSetupComplete.value = true
+                } else {
+                    _googleName.value = user.displayName
+                    _googlePhotoUrl.value = user.photoUrl?.toString()
+                }
+
                 // Keep SharedPreferences in sync for Widget
                 val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 gPrefs.edit().apply {
-                    putString("google_email", user.email ?: user.uid)
-                    putString("google_name", user.displayName)
-                    putString("google_photo_url", user.photoUrl?.toString())
+                    putString("google_email", _googleEmail.value)
+                    putString("google_name", _googleName.value)
+                    putString("google_photo_url", _googlePhotoUrl.value)
                 }.apply()
 
                 startRealtimeSync()
@@ -3018,12 +3029,29 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             .remove("user_address")
             .apply()
 
+        // Clear google profile prefs
+        val gPrefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        gPrefs.edit()
+            .remove("google_email")
+            .remove("google_name")
+            .remove("google_photo_url")
+            .remove("profile_setup_complete")
+            .remove("user_address")
+            .remove("user_phone")
+            .remove("user_dob")
+            .remove("has_prompted_profile_setup")
+            .apply()
+
         _profileName.value = ""
         _profileEmail.value = ""
         _profilePhotoUri.value = null
         _profilePhone.value = ""
         _profileSocial.value = ""
         _profileAddress.value = ""
+        _userAddress.value = null
+        _userPhone.value = null
+        _userDOB.value = null
+        _isProfileSetupComplete.value = null
 
         _googleEmail.value = null
         _googleName.value = null
@@ -3148,6 +3176,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _googlePhotoUrl.value = photoUri
         _isProfileSetupComplete.value = true
 
+        val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        gPrefs.edit()
+            .putString("google_name", name)
+            .putString("google_photo_url", photoUri)
+            .putBoolean("profile_setup_complete", true)
+            .putString("user_address", address)
+            .putString("user_phone", phone)
+            .putString("user_dob", dob)
+            .apply()
+
         // Also update the current workspace profile so it reflects in Dashboard and Widget
         viewModelScope.launch {
             val wsId = _currentWorkspaceId.value
@@ -3163,13 +3201,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _profilePhone.value = phone
             _profilePhotoUri.value = photoUri
 
-            // If we are updating the "default" workspace, we also update the "Main" google photo url state
-            // to keep them in sync as requested.
-            if (wsId == "default") {
-                _googlePhotoUrl.value = photoUri
-                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                gPrefs.edit().putString("google_photo_url", photoUri).apply()
-            }
+            // Also save to financenote_prefs for the widget syncing
+            val wPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            val keySuffix = if (wsId == "default") "" else "_$wsId"
+            wPrefs.edit()
+                .putString("user_name$keySuffix", name)
+                .putString("user_photo$keySuffix", photoUri)
+                .apply()
 
             com.example.widget.updateAllWidgets(getApplication())
         }
@@ -3217,19 +3255,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                 _userDOB.value = doc.getString("dob") ?: ""
                                 _googlePhotoUrl.value = doc.getString("photoUrl") ?: _googlePhotoUrl.value
                                 _isProfileSetupComplete.value = doc.getBoolean("setupComplete") ?: false
+                                
+                                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                                gPrefs.edit()
+                                    .putString("google_name", _googleName.value)
+                                    .putString("google_photo_url", _googlePhotoUrl.value)
+                                    .putBoolean("profile_setup_complete", _isProfileSetupComplete.value == true)
+                                    .putString("user_address", _userAddress.value)
+                                    .putString("user_phone", _userPhone.value)
+                                    .putString("user_dob", _userDOB.value)
+                                    .apply()
                             } else {
                                 _isProfileSetupComplete.value = false
                             }
                         }
                         .addOnFailureListener {
-                            _isProfileSetupComplete.value = false
+                            // Keep cached value
                         }
                 } catch (e: Exception) {
-                    _isProfileSetupComplete.value = false
+                    // Keep cached value
                 }
             }
-        } else {
-            _isProfileSetupComplete.value = false
         }
     }
 
