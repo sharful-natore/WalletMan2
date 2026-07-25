@@ -2806,6 +2806,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
                 
                 // Proceed normally with automatic realtime sync
+                try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
+                try { restoreAllWorkspaceProfilePhotosFromCloud() } catch (e: Exception) { e.printStackTrace() }
                 startRealtimeSync()
                 checkAndTriggerAutoBackup(context)
                 onSuccess()
@@ -3640,18 +3642,37 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun sendPasswordReset(email: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        if (email.isBlank()) {
+        val trimmed = email.trim()
+        if (trimmed.isBlank()) {
             onError("Please enter your email address")
             return
         }
-        getFirebaseAuth().sendPasswordResetEmail(email)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    onSuccess()
-                } else {
-                    onError(task.exception?.localizedMessage ?: "Password reset failed")
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmed).matches()) {
+            onError("Please enter a valid email address")
+            return
+        }
+        try {
+            getFirebaseAuth().sendPasswordResetEmail(trimmed)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        onSuccess()
+                    } else {
+                        val ex = task.exception
+                        val msg = when {
+                            ex?.message?.contains("user-not-found", ignoreCase = true) == true ->
+                                "No user account found with this email address."
+                            ex?.message?.contains("invalid-email", ignoreCase = true) == true ->
+                                "Invalid email address format."
+                            ex?.message?.contains("too-many-requests", ignoreCase = true) == true ->
+                                "Too many requests. Please try again later."
+                            else -> ex?.localizedMessage ?: "Failed to send password reset email."
+                        }
+                        onError(msg)
+                    }
                 }
-            }
+        } catch (e: Exception) {
+            onError(e.localizedMessage ?: "Firebase Auth error")
+        }
     }
 
     fun sendPhoneVerificationCode(

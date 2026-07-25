@@ -34,6 +34,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.*
+import com.example.ui.AppLanguage
+import com.example.ui.screens.CalculatorDialog
+import com.example.ui.screens.evaluateExpression
 import com.example.ui.theme.FinanceNoteTheme
 import com.example.widget.updateAllWidgets
 import kotlinx.coroutines.CoroutineScope
@@ -138,6 +141,7 @@ fun QuickAddDialogScreen(
     var amountText by remember { mutableStateOf("") }
     var categoryText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
+    var showQuickAddCalculator by remember { mutableStateOf(false) }
 
     // Subtypes
     var debtSubtype by remember { mutableStateOf("LEND") } // LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
@@ -349,13 +353,36 @@ fun QuickAddDialogScreen(
                     onValueChange = { amountText = it },
                     label = { Text(if (isBn) "পরিমাণ (টাকা)" else "Amount (BDT)") },
                     prefix = { Text("৳ ", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = {
+                        IconButton(onClick = { showQuickAddCalculator = true }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Calculate,
+                                contentDescription = "Calculator",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                if (showQuickAddCalculator) {
+                    val sysDark = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                    val isDarkTheme = prefs.getBoolean("is_dark_theme", sysDark)
+                    CalculatorDialog(
+                        language = if (isBn) AppLanguage.BN else AppLanguage.EN,
+                        isDark = isDarkTheme,
+                        onDismiss = { showQuickAddCalculator = false },
+                        onInsert = { calcResult ->
+                            amountText = calcResult
+                            showQuickAddCalculator = false
+                        }
+                    )
+                }
 
                 // Dynamic Inputs based on selectedType
                 when (selectedType) {
@@ -553,7 +580,11 @@ fun QuickAddDialogScreen(
 
                     Button(
                         onClick = {
-                            val amount = amountText.toDoubleOrNull()
+                            val amount = amountText.toDoubleOrNull() ?: try {
+                                evaluateExpression(amountText.replace("×", "*").replace("÷", "/"))
+                            } catch (e: Exception) {
+                                null
+                            }
                             if (amount == null || amount <= 0) {
                                 Toast.makeText(context, if (isBn) "সঠিক পরিমাণ লিখুন" else "Enter valid amount", Toast.LENGTH_SHORT).show()
                                 return@Button

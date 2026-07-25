@@ -2057,7 +2057,23 @@ fun FinanceNoteApp(
                 val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 val lastEmail = prefs.getString("last_google_email", null)
                 if (lastEmail != null && email != null && lastEmail != email) {
-                    pendingDifferentAccountLogin = account
+                    if (!isAuthenticated) {
+                        viewModel.clearAllDataLocal {
+                            viewModel.handleGoogleSignInSuccess(
+                                context = context,
+                                account = account,
+                                onSuccess = {
+                                    forceDismissLogin = true
+                                    viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে লগইন সফল হয়েছে!" else "Google login successful!", isSuccess = true, type = "SUCCESS")
+                                },
+                                onError = { err ->
+                                    viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "লগইন ব্যর্থ হয়েছে: " else "Login failed: "}$err", isSuccess = false, type = "ERROR")
+                                }
+                            )
+                        }
+                    } else {
+                        pendingDifferentAccountLogin = account
+                    }
                 } else {
                     viewModel.handleGoogleSignInSuccess(
                         context = context,
@@ -17455,6 +17471,65 @@ fun SyncStatusBadge(
     }
 }
 
+@Composable
+fun GoogleLogoIcon(modifier: Modifier = Modifier.size(22.dp)) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val strokeWidth = width * 0.18f
+        val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
+        val radius = (width - strokeWidth) / 2f
+
+        // Top arc (Red)
+        drawArc(
+            color = Color(0xFFEA4335),
+            startAngle = -145f,
+            sweepAngle = 110f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
+            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
+            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+        )
+        // Left arc (Yellow)
+        drawArc(
+            color = Color(0xFFFBBC05),
+            startAngle = -215f,
+            sweepAngle = 70f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
+            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
+            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+        )
+        // Bottom arc (Green)
+        drawArc(
+            color = Color(0xFF34A853),
+            startAngle = 35f,
+            sweepAngle = 110f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
+            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
+            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+        )
+        // Right arc (Blue)
+        drawArc(
+            color = Color(0xFF4285F4),
+            startAngle = -35f,
+            sweepAngle = 70f,
+            useCenter = false,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
+            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
+            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+        )
+        // Blue horizontal bar
+        drawLine(
+            color = Color(0xFF4285F4),
+            start = androidx.compose.ui.geometry.Offset(center.x, center.y),
+            end = androidx.compose.ui.geometry.Offset(center.x + radius, center.y),
+            strokeWidth = strokeWidth
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -17466,6 +17541,27 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     val activity = context as? android.app.Activity
+
+    androidx.compose.runtime.DisposableEffect(activity, isDark) {
+        if (activity != null) {
+            val window = activity.window
+            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            window.statusBarColor = android.graphics.Color.WHITE
+            window.navigationBarColor = android.graphics.Color.WHITE
+            insetsController.isAppearanceLightStatusBars = true
+            insetsController.isAppearanceLightNavigationBars = true
+        }
+        onDispose {
+            if (activity != null) {
+                val window = activity.window
+                val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                window.statusBarColor = android.graphics.Color.TRANSPARENT
+                window.navigationBarColor = android.graphics.Color.TRANSPARENT
+                insetsController.isAppearanceLightStatusBars = !isDark
+                insetsController.isAppearanceLightNavigationBars = !isDark
+            }
+        }
+    }
 
     var selectedTab by remember { mutableStateOf(0) } // 0: Email, 1: Phone
     var emailInput by remember { mutableStateOf("") }
@@ -17538,7 +17634,6 @@ fun LoginScreen(
                 Button(
                     onClick = {
                         onGoogleSignIn()
-                        onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(14.dp),
@@ -17551,17 +17646,11 @@ fun LoginScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Custom Google-like icon or official icon if available
-                        Surface(
+                        Box(
                             modifier = Modifier.size(24.dp),
-                            shape = CircleShape,
-                            color = Color.White
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Cloud, // Placeholder for Google Icon
-                                contentDescription = null,
-                                tint = FintechBlue,
-                                modifier = Modifier.size(18.dp).padding(2.dp)
-                            )
+                            GoogleLogoIcon(modifier = Modifier.size(20.dp))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
@@ -17710,7 +17799,12 @@ fun LoginScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            TextButton(onClick = { showForgotPasswordDialog = true }) {
+                            TextButton(onClick = {
+                                if (forgotEmailInput.isBlank() && emailInput.isNotBlank()) {
+                                    forgotEmailInput = emailInput
+                                }
+                                showForgotPasswordDialog = true
+                            }) {
                                 Text(
                                     text = if (language == AppLanguage.BN) "পাসওয়ার্ড ভুলে গেছেন?" else "Forgot Password?",
                                     color = FintechBlue,
@@ -17889,43 +17983,99 @@ fun LoginScreen(
     }
 
     if (showForgotPasswordDialog) {
+        var isResetting by remember { mutableStateOf(false) }
+        var resetDialogError by remember { mutableStateOf<String?>(null) }
+        var resetDialogSuccess by remember { mutableStateOf<String?>(null) }
+
         AlertDialog(
-            onDismissRequest = { showForgotPasswordDialog = false },
-            title = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড রিস্টেট করুন" else "Reset Password") },
+            onDismissRequest = {
+                if (!isResetting) showForgotPasswordDialog = false
+            },
+            title = { Text(if (language == AppLanguage.BN) "পাসওয়ার্ড রিকভারি" else "Reset Password") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(text = if (language == AppLanguage.BN) "আপনার অ্যাকাউন্ট ইমেইল দিন:" else "Enter your account email:")
+                    Text(
+                        text = if (language == AppLanguage.BN) 
+                            "আপনার অ্যাকাউন্টের ইমেইল অ্যাড্রেস লিখুন। পাসওয়ার্ড রিসেট করার লিংক আপনার ইমেইলে চলে যাবে।" 
+                        else 
+                            "Enter your account email. A password reset link will be sent to your inbox.",
+                        fontSize = 14.sp
+                    )
                     OutlinedTextField(
                         value = forgotEmailInput,
-                        onValueChange = { forgotEmailInput = it },
+                        onValueChange = { 
+                            forgotEmailInput = it
+                            resetDialogError = null
+                        },
                         label = { Text("Email") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isResetting
                     )
+                    if (resetDialogError != null) {
+                        Text(
+                            text = resetDialogError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 13.sp
+                        )
+                    }
+                    if (resetDialogSuccess != null) {
+                        Text(
+                            text = resetDialogSuccess!!,
+                            color = Color(0xFF2E7D32),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
+                        resetDialogError = null
+                        resetDialogSuccess = null
+                        isResetting = true
                         viewModel.sendPasswordReset(forgotEmailInput,
                             onSuccess = {
-                                showForgotPasswordDialog = false
-                                successMessage = if (language == AppLanguage.BN) "পাসওয়ার্ড রিস্টেট লিংক পাঠানো হয়েছে!" else "Password reset email sent!"
+                                isResetting = false
+                                resetDialogSuccess = if (language == AppLanguage.BN) 
+                                    "ইমেইল সফলভাবে পাঠানো হয়েছে! ইনবক্স এবং স্প্যাম (Spam) ফোল্ডার চেক করুন।" 
+                                else 
+                                    "Password reset link sent! Please check your inbox and spam folder."
                             },
                             onError = { err ->
-                                errorMessage = err
-                                showForgotPasswordDialog = false
+                                isResetting = false
+                                resetDialogError = if (language == AppLanguage.BN) {
+                                    when {
+                                        err.contains("No user account", ignoreCase = true) -> "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট খুঁজে পাওয়া যায়নি।"
+                                        err.contains("valid email", ignoreCase = true) -> "সঠিক ইমেইল ফরম্যাট প্রদান করুন।"
+                                        err.contains("Too many requests", ignoreCase = true) -> "অনেক বার চেষ্টা করা হয়েছে, কিছুক্ষণ পর চেষ্টা করুন।"
+                                        else -> "ব্যর্থ হয়েছে: $err"
+                                    }
+                                } else err
                             }
                         )
                     },
+                    enabled = !isResetting && forgotEmailInput.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
                 ) {
-                    Text("Send")
+                    if (isResetting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(if (language == AppLanguage.BN) "লিংক পাঠান" else "Send Link")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showForgotPasswordDialog = false }) {
-                    Text("Cancel")
+                TextButton(
+                    onClick = { showForgotPasswordDialog = false },
+                    enabled = !isResetting
+                ) {
+                    Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close")
                 }
             }
         )
