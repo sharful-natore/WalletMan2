@@ -18,6 +18,10 @@
     @com.squareup.moshi.Json <fields>;
 }
 
+# Keep all classes and members in com.example
+-keep class com.example.** { *; }
+-keepclassmembers class com.example.** { *; }
+
 # Keep all data models & data classes in com.example
 -keep class com.example.data.** { *; }
 -keepclassmembers class com.example.data.** { *; }

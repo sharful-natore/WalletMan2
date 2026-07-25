@@ -3571,23 +3571,33 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Email and password cannot be empty")
             return
         }
-        getFirebaseAuth().signInWithEmailAndPassword(email, pass)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = task.result?.user
-                    val userEmail = user?.email ?: email
-                    _googleEmail.value = userEmail
-                    _isGoogleSignedIn.value = true
-                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                    gPrefs.edit().putString("google_email", userEmail).apply()
-                    fetchUserProfile()
-                    restoreAllWorkspaceProfilePhotosFromCloud()
-                    startRealtimeSync()
-                    onSuccess()
-                } else {
-                    onError(task.exception?.localizedMessage ?: "Login failed")
+        try {
+            getFirebaseAuth().signInWithEmailAndPassword(email, pass)
+                .addOnCompleteListener { task ->
+                    try {
+                        if (task.isSuccessful) {
+                            val user = task.result?.user
+                            val userEmail = user?.email ?: email
+                            _googleEmail.value = userEmail
+                            _isGoogleSignedIn.value = true
+                            val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                            gPrefs.edit().putString("google_email", userEmail).apply()
+                            try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
+                            try { restoreAllWorkspaceProfilePhotosFromCloud() } catch (e: Exception) { e.printStackTrace() }
+                            try { startRealtimeSync() } catch (e: Exception) { e.printStackTrace() }
+                            onSuccess()
+                        } else {
+                            onError(task.exception?.localizedMessage ?: "Login failed")
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        onError(e.localizedMessage ?: "Login error occurred")
+                    }
                 }
-            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onError(e.localizedMessage ?: "Firebase Auth unavailable")
+        }
     }
 
     fun registerWithEmail(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
@@ -3595,25 +3605,35 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("Email and password cannot be empty")
             return
         }
-        getFirebaseAuth().createUserWithEmailAndPassword(email, pass)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val user = task.result?.user
-                    val userEmail = user?.email ?: email
-                    _googleEmail.value = userEmail
-                    _isGoogleSignedIn.value = true
-                    _isProfileSetupComplete.value = false // Explicitly set to false to trigger setup
-                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                    gPrefs.edit().putString("google_email", userEmail).apply()
-                    fetchUserProfile()
-                    restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value)
-                    checkAndRestoreProfilePhoto(getApplication(), _currentWorkspaceId.value)
-                    startRealtimeSync()
-                    onSuccess()
-                } else {
-                    onError(task.exception?.localizedMessage ?: "Registration failed")
+        try {
+            getFirebaseAuth().createUserWithEmailAndPassword(email, pass)
+                .addOnCompleteListener { task ->
+                    try {
+                        if (task.isSuccessful) {
+                            val user = task.result?.user
+                            val userEmail = user?.email ?: email
+                            _googleEmail.value = userEmail
+                            _isGoogleSignedIn.value = true
+                            _isProfileSetupComplete.value = false // Explicitly set to false to trigger setup
+                            val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                            gPrefs.edit().putString("google_email", userEmail).apply()
+                            try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
+                            try { restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value) } catch (e: Exception) { e.printStackTrace() }
+                            try { checkAndRestoreProfilePhoto(getApplication(), _currentWorkspaceId.value) } catch (e: Exception) { e.printStackTrace() }
+                            try { startRealtimeSync() } catch (e: Exception) { e.printStackTrace() }
+                            onSuccess()
+                        } else {
+                            onError(task.exception?.localizedMessage ?: "Registration failed")
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        onError(e.localizedMessage ?: "Registration error occurred")
+                    }
                 }
-            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onError(e.localizedMessage ?: "Firebase Auth unavailable")
+        }
     }
 
     fun sendPasswordReset(email: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
