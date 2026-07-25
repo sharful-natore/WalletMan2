@@ -34,28 +34,21 @@ class MainActivity : ComponentActivity() {
         actionState.value = intent?.action
         targetWorkspaceState.value = intent?.getStringExtra("EXTRA_TARGET_WORKSPACE_ID")
         
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+        
         // Register global exception handler for logging crashes
         com.example.data.ErrorLogger.registerUncaughtExceptionHandler(this)
-
-        // Initialize Firebase early
-        FinanceApplication.ensureFirebaseInitialized(this)
-
-        try {
-            enableEdgeToEdge(
-                statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-                navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-            )
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                window.isStatusBarContrastEnforced = false
-                window.isNavigationBarContrastEnforced = false
-            }
-            WindowCompat.getInsetsController(window, window.decorView).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = false
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
         
         // Initialize database & repository
         val database = AppDatabase.getDatabase(this)

@@ -64,56 +64,54 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         ?: prefs.getString("active_workspace_id", "default") 
         ?: "default"
 
-    val txIntent = Intent(context, com.example.QuickAddActivity::class.java).apply {
+    val txIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_ADD_TRANSACTION"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
-    val personIntent = Intent(context, com.example.QuickAddActivity::class.java).apply {
+    val personIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_DEBT_CREDIT"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
-    val savingIntent = Intent(context, com.example.QuickAddActivity::class.java).apply {
+    val savingIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_SAVINGS"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     val incomeViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_INCOME"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val expenseViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_EXPENSE"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val debtViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_DEBT"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
     val creditViewIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_VIEW_CREDIT"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     val profileIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_REFRESH_WIDGET"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
 
     val syncIntent = Intent(context, MainActivity::class.java).apply {
         action = "ACTION_SYNC_TRIGGER"
         putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
     }
-
-    val profilePendingIntent = PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
     views.setOnClickPendingIntent(R.id.btn_add_tx, PendingIntent.getActivity(context, 1, txIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_person, PendingIntent.getActivity(context, 2, personIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -124,12 +122,9 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     views.setOnClickPendingIntent(R.id.card_expense, PendingIntent.getActivity(context, 11, expenseViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_debt, PendingIntent.getActivity(context, 12, debtViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_credit, PendingIntent.getActivity(context, 13, creditViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-    
-    views.setOnClickPendingIntent(R.id.card_profile, profilePendingIntent)
-    views.setOnClickPendingIntent(R.id.avatar_container, profilePendingIntent)
-    views.setOnClickPendingIntent(R.id.tv_profile_name, profilePendingIntent)
+    views.setOnClickPendingIntent(R.id.card_profile, PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
 
-    // Background logic to switch workspace (only caret button switches workspace)
+    // Background logic to load data
     val switchIntent = Intent(context, FinanceWidgetProvider::class.java).apply {
         action = "ACTION_WIDGET_SWITCH_WORKSPACE"
         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -141,6 +136,8 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
     views.setOnClickPendingIntent(R.id.btn_widget_switch_workspace, switchPendingIntent)
+    views.setOnClickPendingIntent(R.id.avatar_container, switchPendingIntent)
+    views.setOnClickPendingIntent(R.id.tv_profile_name, switchPendingIntent)
 
     CoroutineScope(Dispatchers.IO).launch {
         try {

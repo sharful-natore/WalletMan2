@@ -63,34 +63,29 @@ class FinanceNotificationService : Service() {
     private fun createNotification(): Notification {
         val views = RemoteViews(packageName, R.layout.notification_finance)
 
-        val mainAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val mainAppPendingIntent = PendingIntent.getActivity(this, 0, mainAppIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-
-        val txIntent = Intent(this, com.example.QuickAddActivity::class.java).apply {
+        val txIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_ADD_TRANSACTION"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        val debtIntent = Intent(this, com.example.QuickAddActivity::class.java).apply {
+        val debtIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_DEBT_CREDIT"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
-        val savingsIntent = Intent(this, com.example.QuickAddActivity::class.java).apply {
+        val savingsIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_SAVINGS"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val backupIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_BACKUP"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val dashboardIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_DASHBOARD"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
         val settingsIntent = Intent(this, MainActivity::class.java).apply {
             action = "ACTION_SETTINGS"
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
 
         views.setOnClickPendingIntent(R.id.btn_notif_tx, PendingIntent.getActivity(this, 1, txIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -111,11 +106,16 @@ class FinanceNotificationService : Service() {
         val prefs = getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
         val isDark = prefs.getBoolean("is_dark_theme", false)
         
+        // Remove background color override to keep it transparent as per XML
+        // views.setInt(R.id.notif_main_container, "setBackgroundColor", bgColor)
+        
+        // We can't easily tint ImageViews inside RemoteViews without setInt(..., "setColorFilter", ...)
+        // but for now the XML has them hardcoded to #6A11CB which is the theme blue.
+        
         return NotificationCompat.Builder(this, "finance_notif_channel")
             .setSmallIcon(R.drawable.ic_pie_chart) 
             .setCustomContentView(views)
             .setCustomBigContentView(views)
-            .setContentIntent(mainAppPendingIntent)
             .setOngoing(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
