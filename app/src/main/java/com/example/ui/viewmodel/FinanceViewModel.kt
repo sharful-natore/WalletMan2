@@ -163,6 +163,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             _googleName.value = initialGPrefs.getString("google_name", null)
             _googlePhotoUrl.value = initialGPrefs.getString("google_photo_url", null)
             _isProfileSetupComplete.value = initialGPrefs.getBoolean("profile_setup_complete", false)
+            startRealtimeSync()
         }
 
         try {
@@ -170,26 +171,35 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val user = auth.currentUser
                 _currentUser.value = user
                 
-                // Treat any Firebase sign-in as 'signed in' for sync purposes
-                val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
+                val existingEmail = _googleEmail.value?.lowercase()?.trim()
+                val userEmail = user?.email?.lowercase()?.trim()
+                
+                val finalEmail = when {
+                    !userEmail.isNullOrBlank() -> userEmail
+                    !existingEmail.isNullOrBlank() -> existingEmail
+                    user != null -> user.uid
+                    else -> null
+                }
+                
+                val signedIn = !finalEmail.isNullOrBlank()
                 _isGoogleSignedIn.value = signedIn
                 
-                if (signedIn && user != null) {
-                    // Use Firebase user details as default profile data
+                if (signedIn) {
+                    _googleEmail.value = finalEmail
                     val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                     
-                    _googleEmail.value = user.email ?: user.uid
-                    
-                    if (gPrefs.getBoolean("profile_setup_complete", false)) {
-                        _googleName.value = gPrefs.getString("google_name", user.displayName)
-                        _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
-                        _userAddress.value = gPrefs.getString("user_address", null)
-                        _userPhone.value = gPrefs.getString("user_phone", null)
-                        _userDOB.value = gPrefs.getString("user_dob", null)
-                        _isProfileSetupComplete.value = true
-                    } else {
-                        _googleName.value = user.displayName
-                        _googlePhotoUrl.value = user.photoUrl?.toString()
+                    if (user != null) {
+                        if (gPrefs.getBoolean("profile_setup_complete", false)) {
+                            _googleName.value = gPrefs.getString("google_name", user.displayName)
+                            _googlePhotoUrl.value = gPrefs.getString("google_photo_url", user.photoUrl?.toString())
+                            _userAddress.value = gPrefs.getString("user_address", null)
+                            _userPhone.value = gPrefs.getString("user_phone", null)
+                            _userDOB.value = gPrefs.getString("user_dob", null)
+                            _isProfileSetupComplete.value = true
+                        } else {
+                            if (_googleName.value.isNullOrBlank()) _googleName.value = user.displayName
+                            if (_googlePhotoUrl.value.isNullOrBlank()) _googlePhotoUrl.value = user.photoUrl?.toString()
+                        }
                     }
 
                     // Keep SharedPreferences in sync for Widget
@@ -201,7 +211,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     }.apply()
 
                     startRealtimeSync()
-                } else if (!signedIn) {
+                } else {
                     _googleEmail.value = null
                     _googleName.value = null
                     _googlePhotoUrl.value = null
@@ -1225,6 +1235,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private suspend fun restoreFullBackup(backup: FinanceBackup) {
         repository.restoreBackupData(backup)
 
+        // Ensure current active workspace matches restored workspaces
+        if (backup.workspaces.isNotEmpty()) {
+            val availableWorkspaceIds = backup.workspaces.map { it.id }
+            if (_currentWorkspaceId.value !in availableWorkspaceIds) {
+                val targetWsId = backup.workspaces.firstOrNull()?.id ?: "default"
+                selectWorkspace(targetWsId)
+            } else {
+                loadProfile(getApplication())
+                loadBudgets()
+            }
+        } else {
+            selectWorkspace("default")
+        }
+
         if (!backup.customGradientsConfigSerialized.isNullOrBlank()) {
             prefs.edit().putString("custom_gradients_v3", backup.customGradientsConfigSerialized).apply()
             loadCustomGradients(getApplication())
@@ -1364,8 +1388,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun syncProfilePhotoToCloud(context: Context, workspaceId: String, photoUriOrPath: String?) {
-        val email = _googleEmail.value
-        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+        val rawEmail = _googleEmail.value
+        if (!_isGoogleSignedIn.value || rawEmail.isNullOrBlank()) return
+        val email = rawEmail.lowercase().trim()
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2192,12 +2217,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+        val rawEmail = _googleEmail.value
+        if (rawEmail.isNullOrBlank() || !_isGoogleSignedIn.value) {
             _firestoreSyncStatus.value = "Sign-in required"
             onError?.invoke("Not signed in to Google")
             return
         }
+        val email = rawEmail.lowercase().trim()
         isInitialSyncChecked = true
         uploadJob?.cancel()
         uploadJob = viewModelScope.launch {
@@ -2258,12 +2284,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun pullFromFirestore(onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+        val rawEmail = _googleEmail.value
+        if (rawEmail.isNullOrBlank() || !_isGoogleSignedIn.value) {
             _firestoreSyncStatus.value = "Sign-in required"
             onError("Not signed in to Google")
             return
         }
+        val email = rawEmail.lowercase().trim()
         isInitialSyncChecked = true
         viewModelScope.launch {
             _firestoreSyncStatus.value = "Downloading..."
@@ -2334,11 +2361,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun startRealtimeSync() {
         firestoreListener?.remove()
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+        val rawEmail = _googleEmail.value
+        if (rawEmail.isNullOrBlank() || !_isGoogleSignedIn.value) {
             _firestoreSyncStatus.value = null
             return
         }
+        val email = rawEmail.lowercase().trim()
         try {
             val db = getFirestore(getApplication())
             firestoreListener = db.collection("users").document(email)
@@ -3598,8 +3626,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             uploadToFirestore()
         }
         
-        val email = _googleEmail.value
-        if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
+        val rawEmail = _googleEmail.value
+        if (_isGoogleSignedIn.value && !rawEmail.isNullOrBlank()) {
+            val email = rawEmail.lowercase().trim()
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val db = getFirestore(getApplication())
@@ -3626,8 +3655,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun fetchUserProfile() {
-        val email = _googleEmail.value
-        if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
+        val rawEmail = _googleEmail.value
+        if (_isGoogleSignedIn.value && !rawEmail.isNullOrBlank()) {
+            val email = rawEmail.lowercase().trim()
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val db = getFirestore(getApplication())

@@ -2028,20 +2028,11 @@ fun FinanceNoteApp(
 
     var pendingDifferentAccountLogin by remember { mutableStateOf<com.google.android.gms.auth.api.signin.GoogleSignInAccount?>(null) }
 
+    lateinit var triggerGoogleSignInWithFallback: (Boolean) -> Unit
+
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
-            BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
-            BuildConfig.DRIVE_API != "..." &&
-            BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
-        ) {
-            BuildConfig.DRIVE_API
-        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
-            BuildConfig.GOOGLE_CLIENT_ID
-        } else {
-            BuildConfig.DRIVE_API
-        }
         val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
@@ -2071,39 +2062,58 @@ fun FinanceNoteApp(
             } else {
                 viewModel.triggerCustomNotification(if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে।" else "Sign-in failed.", isSuccess = false, type = "ERROR")
             }
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            if (e.statusCode == 10) {
+                // Code 10 is DEVELOPER_ERROR (caused by OAuth Client ID or SHA-1 mismatch for ID token).
+                // Automatically retry using standard Google Sign-In (without requestIdToken) so sign-in succeeds!
+                triggerGoogleSignInWithFallback(false)
+            } else {
+                val errMsg = e.localizedMessage ?: "Code ${e.statusCode}"
+                viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে: " else "Sign-in failed: "}$errMsg", isSuccess = false, type = "ERROR")
+            }
         } catch (e: Exception) {
             val errMsg = e.localizedMessage ?: "Unknown error"
             viewModel.triggerCustomNotification("${if (language == AppLanguage.BN) "সাইন ইন ব্যর্থ হয়েছে: " else "Sign-in failed: "}$errMsg", isSuccess = false, type = "ERROR")
         }
     }
 
-    val triggerGoogleSignIn = {
+    triggerGoogleSignInWithFallback = { useRequestIdToken ->
         val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
             BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
             BuildConfig.DRIVE_API != "..." &&
             BuildConfig.DRIVE_API.contains(".apps.googleusercontent.com")
         ) {
             BuildConfig.DRIVE_API
-        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty()) {
+        } else if (BuildConfig.GOOGLE_CLIENT_ID.isNotEmpty() &&
+            BuildConfig.GOOGLE_CLIENT_ID.contains(".apps.googleusercontent.com")
+        ) {
             BuildConfig.GOOGLE_CLIENT_ID
         } else {
-            BuildConfig.DRIVE_API
+            ""
         }
-        val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
+
+        val gsoBuilder = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
             com.google.android.gms.auth.api.signin.GoogleSignInOptions.DEFAULT_SIGN_IN
         )
             .requestEmail()
             .requestProfile()
-            .requestIdToken(finalClientId)
             .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
-            .build()
 
+        if (useRequestIdToken && finalClientId.isNotBlank()) {
+            gsoBuilder.requestIdToken(finalClientId)
+        }
+
+        val gso = gsoBuilder.build()
         val googleSignInClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
-        
+
         googleSignInClient.signOut().addOnCompleteListener {
             val signInIntent = googleSignInClient.signInIntent
             googleSignInLauncher.launch(signInIntent)
         }
+    }
+
+    val triggerGoogleSignIn = {
+        triggerGoogleSignInWithFallback(true)
     }
 
     var showSplash by remember { mutableStateOf(true) }
