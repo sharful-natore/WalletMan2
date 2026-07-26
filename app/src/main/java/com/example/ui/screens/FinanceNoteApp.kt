@@ -8794,7 +8794,9 @@ fun TransactionsScreen(
 
         // Floating Action Button to Export Transactions
         val exportInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        val isExportHovered by exportInteractionSource.collectIsHoveredAsState()
+        var isExportExpanded by remember { mutableStateOf(false) }
+        val exportScope = rememberCoroutineScope()
+        var exportCollapseJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
         androidx.compose.animation.AnimatedVisibility(
             visible = !isSelectionMode,
@@ -8805,17 +8807,8 @@ fun TransactionsScreen(
                 .padding(bottom = 113.dp, end = 16.dp)
         ) {
             ExtendedFloatingActionButton(
-                onClick = {
-                    val cat = when (filter) {
-                        "INCOME" -> "ONLY_INCOME"
-                        "EXPENSE" -> "ONLY_EXPENSE"
-                        "DENA" -> "ONLY_DEBT"
-                        "PAWN" -> "ONLY_PAONA"
-                        else -> "TRANSACTIONS"
-                    }
-                    onExportRequest?.invoke(cat)
-                },
-                expanded = isExportHovered,
+                onClick = {},
+                expanded = isExportExpanded,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_custom_export),
@@ -8836,7 +8829,40 @@ fun TransactionsScreen(
                 shape = RoundedCornerShape(16.dp),
                 interactionSource = exportInteractionSource,
                 modifier = Modifier
-                    .hoverable(exportInteractionSource)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                val cat = when (filter) {
+                                    "INCOME" -> "ONLY_INCOME"
+                                    "EXPENSE" -> "ONLY_EXPENSE"
+                                    "DENA" -> "ONLY_DEBT"
+                                    "PAWN" -> "ONLY_PAONA"
+                                    else -> "TRANSACTIONS"
+                                }
+                                onExportRequest?.invoke(cat)
+                            },
+                            onLongPress = {
+                                isExportExpanded = true
+                            },
+                            onPress = {
+                                exportCollapseJob?.cancel()
+                                val released = try {
+                                    awaitRelease()
+                                    true
+                                } catch (c: Exception) {
+                                    false
+                                }
+                                if (released) {
+                                    if (isExportExpanded) {
+                                        exportCollapseJob = exportScope.launch {
+                                            kotlinx.coroutines.delay(2000)
+                                            isExportExpanded = false
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
                     .testTag("fab_export_transactions")
             )
         }
@@ -9308,6 +9334,11 @@ fun DebtsScreen(
         }
 
         // Floating Action Button to Add Person
+        val addPersonInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        var isAddPersonExpanded by remember { mutableStateOf(false) }
+        val addPersonScope = rememberCoroutineScope()
+        var addPersonCollapseJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
         androidx.compose.animation.AnimatedVisibility(
             visible = !isSelectionMode,
             enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
@@ -9316,21 +9347,58 @@ fun DebtsScreen(
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 113.dp, end = 16.dp)
         ) {
-            FloatingActionButton(
-                onClick = onAddPersonClick,
+            ExtendedFloatingActionButton(
+                onClick = {},
+                expanded = isAddPersonExpanded,
+                icon = {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_add_debt_credit), 
+                        contentDescription = "Add Person", 
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ব্যক্তি যোগ করুন" else "Add Person",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                },
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
+                interactionSource = addPersonInteractionSource,
                 modifier = Modifier
-                    .size(60.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                onAddPersonClick()
+                            },
+                            onLongPress = {
+                                isAddPersonExpanded = true
+                            },
+                            onPress = {
+                                addPersonCollapseJob?.cancel()
+                                val released = try {
+                                    awaitRelease()
+                                    true
+                                } catch (c: Exception) {
+                                    false
+                                }
+                                if (released) {
+                                    if (isAddPersonExpanded) {
+                                        addPersonCollapseJob = addPersonScope.launch {
+                                            kotlinx.coroutines.delay(2000)
+                                            isAddPersonExpanded = false
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
                     .testTag("fab_add_person")
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_add_debt_credit), 
-                    contentDescription = "Add Person", 
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
+            )
         }
     }
 }
@@ -9693,14 +9761,15 @@ fun PersonDebtRowItem(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(FintechBlue.copy(alpha = 0.15f)),
+                        .background(FintechBlue.copy(alpha = 0.15f))
+                        .border(2.dp, FintechBlue, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (item.person.photoUri.isNotEmpty()) {
                         AsyncImage(
                             model = item.person.photoUri,
                             contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     } else {
@@ -10171,23 +10240,65 @@ fun SavingsScreen(
             }
         } else {
             // Floating Action Button to Add Savings Goal
-            FloatingActionButton(
-                onClick = onAddSavingsGoalClick,
+            val addSavingsInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            var isAddSavingsExpanded by remember { mutableStateOf(false) }
+            val addSavingsScope = rememberCoroutineScope()
+            var addSavingsCollapseJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+            ExtendedFloatingActionButton(
+                onClick = {},
+                expanded = isAddSavingsExpanded,
+                icon = {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_add_savings), 
+                        contentDescription = "Add Goal", 
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (language == AppLanguage.BN) "কার্ড যোগ করুন" else "Add Card",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                },
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
+                interactionSource = addSavingsInteractionSource,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 113.dp, end = 16.dp)
-                    .size(60.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                onAddSavingsGoalClick()
+                            },
+                            onLongPress = {
+                                isAddSavingsExpanded = true
+                            },
+                            onPress = {
+                                addSavingsCollapseJob?.cancel()
+                                val released = try {
+                                    awaitRelease()
+                                    true
+                                } catch (c: Exception) {
+                                    false
+                                }
+                                if (released) {
+                                    if (isAddSavingsExpanded) {
+                                        addSavingsCollapseJob = addSavingsScope.launch {
+                                            kotlinx.coroutines.delay(2000)
+                                            isAddSavingsExpanded = false
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
                     .testTag("fab_add_savings_goal")
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_add_savings), 
-                    contentDescription = "Add Goal", 
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
+            )
         }
     }
 }
@@ -10546,14 +10657,15 @@ fun PersonSelectorDialog(
                                         modifier = Modifier
                                             .size(48.dp)
                                             .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                            .border(2.dp, FintechBlue, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (person.photoUri.isNotEmpty()) {
                                             AsyncImage(
                                                 model = person.photoUri,
                                                 contentDescription = person.name,
-                                                modifier = Modifier.fillMaxSize(),
+                                                modifier = Modifier.fillMaxSize().clip(CircleShape),
                                                 contentScale = ContentScale.Crop
                                             )
                                         } else {
@@ -11319,14 +11431,15 @@ fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         modifier = Modifier
                             .size(60.dp)
                             .clip(CircleShape)
-                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)),
+                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f))
+                            .border(2.dp, FintechBlue, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (photoUri.isNotEmpty()) {
                             AsyncImage(
                                 model = photoUri,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
@@ -12556,14 +12669,15 @@ fun PersonDetailOverlay(
                         modifier = Modifier
                             .size(54.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            .border(2.dp, FintechBlue, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         if (personDebt.person.photoUri.isNotEmpty()) {
                             AsyncImage(
                                 model = personDebt.person.photoUri,
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
                                 contentScale = ContentScale.Crop
                             )
                         } else {

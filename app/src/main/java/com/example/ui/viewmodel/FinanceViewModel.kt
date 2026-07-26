@@ -829,7 +829,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun addPerson(name: String, phone: String, address: String, photoUri: String) {
         viewModelScope.launch {
-            repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = photoUri, workspaceId = _currentWorkspaceId.value))
+            val pId = repository.insertPerson(Person(name = name, phone = phone, address = address, photoUri = "", workspaceId = _currentWorkspaceId.value)).toInt()
+            
+            val finalPhotoUri = if (photoUri.isNotEmpty()) {
+                val savedPath = savePersonImageToInternalStorage(getApplication(), photoUri, pId) ?: ""
+                if (savedPath.isNotEmpty()) {
+                    val updatedPerson = Person(id = pId, name = name, phone = phone, address = address, photoUri = savedPath, workspaceId = _currentWorkspaceId.value)
+                    repository.updatePerson(updatedPerson)
+                    syncPersonPhotoToCloud(getApplication(), pId, savedPath)
+                    savedPath
+                } else {
+                    ""
+                }
+            } else {
+                ""
+            }
+
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
             recordDatabaseMutation("ADD", name, "PERSON", 0.0)
@@ -839,7 +854,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun updatePerson(person: Person) {
         viewModelScope.launch {
-            repository.updatePerson(person)
+            val currentPerson = repository.getPersonById(person.id)
+            val finalPerson = if (person.photoUri.isNotEmpty() && person.photoUri != currentPerson?.photoUri) {
+                val savedPath = savePersonImageToInternalStorage(getApplication(), person.photoUri, person.id) ?: ""
+                if (savedPath.isNotEmpty()) {
+                    syncPersonPhotoToCloud(getApplication(), person.id, savedPath)
+                    person.copy(photoUri = savedPath)
+                } else {
+                    person
+                }
+            } else if (person.photoUri.isEmpty() && currentPerson?.photoUri?.isNotEmpty() == true) {
+                syncPersonPhotoToCloud(getApplication(), person.id, null)
+                person
+            } else {
+                person
+            }
+
+            repository.updatePerson(finalPerson)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
             recordDatabaseMutation("EDIT", person.name, "PERSON", 0.0)
@@ -1548,6 +1579,146 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun savePersonImageToInternalStorage(context: Context, uriString: String, personId: Int): String? {
+        if (uriString.isBlank()) return null
+        return try {
+            if (uriString.startsWith(context.filesDir.absolutePath)) {
+                val existingFile = File(uriString)
+                if (existingFile.exists() && existingFile.length() > 0) {
+                    return existingFile.absolutePath
+                }
+            }
+
+            val inputStream = if (uriString.startsWith("content://") || uriString.startsWith("file://")) {
+                context.contentResolver.openInputStream(Uri.parse(uriString))
+            } else {
+                val f = File(uriString)
+                if (f.exists()) java.io.FileInputStream(f) else null
+            } ?: return if (File(uriString).exists()) uriString else null
+
+            val originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            if (originalBitmap == null) return null
+
+            val maxDim = 512
+            val width = originalBitmap.width
+            val height = originalBitmap.height
+            val scaledBitmap = if (width > maxDim || height > maxDim) {
+                val ratio = width.toFloat() / height.toFloat()
+                val newWidth = if (width >= height) maxDim else (maxDim * ratio).toInt()
+                val newHeight = if (height > width) maxDim else (maxDim / ratio).toInt()
+                android.graphics.Bitmap.createScaledBitmap(originalBitmap, newWidth, newHeight, true)
+            } else {
+                originalBitmap
+            }
+
+            val fileName = "person_photo_${personId}.jpg"
+            val file = File(context.filesDir, fileName)
+            val outputStream = java.io.FileOutputStream(file)
+            scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
+            outputStream.flush()
+            outputStream.close()
+
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (uriString.startsWith("file://")) {
+                uriString.substring(7)
+            } else {
+                null
+            }
+        }
+    }
+
+    fun syncPersonPhotoToCloud(context: Context, personId: Int, photoUriOrPath: String?) {
+        val email = _googleEmail.value
+        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = getFirestore(getApplication())
+                val docRef = db.collection("users").document(email)
+                    .collection("person_photos").document("person_$personId")
+
+                if (photoUriOrPath.isNullOrBlank()) {
+                    docRef.delete()
+                } else {
+                    val file = File(photoUriOrPath)
+                    val base64 = if (file.exists() && file.length() > 0) {
+                        val bytes = file.readBytes()
+                        android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    } else {
+                        compressUriToBase64(context, photoUriOrPath)
+                    }
+
+                    if (!base64.isNullOrBlank()) {
+                        val data = mapOf(
+                            "photoBase64" to base64,
+                            "personId" to personId,
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                        docRef.set(data)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private val downloadingPersonPhotos = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
+
+    fun downloadAndSavePersonPhotoIfNeeded(person: Person) {
+        val email = _googleEmail.value
+        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) return
+        if (downloadingPersonPhotos.putIfAbsent(person.id, true) == true) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = getFirestore(getApplication())
+                db.collection("users").document(email)
+                    .collection("person_photos").document("person_${person.id}")
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        val base64 = if (doc != null && doc.exists()) doc.getString("photoBase64") else null
+                        if (!base64.isNullOrBlank()) {
+                            val localPath = saveBase64ToLocalStorageForPerson(getApplication(), base64, person.id)
+                            if (!localPath.isNullOrBlank()) {
+                                viewModelScope.launch {
+                                    repository.updatePerson(person.copy(photoUri = localPath))
+                                    onLocalDatabaseChanged()
+                                    com.example.widget.updateAllWidgets(getApplication())
+                                }
+                            }
+                        }
+                        downloadingPersonPhotos.remove(person.id)
+                    }
+                    .addOnFailureListener {
+                        downloadingPersonPhotos.remove(person.id)
+                    }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                downloadingPersonPhotos.remove(person.id)
+            }
+        }
+    }
+
+    private fun saveBase64ToLocalStorageForPerson(context: Context, base64Str: String, personId: Int): String? {
+        return try {
+            val bytes = android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
+            val fileName = "person_photo_${personId}.jpg"
+            val file = File(context.filesDir, fileName)
+            val fos = java.io.FileOutputStream(file)
+            fos.write(bytes)
+            fos.flush()
+            fos.close()
+            file.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
     private fun saveBase64ToLocalStorage(context: Context, base64Str: String, workspaceId: String): String? {
         return try {
             val bytes = android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
@@ -1987,6 +2158,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 e.printStackTrace()
             }
             checkDebtReminders()
+        }
+
+        viewModelScope.launch {
+            persons.collect { personList ->
+                personList.forEach { person ->
+                    if (person.photoUri.isNotEmpty()) {
+                        val file = File(person.photoUri)
+                        if (!file.exists() || file.length() == 0L) {
+                            downloadAndSavePersonPhotoIfNeeded(person)
+                        }
+                    }
+                }
+            }
         }
     }
 
