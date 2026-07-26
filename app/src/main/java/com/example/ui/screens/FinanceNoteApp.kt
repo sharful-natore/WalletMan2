@@ -2177,6 +2177,15 @@ fun FinanceNoteApp(
         var isSubmitting by remember { mutableStateOf(false) }
         var fallbackError by remember { mutableStateOf<String?>(null) }
 
+        val deviceAccounts = remember(context) {
+            try {
+                val am = android.accounts.AccountManager.get(context)
+                am.getAccountsByType("com.google").map { it.name }.filter { it.contains("@") }.distinct()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+
         AlertDialog(
             onDismissRequest = { showGoogleEmailFallbackDialog = false },
             title = {
@@ -2192,12 +2201,70 @@ fun FinanceNoteApp(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (deviceAccounts.isNotEmpty()) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "আপনার ডিভাইসের গুগল অ্যাকাউন্ট সিলেক্ট করুন (১-ট্যাপ):" else "Select your device Google account (1-Tap):",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FintechBlue
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            deviceAccounts.forEach { accEmail ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            isSubmitting = true
+                                            fallbackError = null
+                                            viewModel.handleGoogleSignInByEmail(
+                                                context = context,
+                                                email = accEmail,
+                                                name = accEmail.substringBefore("@").replace(".", " "),
+                                                onSuccess = {
+                                                    isSubmitting = false
+                                                    showGoogleEmailFallbackDialog = false
+                                                    forceDismissLogin = true
+                                                    val successMsg = if (language == AppLanguage.BN) "গুগল অ্যাকাউন্ট দিয়ে সফলভাবে লগইন হয়েছে!" else "Successfully logged in with Google!"
+                                                    viewModel.triggerCustomNotification(successMsg, isSuccess = true, type = "SUCCESS")
+                                                },
+                                                onError = { err ->
+                                                    isSubmitting = false
+                                                    fallbackError = err
+                                                }
+                                            )
+                                        },
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isDarkTheme) Color(0xFF2C2C2E) else Color(0xFFF1F5F9)
+                                    ),
+                                    border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        GoogleLogoIcon(modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = accEmail,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isDarkTheme) Color.White else Color.Black
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Divider(color = Color.Gray.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
+                    }
+
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "আপনার গুগল ইমেইল এড্রেস দিয়ে সরাসরি লগইন সম্পন্ন করুন:" 
+                            "অথবা আপনার গুগল ইমেইল এড্রেস ম্যানুয়ালি লিখুন:" 
                         else 
-                            "Enter your Google Email address to complete sign-in:",
-                        fontSize = 13.sp,
+                            "Or enter your Google Email address manually:",
+                        fontSize = 12.sp,
                         color = Color.Gray
                     )
 
@@ -7134,7 +7201,7 @@ fun DashboardScreen(
                                         shape = RoundedCornerShape(8.dp),
                                         singleLine = true,
                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Text
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
                                         ),
                                         trailingIcon = {
                                             IconButton(onClick = { showInplaceBudgetCalculator = true }) {
@@ -7436,7 +7503,7 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Text
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
                         ),
                         trailingIcon = {
                             IconButton(onClick = { showTempAmountCalculator = true }) {
@@ -10551,7 +10618,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         value = amountInputState,
                         onValueChange = { amountInputState = it },
                         label = { Text(Translation.get("amount", language)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         trailingIcon = {
                             IconButton(onClick = { showTxCalculator = true }) {
                                 Icon(
@@ -11212,7 +11279,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         value = targetStr,
                         onValueChange = { targetStr = it },
                         label = { Text(Translation.get("target", language)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         trailingIcon = {
                             IconButton(onClick = { showTargetCalculator = true }) {
                                 Icon(
@@ -11480,7 +11547,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                     value = amountStr,
                     onValueChange = { amountStr = it },
                     label = { Text(Translation.get("amount", language)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     trailingIcon = {
                         IconButton(onClick = { showSavTxCalculator = true }) {
                             Icon(
@@ -12444,7 +12511,7 @@ fun PersonDetailOverlay(
                                 value = actionAmountStr,
                                 onValueChange = { actionAmountStr = it },
                                 label = { Text(Translation.get("amount", language)) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                 trailingIcon = {
                                     IconButton(onClick = { showActionCalculator = true }) {
                                         Icon(

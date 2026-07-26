@@ -364,7 +364,7 @@ fun QuickAddDialogScreen(
                         }
                     },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
