@@ -192,6 +192,8 @@ fun ExportDialog(
     defaultBudgetSavings: Double = 0.0,
     initialCategory: String = "ALL_DATA",
     initialTimeFilter: String? = null,
+    initialPerson: Person? = null,
+    initialSavingsGoal: SavingsGoal? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -206,11 +208,11 @@ fun ExportDialog(
     var selectedCategory by remember(initialCategory) { mutableStateOf(initialCategory) }
 
     // 3. Time Filter state
-    var selectedTimeFilter by remember(initialTimeFilter) {
+    var selectedTimeFilter by remember(initialTimeFilter, initialPerson, initialSavingsGoal) {
         mutableStateOf(
             when {
+                initialPerson != null || initialSavingsGoal != null || initialTimeFilter == "ALL" -> "ALL_TIME"
                 initialTimeFilter == null -> "MONTH"
-                initialTimeFilter == "ALL" -> "ALL_TIME"
                 initialTimeFilter == "TODAY" -> "DATE_RANGE"
                 initialTimeFilter == "MONTH" -> "MONTH"
                 initialTimeFilter.startsWith("CUSTOM_MONTH:") -> "MONTH"
@@ -355,9 +357,14 @@ fun ExportDialog(
     }
 
     // Person filter state
-    var filterByPerson by remember { mutableStateOf(false) }
-    var selectedPerson by remember { mutableStateOf<Person?>(null) }
+    var filterByPerson by remember(initialPerson) { mutableStateOf(initialPerson != null) }
+    var selectedPerson by remember(initialPerson) { mutableStateOf<Person?>(initialPerson) }
     var showPersonDropdown by remember { mutableStateOf(false) }
+
+    // Savings Goal filter state
+    var filterBySavingsGoal by remember(initialSavingsGoal) { mutableStateOf(initialSavingsGoal != null) }
+    var selectedSavingsGoal by remember(initialSavingsGoal) { mutableStateOf<SavingsGoal?>(initialSavingsGoal) }
+    var showSavingsGoalDropdown by remember { mutableStateOf(false) }
 
     // List of unique years from transactions
     val uniqueYears = remember(transactions) {
@@ -376,8 +383,12 @@ fun ExportDialog(
         transactions, selectedCategory, selectedTimeFilter,
         selectedMonth, selectedYear, startDateMillis, endDateMillis,
         startMonth, startYear, endMonth, endYear, startYearRange, endYearRange,
-        selectedPerson, filterByPerson
+        selectedPerson, filterByPerson, selectedSavingsGoal, filterBySavingsGoal
     ) {
+        if (filterBySavingsGoal && selectedSavingsGoal != null) {
+            return@remember emptyList<Transaction>()
+        }
+
         var list = transactions
 
         // Category Filter
@@ -457,13 +468,18 @@ fun ExportDialog(
     val filteredSavingsTx = remember(
         savingsTransactions, selectedCategory, selectedTimeFilter,
         selectedMonth, selectedYear, startDateMillis, endDateMillis,
-        startMonth, startYear, endMonth, endYear, startYearRange, endYearRange
+        startMonth, startYear, endMonth, endYear, startYearRange, endYearRange,
+        filterByPerson, selectedPerson, filterBySavingsGoal, selectedSavingsGoal
     ) {
-        if (selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_SAVINGS" && selectedCategory != "ONLY_BUDGET") {
+        if ((selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_SAVINGS") || filterByPerson || selectedPerson != null) {
             return@remember emptyList<SavingsTransaction>()
         }
 
         var list = savingsTransactions
+        if (filterBySavingsGoal && selectedSavingsGoal != null) {
+            list = list.filter { it.goalId == selectedSavingsGoal!!.id }
+        }
+
         val cal = Calendar.getInstance()
 
         list = when (selectedTimeFilter) {
@@ -523,9 +539,10 @@ fun ExportDialog(
         monthlyBudgets, selectedCategory, selectedTimeFilter,
         selectedMonth, selectedYear, startDateMillis, endDateMillis,
         startMonth, startYear, endMonth, endYear, startYearRange, endYearRange,
-        defaultBudgetIncome, defaultBudgetExpense, defaultBudgetSavings
+        defaultBudgetIncome, defaultBudgetExpense, defaultBudgetSavings,
+        filterByPerson, selectedPerson
     ) {
-        if (selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_BUDGET") {
+        if ((selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_BUDGET") || filterByPerson || selectedPerson != null) {
             return@remember emptyList<MonthlyBudget>()
         }
 
@@ -696,7 +713,7 @@ fun ExportDialog(
                     context.contentResolver.openOutputStream(uri)?.use { os ->
                         if (selectedFormat == "PDF") {
                             val tempFile = File(context.cacheDir, "temp_export.pdf")
-                            generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempFile)
+                            generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempFile, filterByPerson, selectedPerson, filterBySavingsGoal, selectedSavingsGoal)
                             tempFile.inputStream().use { input ->
                                 input.copyTo(os)
                             }
@@ -789,7 +806,7 @@ fun ExportDialog(
             scope.launch(Dispatchers.IO) {
                 if (format == "PDF") {
                     try {
-                        generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempShareFile)
+                        generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempShareFile, filterByPerson, selectedPerson, filterBySavingsGoal, selectedSavingsGoal)
                     } catch (e: Exception) {
                         withContext(Dispatchers.Main) {
                             isExporting = false
@@ -2268,7 +2285,11 @@ private fun generatePdfFile(
     savingsTransactions: List<SavingsTransaction>,
     filteredBudgets: List<MonthlyBudget>,
     summary: Map<String, Double>,
-    file: File
+    file: File,
+    filterByPerson: Boolean = false,
+    selectedPerson: Person? = null,
+    filterBySavingsGoal: Boolean = false,
+    selectedSavingsGoal: SavingsGoal? = null
 ) {
     val pdfDocument = PdfDocument()
     val isBn = language == AppLanguage.BN
@@ -2402,7 +2423,13 @@ private fun generatePdfFile(
     canvas.drawText(officialStr, 545f - offW, 54f, appSubPaint)
 
     // Category Title & Selected Time Period Subheader
-    val reportTitle = getCategoryTitle(selectedCategory, language)
+    val reportTitle = if (selectedPerson != null) {
+        if (isBn) "${selectedPerson.name} - লেনদেন বিবরণী" else "${selectedPerson.name} - Transaction Statement"
+    } else if (selectedSavingsGoal != null) {
+        if (isBn) "${selectedSavingsGoal.title} - সঞ্চয় বিবরণী" else "${selectedSavingsGoal.title} - Savings Statement"
+    } else {
+        getCategoryTitle(selectedCategory, language)
+    }
     canvas.drawText(reportTitle, 40f, 92f, primaryPaint)
 
     val timePeriodStr = "${if (isBn) "সময়কাল: " else "Period: "}$timePeriodText"
@@ -2661,21 +2688,153 @@ private fun generatePdfFile(
         }
     }
 
-    // 2. Draw Transactions Table
+    // 2. Grouped Transactions Table with Subtotals
+    class PdfGroup(
+        val title: String,
+        val items: List<Transaction>,
+        val subtotalLabel: String,
+        val colorHex: String,
+        val bgHex: String
+    )
+
+    val pdfGroups = mutableListOf<PdfGroup>()
+    val isPersonReport = filterByPerson || selectedPerson != null
+
     if (selectedCategory != "ONLY_BUDGET" && selectedCategory != "ONLY_SAVINGS" && transactions.isNotEmpty()) {
+        if (isPersonReport || selectedCategory == "ONLY_DEBT" || selectedCategory == "ONLY_PAONA" || selectedCategory == "DEBT_REPAYMENT") {
+            // Person / Debt / Paona report: Show Debt first, then Receivable!
+            if (selectedCategory != "ONLY_PAONA") {
+                val debtItems = transactions.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
+                if (debtItems.isNotEmpty()) {
+                    pdfGroups.add(
+                        PdfGroup(
+                            title = if (isBn) "১. দেনা হিসাব (Debt / Borrow Logs)" else "1. Debt / Borrow Logs",
+                            items = debtItems,
+                            subtotalLabel = if (isBn) "মোট দেনা (Total Debt):" else "Total Debt:",
+                            colorHex = "#D97706",
+                            bgHex = "#FFFBEB"
+                        )
+                    )
+                }
+            }
+            if (selectedCategory != "ONLY_DEBT") {
+                val recItems = transactions.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
+                if (recItems.isNotEmpty()) {
+                    val gIdx = if (pdfGroups.isEmpty()) "১" else "২"
+                    pdfGroups.add(
+                        PdfGroup(
+                            title = if (isBn) "$gIdx. পাওনা হিসাব (Receivable / Lend Logs)" else "$gIdx. Receivable / Lend Logs",
+                            items = recItems,
+                            subtotalLabel = if (isBn) "মোট পাওনা (Total Credit):" else "Total Credit:",
+                            colorHex = "#2563EB",
+                            bgHex = "#EFF6FF"
+                        )
+                    )
+                }
+            }
+        } else {
+            // General Report: Income -> Expense -> Debt -> Receivable
+            var gIdx = 1
+            if (selectedCategory == "ALL_DATA" || selectedCategory == "TRANSACTIONS" || selectedCategory == "INCOME_EXPENSE" || selectedCategory == "ONLY_INCOME") {
+                val incItems = transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+                if (incItems.isNotEmpty()) {
+                    val prefix = if (isBn) "${replaceToBnDigits(gIdx.toString())}." else "$gIdx."
+                    pdfGroups.add(
+                        PdfGroup(
+                            title = "$prefix ${if (isBn) "আয় বিবরণী (Income Logs)" else "Income Logs"}",
+                            items = incItems,
+                            subtotalLabel = if (isBn) "মোট আয় (Total Income):" else "Total Income:",
+                            colorHex = "#059669",
+                            bgHex = "#F0FDF4"
+                        )
+                    )
+                    gIdx++
+                }
+            }
+
+            if (selectedCategory == "ALL_DATA" || selectedCategory == "TRANSACTIONS" || selectedCategory == "INCOME_EXPENSE" || selectedCategory == "ONLY_EXPENSE") {
+                val expItems = transactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
+                if (expItems.isNotEmpty()) {
+                    val prefix = if (isBn) "${replaceToBnDigits(gIdx.toString())}." else "$gIdx."
+                    pdfGroups.add(
+                        PdfGroup(
+                            title = "$prefix ${if (isBn) "ব্যয় বিবরণী (Expense Logs)" else "Expense Logs"}",
+                            items = expItems,
+                            subtotalLabel = if (isBn) "মোট ব্যয় (Total Expense):" else "Total Expense:",
+                            colorHex = "#DC2626",
+                            bgHex = "#FEF2F2"
+                        )
+                    )
+                    gIdx++
+                }
+            }
+
+            if (selectedCategory == "ALL_DATA" || selectedCategory == "TRANSACTIONS") {
+                val debtItems = transactions.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
+                if (debtItems.isNotEmpty()) {
+                    val prefix = if (isBn) "${replaceToBnDigits(gIdx.toString())}." else "$gIdx."
+                    pdfGroups.add(
+                        PdfGroup(
+                            title = "$prefix ${if (isBn) "দেনা হিসাব (Debt / Borrow Logs)" else "Debt Logs"}",
+                            items = debtItems,
+                            subtotalLabel = if (isBn) "মোট দেনা (Total Debt):" else "Total Debt:",
+                            colorHex = "#D97706",
+                            bgHex = "#FFFBEB"
+                        )
+                    )
+                    gIdx++
+                }
+
+                val recItems = transactions.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
+                if (recItems.isNotEmpty()) {
+                    val prefix = if (isBn) "${replaceToBnDigits(gIdx.toString())}." else "$gIdx."
+                    pdfGroups.add(
+                        PdfGroup(
+                            title = "$prefix ${if (isBn) "পাওনা হিসাব (Receivable Logs)" else "Receivable Logs"}",
+                            items = recItems,
+                            subtotalLabel = if (isBn) "মোট পাওনা (Total Credit):" else "Total Credit:",
+                            colorHex = "#2563EB",
+                            bgHex = "#EFF6FF"
+                        )
+                    )
+                    gIdx++
+                }
+            }
+        }
+    }
+
+    // Render each Grouped Transaction Table with Subtotal
+    pdfGroups.forEach { grp ->
+        if (currentY + 50f > 780f) {
+            drawPageFooter(canvas, pageNumber)
+            pdfDocument.finishPage(currentPage)
+            pageNumber++
+            pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            currentPage = pdfDocument.startPage(pageInfo)
+            canvas = currentPage.canvas
+            currentY = 45f
+        }
+
+        val secTitlePaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#1E293B")
+            textSize = 10.5f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+        canvas.drawText(grp.title, 40f, currentY + 12f, secTitlePaint)
+        currentY += 18f
+
         drawTableHeader(canvas, currentY)
         currentY += 22f
 
-        transactions.forEachIndexed { index, tx ->
+        grp.items.forEachIndexed { index, tx ->
             if (currentY + 22f > 780f) {
                 drawPageFooter(canvas, pageNumber)
                 pdfDocument.finishPage(currentPage)
-
                 pageNumber++
                 pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
                 currentPage = pdfDocument.startPage(pageInfo)
                 canvas = currentPage.canvas
-
                 currentY = 45f
                 drawTableHeader(canvas, currentY)
                 currentY += 22f
@@ -2690,13 +2849,7 @@ private fun generatePdfFile(
             val personName = persons.find { it.id == tx.personId }?.name ?: ""
             val typeStr = getTransactionTypeName(tx.type, language)
 
-            val colorType = when (tx.type) {
-                "INCOME", "REPAY_RECEIVED" -> android.graphics.Color.parseColor("#059669")
-                "EXPENSE", "REPAY_PAID" -> android.graphics.Color.parseColor("#DC2626")
-                "LEND" -> android.graphics.Color.parseColor("#2563EB")
-                "BORROW" -> android.graphics.Color.parseColor("#D97706")
-                else -> android.graphics.Color.BLACK
-            }
+            val colorType = android.graphics.Color.parseColor(grp.colorHex)
             val typeColorPaint = Paint().apply {
                 color = colorType
                 textSize = 8.5f
@@ -2720,13 +2873,41 @@ private fun generatePdfFile(
 
             currentY += 20f
         }
+
+        // Subtotal row at end of table
+        if (currentY + 25f > 780f) {
+            drawPageFooter(canvas, pageNumber)
+            pdfDocument.finishPage(currentPage)
+            pageNumber++
+            pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            currentPage = pdfDocument.startPage(pageInfo)
+            canvas = currentPage.canvas
+            currentY = 45f
+        }
+
+        val subBgPaint = Paint().apply { color = android.graphics.Color.parseColor(grp.bgHex) }
+        val subBorderPaint = Paint().apply { color = android.graphics.Color.parseColor("#CBD5E1"); strokeWidth = 1f; style = Paint.Style.STROKE }
+
+        canvas.drawRect(40f, currentY, 555f, currentY + 22f, subBgPaint)
+        canvas.drawLine(40f, currentY, 555f, currentY, subBorderPaint)
+        canvas.drawLine(40f, currentY + 22f, 555f, currentY + 22f, subBorderPaint)
+
+        val subLblPaint = Paint().apply { color = android.graphics.Color.parseColor("#1E293B"); textSize = 9.5f; isFakeBoldText = true; isAntiAlias = true }
+        val subValPaint = Paint().apply { color = android.graphics.Color.parseColor(grp.colorHex); textSize = 10f; isFakeBoldText = true; isAntiAlias = true }
+
+        val grpTotal = grp.items.sumOf { it.amount }
+        canvas.drawText(grp.subtotalLabel, 45f, currentY + 15f, subLblPaint)
+
+        val grpTotalStr = formatCurrencyNoSymbol(grpTotal, language)
+        val grpTotalW = subValPaint.measureText(grpTotalStr)
+        canvas.drawText(grpTotalStr, 550f - grpTotalW, currentY + 15f, subValPaint)
+
+        currentY += 32f
     }
 
-    // 3. Draw Savings Table
-    if ((selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_SAVINGS") && savingsTransactions.isNotEmpty()) {
-        currentY += 15f
-
-        if (currentY + 45f > 780f) {
+    // 3. Draw Savings Table (Excluding Person Export)
+    if ((selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_SAVINGS") && savingsTransactions.isNotEmpty() && !isPersonReport) {
+        if (currentY + 50f > 780f) {
             drawPageFooter(canvas, pageNumber)
             pdfDocument.finishPage(currentPage)
 
@@ -2740,11 +2921,12 @@ private fun generatePdfFile(
 
         val secTitlePaint = Paint().apply {
             color = android.graphics.Color.parseColor("#1E293B")
-            textSize = 11f
+            textSize = 10.5f
             isFakeBoldText = true
             isAntiAlias = true
         }
-        canvas.drawText(if (isBn) "সঞ্চয় রেকর্ডসমূহ (Savings Log)" else "Savings Log", 40f, currentY + 12f, secTitlePaint)
+        val savSecTitle = if (isBn) "সঞ্চয় বিবরণী (Savings Logs)" else "Savings Logs"
+        canvas.drawText(savSecTitle, 40f, currentY + 12f, secTitlePaint)
         currentY += 18f
 
         canvas.drawRect(40f, currentY, 555f, currentY + 22f, tableHeaderBgPaint)
@@ -2782,7 +2964,7 @@ private fun generatePdfFile(
 
             val dateStr = SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(Date(stx.timestamp))
             val goalTitle = savingsGoals.find { it.id == stx.goalId }?.title ?: ""
-            val typeStr = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "সঞ্চয় উত্তোলন" else "Withdrawal")
+            val typeStr = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "উত্তোলন" else "Withdrawal")
             val typeColor = if (stx.isDeposit) android.graphics.Color.parseColor("#059669") else android.graphics.Color.parseColor("#DC2626")
 
             val typeColorPaint = Paint().apply {
@@ -2806,6 +2988,44 @@ private fun generatePdfFile(
 
             currentY += 20f
         }
+
+        // Savings Subtotal Row
+        if (currentY + 25f > 780f) {
+            drawPageFooter(canvas, pageNumber)
+            pdfDocument.finishPage(currentPage)
+            pageNumber++
+            pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            currentPage = pdfDocument.startPage(pageInfo)
+            canvas = currentPage.canvas
+            currentY = 45f
+        }
+
+        val savDepTot = savingsTransactions.filter { it.isDeposit }.sumOf { it.amount }
+        val savWithTot = savingsTransactions.filter { !it.isDeposit }.sumOf { it.amount }
+        val savNetTot = savDepTot - savWithTot
+
+        val savBgPaint = Paint().apply { color = android.graphics.Color.parseColor("#F5F3FF") }
+        val savBorderPaint = Paint().apply { color = android.graphics.Color.parseColor("#CBD5E1"); strokeWidth = 1f; style = Paint.Style.STROKE }
+
+        canvas.drawRect(40f, currentY, 555f, currentY + 22f, savBgPaint)
+        canvas.drawLine(40f, currentY, 555f, currentY, savBorderPaint)
+        canvas.drawLine(40f, currentY + 22f, 555f, currentY + 22f, savBorderPaint)
+
+        val savLblPaint = Paint().apply { color = android.graphics.Color.parseColor("#1E293B"); textSize = 9f; isFakeBoldText = true; isAntiAlias = true }
+        val savValPaint = Paint().apply { color = android.graphics.Color.parseColor("#8B5CF6"); textSize = 9.5f; isFakeBoldText = true; isAntiAlias = true }
+
+        val savLblStr = if (isBn) {
+            "মোট জমা: ${formatCurrencyNoSymbol(savDepTot, language)} | উত্তোলন: ${formatCurrencyNoSymbol(savWithTot, language)} | নিট সঞ্চয়:"
+        } else {
+            "Total Dep: ${formatCurrencyNoSymbol(savDepTot, language)} | Withdraw: ${formatCurrencyNoSymbol(savWithTot, language)} | Net Saved:"
+        }
+        canvas.drawText(savLblStr, 45f, currentY + 15f, savLblPaint)
+
+        val netStr = formatCurrencyNoSymbol(savNetTot, language)
+        val netW = savValPaint.measureText(netStr)
+        canvas.drawText(netStr, 550f - netW, currentY + 15f, savValPaint)
+
+        currentY += 32f
     }
 
     drawPageFooter(canvas, pageNumber)
@@ -2839,6 +3059,62 @@ private fun PreviewSummaryBadge(
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
             Text(text = label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isDark) Color.White.copy(alpha = 0.8f) else color)
             Text(text = formatCurrency(amount, language), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = if (isDark) Color.White else color)
+        }
+    }
+}
+
+@Composable
+private fun BudgetFulfillmentPreviewCard(
+    title: String,
+    actual: Double,
+    target: Double,
+    fulfillmentPctText: String,
+    color: Color,
+    language: AppLanguage,
+    isDark: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color.White
+        ),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+                Text(
+                    text = "${if (language == AppLanguage.BN) "প্রকৃত" else "Actual"}: ${formatCurrency(actual, language)} / ${if (language == AppLanguage.BN) "টার্গেট" else "Target"}: ${formatCurrency(target, language)}",
+                    fontSize = 10.sp,
+                    color = if (isDark) Color.White.copy(alpha = 0.8f) else Color(0xFF475569),
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            Surface(
+                color = color.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = fulfillmentPctText,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = color,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
         }
     }
 }

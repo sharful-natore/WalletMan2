@@ -2351,6 +2351,8 @@ fun FinanceNoteApp(
     var showExportDialog by remember { mutableStateOf(false) }
     var exportDialogInitialCategory by remember { mutableStateOf("ALL_DATA") }
     var exportDialogInitialTimeFilter by remember { mutableStateOf<String?>(null) }
+    var exportDialogInitialPerson by remember { mutableStateOf<Person?>(null) }
+    var exportDialogInitialSavingsGoal by remember { mutableStateOf<SavingsGoal?>(null) }
 
     if (showExportDialog) {
         ExportDialog(
@@ -2366,7 +2368,13 @@ fun FinanceNoteApp(
             defaultBudgetSavings = budgetSavings,
             initialCategory = exportDialogInitialCategory,
             initialTimeFilter = exportDialogInitialTimeFilter,
-            onDismiss = { showExportDialog = false }
+            initialPerson = exportDialogInitialPerson,
+            initialSavingsGoal = exportDialogInitialSavingsGoal,
+            onDismiss = {
+                showExportDialog = false
+                exportDialogInitialPerson = null
+                exportDialogInitialSavingsGoal = null
+            }
         )
     }
 
@@ -4153,7 +4161,14 @@ fun FinanceNoteApp(
                             },
                             onDeleteTx = { viewModel.deleteSavingsTransaction(it) },
                             onEditTx = { savingsTxToEdit = it },
-                            onMoveGoal = { goalActionChoice = it }
+                            onMoveGoal = { goalActionChoice = it },
+                            onExportPdf = {
+                                exportDialogInitialCategory = "ONLY_SAVINGS"
+                                exportDialogInitialTimeFilter = "ALL"
+                                exportDialogInitialSavingsGoal = goal
+                                exportDialogInitialPerson = null
+                                showExportDialog = true
+                            }
                         )
                     }
                 }
@@ -4193,6 +4208,13 @@ fun FinanceNoteApp(
                             },
                             onDeletePerson = {
                                 showDeletePersonConfirmId = debtInfo.person.id
+                            },
+                            onExportPdf = {
+                                exportDialogInitialCategory = "ALL_DATA"
+                                exportDialogInitialTimeFilter = "ALL"
+                                exportDialogInitialPerson = debtInfo.person
+                                exportDialogInitialSavingsGoal = null
+                                showExportDialog = true
                             }
                         )
                     }
@@ -11928,7 +11950,8 @@ fun SavingsGoalDetailOverlay(
     onContributeClick: (SavingsGoal, Boolean) -> Unit,
     onDeleteTx: (SavingsTransaction) -> Unit,
     onEditTx: (SavingsTransaction) -> Unit,
-    onMoveGoal: (SavingsGoal) -> Unit = {}
+    onMoveGoal: (SavingsGoal) -> Unit = {},
+    onExportPdf: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val txList by transactionsFlow.collectAsState(initial = emptyList())
@@ -12094,13 +12117,51 @@ fun SavingsGoalDetailOverlay(
             Spacer(modifier = Modifier.height(24.dp))
 
             // History Label
-            Text(
-                text = Translation.get("history", language),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color.White else Color(0xFF0F1724),
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = Translation.get("history", language),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) Color.White else Color(0xFF0F1724),
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (onExportPdf != null) {
+                    Surface(
+                        onClick = { onExportPdf() },
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF10B981).copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.PictureAsPdf,
+                                contentDescription = "Export PDF",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = if (language == AppLanguage.BN) "এক্সপোর্ট" else "Export",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF10B981)
+                            )
+                        }
+                    }
+                }
+            }
 
             // Transactions List
             if (txList.isEmpty()) {
@@ -12446,7 +12507,8 @@ fun PersonDetailOverlay(
     onDeleteTx: (Int) -> Unit,
     onEditTx: (Transaction) -> Unit,
     onEditPerson: (Person) -> Unit,
-    onDeletePerson: () -> Unit
+    onDeletePerson: () -> Unit,
+    onExportPdf: (() -> Unit)? = null
 ) {
     val txList by transactionsFlow.collectAsState(initial = emptyList())
     var showActionSheet by remember { mutableStateOf<String?>(null) } // "LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED"
@@ -12670,19 +12732,55 @@ fun PersonDetailOverlay(
                     text = "${personDebt.person.name} ${Translation.get("history_with", language)}",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color.DarkGray
+                    color = if (isDark) Color.White else Color.DarkGray,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(32.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = "Close",
-                        tint = if (isDark) Color.White else Color.DarkGray,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (onExportPdf != null) {
+                        Surface(
+                            onClick = { onExportPdf() },
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF10B981).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PictureAsPdf,
+                                    contentDescription = "Export PDF",
+                                    tint = Color(0xFF10B981),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (language == AppLanguage.BN) "এক্সপোর্ট" else "Export",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF10B981)
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = if (isDark) Color.White else Color.DarkGray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
