@@ -380,6 +380,10 @@ fun updateAllWidgets(context: Context) {
             intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
             context.sendBroadcast(intent)
         }
+        
+        val draftIntent = Intent("com.example.UPDATE_DRAFT_WIDGET")
+        draftIntent.setPackage(context.packageName)
+        context.sendBroadcast(draftIntent)
     } catch (e: Exception) {
         e.printStackTrace()
     }

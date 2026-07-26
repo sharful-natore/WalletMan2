@@ -15,6 +15,7 @@ import com.example.BuildConfig
 import com.example.R
 import android.content.Context
 import android.content.Intent
+import android.speech.RecognizerIntent
 import android.os.Build
 import android.net.Uri
 import com.example.ui.components.*
@@ -1964,7 +1965,8 @@ class NotchedBottomBarShape(
 fun FinanceNoteApp(
     viewModel: FinanceViewModel, 
     initialAction: String? = null,
-    targetWorkspaceId: String? = null
+    targetWorkspaceId: String? = null,
+    targetDraftId: Int? = null
 ) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
@@ -2511,6 +2513,7 @@ fun FinanceNoteApp(
     var pendingDeleteGoals by remember { mutableStateOf<List<Int>?>(null) }
     var showSavingsContributionDialog by remember { mutableStateOf<SavingsGoal?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transaction?>(null) }
+    var draftToPost by remember { mutableStateOf<DraftTransaction?>(null) }
     var savingsTxToEdit by remember { mutableStateOf<SavingsTransaction?>(null) }
     var isWithdrawMode by remember { mutableStateOf(false) }
     var selectedPersonDetail by remember { mutableStateOf<PersonDebt?>(null) }
@@ -2562,6 +2565,7 @@ fun FinanceNoteApp(
     var showRealtimeSyncDialog by remember { mutableStateOf(false) }
     var showProfileSetup by remember { mutableStateOf(false) }
     var showEnhancedProfileMenu by remember { mutableStateOf(false) }
+    var showDraftsDialog by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
     var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -2620,6 +2624,17 @@ fun FinanceNoteApp(
             
             // Route tab selection and dialog visibility based on intent actions
             when (initialAction) {
+                "ACTION_POST_DRAFT" -> {
+                    if (targetDraftId != null && targetDraftId != -1) {
+                        kotlinx.coroutines.delay(100)
+                        val draftsList = viewModel.draftTransactions.value
+                        val targetDraft = draftsList.find { it.id == targetDraftId }
+                        if (targetDraft != null) {
+                            draftToPost = targetDraft
+                            showAddTransactionDialog = true
+                        }
+                    }
+                }
                 "ACTION_DEBT_CREDIT" -> {
                     activeTab = "debts"
                 }
@@ -2861,6 +2876,19 @@ fun FinanceNoteApp(
         )
     }
 
+    if (showDraftsDialog) {
+        DraftsScratchpadDialog(
+            viewModel = viewModel,
+            language = language,
+            isDark = isDarkTheme,
+            onDismiss = { showDraftsDialog = false },
+            onPostDraft = { draft -> 
+                showDraftsDialog = false
+                draftToPost = draft 
+            }
+        )
+    }
+
     if (showEnhancedProfileMenu) {
         EnhancedProfileMenu(
             viewModel = viewModel,
@@ -2891,6 +2919,10 @@ fun FinanceNoteApp(
                     kotlinx.coroutines.delay(300)
                     showLogoutConfirm = true
                 }
+            },
+            onDrafts = {
+                showEnhancedProfileMenu = false
+                showDraftsDialog = true
             }
         )
     }
@@ -3103,8 +3135,25 @@ fun FinanceNoteApp(
                             
                             Spacer(modifier = Modifier.width(4.dp))
                             
-                            var verticalDragAmount by remember { mutableStateOf(0f) }
-                            AnimatedContent(
+                            val draftsList by viewModel.draftTransactions.collectAsState(initial = emptyList())
+                            val draftCount = draftsList.size
+
+                            androidx.compose.material3.BadgedBox(
+                                badge = {
+                                    if (draftCount > 0) {
+                                        androidx.compose.material3.Badge(
+                                            containerColor = Color.Red,
+                                            contentColor = Color.White,
+                                            modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                        ) {
+                                            Text("$draftCount", fontSize = 10.sp)
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                var verticalDragAmount by remember { mutableStateOf(0f) }
+                                AnimatedContent(
                                 targetState = currentWorkspace.id,
                                 modifier = Modifier.requiredSize(32.dp),
                                 transitionSpec = {
@@ -3194,6 +3243,7 @@ fun FinanceNoteApp(
                                         }
                                     }
                                 }
+                            }
                             }
                         }
                     }
@@ -3987,15 +4037,17 @@ fun FinanceNoteApp(
                     )
                 }
 
-                if (showAddTransactionDialog || transactionToEdit != null) {
+                if (showAddTransactionDialog || transactionToEdit != null || draftToPost != null) {
                     AddTransactionDialog(viewModel = viewModel, 
                         language = language,
                         persons = persons,
                         isDark = isDarkTheme,
                         editTransaction = transactionToEdit,
+                        initialDraft = draftToPost,
                         onDismiss = { 
                             showAddTransactionDialog = false 
                             transactionToEdit = null
+                            draftToPost = null
                         },
                         onConfirm = { amount, type, category, note, personId, timestamp, subType ->
                             if (transactionToEdit != null) {
@@ -4008,11 +4060,14 @@ fun FinanceNoteApp(
                                     timestamp = timestamp,
                                     subType = subType
                                 ))
+                            } else if (draftToPost != null) {
+                                viewModel.postDraftToActual(draftToPost!!.id, amount, type, category, note, personId, subType)
                             } else {
                                 viewModel.addTransaction(amount, type, category, note, personId, timestamp, subType)
                             }
                             showAddTransactionDialog = false
                             transactionToEdit = null
+                            draftToPost = null
                         },
                         onAddPersonClick = {
                             showAddPersonDialog = true
@@ -6756,10 +6811,14 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
 
-            // Monthly Budget Control Card (সাদা রং এর)
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Monthly Budget Control Card (সাদা রং এর)
             Card(
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White),
@@ -8807,8 +8866,17 @@ fun TransactionsScreen(
                 .padding(bottom = 113.dp, end = 16.dp)
         ) {
             ExtendedFloatingActionButton(
-                onClick = {},
-                expanded = isExportExpanded,
+                onClick = {
+                    val cat = when (filter) {
+                        "INCOME" -> "ONLY_INCOME"
+                        "EXPENSE" -> "ONLY_EXPENSE"
+                        "DENA" -> "ONLY_DEBT"
+                        "PAWN" -> "ONLY_PAONA"
+                        else -> "TRANSACTIONS"
+                    }
+                    onExportRequest?.invoke(cat)
+                },
+                expanded = true,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_custom_export),
@@ -8827,42 +8895,7 @@ fun TransactionsScreen(
                 },
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
-                interactionSource = exportInteractionSource,
                 modifier = Modifier
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
-                                val cat = when (filter) {
-                                    "INCOME" -> "ONLY_INCOME"
-                                    "EXPENSE" -> "ONLY_EXPENSE"
-                                    "DENA" -> "ONLY_DEBT"
-                                    "PAWN" -> "ONLY_PAONA"
-                                    else -> "TRANSACTIONS"
-                                }
-                                onExportRequest?.invoke(cat)
-                            },
-                            onLongPress = {
-                                isExportExpanded = true
-                            },
-                            onPress = {
-                                exportCollapseJob?.cancel()
-                                val released = try {
-                                    awaitRelease()
-                                    true
-                                } catch (c: Exception) {
-                                    false
-                                }
-                                if (released) {
-                                    if (isExportExpanded) {
-                                        exportCollapseJob = exportScope.launch {
-                                            kotlinx.coroutines.delay(2000)
-                                            isExportExpanded = false
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
                     .testTag("fab_export_transactions")
             )
         }
@@ -9348,8 +9381,8 @@ fun DebtsScreen(
                 .padding(bottom = 113.dp, end = 16.dp)
         ) {
             ExtendedFloatingActionButton(
-                onClick = {},
-                expanded = isAddPersonExpanded,
+                onClick = { onAddPersonClick() },
+                expanded = true,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_add_debt_credit), 
@@ -9368,35 +9401,7 @@ fun DebtsScreen(
                 },
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
-                interactionSource = addPersonInteractionSource,
                 modifier = Modifier
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
-                                onAddPersonClick()
-                            },
-                            onLongPress = {
-                                isAddPersonExpanded = true
-                            },
-                            onPress = {
-                                addPersonCollapseJob?.cancel()
-                                val released = try {
-                                    awaitRelease()
-                                    true
-                                } catch (c: Exception) {
-                                    false
-                                }
-                                if (released) {
-                                    if (isAddPersonExpanded) {
-                                        addPersonCollapseJob = addPersonScope.launch {
-                                            kotlinx.coroutines.delay(2000)
-                                            isAddPersonExpanded = false
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
                     .testTag("fab_add_person")
             )
         }
@@ -9761,7 +9766,7 @@ fun PersonDebtRowItem(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(FintechBlue.copy(alpha = 0.15f))
+                        .background(Color.White)
                         .border(2.dp, FintechBlue, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -10246,8 +10251,8 @@ fun SavingsScreen(
             var addSavingsCollapseJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
             ExtendedFloatingActionButton(
-                onClick = {},
-                expanded = isAddSavingsExpanded,
+                onClick = { onAddSavingsGoalClick() },
+                expanded = true,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_add_savings), 
@@ -10266,37 +10271,9 @@ fun SavingsScreen(
                 },
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
-                interactionSource = addSavingsInteractionSource,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 113.dp, end = 16.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
-                                onAddSavingsGoalClick()
-                            },
-                            onLongPress = {
-                                isAddSavingsExpanded = true
-                            },
-                            onPress = {
-                                addSavingsCollapseJob?.cancel()
-                                val released = try {
-                                    awaitRelease()
-                                    true
-                                } catch (c: Exception) {
-                                    false
-                                }
-                                if (released) {
-                                    if (isAddSavingsExpanded) {
-                                        addSavingsCollapseJob = addSavingsScope.launch {
-                                            kotlinx.coroutines.delay(2000)
-                                            isAddSavingsExpanded = false
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    }
                     .testTag("fab_add_savings_goal")
             )
         }
@@ -10657,7 +10634,7 @@ fun PersonSelectorDialog(
                                         modifier = Modifier
                                             .size(48.dp)
                                             .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                                            .background(Color.White)
                                             .border(2.dp, FintechBlue, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -10762,19 +10739,25 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     persons: List<Person>,
     isDark: Boolean,
     editTransaction: Transaction? = null,
+    initialDraft: com.example.data.DraftTransaction? = null,
     onDismiss: () -> Unit,
     onConfirm: (Double, String, String, String, Int?, Long, String?) -> Unit,
     onAddPersonClick: () -> Unit = {}
 ) {
     val personDebts by viewModel.personDebts.collectAsState()
-    var note by remember { mutableStateOf(editTransaction?.note ?: "") }
+    
+    val defaultParsed = remember(initialDraft) {
+        if (initialDraft != null) viewModel.parseDraftDetails(initialDraft.note) else null
+    }
+    
+    var note by remember { mutableStateOf(editTransaction?.note ?: initialDraft?.note ?: "") }
     var customTimestamp by remember { mutableStateOf<Long?>(editTransaction?.timestamp) }
 
     // Dropdowns / Option selectors
-    var type by remember { mutableStateOf(editTransaction?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
+    var type by remember { mutableStateOf(editTransaction?.type ?: defaultParsed?.second ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
     var subType by remember { mutableStateOf(editTransaction?.subType ?: "CASH") } // CASH, CREDIT
     var selectedPersonId by remember { mutableStateOf<Int?>(editTransaction?.personId) }
-    var category by remember { mutableStateOf(editTransaction?.category ?: "Food") }
+    var category by remember { mutableStateOf(editTransaction?.category ?: defaultParsed?.third ?: "Food") }
 
     var previousPersonIds by remember { mutableStateOf(persons.map { it.id }.toSet()) }
 
@@ -10812,7 +10795,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
     val chipBg = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9)
 
-    var amountInputState by remember { mutableStateOf(editTransaction?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
+    var amountInputState by remember { mutableStateOf(editTransaction?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: defaultParsed?.first?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
     var showTxCalculator by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -18776,7 +18759,8 @@ fun EnhancedProfileMenu(
     onProfileSettings: () -> Unit,
     onBackupRestore: () -> Unit,
     onLogin: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onDrafts: () -> Unit
 ) {
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
@@ -18785,6 +18769,7 @@ fun EnhancedProfileMenu(
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
     val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsStateWithLifecycle()
     val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
+    val draftsList by viewModel.draftTransactions.collectAsStateWithLifecycle()
 
     val displayPhotoUri = rawProfilePhotoUri.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
     val displayName = profileName.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"))
@@ -18891,6 +18876,14 @@ fun EnhancedProfileMenu(
                     onClick = onBackupRestore
                 )
 
+                ProfileMenuItem(
+                    icon = Icons.Rounded.Note,
+                    label = if (language == AppLanguage.BN) "লেনদেন খসড়া" else "Transaction Drafts",
+                    isDark = isDark,
+                    badgeCount = draftsList.size,
+                    onClick = onDrafts
+                )
+
                 HorizontalDivider(color = if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f))
 
                 if (isGoogleSignedIn) {
@@ -18922,6 +18915,7 @@ fun ProfileMenuItem(
     label: String,
     isDark: Boolean,
     textColor: Color? = null,
+    badgeCount: Int? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -18943,7 +18937,24 @@ fun ProfileMenuItem(
             text = label,
             fontSize = 15.sp,
             fontWeight = FontWeight.Medium,
-            color = textColor ?: (if (isDark) Color.White else Color(0xFF1E293B))
+            color = textColor ?: (if (isDark) Color.White else Color(0xFF1E293B)),
+            modifier = Modifier.weight(1f)
         )
+        
+        if (badgeCount != null && badgeCount > 0) {
+            Box(
+                modifier = Modifier
+                    .background(Color.Red, CircleShape)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = badgeCount.toString(),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }

@@ -138,6 +138,18 @@ data class TrashItem(
     val deletedAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "draft_transactions")
+@JsonClass(generateAdapter = true)
+data class DraftTransaction(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val amount: Double? = null,
+    val type: String? = null, // "INCOME", "EXPENSE", "LEND", "BORROW" etc. or null
+    val category: String? = null,
+    val note: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val workspaceId: String = "default"
+)
+
 @Entity(tableName = "debt_notification_logs")
 data class DebtNotificationLog(
     @PrimaryKey val personId: Int,

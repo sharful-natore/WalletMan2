@@ -8,8 +8,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Person::class, Transaction::class, SavingsGoal::class, SavingsTransaction::class, TrashItem::class, Workspace::class, DebtNotificationLog::class, MonthlyBudget::class],
-    version = 12,
+    entities = [Person::class, Transaction::class, SavingsGoal::class, SavingsTransaction::class, TrashItem::class, Workspace::class, DebtNotificationLog::class, MonthlyBudget::class, DraftTransaction::class],
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,7 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "financenote_finance_db"
-                ).fallbackToDestructiveMigration().addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12).build()
+                ).fallbackToDestructiveMigration().addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13).build()
                 INSTANCE = instance
                 instance
             }
@@ -79,5 +79,11 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
 val MIGRATION_11_12 = object : Migration(11, 12) {
     override fun migrate(database: SupportSQLiteDatabase) {
         database.execSQL("CREATE TABLE IF NOT EXISTS `monthly_budgets` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `year` INTEGER NOT NULL, `month` INTEGER NOT NULL, `income` REAL NOT NULL, `expense` REAL NOT NULL, `savings` REAL NOT NULL, `workspaceId` TEXT NOT NULL)")
+    }
+}
+
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("CREATE TABLE IF NOT EXISTS `draft_transactions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `amount` REAL, `type` TEXT, `category` TEXT, `note` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `workspaceId` TEXT NOT NULL)")
     }
 }

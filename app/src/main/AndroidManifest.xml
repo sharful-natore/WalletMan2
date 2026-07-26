@@ -54,6 +54,29 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.example.ui.screens.DraftInputActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FinanceNote.Dialog"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name="com.example.ui.screens.DraftDeleteConfirmActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FinanceNote.Dialog"
+            android:excludeFromRecents="true" />
+
+        <receiver android:name="com.example.ui.widget.DraftWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.UPDATE_DRAFT_WIDGET" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/draft_widget_info" />
+        </receiver>
+
+        <service android:name="com.example.ui.widget.DraftWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        
         <receiver android:name=".widget.FinanceWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

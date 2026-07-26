@@ -162,5 +162,13 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun insertMonthlyBudget(budget: MonthlyBudget) = financeDao.insertMonthlyBudget(budget)
     suspend fun deleteMonthlyBudget(year: Int, month: Int, workspaceId: String) = financeDao.deleteMonthlyBudget(year, month, workspaceId)
     suspend fun deleteAllMonthlyBudgetsByWorkspace(workspaceId: String) = financeDao.deleteAllMonthlyBudgetsByWorkspace(workspaceId)
+
+    // Draft Transactions
+    val allDraftTransactions: Flow<List<DraftTransaction>> = financeDao.getAllDraftTransactions()
+    suspend fun getAllDraftTransactionsList(): List<DraftTransaction> = financeDao.getAllDraftTransactionsList()
+    suspend fun insertDraftTransaction(draft: DraftTransaction): Long = financeDao.insertDraftTransaction(draft)
+    suspend fun updateDraftTransaction(draft: DraftTransaction) = financeDao.updateDraftTransaction(draft)
+    suspend fun deleteDraftTransaction(id: Int) = financeDao.deleteDraftTransactionById(id)
+    suspend fun deleteAllDraftTransactions() = financeDao.deleteAllDraftTransactions()
 }
 

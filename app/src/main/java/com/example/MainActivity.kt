@@ -21,18 +21,23 @@ import com.example.ui.viewmodel.FinanceViewModelFactory
 class MainActivity : ComponentActivity() {
     private val actionState = androidx.compose.runtime.mutableStateOf<String?>(null)
     private val targetWorkspaceState = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val targetDraftIdState = androidx.compose.runtime.mutableStateOf<Int?>(null)
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         actionState.value = intent.action
         targetWorkspaceState.value = intent.getStringExtra("EXTRA_TARGET_WORKSPACE_ID")
+        val draftId = intent.getIntExtra("EXTRA_TARGET_DRAFT_ID", -1)
+        targetDraftIdState.value = if (draftId != -1) draftId else null
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         actionState.value = intent?.action
         targetWorkspaceState.value = intent?.getStringExtra("EXTRA_TARGET_WORKSPACE_ID")
+        val draftId = intent?.getIntExtra("EXTRA_TARGET_DRAFT_ID", -1) ?: -1
+        targetDraftIdState.value = if (draftId != -1) draftId else null
         
         // Register global exception handler for logging crashes
         com.example.data.ErrorLogger.registerUncaughtExceptionHandler(this)
@@ -75,6 +80,7 @@ class MainActivity : ComponentActivity() {
             val allGradientsConfig by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
             val action by actionState
             val targetWorkspaceId by targetWorkspaceState
+            val targetDraftId by targetDraftIdState
             
             val activeThemeGradient = remember(allGradientsConfig, themeGradientIndex) {
                 if (themeGradientIndex in allGradientsConfig.indices) allGradientsConfig[themeGradientIndex]
@@ -86,7 +92,8 @@ class MainActivity : ComponentActivity() {
                     FinanceNoteApp(
                         viewModel = viewModel, 
                         initialAction = action,
-                        targetWorkspaceId = targetWorkspaceId
+                        targetWorkspaceId = targetWorkspaceId,
+                        targetDraftId = targetDraftId
                     )
                 }
             }

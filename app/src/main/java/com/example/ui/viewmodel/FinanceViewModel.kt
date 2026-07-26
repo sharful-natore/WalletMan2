@@ -22,6 +22,7 @@ import com.example.data.Person
 import com.example.data.Transaction
 import com.example.data.SavingsGoal
 import com.example.data.SavingsTransaction
+import com.example.data.DraftTransaction
 import com.example.data.FinanceRepository
 import com.example.data.FinanceBackup
 import com.example.data.AppDatabase
@@ -676,6 +677,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         list.filter { it.workspaceId == activeId }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val draftTransactions: StateFlow<List<DraftTransaction>> = combine(repository.allDraftTransactions, currentWorkspaceId) { list, activeId ->
+        list.filter { it.workspaceId == activeId }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val savingsGoals: StateFlow<List<SavingsGoal>> = combine(repository.allSavingsGoals, currentWorkspaceId) { list, activeId ->
         list.filter { it.workspaceId == activeId }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -956,6 +961,108 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি মুছে ফেলা হয়েছে" else "Person deleted", isSuccess = true, type = "SUCCESS")
+        }
+    }
+
+    fun parseDraftDetails(note: String): Triple<Double?, String?, String?> {
+        var amount: Double? = null
+        val digitRegex = Regex("[0-9০-৯]+")
+        val matches = digitRegex.findAll(note)
+        for (match in matches) {
+            val numStr = match.value
+            val engNumStr = numStr.map { c ->
+                if (c in '০'..'৯') (c - '০' + 48).toChar().toString() else c.toString()
+            }.joinToString("")
+            val parsed = engNumStr.toDoubleOrNull()
+            if (parsed != null && parsed > 0) {
+                amount = parsed
+                break
+            }
+        }
+
+        var type: String? = null
+        var category: String? = null
+        val noteLower = note.lowercase()
+        
+        if (noteLower.contains("আয়") || noteLower.contains("income") || noteLower.contains("বেতন") || noteLower.contains("salary") || noteLower.contains("পেলাম")) {
+            type = "INCOME"
+            category = if (noteLower.contains("বেতন") || noteLower.contains("salary")) "Salary" else "Other"
+        } else if (noteLower.contains("দেনা") || noteLower.contains("ধারে") || noteLower.contains("পাওনা") || noteLower.contains("lend") || noteLower.contains("borrow") || noteLower.contains("কর্য") || noteLower.contains("কর্জ") || noteLower.contains("ধার")) {
+            if (noteLower.contains("দিলাম") || noteLower.contains("gave") || noteLower.contains("পাওনা")) {
+                type = "LEND"
+                category = "Lending"
+            } else {
+                type = "BORROW"
+                category = "Borrowing"
+            }
+        } else {
+            type = "EXPENSE"
+            category = when {
+                noteLower.contains("খাবার") || noteLower.contains("চা") || noteLower.contains("ভাত") || noteLower.contains("breakfast") || noteLower.contains("lunch") || noteLower.contains("dinner") || noteLower.contains("food") -> "Food"
+                noteLower.contains("বাজার") || noteLower.contains("grocery") -> "Grocery"
+                noteLower.contains("গাড়ি") || noteLower.contains("রিকশা") || noteLower.contains("বাস") || noteLower.contains("ভাড়া") || noteLower.contains("rent") || noteLower.contains("travel") || noteLower.contains("fare") -> "Transportation"
+                noteLower.contains("জামা") || noteLower.contains("কাপড়") || noteLower.contains("shopping") || noteLower.contains("কেনাকাটা") -> "Shopping"
+                else -> "Other"
+            }
+        }
+        
+        return Triple(amount, type, category)
+    }
+
+    fun addDraftTransaction(note: String) {
+        viewModelScope.launch {
+            val (parsedAmt, parsedType, parsedCat) = parseDraftDetails(note)
+            repository.insertDraftTransaction(
+                DraftTransaction(
+                    amount = parsedAmt,
+                    type = parsedType,
+                    category = parsedCat,
+                    note = note,
+                    workspaceId = _currentWorkspaceId.value
+                )
+            )
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+        }
+    }
+
+    fun updateDraftTransaction(draft: DraftTransaction) {
+        viewModelScope.launch {
+            repository.updateDraftTransaction(draft)
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+        }
+    }
+
+    fun deleteDraftTransaction(id: Int) {
+        viewModelScope.launch {
+            repository.deleteDraftTransaction(id)
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+        }
+    }
+
+    fun postDraftToActual(draftId: Int, amount: Double, type: String, category: String, note: String, personId: Int?, subType: String? = "CASH") {
+        viewModelScope.launch {
+            repository.insertTransaction(
+                Transaction(
+                    amount = amount,
+                    type = type,
+                    category = category,
+                    note = note,
+                    personId = personId,
+                    workspaceId = _currentWorkspaceId.value,
+                    subType = subType
+                )
+            )
+            repository.deleteDraftTransaction(draftId)
+            com.example.widget.updateAllWidgets(getApplication())
+            onLocalDatabaseChanged()
+            triggerCustomNotification(
+                if (_language.value == com.example.ui.AppLanguage.BN) "খসড়া লেনদেনটি সফলভাবে পোস্ট করা হয়েছে" else "Draft transaction posted successfully",
+                isSuccess = true,
+                type = "SUCCESS"
+            )
         }
     }
 

@@ -222,5 +222,24 @@ interface FinanceDao {
 
     @Query("DELETE FROM monthly_budgets")
     suspend fun deleteAllMonthlyBudgets()
+
+    // Draft Transactions
+    @Query("SELECT * FROM draft_transactions ORDER BY timestamp DESC")
+    fun getAllDraftTransactions(): Flow<List<DraftTransaction>>
+
+    @Query("SELECT * FROM draft_transactions ORDER BY timestamp DESC")
+    suspend fun getAllDraftTransactionsList(): List<DraftTransaction>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDraftTransaction(draft: DraftTransaction): Long
+
+    @Update
+    suspend fun updateDraftTransaction(draft: DraftTransaction)
+
+    @Query("DELETE FROM draft_transactions WHERE id = :id")
+    suspend fun deleteDraftTransactionById(id: Int)
+
+    @Query("DELETE FROM draft_transactions")
+    suspend fun deleteAllDraftTransactions()
 }
 

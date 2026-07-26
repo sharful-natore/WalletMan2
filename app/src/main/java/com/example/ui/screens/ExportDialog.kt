@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -1022,10 +1024,12 @@ fun ExportDialog(
                             Triple("ONLY_BUDGET", "বাজেট", "Budget")
                         )
 
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             for (cat in categories) {
                                 val catId = cat.first
@@ -1072,10 +1076,12 @@ fun ExportDialog(
                             Pair("ALL_TIME", if (isBn) "সব সময়" else "All Time")
                         )
 
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             for (tf in timeFilters) {
                                 val filterId = tf.first
@@ -1686,9 +1692,42 @@ fun ExportDialog(
                                     }
                                 } else {
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        // Show up to 4 preview records
                                         val sampleTxs = filteredTx.take(4)
-                                        for (tx in sampleTxs) {
+                                        if (selectedCategory == "ONLY_BUDGET") {
+                                            val previewBudgetReport = computeComprehensiveBudgetReport(language, filteredBudgets, filteredTx, filteredSavingsTx, savingsGoals)
+                                            
+                                            BudgetFulfillmentPreviewCard(
+                                                title = if (isBn) "আয় বাজেট অর্জন" else "Income Achievement",
+                                                actual = previewBudgetReport.incomeAnalysis.actualAmount,
+                                                target = previewBudgetReport.incomeAnalysis.targetAmount,
+                                                fulfillmentPctText = "${String.format(Locale.US, "%.1f", previewBudgetReport.incomeAnalysis.fulfillmentPercentage)}%",
+                                                color = Color(0xFF059669),
+                                                language = language,
+                                                isDark = isDark
+                                            )
+                                            
+                                            BudgetFulfillmentPreviewCard(
+                                                title = if (isBn) "ব্যয় বাজেট ব্যবহার" else "Expense Usage",
+                                                actual = previewBudgetReport.expenseAnalysis.actualAmount,
+                                                target = previewBudgetReport.expenseAnalysis.targetAmount,
+                                                fulfillmentPctText = "${String.format(Locale.US, "%.1f", previewBudgetReport.expenseAnalysis.fulfillmentPercentage)}%",
+                                                color = Color(0xFFDC2626),
+                                                language = language,
+                                                isDark = isDark
+                                            )
+                                            
+                                            BudgetFulfillmentPreviewCard(
+                                                title = if (isBn) "সঞ্চয় লক্ষ্য পূরণ" else "Savings Achievement",
+                                                actual = previewBudgetReport.savingsAnalysis.actualAmount,
+                                                target = previewBudgetReport.savingsAnalysis.targetAmount,
+                                                fulfillmentPctText = "${String.format(Locale.US, "%.1f", previewBudgetReport.savingsAnalysis.fulfillmentPercentage)}%",
+                                                color = Color(0xFF8B5CF6),
+                                                language = language,
+                                                isDark = isDark
+                                            )
+                                        } else {
+                                            // Show up to 4 preview records
+                                            for (tx in sampleTxs) {
                                             val person = persons.find { it.id == tx.personId }
                                             val personName = person?.name.orEmpty()
 
@@ -1798,6 +1837,7 @@ fun ExportDialog(
                                                 }
                                             }
                                         }
+                                        }
 
                                         if (selectedCategory == "ONLY_SAVINGS" && filteredSavingsTx.isNotEmpty()) {
                                             val sampleSav = filteredSavingsTx.take(3)
@@ -1826,33 +1866,7 @@ fun ExportDialog(
                                             }
                                         }
 
-                                        if (selectedCategory == "ONLY_BUDGET" && filteredBudgets.isNotEmpty()) {
-                                            val sampleBud = filteredBudgets.take(2)
-                                            for (b in sampleBud) {
-                                                val ymStr = "${months[b.month]} ${b.year}"
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.White, RoundedCornerShape(8.dp))
-                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(text = "${if (isBn) "বাজেট: " else "Budget: "}$ymStr", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textPrimary)
-                                                        Text(text = "${if (isBn) "ব্যয় বাজেট: " else "Exp Target: "}${formatCurrency(b.expense, language)}", fontSize = 9.sp, color = textSecondary)
-                                                    }
-                                                    Text(
-                                                        text = "${if (isBn) "আয়: " else "Inc: "}${formatCurrency(b.income, language)}",
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = Color(0xFF6366F1)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        val shownCount = sampleTxs.size + (if (selectedCategory == "ONLY_SAVINGS") filteredSavingsTx.take(3).size else 0) + (if (selectedCategory == "ONLY_BUDGET") filteredBudgets.take(2).size else 0)
+                                        val shownCount = if (selectedCategory == "ONLY_BUDGET") recordsSize else sampleTxs.size + (if (selectedCategory == "ONLY_SAVINGS") filteredSavingsTx.take(3).size else 0)
                                         if (recordsSize > shownCount) {
                                             Text(
                                                 text = if (isBn) "...এবং আরও ${replaceToBnDigits((recordsSize - shownCount).toString())} টি রেকর্ড রিপোর্টে থাকছে" else "...and ${recordsSize - shownCount} more items included in report",
