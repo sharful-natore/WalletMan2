@@ -2344,6 +2344,23 @@ fun FinanceNoteApp(
     val savingsGoals by viewModel.savingsGoals.collectAsState()
     val personDebts by viewModel.personDebts.collectAsState()
     val savingsTransactions by viewModel.savingsTransactions.collectAsState()
+    val monthlyBudgets by viewModel.monthlyBudgets.collectAsState(initial = emptyList())
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportDialogInitialCategory by remember { mutableStateOf("ALL_DATA") }
+
+    if (showExportDialog) {
+        ExportDialog(
+            language = language,
+            isDark = isDarkTheme,
+            transactions = transactions,
+            persons = persons,
+            savingsGoals = savingsGoals,
+            savingsTransactions = savingsTransactions,
+            monthlyBudgets = monthlyBudgets,
+            initialCategory = exportDialogInitialCategory,
+            onDismiss = { showExportDialog = false }
+        )
+    }
 
     val totalBalance by viewModel.totalBalance.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
@@ -3086,7 +3103,8 @@ fun FinanceNoteApp(
                                     }
                                 },
                                 label = "workspace_switch_transition"
-                            ) { _ ->
+                            ) { targetWorkspaceId ->
+                                val isWorkspaceActive = targetWorkspaceId != null
                                 Box(
                                     modifier = Modifier
                                         .requiredSize(32.dp)
@@ -3532,7 +3550,11 @@ fun FinanceNoteApp(
                                                 }
                                             },
                                             activeTab = activeTab,
-                                            onEditGradient = { editingBudgetGradientType = it }
+                                            onEditGradient = { editingBudgetGradientType = it },
+                                            onExportRequest = { cat ->
+                                                exportDialogInitialCategory = cat
+                                                showExportDialog = true
+                                            }
                                         )
                                         1 -> TransactionsScreen(
                                             language = language,
@@ -3561,7 +3583,11 @@ fun FinanceNoteApp(
                                                     activeTab = "debts"
                                                 }
                                             },
-                                            activeTab = activeTab
+                                            activeTab = activeTab,
+                                            onExportRequest = { cat ->
+                                                exportDialogInitialCategory = cat
+                                                showExportDialog = true
+                                            }
                                         )
                                         2 -> DebtsScreen(
                                             language = language,
@@ -3578,7 +3604,11 @@ fun FinanceNoteApp(
                                             timeFilter = timeFilter,
                                             onTimeFilterChange = handleTimeFilterChange,
                                             highlightedPersonId = highlightedPersonId,
-                                            activeTab = activeTab
+                                            activeTab = activeTab,
+                                            onExportRequest = { cat ->
+                                                exportDialogInitialCategory = cat
+                                                showExportDialog = true
+                                            }
                                         )
                                         3 -> SavingsScreen(
                                             language = language,
@@ -5910,7 +5940,8 @@ fun DashboardScreen(
     viewModel: FinanceViewModel? = null,
     onPersonClick: ((Person) -> Unit)? = null,
     activeTab: String = "",
-    onEditGradient: ((String) -> Unit)? = null
+    onEditGradient: ((String) -> Unit)? = null,
+    onExportRequest: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -6418,6 +6449,9 @@ fun DashboardScreen(
                 gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient, // Sleek Indigo-Violet-Fuchsia Gradient
                 cornerRadius = 32.dp,
                 padding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
+                onLongClick = {
+                    onExportRequest?.invoke("ALL_DATA")
+                },
                 modifier = Modifier.testTag("dashboard_balance_card")
             ) {
                 // Total Balance Header Row (Full-width)
@@ -6500,7 +6534,12 @@ fun DashboardScreen(
                             .clip(RoundedCornerShape(30.dp))
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
-                            .clickable { onNavigate("transactions", "INCOME") }
+                            .combinedClickable(
+                                onClick = { onNavigate("transactions", "INCOME") },
+                                onLongClick = {
+                                    onExportRequest?.invoke("ONLY_INCOME")
+                                }
+                            )
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -6535,7 +6574,12 @@ fun DashboardScreen(
                             .clip(RoundedCornerShape(30.dp))
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(30.dp))
-                            .clickable { onNavigate("transactions", "EXPENSE") }
+                            .combinedClickable(
+                                onClick = { onNavigate("transactions", "EXPENSE") },
+                                onLongClick = {
+                                    onExportRequest?.invoke("ONLY_EXPENSE")
+                                }
+                            )
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -6588,10 +6632,13 @@ fun DashboardScreen(
                     gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    onClick = { onNavigate("debts", "DENA") },
+                    onLongClick = {
+                        onExportRequest?.invoke("ONLY_DEBT")
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(82.dp)
-                        .clickable { onNavigate("debts", "DENA") }
                         .testTag("dashboard_i_owe_card")
                 ) {
                     Row(
@@ -6633,10 +6680,13 @@ fun DashboardScreen(
                     gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    onClick = { onNavigate("debts", "PAWN") },
+                    onLongClick = {
+                        onExportRequest?.invoke("ONLY_PAONA")
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .height(82.dp)
-                        .clickable { onNavigate("debts", "PAWN") }
                         .testTag("dashboard_owed_to_me_card")
                 ) {
                     Row(
@@ -6683,6 +6733,12 @@ fun DashboardScreen(
                 border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            onExportRequest?.invoke("ONLY_BUDGET")
+                        }
+                    )
                     .testTag("budget_control_card")
             ) {
                 Column(
@@ -6848,7 +6904,124 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Export Menu Option (প্রফেশনাল এক্সপোর্ট মেনু)
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)),
+                border = BorderStroke(
+                    1.5.dp,
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        colors = listOf(
+                            FintechBlue.copy(alpha = 0.8f),
+                            Color(0xFF10B981).copy(alpha = 0.8f)
+                        )
+                    )
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onExportRequest?.invoke("ALL_DATA") }
+                    .testTag("dashboard_export_menu_button")
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                colors = listOf(
+                                    FintechBlue.copy(alpha = 0.08f),
+                                    Color(0xFF10B981).copy(alpha = 0.05f)
+                                )
+                            )
+                        )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                            colors = listOf(Color(0xFF10B981), Color(0xFF059669))
+                                        ),
+                                        shape = RoundedCornerShape(14.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Share,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "এক্সপোর্ট মেনু (রিপোর্ট)" else "Export Menu (Reports)",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                color = Color(0xFF10B981).copy(alpha = 0.15f),
+                                                shape = RoundedCornerShape(6.dp)
+                                            )
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "পিডিএফ / এক্সেল" else "PDF / EXCEL",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF059669)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (language == AppLanguage.BN) "পিডিএফ, এক্সেল ও সিএসভি আকারে রিপোর্ট শেয়ার ও ডাউনলোড করুন" else "Share & download reports in PDF, Excel & CSV formats",
+                                    fontSize = 11.sp,
+                                    color = if (isDark) Color.White.copy(alpha = 0.7f) else Color(0xFF475569)
+                                )
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(
+                                    color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = null,
+                                tint = if (isDark) Color.White else Color(0xFF1E293B),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Recent Transactions Section
             Row(
@@ -7201,7 +7374,7 @@ fun DashboardScreen(
                                         shape = RoundedCornerShape(8.dp),
                                         singleLine = true,
                                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
                                         ),
                                         trailingIcon = {
                                             IconButton(onClick = { showInplaceBudgetCalculator = true }) {
@@ -7503,7 +7676,7 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
                         ),
                         trailingIcon = {
                             IconButton(onClick = { showTempAmountCalculator = true }) {
@@ -8098,7 +8271,8 @@ fun TransactionsScreen(
     highlightedTxId: Int? = null,
     onNavigateToTab: ((String, String) -> Unit)? = null,
     onPersonClick: ((Person) -> Unit)? = null,
-    activeTab: String = ""
+    activeTab: String = "",
+    onExportRequest: ((String) -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("DATE_DESC") }
@@ -8292,6 +8466,7 @@ fun TransactionsScreen(
                     gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
+                    onLongClick = { onExportRequest?.invoke("ONLY_INCOME") },
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Row(
@@ -8316,6 +8491,7 @@ fun TransactionsScreen(
                     gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
+                    onLongClick = { onExportRequest?.invoke("ONLY_EXPENSE") },
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Row(
@@ -8618,7 +8794,8 @@ fun DebtsScreen(
     timeFilter: String = "ALL",
     onTimeFilterChange: (String) -> Unit = {},
     highlightedPersonId: Int? = null,
-    activeTab: String = ""
+    activeTab: String = "",
+    onExportRequest: ((String) -> Unit)? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("NAME_ASC") }
@@ -8783,6 +8960,7 @@ fun DebtsScreen(
                     gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
+                    onLongClick = { onExportRequest?.invoke("ONLY_DEBT") },
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Row(
@@ -8807,6 +8985,7 @@ fun DebtsScreen(
                     gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
+                    onLongClick = { onExportRequest?.invoke("ONLY_PAONA") },
                     modifier = Modifier.weight(1f).height(80.dp)
                 ) {
                     Row(
@@ -10618,7 +10797,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         value = amountInputState,
                         onValueChange = { amountInputState = it },
                         label = { Text(Translation.get("amount", language)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         trailingIcon = {
                             IconButton(onClick = { showTxCalculator = true }) {
                                 Icon(
@@ -11279,7 +11458,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         value = targetStr,
                         onValueChange = { targetStr = it },
                         label = { Text(Translation.get("target", language)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         trailingIcon = {
                             IconButton(onClick = { showTargetCalculator = true }) {
                                 Icon(
@@ -11547,7 +11726,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                     value = amountStr,
                     onValueChange = { amountStr = it },
                     label = { Text(Translation.get("amount", language)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     trailingIcon = {
                         IconButton(onClick = { showSavTxCalculator = true }) {
                             Icon(
@@ -12511,7 +12690,7 @@ fun PersonDetailOverlay(
                                 value = actionAmountStr,
                                 onValueChange = { actionAmountStr = it },
                                 label = { Text(Translation.get("amount", language)) },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 trailingIcon = {
                                     IconButton(onClick = { showActionCalculator = true }) {
                                         Icon(

@@ -1205,7 +1205,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    private suspend fun restoreFullBackup(backup: FinanceBackup) {
+    private suspend fun restoreFullBackup(backup: FinanceBackup, isCloudSyncRestore: Boolean = false) {
         repository.restoreBackupData(backup)
 
         if (!backup.customGradientsConfigSerialized.isNullOrBlank()) {
@@ -1269,7 +1269,24 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             )
         }
         com.example.widget.updateAllWidgets(getApplication())
-        onLocalDatabaseChanged()
+        if (isCloudSyncRestore) {
+            _hasUnsavedChanges.value = false
+            _unsyncedItems.value = emptyList()
+            _firestoreSyncStatus.value = "Synced"
+            val email = _googleEmail.value
+            if (!email.isNullOrBlank()) {
+                val now = System.currentTimeMillis()
+                _lastSyncTime.value = now
+                val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                val currentJson = backupAdapter.toJson(backup)
+                prefs.edit()
+                    .putString("firestore_cached_data_$email", currentJson)
+                    .putLong("last_firestore_sync_time", now)
+                    .apply()
+            }
+        } else {
+            onLocalDatabaseChanged()
+        }
     }
 
     suspend fun restoreSelectiveBackup(backup: FinanceBackup, workspaceIds: List<String>) {
@@ -2207,7 +2224,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                         val decryptedJson = BackupEncryptionHelper.decrypt(json)
                                         val backupData = backupAdapter.fromJson(decryptedJson)
                                         if (backupData != null) {
-                                            restoreFullBackup(backupData)
+                                            restoreFullBackup(backupData, isCloudSyncRestore = true)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             try {
                                                 val prefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
@@ -2285,7 +2302,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                                     currentLocalData.persons.isEmpty() &&
                                                     currentLocalData.savingsGoals.isEmpty()
                                             if (localIsEmpty) {
-                                                restoreFullBackup(remoteData)
+                                                restoreFullBackup(remoteData, isCloudSyncRestore = true)
                                                 com.example.widget.updateAllWidgets(getApplication())
                                                 prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
                                                 _hasUnsavedChanges.value = false
@@ -2301,7 +2318,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                                     } else if (cachedJson == currentJson) {
                                         // Local hasn't changed, but remote has updated from another device
                                         if (remoteData != null) {
-                                            restoreFullBackup(remoteData)
+                                            restoreFullBackup(remoteData, isCloudSyncRestore = true)
                                             com.example.widget.updateAllWidgets(getApplication())
                                             prefs.edit().putString("firestore_cached_data_$email", decryptedJson).apply()
                                             _hasUnsavedChanges.value = false
@@ -3214,7 +3231,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     onSuccess = {
                         // After successful backup, restore from cloud
                         viewModelScope.launch {
-                            restoreFullBackup(dataToRestore)
+                            restoreFullBackup(dataToRestore, isCloudSyncRestore = true)
                             com.example.widget.updateAllWidgets(context)
                             val email = _googleEmail.value
                             if (email != null) {
@@ -3233,7 +3250,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         // If backup fails, we should probably warn or still proceed depending on risk
                         // For now let's just proceed to restore as requested
                         viewModelScope.launch {
-                            restoreFullBackup(dataToRestore)
+                            restoreFullBackup(dataToRestore, isCloudSyncRestore = true)
                             com.example.widget.updateAllWidgets(context)
                             startRealtimeSync()
                             dismissCloudDataFoundDialog()
@@ -3242,6 +3259,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     }
                 )
             } else {
+                restoreFullBackup(dataToRestore, isCloudSyncRestore = true)
                 com.example.widget.updateAllWidgets(context)
                 val email = _googleEmail.value
                 if (email != null) {
