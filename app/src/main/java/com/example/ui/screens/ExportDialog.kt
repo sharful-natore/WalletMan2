@@ -57,6 +57,126 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+data class CategoryContribution(
+    val categoryName: String,
+    val amount: Double,
+    val percentageOfTarget: Double,
+    val percentageOfTotal: Double
+)
+
+data class BudgetTypeAnalysis(
+    val typeName: String,
+    val targetAmount: Double,
+    val actualAmount: Double,
+    val fulfillmentPercentage: Double,
+    val remainingAmount: Double,
+    val categories: List<CategoryContribution>
+)
+
+data class ComprehensiveBudgetReportData(
+    val incomeAnalysis: BudgetTypeAnalysis,
+    val expenseAnalysis: BudgetTypeAnalysis,
+    val savingsAnalysis: BudgetTypeAnalysis
+)
+
+fun computeComprehensiveBudgetReport(
+    language: AppLanguage,
+    filteredBudgets: List<MonthlyBudget>,
+    transactions: List<Transaction>,
+    savingsTransactions: List<SavingsTransaction>,
+    savingsGoals: List<SavingsGoal>
+): ComprehensiveBudgetReportData {
+    val isBn = language == AppLanguage.BN
+
+    val incTarget = filteredBudgets.sumOf { it.income }
+    val expTarget = filteredBudgets.sumOf { it.expense }
+    val savTarget = filteredBudgets.sumOf { it.savings }
+
+    // Actual Income
+    val incTxs = transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+    val actualInc = incTxs.sumOf { it.amount }
+    val incPct = if (incTarget > 0) (actualInc / incTarget) * 100 else 0.0
+    val incRem = incTarget - actualInc
+
+    val incCats = incTxs.groupBy { it.category }
+        .map { (cat, txs) ->
+            val sum = txs.sumOf { it.amount }
+            CategoryContribution(
+                categoryName = cat,
+                amount = sum,
+                percentageOfTarget = if (incTarget > 0) (sum / incTarget) * 100 else 0.0,
+                percentageOfTotal = if (actualInc > 0) (sum / actualInc) * 100 else 0.0
+            )
+        }.sortedByDescending { it.amount }
+
+    val incomeAnalysis = BudgetTypeAnalysis(
+        typeName = if (isBn) "আয় বাজেট" else "Income Budget",
+        targetAmount = incTarget,
+        actualAmount = actualInc,
+        fulfillmentPercentage = incPct,
+        remainingAmount = incRem,
+        categories = incCats
+    )
+
+    // Actual Expense
+    val expTxs = transactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
+    val actualExp = expTxs.sumOf { it.amount }
+    val expPct = if (expTarget > 0) (actualExp / expTarget) * 100 else 0.0
+    val expRem = expTarget - actualExp
+
+    val expCats = expTxs.groupBy { it.category }
+        .map { (cat, txs) ->
+            val sum = txs.sumOf { it.amount }
+            CategoryContribution(
+                categoryName = cat,
+                amount = sum,
+                percentageOfTarget = if (expTarget > 0) (sum / expTarget) * 100 else 0.0,
+                percentageOfTotal = if (actualExp > 0) (sum / actualExp) * 100 else 0.0
+            )
+        }.sortedByDescending { it.amount }
+
+    val expenseAnalysis = BudgetTypeAnalysis(
+        typeName = if (isBn) "ব্যয় বাজেট" else "Expense Budget",
+        targetAmount = expTarget,
+        actualAmount = actualExp,
+        fulfillmentPercentage = expPct,
+        remainingAmount = expRem,
+        categories = expCats
+    )
+
+    // Actual Savings
+    val actualSav = savingsTransactions.sumOf { if (it.isDeposit) it.amount else -it.amount }
+    val savPct = if (savTarget > 0) (actualSav / savTarget) * 100 else 0.0
+    val savRem = savTarget - actualSav
+
+    val savCats = savingsTransactions.groupBy { it.goalId }
+        .map { (goalId, stxs) ->
+            val goalTitle = savingsGoals.find { it.id == goalId }?.title ?: (if (isBn) "সাধারণ সঞ্চয়" else "General Savings")
+            val sum = stxs.sumOf { if (it.isDeposit) it.amount else -it.amount }
+            CategoryContribution(
+                categoryName = goalTitle,
+                amount = sum,
+                percentageOfTarget = if (savTarget > 0) (sum / savTarget) * 100 else 0.0,
+                percentageOfTotal = if (actualSav > 0) (sum / actualSav) * 100 else 0.0
+            )
+        }.sortedByDescending { it.amount }
+
+    val savingsAnalysis = BudgetTypeAnalysis(
+        typeName = if (isBn) "সঞ্চয় বাজেট" else "Savings Budget",
+        targetAmount = savTarget,
+        actualAmount = actualSav,
+        fulfillmentPercentage = savPct,
+        remainingAmount = savRem,
+        categories = savCats
+    )
+
+    return ComprehensiveBudgetReportData(
+        incomeAnalysis = incomeAnalysis,
+        expenseAnalysis = expenseAnalysis,
+        savingsAnalysis = savingsAnalysis
+    )
+}
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ExportDialog(
@@ -67,6 +187,9 @@ fun ExportDialog(
     savingsGoals: List<SavingsGoal>,
     savingsTransactions: List<SavingsTransaction>,
     monthlyBudgets: List<MonthlyBudget> = emptyList(),
+    defaultBudgetIncome: Double = 0.0,
+    defaultBudgetExpense: Double = 0.0,
+    defaultBudgetSavings: Double = 0.0,
     initialCategory: String = "ALL_DATA",
     onDismiss: () -> Unit
 ) {
@@ -131,19 +254,20 @@ fun ExportDialog(
 
         // Category Filter
         list = when (selectedCategory) {
-            "ALL_DATA", "TRANSACTIONS" -> list
+            "ALL_DATA", "TRANSACTIONS", "ONLY_BUDGET" -> list
             "DEBT_REPAYMENT" -> list.filter { it.type == "LEND" || it.type == "BORROW" || it.type == "REPAY_PAID" || it.type == "REPAY_RECEIVED" }
             "INCOME_EXPENSE" -> list.filter { it.type == "INCOME" || it.type == "EXPENSE" }
             "ONLY_DEBT" -> list.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
             "ONLY_PAONA" -> list.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
             "ONLY_INCOME" -> list.filter { it.type == "INCOME" }
             "ONLY_EXPENSE" -> list.filter { it.type == "EXPENSE" }
-            "ONLY_SAVINGS", "ONLY_BUDGET" -> emptyList()
+            "ONLY_SAVINGS" -> emptyList()
             else -> list
         }
 
         // Person Filter
-        if (filterByPerson && selectedPerson != null) {
+        val showPersonFilterOption = selectedCategory != "ONLY_SAVINGS" && selectedCategory != "ONLY_BUDGET"
+        if (showPersonFilterOption && filterByPerson && selectedPerson != null) {
             list = list.filter { it.personId == selectedPerson!!.id }
         }
 
@@ -207,7 +331,7 @@ fun ExportDialog(
         selectedMonth, selectedYear, startDateMillis, endDateMillis,
         startMonth, startYear, endMonth, endYear, startYearRange, endYearRange
     ) {
-        if (selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_SAVINGS") {
+        if (selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_SAVINGS" && selectedCategory != "ONLY_BUDGET") {
             return@remember emptyList<SavingsTransaction>()
         }
 
@@ -270,7 +394,8 @@ fun ExportDialog(
     val filteredBudgets = remember(
         monthlyBudgets, selectedCategory, selectedTimeFilter,
         selectedMonth, selectedYear, startDateMillis, endDateMillis,
-        startMonth, startYear, endMonth, endYear, startYearRange, endYearRange
+        startMonth, startYear, endMonth, endYear, startYearRange, endYearRange,
+        defaultBudgetIncome, defaultBudgetExpense, defaultBudgetSavings
     ) {
         if (selectedCategory != "ALL_DATA" && selectedCategory != "ONLY_BUDGET") {
             return@remember emptyList<MonthlyBudget>()
@@ -278,7 +403,7 @@ fun ExportDialog(
 
         var list = monthlyBudgets
 
-        list = when (selectedTimeFilter) {
+        var filtered = when (selectedTimeFilter) {
             "MONTH" -> {
                 list.filter {
                     it.year == selectedYear && it.month == selectedMonth
@@ -315,13 +440,45 @@ fun ExportDialog(
             else -> list
         }
 
-        list.sortedWith(compareByDescending<MonthlyBudget> { it.year }.thenByDescending { it.month })
+        if (filtered.isEmpty() && selectedCategory == "ONLY_BUDGET") {
+            filtered = listOf(
+                MonthlyBudget(
+                    year = selectedYear,
+                    month = selectedMonth,
+                    income = defaultBudgetIncome,
+                    expense = defaultBudgetExpense,
+                    savings = defaultBudgetSavings
+                )
+            )
+        }
+
+        filtered.sortedWith(compareByDescending<MonthlyBudget> { it.year }.thenByDescending { it.month })
     }
 
     // Month lists
     val monthNamesBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
     val monthNamesEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
     val months = if (isBn) monthNamesBn else monthNamesEn
+
+    val timePeriodText = remember(
+        selectedTimeFilter, selectedMonth, selectedYear, startDateMillis, endDateMillis,
+        startMonth, startYear, endMonth, endYear, startYearRange, endYearRange, isBn
+    ) {
+        getFormattedTimePeriod(
+            language = language,
+            timeFilter = selectedTimeFilter,
+            month = selectedMonth,
+            year = selectedYear,
+            startDateMillis = startDateMillis,
+            endDateMillis = endDateMillis,
+            startMonth = startMonth,
+            startYear = startYear,
+            endMonth = endMonth,
+            endYear = endYear,
+            startYearRange = startYearRange,
+            endYearRange = endYearRange
+        )
+    }
 
     // SAF CreateDocument Launcher for saving to a custom folder chosen by the user
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -331,13 +488,21 @@ fun ExportDialog(
             isExporting = true
             scope.launch(Dispatchers.IO) {
                 try {
-                    val totalInc = filteredTx.filter { it.type == "INCOME" }.sumOf { it.amount }
-                    val totalExp = filteredTx.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+                    val totalInc = filteredTx.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+                    val totalExp = filteredTx.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
                     val totalLend = filteredTx.filter { it.type == "LEND" }.sumOf { it.amount }
                     val totalBorrow = filteredTx.filter { it.type == "BORROW" }.sumOf { it.amount }
                     val totalRepayPaid = filteredTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
                     val totalRepayRecv = filteredTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
                     val netBalance = totalInc - totalExp
+
+                    val totalSavDeposit = filteredSavingsTx.filter { it.isDeposit }.sumOf { it.amount }
+                    val totalSavWithdraw = filteredSavingsTx.filter { !it.isDeposit }.sumOf { it.amount }
+                    val netSavings = totalSavDeposit - totalSavWithdraw
+
+                    val budIncTarget = filteredBudgets.sumOf { it.income }
+                    val budExpTarget = filteredBudgets.sumOf { it.expense }
+                    val budSavTarget = filteredBudgets.sumOf { it.savings }
 
                     val summary = mapOf(
                         "income" to totalInc,
@@ -346,19 +511,25 @@ fun ExportDialog(
                         "lend" to totalLend,
                         "borrow" to totalBorrow,
                         "repayPaid" to totalRepayPaid,
-                        "repayRecv" to totalRepayRecv
+                        "repayRecv" to totalRepayRecv,
+                        "savingsDeposit" to totalSavDeposit,
+                        "savingsWithdraw" to totalSavWithdraw,
+                        "savingsNet" to netSavings,
+                        "budIncTarget" to budIncTarget,
+                        "budExpTarget" to budExpTarget,
+                        "budSavTarget" to budSavTarget
                     )
 
                     context.contentResolver.openOutputStream(uri)?.use { os ->
                         if (selectedFormat == "PDF") {
                             val tempFile = File(context.cacheDir, "temp_export.pdf")
-                            generatePdfFile(context, language, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempFile)
+                            generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempFile)
                             tempFile.inputStream().use { input ->
                                 input.copyTo(os)
                             }
                             tempFile.delete()
                         } else {
-                            val csvContent = generateCsvData(language, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, selectedFormat == "EXCEL")
+                            val csvContent = generateCsvData(language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, selectedFormat == "EXCEL")
                             os.write(csvContent.toByteArray(Charsets.UTF_8))
                         }
                     }
@@ -395,13 +566,21 @@ fun ExportDialog(
 
     // Helper functions for sharing/downloading
     fun performExport(context: Context, format: String, action: String) {
-        val totalInc = filteredTx.filter { it.type == "INCOME" }.sumOf { it.amount }
-        val totalExp = filteredTx.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+        val totalInc = filteredTx.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+        val totalExp = filteredTx.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
         val totalLend = filteredTx.filter { it.type == "LEND" }.sumOf { it.amount }
         val totalBorrow = filteredTx.filter { it.type == "BORROW" }.sumOf { it.amount }
         val totalRepayPaid = filteredTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
         val totalRepayRecv = filteredTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
         val netBalance = totalInc - totalExp
+
+        val totalSavDeposit = filteredSavingsTx.filter { it.isDeposit }.sumOf { it.amount }
+        val totalSavWithdraw = filteredSavingsTx.filter { !it.isDeposit }.sumOf { it.amount }
+        val netSavings = totalSavDeposit - totalSavWithdraw
+
+        val budIncTarget = filteredBudgets.sumOf { it.income }
+        val budExpTarget = filteredBudgets.sumOf { it.expense }
+        val budSavTarget = filteredBudgets.sumOf { it.savings }
 
         val summary = mapOf(
             "income" to totalInc,
@@ -410,7 +589,13 @@ fun ExportDialog(
             "lend" to totalLend,
             "borrow" to totalBorrow,
             "repayPaid" to totalRepayPaid,
-            "repayRecv" to totalRepayRecv
+            "repayRecv" to totalRepayRecv,
+            "savingsDeposit" to totalSavDeposit,
+            "savingsWithdraw" to totalSavWithdraw,
+            "savingsNet" to netSavings,
+            "budIncTarget" to budIncTarget,
+            "budExpTarget" to budExpTarget,
+            "budSavTarget" to budSavTarget
         )
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -431,7 +616,7 @@ fun ExportDialog(
             scope.launch(Dispatchers.IO) {
                 if (format == "PDF") {
                     try {
-                        generatePdfFile(context, language, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempShareFile)
+                        generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempShareFile)
                     } catch (e: Exception) {
                         withContext(Dispatchers.Main) {
                             isExporting = false
@@ -440,7 +625,7 @@ fun ExportDialog(
                         return@launch
                     }
                 } else {
-                    val csvContent = generateCsvData(language, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, format == "EXCEL")
+                    val csvContent = generateCsvData(language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, format == "EXCEL")
                     try {
                         FileOutputStream(tempShareFile).use { fos ->
                             fos.write(csvContent.toByteArray(Charsets.UTF_8))
@@ -1026,61 +1211,65 @@ fun ExportDialog(
                     }
 
                     // 5. Specific Person Filter
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (isBn) "ব্যক্তি অনুযায়ী ফিল্টার?" else "Filter by Person?",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF10B981)
-                                )
-                                Switch(
-                                    checked = filterByPerson,
-                                    onCheckedChange = { filterByPerson = it },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Color(0xFF10B981)
+                    val showPersonFilterOption = selectedCategory != "ONLY_SAVINGS" && selectedCategory != "ONLY_BUDGET"
+
+                    if (showPersonFilterOption) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isBn) "ব্যক্তি অনুযায়ী ফিল্টার?" else "Filter by Person?",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF10B981)
                                     )
-                                )
-                            }
-
-                            if (filterByPerson) {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    val buttonLabel = selectedPerson?.name ?: (if (isBn) "ব্যক্তি নির্বাচন করুন" else "Select Person")
-                                    OutlinedButton(
-                                        onClick = { showPersonDropdown = true },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
-                                        Text(buttonLabel, fontSize = 13.sp)
-                                        Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.padding(start = 4.dp))
-                                    }
-
-                                    DropdownMenu(
-                                        expanded = showPersonDropdown,
-                                        onDismissRequest = { showPersonDropdown = false },
-                                        modifier = Modifier.fillMaxWidth(0.8f)
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(if (isBn) "সব ব্যক্তি (সবার লেনদেন)" else "All Persons") },
-                                            onClick = {
-                                                selectedPerson = null
-                                                showPersonDropdown = false
-                                            }
+                                    Switch(
+                                        checked = filterByPerson,
+                                        onCheckedChange = { filterByPerson = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = Color(0xFF10B981)
                                         )
-                                        persons.forEach { person ->
+                                    )
+                                }
+
+                                if (filterByPerson) {
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        val buttonLabel = selectedPerson?.name ?: (if (isBn) "ব্যক্তি নির্বাচন করুন" else "Select Person")
+                                        OutlinedButton(
+                                            onClick = { showPersonDropdown = true },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(buttonLabel, fontSize = 13.sp)
+                                            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.padding(start = 4.dp))
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = showPersonDropdown,
+                                            onDismissRequest = { showPersonDropdown = false },
+                                            modifier = Modifier.fillMaxWidth(0.8f)
+                                        ) {
                                             DropdownMenuItem(
-                                                text = { Text(person.name) },
+                                                text = { Text(if (isBn) "সব ব্যক্তি (সবার লেনদেন)" else "All Persons") },
                                                 onClick = {
-                                                    selectedPerson = person
+                                                    selectedPerson = null
                                                     showPersonDropdown = false
                                                 }
                                             )
+                                            persons.forEach { person ->
+                                                DropdownMenuItem(
+                                                    text = { Text(person.name) },
+                                                    onClick = {
+                                                        selectedPerson = person
+                                                        showPersonDropdown = false
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1088,40 +1277,364 @@ fun ExportDialog(
                         }
                     }
 
-                    // 6. Preview and Statistics Card
+                    // 6. Live Document Report Preview Card
                     item {
+                        val recordsSize = filteredTx.size + 
+                                          (if (selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_SAVINGS") filteredSavingsTx.size else 0) +
+                                          (if (selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_BUDGET") filteredBudgets.size else 0)
+
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = cardBg),
-                            border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) Color(0xFF1E1B4B).copy(alpha = 0.6f) else Color(0xFFF5F3FF)
+                            ),
+                            border = BorderStroke(1.dp, if (isDark) Color(0xFF6366F1).copy(alpha = 0.3f) else Color(0xFFC7D2FE))
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                // Live Preview Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .background(Color(0xFF6366F1), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("F", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                                        }
+                                        Column {
+                                            Text(
+                                                text = if (isBn) "রিপোর্ট প্রিভিউ (Report Preview)" else "Report Preview",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color(0xFF6366F1)
+                                            )
+                                            Text(
+                                                text = getCategoryTitle(selectedCategory, language),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textPrimary
+                                            )
+                                        }
+                                    }
+
+                                    Surface(
+                                        color = Color(0xFF6366F1).copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(
+                                            text = timePeriodText,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color(0xFFA5B4FC) else Color(0xFF4338CA),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFDDD6FE))
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Dynamic Summary Badges for Selected Category
+                                val totalInc = filteredTx.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+                                val totalExp = filteredTx.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+                                val totalLend = filteredTx.filter { it.type == "LEND" }.sumOf { it.amount }
+                                val totalBorrow = filteredTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+                                val totalSavDep = filteredSavingsTx.filter { it.isDeposit }.sumOf { it.amount }
+                                val totalSavWith = filteredSavingsTx.filter { !it.isDeposit }.sumOf { it.amount }
+                                val netSav = totalSavDep - totalSavWith
+
+                                val budIncTarget = filteredBudgets.sumOf { it.income }
+                                val budExpTarget = filteredBudgets.sumOf { it.expense }
+                                val budSavTarget = filteredBudgets.sumOf { it.savings }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = if (isBn) "মোট পরিমাণ (সারসংক্ষেপ):" else "Category Totals Summary:",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textSecondary
+                                    )
+
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        when (selectedCategory) {
+                                            "ONLY_INCOME" -> {
+                                                PreviewSummaryBadge(label = if (isBn) "মোট আয়" else "Total Income", amount = totalInc, color = Color(0xFF059669), language = language, isDark = isDark)
+                                            }
+                                            "ONLY_EXPENSE" -> {
+                                                PreviewSummaryBadge(label = if (isBn) "মোট ব্যয়" else "Total Expense", amount = totalExp, color = Color(0xFFDC2626), language = language, isDark = isDark)
+                                            }
+                                            "INCOME_EXPENSE" -> {
+                                                PreviewSummaryBadge(label = if (isBn) "মোট আয়" else "Total Income", amount = totalInc, color = Color(0xFF059669), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট ব্যয়" else "Total Expense", amount = totalExp, color = Color(0xFFDC2626), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "ব্যালেন্স" else "Balance", amount = totalInc - totalExp, color = Color(0xFF6366F1), language = language, isDark = isDark)
+                                            }
+                                            "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
+                                                if (selectedCategory != "ONLY_PAONA") {
+                                                    PreviewSummaryBadge(label = if (isBn) "মোট দেনা" else "Total Debt", amount = totalBorrow, color = Color(0xFFD97706), language = language, isDark = isDark)
+                                                }
+                                                if (selectedCategory != "ONLY_DEBT") {
+                                                    PreviewSummaryBadge(label = if (isBn) "মোট পাওনা" else "Total Credit", amount = totalLend, color = Color(0xFF2563EB), language = language, isDark = isDark)
+                                                }
+                                            }
+                                            "ONLY_SAVINGS" -> {
+                                                PreviewSummaryBadge(label = if (isBn) "সঞ্চয় জমা" else "Deposit", amount = totalSavDep, color = Color(0xFF059669), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "সঞ্চয় উত্তোলন" else "Withdrawal", amount = totalSavWith, color = Color(0xFFDC2626), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "অবশিষ্ট সঞ্চয়" else "Net Saved", amount = netSav, color = Color(0xFF8B5CF6), language = language, isDark = isDark)
+                                            }
+                                            "ONLY_BUDGET" -> {
+                                                PreviewSummaryBadge(label = if (isBn) "আয় বাজেট" else "Inc Target", amount = budIncTarget, color = Color(0xFF059669), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "ব্যয় বাজেট" else "Exp Target", amount = budExpTarget, color = Color(0xFFDC2626), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "সঞ্চয় বাজেট" else "Sav Target", amount = budSavTarget, color = Color(0xFF8B5CF6), language = language, isDark = isDark)
+                                            }
+                                            else -> {
+                                                PreviewSummaryBadge(label = if (isBn) "মোট আয়" else "Total Income", amount = totalInc, color = Color(0xFF059669), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট ব্যয়" else "Total Expense", amount = totalExp, color = Color(0xFFDC2626), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট দেনা" else "Total Debt", amount = totalBorrow, color = Color(0xFFD97706), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট পাওনা" else "Total Credit", amount = totalLend, color = Color(0xFF2563EB), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট সঞ্চয়" else "Total Savings", amount = netSav, color = Color(0xFF8B5CF6), language = language, isDark = isDark)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color(0xFFDDD6FE))
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Matching Items Preview List
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = if (isBn) "রেকর্ড সংখ্যা:" else "Matching Records:",
-                                        fontSize = 12.sp,
+                                        text = if (isBn) "রিপোর্টে অন্তর্ভুক্ত ডেটা:" else "Records in Report:",
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = textSecondary
                                     )
-                                    val recordsSize = filteredTx.size + 
-                                                      (if (selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_SAVINGS") filteredSavingsTx.size else 0) +
-                                                      (if (selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_BUDGET") filteredBudgets.size else 0)
-                                    val recordsText = if (isBn) {
-                                        "${replaceToBnDigits(recordsSize.toString())} টি"
-                                    } else {
-                                        "$recordsSize items"
+                                    val recordsText = if (isBn) "${replaceToBnDigits(recordsSize.toString())} টি রেকর্ড" else "$recordsSize items"
+                                    Surface(
+                                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = recordsText,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFF059669),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
                                     }
-                                    Text(
-                                        text = recordsText,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFF10B981)
-                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                if (recordsSize == 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 12.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (isBn) "নির্বাচিত ফিল্টারে কোনো তথ্য পাওয়া যায়নি" else "No matching data found for this selection",
+                                            fontSize = 12.sp,
+                                            color = textSecondary,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        // Show up to 4 preview records
+                                        val sampleTxs = filteredTx.take(4)
+                                        for (tx in sampleTxs) {
+                                            val person = persons.find { it.id == tx.personId }
+                                            val personName = person?.name.orEmpty()
+
+                                            val primaryTitle = if (personName.isNotEmpty()) {
+                                                personName
+                                            } else {
+                                                tx.category
+                                            }
+
+                                            val typeLabel = when (tx.type) {
+                                                "INCOME" -> if (isBn) "আয়" else "Income"
+                                                "EXPENSE" -> if (isBn) "ব্যয়" else "Expense"
+                                                "LEND" -> if (isBn) "পাওনা" else "Receivable"
+                                                "BORROW" -> if (isBn) "দেনা" else "Debt"
+                                                "REPAY_PAID" -> if (isBn) "দেনা পরিশোধ" else "Debt Paid"
+                                                "REPAY_RECEIVED" -> if (isBn) "পাওনা আদায়" else "Credit Recv"
+                                                else -> getTransactionTypeName(tx.type, language)
+                                            }
+
+                                            val dateStr = SimpleDateFormat("dd MMM, yyyy", Locale.getDefault()).format(Date(tx.timestamp))
+                                            val formattedDate = if (isBn) replaceToBnDigits(dateStr) else dateStr
+
+                                            val amtColor = when (tx.type) {
+                                                "INCOME", "REPAY_RECEIVED" -> Color(0xFF059669)
+                                                "EXPENSE", "REPAY_PAID" -> Color(0xFFDC2626)
+                                                "LEND" -> Color(0xFF2563EB)
+                                                "BORROW" -> Color(0xFFD97706)
+                                                else -> textPrimary
+                                            }
+
+                                            val typeBgColor = when (tx.type) {
+                                                "INCOME", "REPAY_RECEIVED" -> Color(0xFF059669).copy(alpha = 0.12f)
+                                                "EXPENSE", "REPAY_PAID" -> Color(0xFFDC2626).copy(alpha = 0.12f)
+                                                "LEND" -> Color(0xFF2563EB).copy(alpha = 0.12f)
+                                                "BORROW" -> Color(0xFFD97706).copy(alpha = 0.12f)
+                                                else -> Color.Gray.copy(alpha = 0.12f)
+                                            }
+
+                                            Card(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = if (isDark) Color.White.copy(alpha = 0.05f) else Color.White
+                                                ),
+                                                border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.08f) else Color(0xFFE5E7EB))
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = primaryTitle,
+                                                                fontSize = 12.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = textPrimary
+                                                            )
+                                                            Surface(
+                                                                color = typeBgColor,
+                                                                shape = RoundedCornerShape(4.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = typeLabel,
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = amtColor,
+                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                )
+                                                            }
+                                                        }
+
+                                                        if (tx.note.isNotBlank()) {
+                                                            Text(
+                                                                text = tx.note.trim(),
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Normal,
+                                                                color = textSecondary,
+                                                                maxLines = 1,
+                                                                modifier = Modifier.padding(top = 2.dp)
+                                                            )
+                                                        }
+
+                                                        Text(
+                                                            text = formattedDate,
+                                                            fontSize = 9.sp,
+                                                            color = textSecondary.copy(alpha = 0.7f),
+                                                            modifier = Modifier.padding(top = 1.dp)
+                                                        )
+                                                    }
+
+                                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                                    Text(
+                                                        text = formatCurrency(tx.amount, language),
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = amtColor
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        if (selectedCategory == "ONLY_SAVINGS" && filteredSavingsTx.isNotEmpty()) {
+                                            val sampleSav = filteredSavingsTx.take(3)
+                                            for (stx in sampleSav) {
+                                                val goalTitle = savingsGoals.find { it.id == stx.goalId }?.title ?: ""
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.White, RoundedCornerShape(8.dp))
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(text = goalTitle, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                                        Text(text = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "উত্তোলন" else "Withdrawal"), fontSize = 9.sp, color = textSecondary)
+                                                    }
+                                                    Text(
+                                                        text = formatCurrency(stx.amount, language),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = if (stx.isDeposit) Color(0xFF059669) else Color(0xFFDC2626)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        if (selectedCategory == "ONLY_BUDGET" && filteredBudgets.isNotEmpty()) {
+                                            val sampleBud = filteredBudgets.take(2)
+                                            for (b in sampleBud) {
+                                                val ymStr = "${months[b.month]} ${b.year}"
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.White, RoundedCornerShape(8.dp))
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(text = "${if (isBn) "বাজেট: " else "Budget: "}$ymStr", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textPrimary)
+                                                        Text(text = "${if (isBn) "ব্যয় বাজেট: " else "Exp Target: "}${formatCurrency(b.expense, language)}", fontSize = 9.sp, color = textSecondary)
+                                                    }
+                                                    Text(
+                                                        text = "${if (isBn) "আয়: " else "Inc: "}${formatCurrency(b.income, language)}",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Color(0xFF6366F1)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        val shownCount = sampleTxs.size + (if (selectedCategory == "ONLY_SAVINGS") filteredSavingsTx.take(3).size else 0) + (if (selectedCategory == "ONLY_BUDGET") filteredBudgets.take(2).size else 0)
+                                        if (recordsSize > shownCount) {
+                                            Text(
+                                                text = if (isBn) "...এবং আরও ${replaceToBnDigits((recordsSize - shownCount).toString())} টি রেকর্ড রিপোর্টে থাকছে" else "...and ${recordsSize - shownCount} more items included in report",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF6366F1),
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1223,6 +1736,8 @@ private fun replaceToBnDigits(str: String): String {
 // Generate CSV / Tab-separated Excel layout string
 private fun generateCsvData(
     language: AppLanguage,
+    selectedCategory: String,
+    timePeriodText: String,
     transactions: List<Transaction>,
     persons: List<Person>,
     savingsGoals: List<SavingsGoal>,
@@ -1236,139 +1751,332 @@ private fun generateCsvData(
 
     sb.append("\uFEFF")
 
-    sb.append(if (isBn) "আর্থিক প্রতিবেদন ও ডাটা" else "Financial Statement Report").append("\n")
+    val reportTitle = getCategoryTitle(selectedCategory, language)
+    sb.append(if (isBn) "ফাইন্যান্স নোট - " else "Finance Note - ").append(reportTitle).append("\n")
+    sb.append(if (isBn) "সময়কাল: " else "Period: ").append(timePeriodText).append("\n")
     sb.append(if (isBn) "তৈরি হয়েছে: " else "Generated on: ").append(SimpleDateFormat("dd MMMM, yyyy hh:mm a", Locale.getDefault()).format(Date())).append("\n\n")
 
     val totalInc = transactions.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
     val totalExp = transactions.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
     val netBalance = totalInc - totalExp
 
-    sb.append(if (isBn) "আর্থিক সারসংক্ষেপ (Financial Summary)" else "Financial Summary").append("\n")
-    sb.append(if (isBn) "ক্যাটাগরি" else "Metric").append(delimiter).append(if (isBn) "টাকার পরিমাণ" else "Amount").append("\n")
-    sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
-    sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
-    sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
-    sb.append("\n\n")
+    val budgetReport = computeComprehensiveBudgetReport(language, filteredBudgets, transactions, savingsTransactions, savingsGoals)
 
-    if (transactions.isNotEmpty()) {
-        sb.append(if (isBn) "লেনদেন বিবরণী (Transactions Log)" else "Transactions Log").append("\n")
+    if (selectedCategory == "ONLY_BUDGET") {
+        // SECTION 1: Budget Performance Overview Summary
+        sb.append(if (isBn) "১. বাজেট পারফরম্যান্স ও অর্জনের সারসংক্ষেপ" else "1. Budget Performance & Achievement Summary").append("\n")
         sb.append(
             listOf(
-                if (isBn) "ক্রমিক" else "Sl No",
-                if (isBn) "তারিখ" else "Date",
-                if (isBn) "ক্যাটাগরি" else "Category",
-                if (isBn) "ধরন" else "Type",
-                if (isBn) "ব্যক্তি" else "Person",
-                if (isBn) "বিবরণ/নোট" else "Note/Description",
-                if (isBn) "টাকা" else "Amount"
+                if (isBn) "বাজেটের বিষয়" else "Budget Metric",
+                if (isBn) "নির্ধারিত টার্গেট" else "Target Amount",
+                if (isBn) "প্রকৃত অর্জন/ব্যয়" else "Actual Amount",
+                if (isBn) "পূরণ / ব্যবহারের %" else "Fulfillment / Usage %",
+                if (isBn) "অবশিষ্ট / পার্থক্য" else "Variance / Remaining"
             ).joinToString(delimiter)
         ).append("\n")
 
-        transactions.forEachIndexed { idx, tx ->
-            val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(tx.timestamp))
-            val typeStr = getTransactionTypeName(tx.type, language)
-            val personName = persons.find { it.id == tx.personId }?.name ?: ""
-            val noteSafe = tx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
-            val catSafe = tx.category.replace(",", " ").replace("\t", " ").replace("\n", " ")
-            val personSafe = personName.replace(",", " ").replace("\t", " ").replace("\n", " ")
+        val incData = budgetReport.incomeAnalysis
+        sb.append(
+            listOf(
+                incData.typeName,
+                incData.targetAmount.toString(),
+                incData.actualAmount.toString(),
+                "${String.format(Locale.US, "%.1f", incData.fulfillmentPercentage)}%",
+                incData.remainingAmount.toString()
+            ).joinToString(delimiter)
+        ).append("\n")
 
+        val expData = budgetReport.expenseAnalysis
+        sb.append(
+            listOf(
+                expData.typeName,
+                expData.targetAmount.toString(),
+                expData.actualAmount.toString(),
+                "${String.format(Locale.US, "%.1f", expData.fulfillmentPercentage)}%",
+                expData.remainingAmount.toString()
+            ).joinToString(delimiter)
+        ).append("\n")
+
+        val savData = budgetReport.savingsAnalysis
+        sb.append(
+            listOf(
+                savData.typeName,
+                savData.targetAmount.toString(),
+                savData.actualAmount.toString(),
+                "${String.format(Locale.US, "%.1f", savData.fulfillmentPercentage)}%",
+                savData.remainingAmount.toString()
+            ).joinToString(delimiter)
+        ).append("\n\n")
+
+        // SECTION 2: Income Category Breakdown
+        if (incData.categories.isNotEmpty()) {
+            sb.append(if (isBn) "২. আয় খাতভিত্তিক বাজেট বিশ্লেষণ (খাতওয়ারি তথ্য)" else "2. Income Category Breakdown").append("\n")
             sb.append(
                 listOf(
-                    (idx + 1).toString(),
-                    dateStr,
-                    catSafe,
-                    typeStr,
-                    personSafe,
-                    noteSafe,
-                    tx.amount.toString()
+                    if (isBn) "আয় খাত" else "Income Category",
+                    if (isBn) "অর্জিত পরিমাণ" else "Actual Amount",
+                    if (isBn) "আয় বাজেটের %" else "% of Target Budget",
+                    if (isBn) "মোট আয়ের %" else "% of Total Income"
                 ).joinToString(delimiter)
             ).append("\n")
+
+            incData.categories.forEach { c ->
+                sb.append(
+                    listOf(
+                        c.categoryName,
+                        c.amount.toString(),
+                        "${String.format(Locale.US, "%.1f", c.percentageOfTarget)}%",
+                        "${String.format(Locale.US, "%.1f", c.percentageOfTotal)}%"
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
+            sb.append("\n")
+        }
+
+        // SECTION 3: Expense Category Breakdown
+        if (expData.categories.isNotEmpty()) {
+            sb.append(if (isBn) "৩. ব্যয় খাতভিত্তিক বাজেট বিশ্লেষণ (খাতওয়ারি তথ্য)" else "3. Expense Category Breakdown").append("\n")
+            sb.append(
+                listOf(
+                    if (isBn) "ব্যয় খাত" else "Expense Category",
+                    if (isBn) "ব্যয়িত পরিমাণ" else "Actual Amount",
+                    if (isBn) "ব্যয় বাজেটের %" else "% of Target Budget",
+                    if (isBn) "মোট ব্যয়ের %" else "% of Total Expense"
+                ).joinToString(delimiter)
+            ).append("\n")
+
+            expData.categories.forEach { c ->
+                sb.append(
+                    listOf(
+                        c.categoryName,
+                        c.amount.toString(),
+                        "${String.format(Locale.US, "%.1f", c.percentageOfTarget)}%",
+                        "${String.format(Locale.US, "%.1f", c.percentageOfTotal)}%"
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
+            sb.append("\n")
+        }
+
+        // SECTION 4: Savings Goal Breakdown
+        if (savData.categories.isNotEmpty()) {
+            sb.append(if (isBn) "৪. সঞ্চয় লক্ষ্যভিত্তিক বাজেট বিশ্লেষণ (খাতওয়ারি তথ্য)" else "4. Savings Goal Breakdown").append("\n")
+            sb.append(
+                listOf(
+                    if (isBn) "সঞ্চয় লক্ষ্য / খাত" else "Savings Goal",
+                    if (isBn) "জমাকৃত পরিমাণ" else "Actual Amount",
+                    if (isBn) "সঞ্চয় বাজেটের %" else "% of Target Budget",
+                    if (isBn) "মোট সঞ্চয়ের %" else "% of Total Savings"
+                ).joinToString(delimiter)
+            ).append("\n")
+
+            savData.categories.forEach { c ->
+                sb.append(
+                    listOf(
+                        c.categoryName,
+                        c.amount.toString(),
+                        "${String.format(Locale.US, "%.1f", c.percentageOfTarget)}%",
+                        "${String.format(Locale.US, "%.1f", c.percentageOfTotal)}%"
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
+            sb.append("\n")
+        }
+
+        // SECTION 5: Itemized Transactions Log (for context)
+        if (transactions.isNotEmpty()) {
+            sb.append(if (isBn) "৫. আইটেমাইজড লেনদেন লগ (বিবরণী)" else "5. Itemized Transactions Log").append("\n")
+            sb.append(
+                listOf(
+                    if (isBn) "ক্রমিক" else "Sl No",
+                    if (isBn) "তারিখ" else "Date",
+                    if (isBn) "ক্যাটাগরি" else "Category",
+                    if (isBn) "ধরন" else "Type",
+                    if (isBn) "ব্যক্তি" else "Person",
+                    if (isBn) "বিবরণ/নোট" else "Note/Description",
+                    if (isBn) "টাকা" else "Amount"
+                ).joinToString(delimiter)
+            ).append("\n")
+
+            transactions.forEachIndexed { idx, tx ->
+                val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(tx.timestamp))
+                val typeStr = getTransactionTypeName(tx.type, language)
+                val personName = persons.find { it.id == tx.personId }?.name ?: ""
+                val noteSafe = tx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val catSafe = tx.category.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val personSafe = personName.replace(",", " ").replace("\t", " ").replace("\n", " ")
+
+                sb.append(
+                    listOf(
+                        (idx + 1).toString(),
+                        dateStr,
+                        catSafe,
+                        typeStr,
+                        personSafe,
+                        noteSafe,
+                        tx.amount.toString()
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
+        }
+    } else {
+        // Standard Flow for non-budget categories
+        sb.append(if (isBn) "আর্থিক সারসংক্ষেপ (Financial Summary)" else "Financial Summary").append("\n")
+        sb.append(if (isBn) "ক্যাটাগরি" else "Metric").append(delimiter).append(if (isBn) "টাকার পরিমাণ" else "Amount").append("\n")
+
+        when (selectedCategory) {
+            "ONLY_INCOME" -> {
+                sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+            }
+            "ONLY_EXPENSE" -> {
+                sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
+            }
+            "INCOME_EXPENSE" -> {
+                sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+                sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
+                sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
+            }
+            "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
+                val totalLend = transactions.filter { it.type == "LEND" }.sumOf { it.amount }
+                val totalBorrow = transactions.filter { it.type == "BORROW" }.sumOf { it.amount }
+                if (selectedCategory != "ONLY_PAONA") sb.append(if (isBn) "মোট দেনা" else "Total Debt").append(delimiter).append(totalBorrow).append("\n")
+                if (selectedCategory != "ONLY_DEBT") sb.append(if (isBn) "মোট পাওনা" else "Total Receivable").append(delimiter).append(totalLend).append("\n")
+            }
+            "ONLY_SAVINGS" -> {
+                val totalSavDep = savingsTransactions.filter { it.isDeposit }.sumOf { it.amount }
+                val totalSavWith = savingsTransactions.filter { !it.isDeposit }.sumOf { it.amount }
+                sb.append(if (isBn) "সঞ্চয় জমা" else "Total Deposit").append(delimiter).append(totalSavDep).append("\n")
+                sb.append(if (isBn) "সঞ্চয় উত্তোলন" else "Total Withdrawal").append(delimiter).append(totalSavWith).append("\n")
+                sb.append(if (isBn) "অবশিষ্ট সঞ্চয়" else "Net Savings").append(delimiter).append(totalSavDep - totalSavWith).append("\n")
+            }
+            else -> {
+                sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+                sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
+                sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
+            }
         }
         sb.append("\n\n")
-    }
 
-    if (savingsTransactions.isNotEmpty()) {
-        sb.append(if (isBn) "সঞ্চয় বিবরণী (Savings Log)" else "Savings Log").append("\n")
-        sb.append(
-            listOf(
-                if (isBn) "ক্রমিক" else "Sl No",
-                if (isBn) "তারিখ" else "Date",
-                if (isBn) "লক্ষ্য শিরোনাম" else "Savings Goal",
-                if (isBn) "ধরন" else "Type",
-                if (isBn) "বিবরণ" else "Note",
-                if (isBn) "টাকা" else "Amount"
-            ).joinToString(delimiter)
-        ).append("\n")
-
-        savingsTransactions.forEachIndexed { idx, stx ->
-            val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(stx.timestamp))
-            val goalTitle = savingsGoals.find { it.id == stx.goalId }?.title ?: ""
-            val typeStr = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "সঞ্চয় উত্তোলন" else "Withdrawal")
-            val noteSafe = stx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
-            val goalSafe = goalTitle.replace(",", " ").replace("\t", " ").replace("\n", " ")
-
+        if (transactions.isNotEmpty()) {
+            sb.append(if (isBn) "লেনদেন বিবরণী (Transactions Log)" else "Transactions Log").append("\n")
             sb.append(
                 listOf(
-                    (idx + 1).toString(),
-                    dateStr,
-                    goalSafe,
-                    typeStr,
-                    noteSafe,
-                    stx.amount.toString()
+                    if (isBn) "ক্রমিক" else "Sl No",
+                    if (isBn) "তারিখ" else "Date",
+                    if (isBn) "ক্যাটাগরি" else "Category",
+                    if (isBn) "ধরন" else "Type",
+                    if (isBn) "ব্যক্তি" else "Person",
+                    if (isBn) "বিবরণ/নোট" else "Note/Description",
+                    if (isBn) "টাকা" else "Amount"
                 ).joinToString(delimiter)
             ).append("\n")
+
+            transactions.forEachIndexed { idx, tx ->
+                val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(tx.timestamp))
+                val typeStr = getTransactionTypeName(tx.type, language)
+                val personName = persons.find { it.id == tx.personId }?.name ?: ""
+                val noteSafe = tx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val catSafe = tx.category.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val personSafe = personName.replace(",", " ").replace("\t", " ").replace("\n", " ")
+
+                sb.append(
+                    listOf(
+                        (idx + 1).toString(),
+                        dateStr,
+                        catSafe,
+                        typeStr,
+                        personSafe,
+                        noteSafe,
+                        tx.amount.toString()
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
+            sb.append("\n\n")
         }
-        sb.append("\n\n")
-    }
 
-    if (filteredBudgets.isNotEmpty()) {
-        val monthNamesBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
-        val monthNamesEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
-        val months = if (isBn) monthNamesBn else monthNamesEn
-
-        sb.append(if (isBn) "বাজেট বিবরণী (Budgets Log)" else "Budgets Log").append("\n")
-        sb.append(
-            listOf(
-                if (isBn) "ক্রমিক" else "Sl No",
-                if (isBn) "মাস/বছর" else "Month/Year",
-                if (isBn) "আয় টার্গেট" else "Income Target",
-                if (isBn) "আয় অর্জিত" else "Income Actual",
-                if (isBn) "ব্যয় টার্গেট" else "Expense Target",
-                if (isBn) "ব্যয়িত" else "Expense Actual",
-                if (isBn) "সঞ্চয় টার্গেট" else "Savings Target",
-                if (isBn) "সঞ্চিত" else "Savings Actual"
-            ).joinToString(delimiter)
-        ).append("\n")
-
-        filteredBudgets.forEachIndexed { idx, budget ->
-            val ymVal = "${months[budget.month]} ${budget.year}"
-            val bActualInc = transactions.filter {
-                val (y, m) = getYearAndMonth(it.timestamp)
-                y == budget.year && m == budget.month && (it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT"))
-            }.sumOf { it.amount }
-
-            val bActualExp = transactions.filter {
-                val (y, m) = getYearAndMonth(it.timestamp)
-                y == budget.year && m == budget.month && (it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT"))
-            }.sumOf { it.amount }
-
-            val bActualSav = savingsTransactions.filter {
-                val (y, m) = getYearAndMonth(it.timestamp)
-                y == budget.year && m == budget.month
-            }.sumOf { if (it.isDeposit) it.amount else -it.amount }
-
+        if (savingsTransactions.isNotEmpty()) {
+            sb.append(if (isBn) "সঞ্চয় বিবরণী (Savings Log)" else "Savings Log").append("\n")
             sb.append(
                 listOf(
-                    (idx + 1).toString(),
-                    ymVal,
-                    budget.income.toString(),
-                    bActualInc.toString(),
-                    budget.expense.toString(),
-                    bActualExp.toString(),
-                    budget.savings.toString(),
-                    bActualSav.toString()
+                    if (isBn) "ক্রমিক" else "Sl No",
+                    if (isBn) "তারিখ" else "Date",
+                    if (isBn) "লক্ষ্য শিরোনাম" else "Savings Goal",
+                    if (isBn) "ধরন" else "Type",
+                    if (isBn) "বিবরণ" else "Note",
+                    if (isBn) "টাকা" else "Amount"
                 ).joinToString(delimiter)
             ).append("\n")
+
+            savingsTransactions.forEachIndexed { idx, stx ->
+                val dateStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(stx.timestamp))
+                val goalTitle = savingsGoals.find { it.id == stx.goalId }?.title ?: ""
+                val typeStr = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "সঞ্চয় উত্তোলন" else "Withdrawal")
+                val noteSafe = stx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val goalSafe = goalTitle.replace(",", " ").replace("\t", " ").replace("\n", " ")
+
+                sb.append(
+                    listOf(
+                        (idx + 1).toString(),
+                        dateStr,
+                        goalSafe,
+                        typeStr,
+                        noteSafe,
+                        stx.amount.toString()
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
+            sb.append("\n\n")
+        }
+
+        if (filteredBudgets.isNotEmpty()) {
+            val monthNamesBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+            val monthNamesEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+            val months = if (isBn) monthNamesBn else monthNamesEn
+
+            sb.append(if (isBn) "বাজেট বিবরণী (Budgets Log)" else "Budgets Log").append("\n")
+            sb.append(
+                listOf(
+                    if (isBn) "ক্রমিক" else "Sl No",
+                    if (isBn) "মাস/বছর" else "Month/Year",
+                    if (isBn) "আয় টার্গেট" else "Income Target",
+                    if (isBn) "আয় অর্জিত" else "Income Actual",
+                    if (isBn) "ব্যয় টার্গেট" else "Expense Target",
+                    if (isBn) "ব্যয়িত" else "Expense Actual",
+                    if (isBn) "সঞ্চয় টার্গেট" else "Savings Target",
+                    if (isBn) "সঞ্চিত" else "Savings Actual"
+                ).joinToString(delimiter)
+            ).append("\n")
+
+            filteredBudgets.forEachIndexed { idx, budget ->
+                val ymVal = "${months[budget.month]} ${budget.year}"
+                val bActualInc = transactions.filter {
+                    val (y, m) = getYearAndMonth(it.timestamp)
+                    y == budget.year && m == budget.month && (it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT"))
+                }.sumOf { it.amount }
+
+                val bActualExp = transactions.filter {
+                    val (y, m) = getYearAndMonth(it.timestamp)
+                    y == budget.year && m == budget.month && (it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT"))
+                }.sumOf { it.amount }
+
+                val bActualSav = savingsTransactions.filter {
+                    val (y, m) = getYearAndMonth(it.timestamp)
+                    y == budget.year && m == budget.month
+                }.sumOf { if (it.isDeposit) it.amount else -it.amount }
+
+                sb.append(
+                    listOf(
+                        (idx + 1).toString(),
+                        ymVal,
+                        budget.income.toString(),
+                        bActualInc.toString(),
+                        budget.expense.toString(),
+                        bActualExp.toString(),
+                        budget.savings.toString(),
+                        bActualSav.toString()
+                    ).joinToString(delimiter)
+                ).append("\n")
+            }
         }
     }
 
@@ -1379,6 +2087,8 @@ private fun generateCsvData(
 private fun generatePdfFile(
     context: Context,
     language: AppLanguage,
+    selectedCategory: String,
+    timePeriodText: String,
     transactions: List<Transaction>,
     persons: List<Person>,
     savingsGoals: List<SavingsGoal>,
@@ -1399,55 +2109,63 @@ private fun generatePdfFile(
     var canvas = currentPage.canvas
 
     val primaryPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#1E3A8A")
-        textSize = 18f
+        color = android.graphics.Color.parseColor("#4F46E5") // Modern Indigo / Violet
+        textSize = 16f
         isFakeBoldText = true
+        isAntiAlias = true
     }
 
     val subtitlePaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#6B7280")
-        textSize = 10f
+        color = android.graphics.Color.parseColor("#64748B")
+        textSize = 9.5f
+        isAntiAlias = true
     }
 
     val statsHeaderPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#1E3A8A")
-        textSize = 10f
+        color = android.graphics.Color.parseColor("#4338CA")
+        textSize = 9.5f
         isFakeBoldText = true
+        isAntiAlias = true
     }
 
     val statsValPaint = Paint().apply {
-        color = android.graphics.Color.BLACK
-        textSize = 13f
+        color = android.graphics.Color.parseColor("#0F172A")
+        textSize = 12f
         isFakeBoldText = true
+        isAntiAlias = true
     }
 
     val tableHeaderBgPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#111827")
+        color = android.graphics.Color.parseColor("#4F46E5") // Indigo header
+        isAntiAlias = true
     }
 
     val tableHeaderTxtPaint = Paint().apply {
         color = android.graphics.Color.WHITE
         textSize = 9f
         isFakeBoldText = true
+        isAntiAlias = true
     }
 
     val tableRowTxtPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#1F2937")
+        color = android.graphics.Color.parseColor("#1E293B")
         textSize = 8.5f
+        isAntiAlias = true
     }
 
     val tableRowTxtBoldPaint = Paint().apply {
-        color = android.graphics.Color.BLACK
+        color = android.graphics.Color.parseColor("#0F172A")
         textSize = 8.5f
         isFakeBoldText = true
+        isAntiAlias = true
     }
 
     val zebraBgPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#F9FAFB")
+        color = android.graphics.Color.parseColor("#F5F3FF") // Light soft purple row tint
     }
 
     val dividerPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#E5E7EB")
+        color = android.graphics.Color.parseColor("#E0E7FF")
         style = Paint.Style.STROKE
         strokeWidth = 1f
     }
@@ -1458,73 +2176,177 @@ private fun generatePdfFile(
 
     fun drawPageFooter(canvas: Canvas, pageNum: Int) {
         val paint = Paint().apply {
-            color = android.graphics.Color.parseColor("#9CA3AF")
-            textSize = 8f
+            color = android.graphics.Color.parseColor("#94A3B8")
+            textSize = 8.5f
+            isAntiAlias = true
         }
-        val appName = if (isBn) "ফিনান্স নোট রিপোর্ট" else "Finance Note Report"
+        val genTime = SimpleDateFormat("dd MMMM, yyyy hh:mm a", Locale.getDefault()).format(Date())
+        val footerStr = "${if (isBn) "ফাইন্যান্স নোট অ্যাপ • জেনারেট সময়: " else "Finance Note App • Generated: "}${if (isBn) replaceToBnDigits(genTime) else genTime}"
         val pageStr = if (isBn) "পৃষ্ঠা $pageNum" else "Page $pageNum"
-        canvas.drawText(appName, 40f, 810f, paint)
+        canvas.drawText(footerStr, 40f, 810f, paint)
         val w = paint.measureText(pageStr)
         canvas.drawText(pageStr, 555f - w, 810f, paint)
     }
 
-    // Styled App Logo & Name Header
-    val logoPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#10B981") // Emerald Green
+    // Top Header Gradient / Banner
+    val headerBannerPaint = Paint().apply {
+        color = android.graphics.Color.parseColor("#6366F1")
         isAntiAlias = true
     }
-    canvas.drawCircle(52f, 48f, 12f, logoPaint)
+    val headerRect = android.graphics.RectF(40f, 30f, 555f, 70f)
+    canvas.drawRoundRect(headerRect, 10f, 10f, headerBannerPaint)
+
+    // White Logo Emblem Circle
+    val logoPaint = Paint().apply {
+        color = android.graphics.Color.WHITE
+        isAntiAlias = true
+    }
+    canvas.drawCircle(58f, 50f, 12f, logoPaint)
 
     val symbolPaint = Paint().apply {
-        color = android.graphics.Color.WHITE
-        textSize = 14f
+        color = android.graphics.Color.parseColor("#6366F1")
+        textSize = 13f
         isFakeBoldText = true
         isAntiAlias = true
     }
-    // Draw "F" white emblem inside the green circle
-    canvas.drawText("F", 47f, 53f, symbolPaint)
+    canvas.drawText("F", 54f, 55f, symbolPaint)
 
     val appNamePaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#1E293B") // Dark Slate Blue
-        textSize = 14f
+        color = android.graphics.Color.WHITE
+        textSize = 13f
         isFakeBoldText = true
         isAntiAlias = true
     }
-    canvas.drawText(if (isBn) "ফিনান্স নোট অ্যাপ" else "Finance Note App", 72f, 53f, appNamePaint)
+    canvas.drawText(if (isBn) "ফাইন্যান্স নোট" else "Finance Note App", 78f, 54f, appNamePaint)
 
-    val titlePaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#0F172A") // Slate Dark
-        textSize = 15f
-        isFakeBoldText = true
+    val appSubPaint = Paint().apply {
+        color = android.graphics.Color.parseColor("#E0E7FF")
+        textSize = 9f
         isAntiAlias = true
     }
-    canvas.drawText(if (isBn) "লেনদেন ও বাজেট কন্ট্রোল প্রতিবেদন" else "Transaction & Budget Statement", 40f, 92f, titlePaint)
-    canvas.drawText("${if (isBn) "তৈরি হয়েছে: " else "Generated on: "} ${SimpleDateFormat("dd MMMM, yyyy hh:mm a", Locale.getDefault()).format(Date())}", 40f, 108f, subtitlePaint)
+    val officialStr = if (isBn) "অফিশিয়াল রিপোর্ট ও ডাটা স্টেটমেন্ট" else "Official Financial Statement"
+    val offW = appSubPaint.measureText(officialStr)
+    canvas.drawText(officialStr, 545f - offW, 54f, appSubPaint)
 
+    // Category Title & Selected Time Period Subheader
+    val reportTitle = getCategoryTitle(selectedCategory, language)
+    canvas.drawText(reportTitle, 40f, 92f, primaryPaint)
+
+    val timePeriodStr = "${if (isBn) "সময়কাল: " else "Period: "}$timePeriodText"
+    canvas.drawText(timePeriodStr, 40f, 108f, subtitlePaint)
+
+    val genTimeStr = "${if (isBn) "তৈরির সময়: " else "Generated on: "}${SimpleDateFormat("dd MMMM, yyyy hh:mm a", Locale.getDefault()).format(Date())}"
+    val genW = subtitlePaint.measureText(genTimeStr)
+    canvas.drawText(genTimeStr, 555f - genW, 108f, subtitlePaint)
+
+    // Category Specific Summary Box
     val cardBgPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#F1F5F9") // Soft modern gray card background
+        color = android.graphics.Color.parseColor("#F5F3FF") // Light soft purple
     }
-    canvas.drawRect(40f, 122f, 555f, 182f, cardBgPaint)
+    val cardBorderPaint = Paint().apply {
+        color = android.graphics.Color.parseColor("#DDD6FE")
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+    }
+    val summaryRect = android.graphics.RectF(40f, 118f, 555f, 178f)
+    canvas.drawRoundRect(summaryRect, 8f, 8f, cardBgPaint)
+    canvas.drawRoundRect(summaryRect, 8f, 8f, cardBorderPaint)
 
     val inc = summary["income"] ?: 0.0
     val exp = summary["expense"] ?: 0.0
     val bal = summary["balance"] ?: 0.0
+    val lnd = summary["lend"] ?: 0.0
+    val brw = summary["borrow"] ?: 0.0
+    val savDep = summary["savingsDeposit"] ?: 0.0
+    val savWith = summary["savingsWithdraw"] ?: 0.0
+    val savNet = summary["savingsNet"] ?: 0.0
+    val bInc = summary["budIncTarget"] ?: 0.0
+    val bExp = summary["budExpTarget"] ?: 0.0
 
-    canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 142f, statsHeaderPaint)
-    canvas.drawText(formatCurrency(inc, language), 60f, 162f, statsValPaint)
+    val budgetReport = computeComprehensiveBudgetReport(language, filteredBudgets, transactions, savingsTransactions, savingsGoals)
 
-    canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 230f, 142f, statsHeaderPaint)
-    canvas.drawText(formatCurrency(exp, language), 230f, 162f, statsValPaint)
+    when (selectedCategory) {
+        "ONLY_INCOME" -> {
+            canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(inc, language), 60f, 160f, statsValPaint)
+        }
+        "ONLY_EXPENSE" -> {
+            canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 60f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(exp, language), 60f, 160f, statsValPaint)
+        }
+        "INCOME_EXPENSE" -> {
+            canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(inc, language), 60f, 160f, statsValPaint)
 
-    canvas.drawText(if (isBn) "নিট ব্যালেন্স (Balance)" else "Net Balance", 400f, 142f, statsHeaderPaint)
-    val colorGreen = android.graphics.Color.parseColor("#059669")
-    val colorRed = android.graphics.Color.parseColor("#DC2626")
-    val balColorPaint = Paint().apply {
-        color = if (bal >= 0) colorGreen else colorRed
-        textSize = 13f
-        isFakeBoldText = true
+            canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 230f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(exp, language), 230f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "নিট ব্যালেন্স (Balance)" else "Net Balance", 400f, 140f, statsHeaderPaint)
+            val balColorPaint = Paint().apply {
+                color = if (bal >= 0) android.graphics.Color.parseColor("#059669") else android.graphics.Color.parseColor("#DC2626")
+                textSize = 12f
+                isFakeBoldText = true
+            }
+            canvas.drawText(formatCurrency(bal, language), 400f, 160f, balColorPaint)
+        }
+        "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
+            var posX = 60f
+            if (selectedCategory != "ONLY_PAONA") {
+                canvas.drawText(if (isBn) "মোট দেনা (Debt)" else "Total Debt", posX, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(brw, language), posX, 160f, statsValPaint)
+                posX += 170f
+            }
+            if (selectedCategory != "ONLY_DEBT") {
+                canvas.drawText(if (isBn) "মোট পাওনা (Receivable)" else "Total Receivable", posX, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(lnd, language), posX, 160f, statsValPaint)
+            }
+        }
+        "ONLY_SAVINGS" -> {
+            canvas.drawText(if (isBn) "সঞ্চয় জমা (Deposit)" else "Savings Deposit", 60f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(savDep, language), 60f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "উত্তোলন (Withdrawal)" else "Withdrawal", 230f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(savWith, language), 230f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "অবশিষ্ট সঞ্চয় (Net Saved)" else "Net Savings", 400f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(savNet, language), 400f, 160f, statsValPaint)
+        }
+        "ONLY_BUDGET" -> {
+            canvas.drawText(if (isBn) "আয় টার্গেট vs প্রকৃত" else "Inc Target vs Actual", 60f, 138f, statsHeaderPaint)
+            canvas.drawText("${formatCurrencyNoSymbol(budgetReport.incomeAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.incomeAnalysis.actualAmount, language)}", 60f, 153f, statsValPaint)
+            val incPctStr = "${String.format(Locale.US, "%.1f", budgetReport.incomeAnalysis.fulfillmentPercentage)}%"
+            val incPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#059669"); textSize = 9f; isFakeBoldText = true }
+            canvas.drawText("${if (isBn) "পূরণ: " else "Fulfilled: "}${if (isBn) replaceToBnDigits(incPctStr) else incPctStr}", 60f, 168f, incPctPaint)
+
+            canvas.drawText(if (isBn) "ব্যয় টার্গেট vs প্রকৃত" else "Exp Target vs Actual", 230f, 138f, statsHeaderPaint)
+            canvas.drawText("${formatCurrencyNoSymbol(budgetReport.expenseAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.expenseAnalysis.actualAmount, language)}", 230f, 153f, statsValPaint)
+            val expPctStr = "${String.format(Locale.US, "%.1f", budgetReport.expenseAnalysis.fulfillmentPercentage)}%"
+            val expPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#DC2626"); textSize = 9f; isFakeBoldText = true }
+            canvas.drawText("${if (isBn) "ব্যবহৃত: " else "Used: "}${if (isBn) replaceToBnDigits(expPctStr) else expPctStr}", 230f, 168f, expPctPaint)
+
+            canvas.drawText(if (isBn) "সঞ্চয় টার্গেট vs প্রকৃত" else "Sav Target vs Actual", 400f, 138f, statsHeaderPaint)
+            canvas.drawText("${formatCurrencyNoSymbol(budgetReport.savingsAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.savingsAnalysis.actualAmount, language)}", 400f, 153f, statsValPaint)
+            val savPctStr = "${String.format(Locale.US, "%.1f", budgetReport.savingsAnalysis.fulfillmentPercentage)}%"
+            val savPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#8B5CF6"); textSize = 9f; isFakeBoldText = true }
+            canvas.drawText("${if (isBn) "পূরণ: " else "Achieved: "}${if (isBn) replaceToBnDigits(savPctStr) else savPctStr}", 400f, 168f, savPctPaint)
+        }
+        else -> {
+            canvas.drawText(if (isBn) "মোট আয়" else "Income", 50f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(inc, language), 50f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "মোট ব্যয়" else "Expense", 155f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(exp, language), 155f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "মোট দেনা" else "Debt", 260f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(brw, language), 260f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "মোট পাওনা" else "Credit", 365f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(lnd, language), 365f, 160f, statsValPaint)
+
+            canvas.drawText(if (isBn) "মোট সঞ্চয়" else "Savings", 470f, 140f, statsHeaderPaint)
+            canvas.drawText(formatCurrency(savNet, language), 470f, 160f, statsValPaint)
+        }
     }
-    canvas.drawText(formatCurrency(bal, language), 400f, 162f, balColorPaint)
 
     fun drawTableHeader(canvas: Canvas, y: Float) {
         canvas.drawRect(40f, y, 555f, y + 22f, tableHeaderBgPaint)
@@ -1536,114 +2358,138 @@ private fun generatePdfFile(
         canvas.drawText(if (isBn) "টাকা" else "Amount", 495f, y + 14f, tableHeaderTxtPaint)
     }
 
-    var currentY = 202f
+    var currentY = 195f
 
-    // Draw Budget donut charts if ONLY_BUDGET is selected
-    if (transactions.isEmpty() && savingsTransactions.isEmpty() && filteredBudgets.isNotEmpty()) {
-        val firstBudget = filteredBudgets.first()
-        val ymText = "${months[firstBudget.month]} ${firstBudget.year}"
-
-        val budgetTitlePaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#0F172A")
-            textSize = 12f
-            isFakeBoldText = true
-            isAntiAlias = true
-        }
-        canvas.drawText("${if (isBn) "বাজেট সারসংক্ষেপ - " else "Budget Summary - "}$ymText", 40f, currentY + 12f, budgetTitlePaint)
-        currentY += 24f
-
-        val actualInc = transactions.filter {
-            val (y, m) = getYearAndMonth(it.timestamp)
-            y == firstBudget.year && m == firstBudget.month && (it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT"))
-        }.sumOf { it.amount }
-
-        val actualExp = transactions.filter {
-            val (y, m) = getYearAndMonth(it.timestamp)
-            y == firstBudget.year && m == firstBudget.month && (it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT"))
-        }.sumOf { it.amount }
-
-        val actualSav = savingsTransactions.filter {
-            val (y, m) = getYearAndMonth(it.timestamp)
-            y == firstBudget.year && m == firstBudget.month
-        }.sumOf { if (it.isDeposit) it.amount else -it.amount }
-
-        val donutRadius = 26f
-        val startY = currentY + 35f
-
-        val arcPaintBg = Paint().apply {
-            color = android.graphics.Color.parseColor("#E2E8F0")
-            style = Paint.Style.STROKE
-            strokeWidth = 7f
-            isAntiAlias = true
-        }
-
-        val labelPaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#475569")
-            textSize = 9f
+    // 1. If ONLY_BUDGET, draw full budget & percentage breakdown tables
+    if (selectedCategory == "ONLY_BUDGET") {
+        val secTitlePaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#4338CA")
+            textSize = 10.5f
             isFakeBoldText = true
             isAntiAlias = true
         }
 
-        val valPaint = Paint().apply {
-            color = android.graphics.Color.BLACK
-            textSize = 8.5f
-            isAntiAlias = true
+        canvas.drawText(if (isBn) "১. বাজেট পারফরম্যান্স ও অর্জনের সারসংক্ষেপ" else "1. Budget Performance & Achievement Summary", 40f, currentY + 12f, secTitlePaint)
+        currentY += 18f
+
+        fun drawBudgetOverviewHeader(canvas: Canvas, y: Float) {
+            canvas.drawRect(40f, y, 555f, y + 22f, tableHeaderBgPaint)
+            canvas.drawText(if (isBn) "বাজেটের বিষয়" else "Budget Metric", 45f, y + 14f, tableHeaderTxtPaint)
+            canvas.drawText(if (isBn) "নির্ধারিত টার্গেট" else "Target Amount", 150f, y + 14f, tableHeaderTxtPaint)
+            canvas.drawText(if (isBn) "প্রকৃত অর্জন/ব্যয়" else "Actual Amount", 260f, y + 14f, tableHeaderTxtPaint)
+            canvas.drawText(if (isBn) "পূরণ/ব্যবহার %" else "Fulfillment %", 370f, y + 14f, tableHeaderTxtPaint)
+            canvas.drawText(if (isBn) "অবশিষ্ট / পার্থক্য" else "Variance", 460f, y + 14f, tableHeaderTxtPaint)
         }
 
-        // 1. Income Donut
-        val incX = 100f
-        val rectInc = android.graphics.RectF(incX - donutRadius, startY - donutRadius, incX + donutRadius, startY + donutRadius)
-        canvas.drawArc(rectInc, 0f, 360f, false, arcPaintBg)
-        val incPct = if (firstBudget.income > 0) (actualInc / firstBudget.income) else 0.0
-        val sweepInc = (incPct * 360f).coerceIn(0.0, 360.0).toFloat()
-        val arcPaintInc = Paint().apply {
-            color = android.graphics.Color.parseColor("#10B981") // Green
-            style = Paint.Style.STROKE
-            strokeWidth = 7f
-            isAntiAlias = true
+        drawBudgetOverviewHeader(canvas, currentY)
+        currentY += 22f
+
+        val metricsList = listOf(budgetReport.incomeAnalysis, budgetReport.expenseAnalysis, budgetReport.savingsAnalysis)
+
+        metricsList.forEachIndexed { idx, m ->
+            if (currentY + 22f > 780f) {
+                drawPageFooter(canvas, pageNumber)
+                pdfDocument.finishPage(currentPage)
+                pageNumber++
+                pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+                currentPage = pdfDocument.startPage(pageInfo)
+                canvas = currentPage.canvas
+                currentY = 45f
+                drawBudgetOverviewHeader(canvas, currentY)
+                currentY += 22f
+            }
+
+            if (idx % 2 == 1) {
+                canvas.drawRect(40f, currentY, 555f, currentY + 20f, zebraBgPaint)
+            }
+            canvas.drawLine(40f, currentY + 20f, 555f, currentY + 20f, dividerPaint)
+
+            canvas.drawText(m.typeName, 45f, currentY + 13f, tableRowTxtBoldPaint)
+            canvas.drawText(formatCurrencyNoSymbol(m.targetAmount, language), 150f, currentY + 13f, tableRowTxtPaint)
+            canvas.drawText(formatCurrencyNoSymbol(m.actualAmount, language), 260f, currentY + 13f, tableRowTxtPaint)
+
+            val pctStr = "${String.format(Locale.US, "%.1f", m.fulfillmentPercentage)}%"
+            val pctStrBn = if (isBn) replaceToBnDigits(pctStr) else pctStr
+            canvas.drawText(pctStrBn, 370f, currentY + 13f, tableRowTxtBoldPaint)
+
+            canvas.drawText(formatCurrencyNoSymbol(m.remainingAmount, language), 460f, currentY + 13f, tableRowTxtPaint)
+
+            currentY += 20f
         }
-        canvas.drawArc(rectInc, -90f, sweepInc, false, arcPaintInc)
 
-        val incPctText = "${(incPct * 100).toInt()}%"
-        val pctPaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#0F172A")
-            textSize = 9f
-            isFakeBoldText = true
-            isAntiAlias = true
+        currentY += 12f
+
+        // Category Breakdowns
+        val categoriesSections = listOf(
+            Pair(if (isBn) "২. আয় খাতভিত্তিক বাজেট বিশ্লেষণ (খাতওয়ারি তথ্য)" else "2. Income Category Breakdown", budgetReport.incomeAnalysis.categories),
+            Pair(if (isBn) "৩. ব্যয় খাতভিত্তিক বাজেট বিশ্লেষণ (খাতওয়ারি তথ্য)" else "3. Expense Category Breakdown", budgetReport.expenseAnalysis.categories),
+            Pair(if (isBn) "৪. সঞ্চয় লক্ষ্যভিত্তিক বাজেট বিশ্লেষণ (খাতওয়ারি তথ্য)" else "4. Savings Goal Breakdown", budgetReport.savingsAnalysis.categories)
+        )
+
+        categoriesSections.forEach { (secTitle, catList) ->
+            if (catList.isNotEmpty()) {
+                if (currentY + 50f > 780f) {
+                    drawPageFooter(canvas, pageNumber)
+                    pdfDocument.finishPage(currentPage)
+                    pageNumber++
+                    pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+                    currentPage = pdfDocument.startPage(pageInfo)
+                    canvas = currentPage.canvas
+                    currentY = 45f
+                }
+
+                canvas.drawText(secTitle, 40f, currentY + 12f, secTitlePaint)
+                currentY += 18f
+
+                fun drawCatHeader(canvas: Canvas, y: Float) {
+                    canvas.drawRect(40f, y, 555f, y + 22f, tableHeaderBgPaint)
+                    canvas.drawText(if (isBn) "খাত / লক্ষ্য শিরোনাম" else "Category / Goal", 45f, y + 14f, tableHeaderTxtPaint)
+                    canvas.drawText(if (isBn) "প্রকৃত পরিমাণ" else "Actual Amount", 210f, y + 14f, tableHeaderTxtPaint)
+                    canvas.drawText(if (isBn) "বাজেটের % (% Target)" else "% of Target Budget", 330f, y + 14f, tableHeaderTxtPaint)
+                    canvas.drawText(if (isBn) "মোট এর % (% Total)" else "% of Total", 450f, y + 14f, tableHeaderTxtPaint)
+                }
+
+                drawCatHeader(canvas, currentY)
+                currentY += 22f
+
+                catList.forEachIndexed { idx, c ->
+                    if (currentY + 22f > 780f) {
+                        drawPageFooter(canvas, pageNumber)
+                        pdfDocument.finishPage(currentPage)
+                        pageNumber++
+                        pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+                        currentPage = pdfDocument.startPage(pageInfo)
+                        canvas = currentPage.canvas
+                        currentY = 45f
+                        drawCatHeader(canvas, currentY)
+                        currentY += 22f
+                    }
+
+                    if (idx % 2 == 1) {
+                        canvas.drawRect(40f, currentY, 555f, currentY + 20f, zebraBgPaint)
+                    }
+                    canvas.drawLine(40f, currentY + 20f, 555f, currentY + 20f, dividerPaint)
+
+                    val catNameTrunc = if (c.categoryName.length > 22) c.categoryName.substring(0, 20) + ".." else c.categoryName
+                    canvas.drawText(catNameTrunc, 45f, currentY + 13f, tableRowTxtPaint)
+                    canvas.drawText(formatCurrencyNoSymbol(c.amount, language), 210f, currentY + 13f, tableRowTxtPaint)
+
+                    val tgtPctStr = "${String.format(Locale.US, "%.1f", c.percentageOfTarget)}%"
+                    canvas.drawText(if (isBn) replaceToBnDigits(tgtPctStr) else tgtPctStr, 330f, currentY + 13f, tableRowTxtBoldPaint)
+
+                    val totPctStr = "${String.format(Locale.US, "%.1f", c.percentageOfTotal)}%"
+                    canvas.drawText(if (isBn) replaceToBnDigits(totPctStr) else totPctStr, 450f, currentY + 13f, tableRowTxtPaint)
+
+                    currentY += 20f
+                }
+
+                currentY += 12f
+            }
         }
-        val incPctW = pctPaint.measureText(incPctText)
-        canvas.drawText(incPctText, incX - (incPctW / 2f), startY + 3f, pctPaint)
-
-        canvas.drawText(if (isBn) "আয় (Income)" else "Income", incX + 45f, startY - 12f, labelPaint)
-        canvas.drawText("${if (isBn) "টার্গেট: " else "Target: "}${formatCurrencyNoSymbol(firstBudget.income, language)}", incX + 45f, startY + 2f, valPaint)
-        canvas.drawText("${if (isBn) "অর্জিত: " else "Actual: "}${formatCurrencyNoSymbol(actualInc, language)}", incX + 45f, startY + 14f, valPaint)
-
-        // 2. Expense Donut
-        val expX = 320f
-        val rectExp = android.graphics.RectF(expX - donutRadius, startY - donutRadius, expX + donutRadius, startY + donutRadius)
-        canvas.drawArc(rectExp, 0f, 360f, false, arcPaintBg)
-        val expPct = if (firstBudget.expense > 0) (actualExp / firstBudget.expense) else 0.0
-        val sweepExp = (expPct * 360f).coerceIn(0.0, 360.0).toFloat()
-        val arcPaintExp = Paint().apply {
-            color = android.graphics.Color.parseColor("#F97316") // Orange
-            style = Paint.Style.STROKE
-            strokeWidth = 7f
-            isAntiAlias = true
-        }
-        canvas.drawArc(rectExp, -90f, sweepExp, false, arcPaintExp)
-
-        val expPctText = "${(expPct * 100).toInt()}%"
-        val expPctW = pctPaint.measureText(expPctText)
-        canvas.drawText(expPctText, expX - (expPctW / 2f), startY + 3f, pctPaint)
-
-        canvas.drawText(if (isBn) "ব্যয় (Expense)" else "Expense", expX + 45f, startY - 12f, labelPaint)
-        canvas.drawText("${if (isBn) "টার্গেট: " else "Target: "}${formatCurrencyNoSymbol(firstBudget.expense, language)}", expX + 45f, startY + 2f, valPaint)
-        canvas.drawText("${if (isBn) "ব্যয়িত: " else "Spent: "}${formatCurrencyNoSymbol(actualExp, language)}", expX + 45f, startY + 14f, valPaint)
-
-        currentY = startY + donutRadius + 35f
     }
 
-    if (transactions.isNotEmpty()) {
+    // 2. Draw Transactions Table
+    if (selectedCategory != "ONLY_BUDGET" && selectedCategory != "ONLY_SAVINGS" && transactions.isNotEmpty()) {
         drawTableHeader(canvas, currentY)
         currentY += 22f
 
@@ -1682,6 +2528,7 @@ private fun generatePdfFile(
                 color = colorType
                 textSize = 8.5f
                 isFakeBoldText = true
+                isAntiAlias = true
             }
 
             val catTrunc = if (tx.category.length > 15) tx.category.substring(0, 13) + ".." else tx.category
@@ -1702,7 +2549,8 @@ private fun generatePdfFile(
         }
     }
 
-    if (savingsTransactions.isNotEmpty()) {
+    // 3. Draw Savings Table
+    if ((selectedCategory == "ALL_DATA" || selectedCategory == "ONLY_SAVINGS") && savingsTransactions.isNotEmpty()) {
         currentY += 15f
 
         if (currentY + 45f > 780f) {
@@ -1718,11 +2566,12 @@ private fun generatePdfFile(
         }
 
         val secTitlePaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#1E3A8A")
+            color = android.graphics.Color.parseColor("#4338CA")
             textSize = 11f
             isFakeBoldText = true
+            isAntiAlias = true
         }
-        canvas.drawText(if (isBn) "সঞ্চয় রেকর্ডসমূহ (Savings Logs)" else "Savings Logs", 40f, currentY + 12f, secTitlePaint)
+        canvas.drawText(if (isBn) "সঞ্চয় রেকর্ডসমূহ (Savings Log)" else "Savings Log", 40f, currentY + 12f, secTitlePaint)
         currentY += 18f
 
         canvas.drawRect(40f, currentY, 555f, currentY + 22f, tableHeaderBgPaint)
@@ -1767,6 +2616,7 @@ private fun generatePdfFile(
                 color = typeColor
                 textSize = 8.5f
                 isFakeBoldText = true
+                isAntiAlias = true
             }
 
             val goalTrunc = if (goalTitle.length > 20) goalTitle.substring(0, 18) + ".." else goalTitle
@@ -1785,86 +2635,6 @@ private fun generatePdfFile(
         }
     }
 
-    // Draw Budgets Table
-    if (filteredBudgets.isNotEmpty()) {
-        currentY += 15f
-        if (currentY + 45f > 780f) {
-            drawPageFooter(canvas, pageNumber)
-            pdfDocument.finishPage(currentPage)
-            pageNumber++
-            pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
-            currentPage = pdfDocument.startPage(pageInfo)
-            canvas = currentPage.canvas
-            currentY = 45f
-        }
-
-        val secTitlePaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#1E3A8A")
-            textSize = 11f
-            isFakeBoldText = true
-        }
-        canvas.drawText(if (isBn) "বাজেট বিবরণী (Budgets Log)" else "Budgets Log", 40f, currentY + 12f, secTitlePaint)
-        currentY += 18f
-
-        fun drawBudgetTableHeader(canvas: Canvas, y: Float) {
-            canvas.drawRect(40f, y, 555f, y + 22f, tableHeaderBgPaint)
-            canvas.drawText(if (isBn) "মাস/বছর" else "Month/Year", 45f, y + 14f, tableHeaderTxtPaint)
-            canvas.drawText(if (isBn) "আয় (টার্গেট/অর্জিত)" else "Income (Target/Actual)", 140f, y + 14f, tableHeaderTxtPaint)
-            canvas.drawText(if (isBn) "ব্যয় (টার্গেট/ব্যয়িত)" else "Expense (Target/Spent)", 290f, y + 14f, tableHeaderTxtPaint)
-            canvas.drawText(if (isBn) "সঞ্চয় (টার্গেট/অর্জিত)" else "Savings (Target/Actual)", 430f, y + 14f, tableHeaderTxtPaint)
-        }
-
-        drawBudgetTableHeader(canvas, currentY)
-        currentY += 22f
-
-        filteredBudgets.forEachIndexed { index, budget ->
-            if (currentY + 22f > 780f) {
-                drawPageFooter(canvas, pageNumber)
-                pdfDocument.finishPage(currentPage)
-                pageNumber++
-                pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
-                currentPage = pdfDocument.startPage(pageInfo)
-                canvas = currentPage.canvas
-                currentY = 45f
-                drawBudgetTableHeader(canvas, currentY)
-                currentY += 22f
-            }
-
-            if (index % 2 == 1) {
-                canvas.drawRect(40f, currentY, 555f, currentY + 20f, zebraBgPaint)
-            }
-            canvas.drawLine(40f, currentY + 20f, 555f, currentY + 20f, dividerPaint)
-
-            val ymVal = "${months[budget.month]} ${budget.year}"
-
-            val bActualInc = transactions.filter {
-                val (y, m) = getYearAndMonth(it.timestamp)
-                y == budget.year && m == budget.month && (it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT"))
-            }.sumOf { it.amount }
-
-            val bActualExp = transactions.filter {
-                val (y, m) = getYearAndMonth(it.timestamp)
-                y == budget.year && m == budget.month && (it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT"))
-            }.sumOf { it.amount }
-
-            val bActualSav = savingsTransactions.filter {
-                val (y, m) = getYearAndMonth(it.timestamp)
-                y == budget.year && m == budget.month
-            }.sumOf { if (it.isDeposit) it.amount else -it.amount }
-
-            val incStr = "${formatCurrencyNoSymbol(budget.income, language)} / ${formatCurrencyNoSymbol(bActualInc, language)}"
-            val expStr = "${formatCurrencyNoSymbol(budget.expense, language)} / ${formatCurrencyNoSymbol(bActualExp, language)}"
-            val savStr = "${formatCurrencyNoSymbol(budget.savings, language)} / ${formatCurrencyNoSymbol(bActualSav, language)}"
-
-            canvas.drawText(ymVal, 45f, currentY + 13f, tableRowTxtPaint)
-            canvas.drawText(incStr, 140f, currentY + 13f, tableRowTxtPaint)
-            canvas.drawText(expStr, 290f, currentY + 13f, tableRowTxtPaint)
-            canvas.drawText(savStr, 430f, currentY + 13f, tableRowTxtPaint)
-
-            currentY += 20f
-        }
-    }
-
     drawPageFooter(canvas, pageNumber)
     pdfDocument.finishPage(currentPage)
 
@@ -1877,6 +2647,87 @@ private fun generatePdfFile(
         e.printStackTrace()
     } finally {
         pdfDocument.close()
+    }
+}
+
+@Composable
+private fun PreviewSummaryBadge(
+    label: String,
+    amount: Double,
+    color: Color,
+    language: AppLanguage,
+    isDark: Boolean
+) {
+    Surface(
+        color = color.copy(alpha = if (isDark) 0.2f else 0.12f),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Text(text = label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isDark) Color.White.copy(alpha = 0.8f) else color)
+            Text(text = formatCurrency(amount, language), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = if (isDark) Color.White else color)
+        }
+    }
+}
+
+fun getFormattedTimePeriod(
+    language: AppLanguage,
+    timeFilter: String,
+    month: Int,
+    year: Int,
+    startDateMillis: Long,
+    endDateMillis: Long,
+    startMonth: Int,
+    startYear: Int,
+    endMonth: Int,
+    endYear: Int,
+    startYearRange: Int,
+    endYearRange: Int
+): String {
+    val isBn = language == AppLanguage.BN
+    val monthNamesBn = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+    val monthNamesEn = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    val months = if (isBn) monthNamesBn else monthNamesEn
+
+    return when (timeFilter) {
+        "MONTH" -> "${months[month]} ${if (isBn) replaceToBnDigits(year.toString()) else year.toString()}"
+        "YEAR" -> if (isBn) "${replaceToBnDigits(year.toString())} সাল" else "Year $year"
+        "DATE_RANGE" -> {
+            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+            val startStr = sdf.format(Date(startDateMillis))
+            val endStr = sdf.format(Date(endDateMillis))
+            val s = if (isBn) replaceToBnDigits(startStr) else startStr
+            val e = if (isBn) replaceToBnDigits(endStr) else endStr
+            "$s - $e"
+        }
+        "MONTH_RANGE" -> {
+            val sm = "${months[startMonth]} ${if (isBn) replaceToBnDigits(startYear.toString()) else startYear}"
+            val em = "${months[endMonth]} ${if (isBn) replaceToBnDigits(endYear.toString()) else endYear}"
+            "$sm - $em"
+        }
+        "YEAR_RANGE" -> {
+            val sy = if (isBn) replaceToBnDigits(startYearRange.toString()) else startYearRange.toString()
+            val ey = if (isBn) replaceToBnDigits(endYearRange.toString()) else endYearRange.toString()
+            "$sy - $ey"
+        }
+        else -> if (isBn) "সব সময়ের" else "All Time"
+    }
+}
+
+fun getCategoryTitle(category: String, language: AppLanguage): String {
+    val isBn = language == AppLanguage.BN
+    return when (category) {
+        "ALL_DATA" -> if (isBn) "সকল তথ্যের সর্বমোট হিসাব" else "Complete Financial Statement"
+        "TRANSACTIONS" -> if (isBn) "সকল লেনদেনের হিসাব" else "All Transactions Report"
+        "INCOME_EXPENSE" -> if (isBn) "আয়-ব্যয়ের হিসাব" else "Income & Expense Report"
+        "ONLY_INCOME" -> if (isBn) "আয়ের হিসাব" else "Income Statement"
+        "ONLY_EXPENSE" -> if (isBn) "ব্যয়ের হিসাব" else "Expense Statement"
+        "DEBT_REPAYMENT" -> if (isBn) "দেনা-পাওনার হিসাব" else "Debts & Receivables Report"
+        "ONLY_DEBT" -> if (isBn) "দেনার হিসাব" else "Debts Statement"
+        "ONLY_PAONA" -> if (isBn) "পাওনার হিসাব" else "Receivables Statement"
+        "ONLY_SAVINGS" -> if (isBn) "সঞ্চয়ের হিসাব" else "Savings Statement"
+        "ONLY_BUDGET" -> if (isBn) "মাসিক বাজেট কন্ট্রোল হিসাব" else "Monthly Budget Report"
+        else -> if (isBn) "আর্থিক প্রতিবেদন" else "Financial Statement"
     }
 }
 

@@ -2345,6 +2345,9 @@ fun FinanceNoteApp(
     val personDebts by viewModel.personDebts.collectAsState()
     val savingsTransactions by viewModel.savingsTransactions.collectAsState()
     val monthlyBudgets by viewModel.monthlyBudgets.collectAsState(initial = emptyList())
+    val budgetIncome by viewModel.budgetIncome.collectAsState()
+    val budgetExpense by viewModel.budgetExpense.collectAsState()
+    val budgetSavings by viewModel.budgetSavings.collectAsState()
     var showExportDialog by remember { mutableStateOf(false) }
     var exportDialogInitialCategory by remember { mutableStateOf("ALL_DATA") }
 
@@ -2357,6 +2360,9 @@ fun FinanceNoteApp(
             savingsGoals = savingsGoals,
             savingsTransactions = savingsTransactions,
             monthlyBudgets = monthlyBudgets,
+            defaultBudgetIncome = budgetIncome,
+            defaultBudgetExpense = budgetExpense,
+            defaultBudgetSavings = budgetSavings,
             initialCategory = exportDialogInitialCategory,
             onDismiss = { showExportDialog = false }
         )
