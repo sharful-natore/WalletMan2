@@ -8793,6 +8793,9 @@ fun TransactionsScreen(
         }
 
         // Floating Action Button to Export Transactions
+        val exportInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+        val isExportHovered by exportInteractionSource.collectIsHoveredAsState()
+
         androidx.compose.animation.AnimatedVisibility(
             visible = !isSelectionMode,
             enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
@@ -8801,7 +8804,7 @@ fun TransactionsScreen(
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 113.dp, end = 16.dp)
         ) {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = {
                     val cat = when (filter) {
                         "INCOME" -> "ONLY_INCOME"
@@ -8812,19 +8815,30 @@ fun TransactionsScreen(
                     }
                     onExportRequest?.invoke(cat)
                 },
+                expanded = isExportHovered,
+                icon = {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_custom_export),
+                        contentDescription = "Export Transactions",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (language == AppLanguage.BN) "এক্সপোর্ট রিপোর্ট" else "Export Report",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                },
                 containerColor = FintechBlue,
                 shape = RoundedCornerShape(16.dp),
+                interactionSource = exportInteractionSource,
                 modifier = Modifier
-                    .size(60.dp)
+                    .hoverable(exportInteractionSource)
                     .testTag("fab_export_transactions")
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.FileDownload,
-                    contentDescription = "Export Transactions",
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
+            )
         }
     }
 }
@@ -12147,7 +12161,7 @@ fun SavingsGoalDetailOverlay(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.PictureAsPdf,
+                                painter = painterResource(id = R.drawable.ic_custom_export),
                                 contentDescription = "Export PDF",
                                 tint = Color(0xFF10B981),
                                 modifier = Modifier.size(16.dp)
@@ -12755,7 +12769,7 @@ fun PersonDetailOverlay(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.PictureAsPdf,
+                                    painter = painterResource(id = R.drawable.ic_custom_export),
                                     contentDescription = "Export PDF",
                                     tint = Color(0xFF10B981),
                                     modifier = Modifier.size(16.dp)

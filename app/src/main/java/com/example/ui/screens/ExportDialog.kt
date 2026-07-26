@@ -407,7 +407,10 @@ fun ExportDialog(
         // Person Filter
         val showPersonFilterOption = selectedCategory != "ONLY_SAVINGS" && selectedCategory != "ONLY_BUDGET"
         if (showPersonFilterOption && filterByPerson && selectedPerson != null) {
-            list = list.filter { it.personId == selectedPerson!!.id }
+            list = list.filter { 
+                it.personId == selectedPerson!!.id && 
+                (it.type == "LEND" || it.type == "BORROW" || it.type == "REPAY_PAID" || it.type == "REPAY_RECEIVED")
+            }
         }
 
         // Time Filter
@@ -670,90 +673,6 @@ fun ExportDialog(
         )
     }
 
-    // SAF CreateDocument Launcher for saving to a custom folder chosen by the user
-    val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            isExporting = true
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val totalInc = filteredTx.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
-                    val totalExp = filteredTx.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
-                    val totalLend = filteredTx.filter { it.type == "LEND" }.sumOf { it.amount }
-                    val totalBorrow = filteredTx.filter { it.type == "BORROW" }.sumOf { it.amount }
-                    val totalRepayPaid = filteredTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
-                    val totalRepayRecv = filteredTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
-                    val netBalance = totalInc - totalExp
-
-                    val totalSavDeposit = filteredSavingsTx.filter { it.isDeposit }.sumOf { it.amount }
-                    val totalSavWithdraw = filteredSavingsTx.filter { !it.isDeposit }.sumOf { it.amount }
-                    val netSavings = totalSavDeposit - totalSavWithdraw
-
-                    val budIncTarget = filteredBudgets.sumOf { it.income }
-                    val budExpTarget = filteredBudgets.sumOf { it.expense }
-                    val budSavTarget = filteredBudgets.sumOf { it.savings }
-
-                    val summary = mapOf(
-                        "income" to totalInc,
-                        "expense" to totalExp,
-                        "balance" to netBalance,
-                        "lend" to totalLend,
-                        "borrow" to totalBorrow,
-                        "repayPaid" to totalRepayPaid,
-                        "repayRecv" to totalRepayRecv,
-                        "savingsDeposit" to totalSavDeposit,
-                        "savingsWithdraw" to totalSavWithdraw,
-                        "savingsNet" to netSavings,
-                        "budIncTarget" to budIncTarget,
-                        "budExpTarget" to budExpTarget,
-                        "budSavTarget" to budSavTarget
-                    )
-
-                    context.contentResolver.openOutputStream(uri)?.use { os ->
-                        if (selectedFormat == "PDF") {
-                            val tempFile = File(context.cacheDir, "temp_export.pdf")
-                            generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, tempFile, filterByPerson, selectedPerson, filterBySavingsGoal, selectedSavingsGoal)
-                            tempFile.inputStream().use { input ->
-                                input.copyTo(os)
-                            }
-                            tempFile.delete()
-                        } else {
-                            val csvContent = generateCsvData(language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, selectedFormat == "EXCEL")
-                            os.write(csvContent.toByteArray(Charsets.UTF_8))
-                        }
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        isExporting = false
-                        Toast.makeText(context, if (isBn) "সফলভাবে ফোল্ডারে ফাইলটি সংরক্ষণ করা হয়েছে!" else "File successfully saved to your selected folder!", Toast.LENGTH_LONG).show()
-
-                        try {
-                            val mimeType = when (selectedFormat) {
-                                "PDF" -> "application/pdf"
-                                "EXCEL" -> "application/vnd.ms-excel"
-                                else -> "text/csv"
-                            }
-                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, mimeType)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(viewIntent, if (isBn) "ফাইলটি খুলুন" else "Open File"))
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
-                } catch (e: java.lang.Exception) {
-                    e.printStackTrace()
-                    withContext(Dispatchers.Main) {
-                        isExporting = false
-                        Toast.makeText(context, if (isBn) "ফাইল সংরক্ষণে ত্রুটি!" else "Failed to save file!", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
-    }
-
     // Helper functions for sharing/downloading
     fun performExport(context: Context, format: String, action: String) {
         val totalInc = filteredTx.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
@@ -788,20 +707,51 @@ fun ExportDialog(
             "budSavTarget" to budSavTarget
         )
 
+        // Generate PDF name based on selected sorting/filter and time period
+        val filePrefix = when {
+            filterByPerson && selectedPerson != null -> {
+                selectedPerson!!.name
+            }
+            filterBySavingsGoal && selectedSavingsGoal != null -> {
+                selectedSavingsGoal!!.title
+            }
+            else -> {
+                when (selectedCategory) {
+                    "ALL_DATA", "TRANSACTIONS" -> "All Transaction"
+                    "DEBT_REPAYMENT" -> if (isBn) "দেনা পাওনা ও পরিশোধ" else "Debt and Repayments"
+                    "INCOME_EXPENSE" -> if (isBn) "আয় ব্যয়" else "Income and Expense"
+                    "ONLY_DEBT" -> if (isBn) "দেনা" else "Debt"
+                    "ONLY_PAONA" -> if (isBn) "পাওনা" else "Credit"
+                    "ONLY_INCOME" -> if (isBn) "আয়" else "Income"
+                    "ONLY_EXPENSE" -> if (isBn) "ব্যয়" else "Expense"
+                    "ONLY_SAVINGS" -> if (isBn) "সঞ্চয়" else "Savings"
+                    "ONLY_BUDGET" -> if (isBn) "বাজেট" else "Budget"
+                    else -> "All Transaction"
+                }
+            }
+        }
+
+        val cleanPrefix = filePrefix.replace(Regex("[\\\\/:*?\"<>|\\s+]"), "_")
+        val cleanPeriod = timePeriodText.replace(Regex("[\\\\/:*?\"<>|\\s+]"), "_")
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val extension = when (format) {
             "PDF" -> ".pdf"
             "EXCEL" -> ".xls"
             else -> ".csv"
         }
-        val categoryPrefix = selectedCategory.lowercase(Locale.ROOT)
-        val fileName = "finance_${categoryPrefix}_$timestamp$extension"
+        val fileName = "${cleanPrefix}_${cleanPeriod}_$timestamp$extension"
 
-        val shareDir = File(context.cacheDir, "shared_images")
-        if (!shareDir.exists()) shareDir.mkdirs()
-        val tempShareFile = File(shareDir, fileName)
+        val mimeType = when (format) {
+            "PDF" -> "application/pdf"
+            "EXCEL" -> "application/vnd.ms-excel"
+            else -> "text/csv"
+        }
 
         if (action == "SHARE") {
+            val shareDir = File(context.cacheDir, "shared_images")
+            if (!shareDir.exists()) shareDir.mkdirs()
+            val tempShareFile = File(shareDir, fileName)
+
             isExporting = true
             scope.launch(Dispatchers.IO) {
                 if (format == "PDF") {
@@ -815,7 +765,7 @@ fun ExportDialog(
                         return@launch
                     }
                 } else {
-                    val csvContent = generateCsvData(language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, format == "EXCEL")
+                    val csvContent = generateCsvData(language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, format == "EXCEL", filterByPerson, selectedPerson)
                     try {
                         FileOutputStream(tempShareFile).use { fos ->
                             fos.write(csvContent.toByteArray(Charsets.UTF_8))
@@ -835,12 +785,6 @@ fun ExportDialog(
                         val authority = "${context.packageName}.fileprovider"
                         val fileUri = FileProvider.getUriForFile(context, authority, tempShareFile)
 
-                        val mimeType = when (format) {
-                            "PDF" -> "application/pdf"
-                            "EXCEL" -> "application/vnd.ms-excel"
-                            else -> "text/csv"
-                        }
-
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = mimeType
                             putExtra(Intent.EXTRA_STREAM, fileUri)
@@ -855,8 +799,62 @@ fun ExportDialog(
                 }
             }
         } else {
-            // "DOWNLOAD" triggers custom directory saving via SAF (Storage Access Framework)
-            createDocumentLauncher.launch(fileName)
+            // "DOWNLOAD" - Automatically saves to standard Downloads/Finance Note/Reports directory
+            isExporting = true
+            scope.launch(Dispatchers.IO) {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val targetDir = File(downloadsDir, "Finance Note/Reports")
+                if (!targetDir.exists()) {
+                    targetDir.mkdirs()
+                }
+                val targetFile = File(targetDir, fileName)
+
+                if (format == "PDF") {
+                    try {
+                        generatePdfFile(context, language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, summary, targetFile, filterByPerson, selectedPerson, filterBySavingsGoal, selectedSavingsGoal)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        withContext(Dispatchers.Main) {
+                            isExporting = false
+                            Toast.makeText(context, if (isBn) "পিডিএফ তৈরিতে ত্রুটি!" else "Failed to generate PDF!", Toast.LENGTH_SHORT).show()
+                        }
+                        return@launch
+                    }
+                } else {
+                    val csvContent = generateCsvData(language, selectedCategory, timePeriodText, filteredTx, persons, savingsGoals, filteredSavingsTx, filteredBudgets, format == "EXCEL", filterByPerson, selectedPerson)
+                    try {
+                        FileOutputStream(targetFile).use { fos ->
+                            fos.write(csvContent.toByteArray(Charsets.UTF_8))
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        withContext(Dispatchers.Main) {
+                            isExporting = false
+                            Toast.makeText(context, if (isBn) "ফাইল তৈরিতে ত্রুটি!" else "Failed to generate file!", Toast.LENGTH_SHORT).show()
+                        }
+                        return@launch
+                    }
+                }
+
+                withContext(Dispatchers.Main) {
+                    isExporting = false
+                    Toast.makeText(context, if (isBn) "সফলভাবে 'Finance Note/Reports' ফোল্ডারে ফাইলটি সংরক্ষণ করা হয়েছে!" else "File successfully saved in 'Finance Note/Reports' folder!", Toast.LENGTH_LONG).show()
+
+                    try {
+                        val authority = "${context.packageName}.fileprovider"
+                        val fileUri = FileProvider.getUriForFile(context, authority, targetFile)
+
+                        val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(fileUri, mimeType)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(viewIntent, if (isBn) "ফাইলটি খুলুন" else "Open File"))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Toast.makeText(context, if (isBn) "ফাইলটি ওপেন করা সম্ভব হয়নি!" else "Could not open file automatically!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 
@@ -1539,6 +1537,8 @@ fun ExportDialog(
                                 val totalExp = filteredTx.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
                                 val totalLend = filteredTx.filter { it.type == "LEND" }.sumOf { it.amount }
                                 val totalBorrow = filteredTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+                                val totalRepayPaid = filteredTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+                                val totalRepayRecv = filteredTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
                                 val totalSavDep = filteredSavingsTx.filter { it.isDeposit }.sumOf { it.amount }
                                 val totalSavWith = filteredSavingsTx.filter { !it.isDeposit }.sumOf { it.amount }
                                 val netSav = totalSavDep - totalSavWith
@@ -1574,10 +1574,10 @@ fun ExportDialog(
                                             }
                                             "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
                                                 if (selectedCategory != "ONLY_PAONA") {
-                                                    PreviewSummaryBadge(label = if (isBn) "মোট দেনা" else "Total Debt", amount = totalBorrow, color = Color(0xFFD97706), language = language, isDark = isDark)
+                                                    PreviewSummaryBadge(label = if (isBn) "মোট দেনা" else "Total Debt", amount = totalBorrow - totalRepayPaid, color = Color(0xFFD97706), language = language, isDark = isDark)
                                                 }
                                                 if (selectedCategory != "ONLY_DEBT") {
-                                                    PreviewSummaryBadge(label = if (isBn) "মোট পাওনা" else "Total Credit", amount = totalLend, color = Color(0xFF2563EB), language = language, isDark = isDark)
+                                                    PreviewSummaryBadge(label = if (isBn) "মোট পাওনা" else "Total Credit", amount = totalLend - totalRepayRecv, color = Color(0xFF2563EB), language = language, isDark = isDark)
                                                 }
                                             }
                                             "ONLY_SAVINGS" -> {
@@ -1593,8 +1593,8 @@ fun ExportDialog(
                                             else -> {
                                                 PreviewSummaryBadge(label = if (isBn) "মোট আয়" else "Total Income", amount = totalInc, color = Color(0xFF059669), language = language, isDark = isDark)
                                                 PreviewSummaryBadge(label = if (isBn) "মোট ব্যয়" else "Total Expense", amount = totalExp, color = Color(0xFFDC2626), language = language, isDark = isDark)
-                                                PreviewSummaryBadge(label = if (isBn) "মোট দেনা" else "Total Debt", amount = totalBorrow, color = Color(0xFFD97706), language = language, isDark = isDark)
-                                                PreviewSummaryBadge(label = if (isBn) "মোট পাওনা" else "Total Credit", amount = totalLend, color = Color(0xFF2563EB), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট দেনা" else "Total Debt", amount = totalBorrow - totalRepayPaid, color = Color(0xFFD97706), language = language, isDark = isDark)
+                                                PreviewSummaryBadge(label = if (isBn) "মোট পাওনা" else "Total Credit", amount = totalLend - totalRepayRecv, color = Color(0xFF2563EB), language = language, isDark = isDark)
                                                 PreviewSummaryBadge(label = if (isBn) "মোট সঞ্চয়" else "Total Savings", amount = netSav, color = Color(0xFF8B5CF6), language = language, isDark = isDark)
                                             }
                                         }
@@ -1752,8 +1752,9 @@ fun ExportDialog(
 
                                                     Spacer(modifier = Modifier.width(8.dp))
 
+                                                    val displayAmt = if (tx.type == "REPAY_PAID" || tx.type == "REPAY_RECEIVED") -tx.amount else tx.amount
                                                     Text(
-                                                        text = formatCurrency(tx.amount, language),
+                                                        text = formatCurrency(displayAmt, language),
                                                         fontSize = 12.sp,
                                                         fontWeight = FontWeight.ExtraBold,
                                                         color = amtColor
@@ -1778,8 +1779,9 @@ fun ExportDialog(
                                                         Text(text = goalTitle, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textPrimary)
                                                         Text(text = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "উত্তোলন" else "Withdrawal"), fontSize = 9.sp, color = textSecondary)
                                                     }
+                                                    val displaySavAmt = if (stx.isDeposit) stx.amount else -stx.amount
                                                     Text(
-                                                        text = formatCurrency(stx.amount, language),
+                                                        text = formatCurrency(displaySavAmt, language),
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.ExtraBold,
                                                         color = if (stx.isDeposit) Color(0xFF059669) else Color(0xFFDC2626)
@@ -1933,7 +1935,9 @@ private fun generateCsvData(
     savingsGoals: List<SavingsGoal>,
     savingsTransactions: List<SavingsTransaction>,
     filteredBudgets: List<MonthlyBudget>,
-    isExcelMode: Boolean
+    isExcelMode: Boolean,
+    filterByPerson: Boolean = false,
+    selectedPerson: Person? = null
 ): String {
     val delimiter = if (isExcelMode) "\t" else ","
     val isBn = language == AppLanguage.BN
@@ -1941,7 +1945,11 @@ private fun generateCsvData(
 
     sb.append("\uFEFF")
 
-    val reportTitle = getCategoryTitle(selectedCategory, language)
+    val reportTitle = if (selectedPerson != null) {
+        if (isBn) "${selectedPerson.name} - লেনদেন বিবরণী" else "${selectedPerson.name} - Transaction Statement"
+    } else {
+        getCategoryTitle(selectedCategory, language)
+    }
     sb.append(if (isBn) "ফাইন্যান্স নোট - " else "Finance Note - ").append(reportTitle).append("\n")
     sb.append(if (isBn) "সময়কাল: " else "Period: ").append(timePeriodText).append("\n")
     sb.append(if (isBn) "তৈরি হয়েছে: " else "Generated on: ").append(SimpleDateFormat("dd MMMM, yyyy hh:mm a", Locale.getDefault()).format(Date())).append("\n\n")
@@ -2095,6 +2103,7 @@ private fun generateCsvData(
                 val noteSafe = tx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
                 val catSafe = tx.category.replace(",", " ").replace("\t", " ").replace("\n", " ")
                 val personSafe = personName.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val actualAmt = if (tx.type == "REPAY_PAID" || tx.type == "REPAY_RECEIVED") -tx.amount else tx.amount
 
                 sb.append(
                     listOf(
@@ -2104,7 +2113,7 @@ private fun generateCsvData(
                         typeStr,
                         personSafe,
                         noteSafe,
-                        tx.amount.toString()
+                        actualAmt.toString()
                     ).joinToString(delimiter)
                 ).append("\n")
             }
@@ -2114,35 +2123,74 @@ private fun generateCsvData(
         sb.append(if (isBn) "আর্থিক সারসংক্ষেপ (Financial Summary)" else "Financial Summary").append("\n")
         sb.append(if (isBn) "ক্যাটাগরি" else "Metric").append(delimiter).append(if (isBn) "টাকার পরিমাণ" else "Amount").append("\n")
 
-        when (selectedCategory) {
-            "ONLY_INCOME" -> {
-                sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+        if (selectedPerson != null) {
+            val personBorrow = transactions.filter { it.type == "BORROW" }.sumOf { it.amount }
+            val personRepayPaid = transactions.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+            val personDebtNet = personBorrow - personRepayPaid
+
+            val personLend = transactions.filter { it.type == "LEND" }.sumOf { it.amount }
+            val personRepayReceived = transactions.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+            val personReceivableNet = personLend - personRepayReceived
+
+            val netStatus = personReceivableNet - personDebtNet
+            val netStatusStr = if (netStatus > 0) {
+                if (isBn) "পাবেন $netStatus" else "Get $netStatus"
+            } else if (netStatus < 0) {
+                if (isBn) "দেবেন ${-netStatus}" else "Owe ${-netStatus}"
+            } else {
+                if (isBn) "পরিশোধিত" else "Settled"
             }
-            "ONLY_EXPENSE" -> {
-                sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
-            }
-            "INCOME_EXPENSE" -> {
-                sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
-                sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
-                sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
-            }
-            "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
-                val totalLend = transactions.filter { it.type == "LEND" }.sumOf { it.amount }
-                val totalBorrow = transactions.filter { it.type == "BORROW" }.sumOf { it.amount }
-                if (selectedCategory != "ONLY_PAONA") sb.append(if (isBn) "মোট দেনা" else "Total Debt").append(delimiter).append(totalBorrow).append("\n")
-                if (selectedCategory != "ONLY_DEBT") sb.append(if (isBn) "মোট পাওনা" else "Total Receivable").append(delimiter).append(totalLend).append("\n")
-            }
-            "ONLY_SAVINGS" -> {
-                val totalSavDep = savingsTransactions.filter { it.isDeposit }.sumOf { it.amount }
-                val totalSavWith = savingsTransactions.filter { !it.isDeposit }.sumOf { it.amount }
-                sb.append(if (isBn) "সঞ্চয় জমা" else "Total Deposit").append(delimiter).append(totalSavDep).append("\n")
-                sb.append(if (isBn) "সঞ্চয় উত্তোলন" else "Total Withdrawal").append(delimiter).append(totalSavWith).append("\n")
-                sb.append(if (isBn) "অবশিষ্ট সঞ্চয়" else "Net Savings").append(delimiter).append(totalSavDep - totalSavWith).append("\n")
-            }
-            else -> {
-                sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
-                sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
-                sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
+
+            sb.append(if (isBn) "মোট দেনা (Debt)" else "Total Debt").append(delimiter).append(personDebtNet).append("\n")
+            sb.append(if (isBn) "মোট পাওনা (Receivable)" else "Total Receivable").append(delimiter).append(personReceivableNet).append("\n")
+            sb.append(if (isBn) "বর্তমান অবস্থা (Net Status)" else "Net Status").append(delimiter).append(netStatusStr).append("\n")
+        } else {
+            when (selectedCategory) {
+                "ONLY_INCOME" -> {
+                    sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+                }
+                "ONLY_EXPENSE" -> {
+                    sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
+                }
+                "INCOME_EXPENSE" -> {
+                    sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+                    sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
+                    sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
+                }
+                "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
+                    val totalLend = transactions.filter { it.type == "LEND" }.sumOf { it.amount }
+                    val totalRepayRecv = transactions.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+                    val netLnd = totalLend - totalRepayRecv
+
+                    val totalBorrow = transactions.filter { it.type == "BORROW" }.sumOf { it.amount }
+                    val totalRepayPaid = transactions.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+                    val netBrw = totalBorrow - totalRepayPaid
+
+                    if (selectedCategory != "ONLY_PAONA") sb.append(if (isBn) "মোট দেনা" else "Total Debt").append(delimiter).append(netBrw).append("\n")
+                    if (selectedCategory != "ONLY_DEBT") sb.append(if (isBn) "মোট পাওনা" else "Total Receivable").append(delimiter).append(netLnd).append("\n")
+                }
+                "ONLY_SAVINGS" -> {
+                    val totalSavDep = savingsTransactions.filter { it.isDeposit }.sumOf { it.amount }
+                    val totalSavWith = savingsTransactions.filter { !it.isDeposit }.sumOf { it.amount }
+                    sb.append(if (isBn) "সঞ্চয় জমা" else "Total Deposit").append(delimiter).append(totalSavDep).append("\n")
+                    sb.append(if (isBn) "সঞ্চয় উত্তোলন" else "Total Withdrawal").append(delimiter).append(totalSavWith).append("\n")
+                    sb.append(if (isBn) "অবশিষ্ট সঞ্চয়" else "Net Savings").append(delimiter).append(totalSavDep - totalSavWith).append("\n")
+                }
+                else -> {
+                    val totalLend = transactions.filter { it.type == "LEND" }.sumOf { it.amount }
+                    val totalRepayRecv = transactions.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+                    val netLnd = totalLend - totalRepayRecv
+
+                    val totalBorrow = transactions.filter { it.type == "BORROW" }.sumOf { it.amount }
+                    val totalRepayPaid = transactions.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+                    val netBrw = totalBorrow - totalRepayPaid
+
+                    sb.append(if (isBn) "মোট আয়" else "Total Income").append(delimiter).append(totalInc).append("\n")
+                    sb.append(if (isBn) "মোট ব্যয়" else "Total Expense").append(delimiter).append(totalExp).append("\n")
+                    sb.append(if (isBn) "নিট ব্যালেন্স" else "Net Balance").append(delimiter).append(netBalance).append("\n")
+                    sb.append(if (isBn) "মোট দেনা" else "Total Debt").append(delimiter).append(netBrw).append("\n")
+                    sb.append(if (isBn) "মোট পাওনা" else "Total Receivable").append(delimiter).append(netLnd).append("\n")
+                }
             }
         }
         sb.append("\n\n")
@@ -2168,6 +2216,7 @@ private fun generateCsvData(
                 val noteSafe = tx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
                 val catSafe = tx.category.replace(",", " ").replace("\t", " ").replace("\n", " ")
                 val personSafe = personName.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val actualAmt = if (tx.type == "REPAY_PAID" || tx.type == "REPAY_RECEIVED") -tx.amount else tx.amount
 
                 sb.append(
                     listOf(
@@ -2177,7 +2226,7 @@ private fun generateCsvData(
                         typeStr,
                         personSafe,
                         noteSafe,
-                        tx.amount.toString()
+                        actualAmt.toString()
                     ).joinToString(delimiter)
                 ).append("\n")
             }
@@ -2203,6 +2252,7 @@ private fun generateCsvData(
                 val typeStr = if (stx.isDeposit) (if (isBn) "সঞ্চয় জমা" else "Deposit") else (if (isBn) "সঞ্চয় উত্তোলন" else "Withdrawal")
                 val noteSafe = stx.note.replace(",", " ").replace("\t", " ").replace("\n", " ")
                 val goalSafe = goalTitle.replace(",", " ").replace("\t", " ").replace("\n", " ")
+                val actualAmt = if (stx.isDeposit) stx.amount else -stx.amount
 
                 sb.append(
                     listOf(
@@ -2211,7 +2261,7 @@ private fun generateCsvData(
                         goalSafe,
                         typeStr,
                         noteSafe,
-                        stx.amount.toString()
+                        actualAmt.toString()
                     ).joinToString(delimiter)
                 ).append("\n")
             }
@@ -2462,89 +2512,131 @@ private fun generatePdfFile(
     val savNet = summary["savingsNet"] ?: 0.0
     val bInc = summary["budIncTarget"] ?: 0.0
     val bExp = summary["budExpTarget"] ?: 0.0
+    val repayPaid = summary["repayPaid"] ?: 0.0
+    val repayRecv = summary["repayRecv"] ?: 0.0
+
+    val netBrw = brw - repayPaid
+    val netLnd = lnd - repayRecv
 
     val budgetReport = computeComprehensiveBudgetReport(language, filteredBudgets, transactions, savingsTransactions, savingsGoals)
 
-    when (selectedCategory) {
-        "ONLY_INCOME" -> {
-            canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(inc, language), 60f, 160f, statsValPaint)
-        }
-        "ONLY_EXPENSE" -> {
-            canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 60f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(exp, language), 60f, 160f, statsValPaint)
-        }
-        "INCOME_EXPENSE" -> {
-            canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(inc, language), 60f, 160f, statsValPaint)
+    if (selectedPerson != null) {
+        val personTx = transactions
+        val personBorrow = personTx.filter { it.type == "BORROW" }.sumOf { it.amount }
+        val personRepayPaid = personTx.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }
+        val personDebtNet = personBorrow - personRepayPaid
 
-            canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 230f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(exp, language), 230f, 160f, statsValPaint)
+        val personLend = personTx.filter { it.type == "LEND" }.sumOf { it.amount }
+        val personRepayReceived = personTx.filter { it.type == "REPAY_RECEIVED" }.sumOf { it.amount }
+        val personReceivableNet = personLend - personRepayReceived
 
-            canvas.drawText(if (isBn) "নিট ব্যালেন্স (Balance)" else "Net Balance", 400f, 140f, statsHeaderPaint)
-            val balColorPaint = Paint().apply {
-                color = if (bal >= 0) android.graphics.Color.parseColor("#059669") else android.graphics.Color.parseColor("#DC2626")
-                textSize = 12f
-                isFakeBoldText = true
+        val netStatus = personReceivableNet - personDebtNet
+
+        canvas.drawText(if (isBn) "মোট দেনা (Debt)" else "Total Debt", 60f, 140f, statsHeaderPaint)
+        canvas.drawText(formatCurrency(personDebtNet, language), 60f, 160f, statsValPaint)
+
+        canvas.drawText(if (isBn) "মোট পাওনা (Receivable)" else "Total Receivable", 230f, 140f, statsHeaderPaint)
+        canvas.drawText(formatCurrency(personReceivableNet, language), 230f, 160f, statsValPaint)
+
+        canvas.drawText(if (isBn) "বর্তমান অবস্থা (Net Status)" else "Net Status", 400f, 140f, statsHeaderPaint)
+        val balColorPaint = Paint().apply {
+            color = if (netStatus > 0) android.graphics.Color.parseColor("#059669")
+                    else if (netStatus < 0) android.graphics.Color.parseColor("#DC2626")
+                    else android.graphics.Color.parseColor("#64748B")
+            textSize = 12f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+        val netStatusStr = if (netStatus > 0) {
+            if (isBn) "পাবেন ${formatCurrency(netStatus, language)}" else "Get ${formatCurrency(netStatus, language)}"
+        } else if (netStatus < 0) {
+            if (isBn) "দেবেন ${formatCurrency(-netStatus, language)}" else "Owe ${formatCurrency(-netStatus, language)}"
+        } else {
+            if (isBn) "পরিশোধিত" else "Settled"
+        }
+        canvas.drawText(netStatusStr, 400f, 160f, balColorPaint)
+    } else {
+        when (selectedCategory) {
+            "ONLY_INCOME" -> {
+                canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(inc, language), 60f, 160f, statsValPaint)
             }
-            canvas.drawText(formatCurrency(bal, language), 400f, 160f, balColorPaint)
-        }
-        "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
-            var posX = 60f
-            if (selectedCategory != "ONLY_PAONA") {
-                canvas.drawText(if (isBn) "মোট দেনা (Debt)" else "Total Debt", posX, 140f, statsHeaderPaint)
-                canvas.drawText(formatCurrency(brw, language), posX, 160f, statsValPaint)
-                posX += 170f
+            "ONLY_EXPENSE" -> {
+                canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 60f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(exp, language), 60f, 160f, statsValPaint)
             }
-            if (selectedCategory != "ONLY_DEBT") {
-                canvas.drawText(if (isBn) "মোট পাওনা (Receivable)" else "Total Receivable", posX, 140f, statsHeaderPaint)
-                canvas.drawText(formatCurrency(lnd, language), posX, 160f, statsValPaint)
+            "INCOME_EXPENSE" -> {
+                canvas.drawText(if (isBn) "মোট আয় (Income)" else "Total Income", 60f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(inc, language), 60f, 160f, statsValPaint)
+
+                canvas.drawText(if (isBn) "মোট ব্যয় (Expense)" else "Total Expense", 230f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(exp, language), 230f, 160f, statsValPaint)
+
+                canvas.drawText(if (isBn) "নিট ব্যালেন্স (Balance)" else "Net Balance", 400f, 140f, statsHeaderPaint)
+                val balColorPaint = Paint().apply {
+                    color = if (bal >= 0) android.graphics.Color.parseColor("#059669") else android.graphics.Color.parseColor("#DC2626")
+                    textSize = 12f
+                    isFakeBoldText = true
+                }
+                canvas.drawText(formatCurrency(bal, language), 400f, 160f, balColorPaint)
             }
-        }
-        "ONLY_SAVINGS" -> {
-            canvas.drawText(if (isBn) "সঞ্চয় জমা (Deposit)" else "Savings Deposit", 60f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(savDep, language), 60f, 160f, statsValPaint)
+            "DEBT_REPAYMENT", "ONLY_DEBT", "ONLY_PAONA" -> {
+                var posX = 60f
+                if (selectedCategory != "ONLY_PAONA") {
+                    canvas.drawText(if (isBn) "মোট দেনা (Debt)" else "Total Debt", posX, 140f, statsHeaderPaint)
+                    canvas.drawText(formatCurrency(netBrw, language), posX, 160f, statsValPaint)
+                    posX += 170f
+                }
+                if (selectedCategory != "ONLY_DEBT") {
+                    canvas.drawText(if (isBn) "মোট পাওনা (Receivable)" else "Total Receivable", posX, 140f, statsHeaderPaint)
+                    canvas.drawText(formatCurrency(netLnd, language), posX, 160f, statsValPaint)
+                }
+            }
+            "ONLY_SAVINGS" -> {
+                canvas.drawText(if (isBn) "সঞ্চয় জমা (Deposit)" else "Savings Deposit", 60f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(savDep, language), 60f, 160f, statsValPaint)
 
-            canvas.drawText(if (isBn) "উত্তোলন (Withdrawal)" else "Withdrawal", 230f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(savWith, language), 230f, 160f, statsValPaint)
+                canvas.drawText(if (isBn) "উত্তোলন (Withdrawal)" else "Withdrawal", 230f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(savWith, language), 230f, 160f, statsValPaint)
 
-            canvas.drawText(if (isBn) "অবশিষ্ট সঞ্চয় (Net Saved)" else "Net Savings", 400f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(savNet, language), 400f, 160f, statsValPaint)
-        }
-        "ONLY_BUDGET" -> {
-            canvas.drawText(if (isBn) "আয় টার্গেট vs প্রকৃত" else "Inc Target vs Actual", 60f, 138f, statsHeaderPaint)
-            canvas.drawText("${formatCurrencyNoSymbol(budgetReport.incomeAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.incomeAnalysis.actualAmount, language)}", 60f, 153f, statsValPaint)
-            val incPctStr = "${String.format(Locale.US, "%.1f", budgetReport.incomeAnalysis.fulfillmentPercentage)}%"
-            val incPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#059669"); textSize = 9f; isFakeBoldText = true }
-            canvas.drawText("${if (isBn) "পূরণ: " else "Fulfilled: "}${if (isBn) replaceToBnDigits(incPctStr) else incPctStr}", 60f, 168f, incPctPaint)
+                canvas.drawText(if (isBn) "অবশিষ্ট সঞ্চয় (Net Saved)" else "Net Savings", 400f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(savNet, language), 400f, 160f, statsValPaint)
+            }
+            "ONLY_BUDGET" -> {
+                canvas.drawText(if (isBn) "আয় টার্গেট vs প্রকৃত" else "Inc Target vs Actual", 60f, 138f, statsHeaderPaint)
+                canvas.drawText("${formatCurrencyNoSymbol(budgetReport.incomeAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.incomeAnalysis.actualAmount, language)}", 60f, 153f, statsValPaint)
+                val incPctStr = "${String.format(Locale.US, "%.1f", budgetReport.incomeAnalysis.fulfillmentPercentage)}%"
+                val incPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#059669"); textSize = 9f; isFakeBoldText = true }
+                canvas.drawText("${if (isBn) "পূরণ: " else "Fulfilled: "}${if (isBn) replaceToBnDigits(incPctStr) else incPctStr}", 60f, 168f, incPctPaint)
 
-            canvas.drawText(if (isBn) "ব্যয় টার্গেট vs প্রকৃত" else "Exp Target vs Actual", 230f, 138f, statsHeaderPaint)
-            canvas.drawText("${formatCurrencyNoSymbol(budgetReport.expenseAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.expenseAnalysis.actualAmount, language)}", 230f, 153f, statsValPaint)
-            val expPctStr = "${String.format(Locale.US, "%.1f", budgetReport.expenseAnalysis.fulfillmentPercentage)}%"
-            val expPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#DC2626"); textSize = 9f; isFakeBoldText = true }
-            canvas.drawText("${if (isBn) "ব্যবহৃত: " else "Used: "}${if (isBn) replaceToBnDigits(expPctStr) else expPctStr}", 230f, 168f, expPctPaint)
+                canvas.drawText(if (isBn) "ব্যয় টার্গেট vs প্রকৃত" else "Exp Target vs Actual", 230f, 138f, statsHeaderPaint)
+                canvas.drawText("${formatCurrencyNoSymbol(budgetReport.expenseAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.expenseAnalysis.actualAmount, language)}", 230f, 153f, statsValPaint)
+                val expPctStr = "${String.format(Locale.US, "%.1f", budgetReport.expenseAnalysis.fulfillmentPercentage)}%"
+                val expPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#DC2626"); textSize = 9f; isFakeBoldText = true }
+                canvas.drawText("${if (isBn) "ব্যবহৃত: " else "Used: "}${if (isBn) replaceToBnDigits(expPctStr) else expPctStr}", 230f, 168f, expPctPaint)
 
-            canvas.drawText(if (isBn) "সঞ্চয় টার্গেট vs প্রকৃত" else "Sav Target vs Actual", 400f, 138f, statsHeaderPaint)
-            canvas.drawText("${formatCurrencyNoSymbol(budgetReport.savingsAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.savingsAnalysis.actualAmount, language)}", 400f, 153f, statsValPaint)
-            val savPctStr = "${String.format(Locale.US, "%.1f", budgetReport.savingsAnalysis.fulfillmentPercentage)}%"
-            val savPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#8B5CF6"); textSize = 9f; isFakeBoldText = true }
-            canvas.drawText("${if (isBn) "পূরণ: " else "Achieved: "}${if (isBn) replaceToBnDigits(savPctStr) else savPctStr}", 400f, 168f, savPctPaint)
-        }
-        else -> {
-            canvas.drawText(if (isBn) "মোট আয়" else "Income", 50f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(inc, language), 50f, 160f, statsValPaint)
+                canvas.drawText(if (isBn) "সঞ্চয় টার্গেট vs প্রকৃত" else "Sav Target vs Actual", 400f, 138f, statsHeaderPaint)
+                canvas.drawText("${formatCurrencyNoSymbol(budgetReport.savingsAnalysis.targetAmount, language)} / ${formatCurrencyNoSymbol(budgetReport.savingsAnalysis.actualAmount, language)}", 400f, 153f, statsValPaint)
+                val savPctStr = "${String.format(Locale.US, "%.1f", budgetReport.savingsAnalysis.fulfillmentPercentage)}%"
+                val savPctPaint = Paint().apply { color = android.graphics.Color.parseColor("#8B5CF6"); textSize = 9f; isFakeBoldText = true }
+                canvas.drawText("${if (isBn) "পূরণ: " else "Achieved: "}${if (isBn) replaceToBnDigits(savPctStr) else savPctStr}", 400f, 168f, savPctPaint)
+            }
+            else -> {
+                canvas.drawText(if (isBn) "মোট আয়" else "Income", 50f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(inc, language), 50f, 160f, statsValPaint)
 
-            canvas.drawText(if (isBn) "মোট ব্যয়" else "Expense", 155f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(exp, language), 155f, 160f, statsValPaint)
+                canvas.drawText(if (isBn) "মোট ব্যয়" else "Expense", 155f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(exp, language), 155f, 160f, statsValPaint)
 
-            canvas.drawText(if (isBn) "মোট দেনা" else "Debt", 260f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(brw, language), 260f, 160f, statsValPaint)
+                canvas.drawText(if (isBn) "মোট দেনা" else "Debt", 260f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(netBrw, language), 260f, 160f, statsValPaint)
 
-            canvas.drawText(if (isBn) "মোট পাওনা" else "Credit", 365f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(lnd, language), 365f, 160f, statsValPaint)
+                canvas.drawText(if (isBn) "মোট পাওনা" else "Credit", 365f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(netLnd, language), 365f, 160f, statsValPaint)
 
-            canvas.drawText(if (isBn) "মোট সঞ্চয়" else "Savings", 470f, 140f, statsHeaderPaint)
-            canvas.drawText(formatCurrency(savNet, language), 470f, 160f, statsValPaint)
+                canvas.drawText(if (isBn) "মোট সঞ্চয়" else "Savings", 470f, 140f, statsHeaderPaint)
+                canvas.drawText(formatCurrency(savNet, language), 470f, 160f, statsValPaint)
+            }
         }
     }
 
@@ -2867,9 +2959,20 @@ private fun generatePdfFile(
             canvas.drawText(personTrunc, 275f, currentY + 13f, tableRowTxtPaint)
             canvas.drawText(noteTrunc, 355f, currentY + 13f, tableRowTxtPaint)
 
-            val amtText = formatCurrencyNoSymbol(tx.amount, language)
-            val amtW = tableRowTxtBoldPaint.measureText(amtText)
-            canvas.drawText(amtText, 550f - amtW, currentY + 13f, tableRowTxtBoldPaint)
+            val actualAmt = if (tx.type == "REPAY_PAID" || tx.type == "REPAY_RECEIVED") -tx.amount else tx.amount
+            val amtText = formatCurrencyNoSymbol(actualAmt, language)
+            val rowAmtPaint = if (actualAmt < 0) {
+                Paint().apply {
+                    color = android.graphics.Color.parseColor("#DC2626") // Subtraction Crimson Red
+                    textSize = 8.5f
+                    isFakeBoldText = true
+                    isAntiAlias = true
+                }
+            } else {
+                tableRowTxtBoldPaint
+            }
+            val amtW = rowAmtPaint.measureText(amtText)
+            canvas.drawText(amtText, 550f - amtW, currentY + 13f, rowAmtPaint)
 
             currentY += 20f
         }
@@ -2895,7 +2998,7 @@ private fun generatePdfFile(
         val subLblPaint = Paint().apply { color = android.graphics.Color.parseColor("#1E293B"); textSize = 9.5f; isFakeBoldText = true; isAntiAlias = true }
         val subValPaint = Paint().apply { color = android.graphics.Color.parseColor(grp.colorHex); textSize = 10f; isFakeBoldText = true; isAntiAlias = true }
 
-        val grpTotal = grp.items.sumOf { it.amount }
+        val grpTotal = grp.items.sumOf { if (it.type == "REPAY_PAID" || it.type == "REPAY_RECEIVED") -it.amount else it.amount }
         canvas.drawText(grp.subtotalLabel, 45f, currentY + 15f, subLblPaint)
 
         val grpTotalStr = formatCurrencyNoSymbol(grpTotal, language)
@@ -2982,9 +3085,20 @@ private fun generatePdfFile(
             canvas.drawText(typeStr, 260f, currentY + 13f, typeColorPaint)
             canvas.drawText(noteTrunc, 350f, currentY + 13f, tableRowTxtPaint)
 
-            val amtText = formatCurrencyNoSymbol(stx.amount, language)
-            val amtW = tableRowTxtBoldPaint.measureText(amtText)
-            canvas.drawText(amtText, 550f - amtW, currentY + 13f, tableRowTxtBoldPaint)
+            val actualAmt = if (stx.isDeposit) stx.amount else -stx.amount
+            val amtText = formatCurrencyNoSymbol(actualAmt, language)
+            val rowAmtPaint = if (actualAmt < 0) {
+                Paint().apply {
+                    color = android.graphics.Color.parseColor("#DC2626") // Subtraction Crimson Red
+                    textSize = 8.5f
+                    isFakeBoldText = true
+                    isAntiAlias = true
+                }
+            } else {
+                tableRowTxtBoldPaint
+            }
+            val amtW = rowAmtPaint.measureText(amtText)
+            canvas.drawText(amtText, 550f - amtW, currentY + 13f, rowAmtPaint)
 
             currentY += 20f
         }
