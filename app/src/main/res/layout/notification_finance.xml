@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/notif_main_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -54,7 +55,7 @@
                 <ImageView android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_dashboard"
-                    android:tint="#FFFFFF" />
+                    app:tint="#FFFFFF" />
             </LinearLayout>
         </FrameLayout>
 
@@ -73,7 +74,7 @@
                 <ImageView android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_add"
-                    android:tint="#FFFFFF" />
+                    app:tint="#FFFFFF" />
             </LinearLayout>
         </FrameLayout>
 
@@ -92,7 +93,7 @@
                 <ImageView android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_person_add"
-                    android:tint="#FFFFFF" />
+                    app:tint="#FFFFFF" />
             </LinearLayout>
         </FrameLayout>
 
@@ -111,7 +112,7 @@
                 <ImageView android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_card"
-                    android:tint="#FFFFFF" />
+                    app:tint="#FFFFFF" />
             </LinearLayout>
         </FrameLayout>
 
@@ -130,7 +131,7 @@
                 <ImageView android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_cloud_backup"
-                    android:tint="#FFFFFF" />
+                    app:tint="#FFFFFF" />
             </LinearLayout>
         </FrameLayout>
 
@@ -149,7 +150,7 @@
                 <ImageView android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:src="@drawable/ic_settings"
-                    android:tint="#FFFFFF" />
+                    app:tint="#FFFFFF" />
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>

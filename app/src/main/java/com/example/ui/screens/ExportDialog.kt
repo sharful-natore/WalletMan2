@@ -138,7 +138,7 @@ fun ExportDialog(
             "ONLY_PAONA" -> list.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
             "ONLY_INCOME" -> list.filter { it.type == "INCOME" }
             "ONLY_EXPENSE" -> list.filter { it.type == "EXPENSE" }
-            "ONLY_SAVINGS" -> emptyList()
+            "ONLY_SAVINGS", "ONLY_BUDGET" -> emptyList()
             else -> list
         }
 
@@ -366,6 +366,21 @@ fun ExportDialog(
                     withContext(Dispatchers.Main) {
                         isExporting = false
                         Toast.makeText(context, if (isBn) "সফলভাবে ফোল্ডারে ফাইলটি সংরক্ষণ করা হয়েছে!" else "File successfully saved to your selected folder!", Toast.LENGTH_LONG).show()
+
+                        try {
+                            val mimeType = when (selectedFormat) {
+                                "PDF" -> "application/pdf"
+                                "EXCEL" -> "application/vnd.ms-excel"
+                                else -> "text/csv"
+                            }
+                            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, mimeType)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(viewIntent, if (isBn) "ফাইলটি খুলুন" else "Open File"))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 } catch (e: java.lang.Exception) {
                     e.printStackTrace()
@@ -1134,7 +1149,7 @@ fun ExportDialog(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(imageVector = Icons.Rounded.FileDownload, contentDescription = "Download", modifier = Modifier.size(18.dp))
-                            Text(text = if (isBn) "সংরক্ষণ করুন" else "Save / Download", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = if (isBn) "সংরক্ষন" else "Save / Download", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 

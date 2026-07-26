@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -43,7 +44,7 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_app_logo"
-                android:tint="#FFFFFF"
+                app:tint="#FFFFFF"
                 android:visibility="visible" />
             
             <TextView
@@ -100,7 +101,7 @@
                     android:layout_height="16dp"
                     android:layout_marginLeft="4dp"
                     android:src="@drawable/ic_dropdown_caret"
-                    android:tint="#FFFFFF"
+                    app:tint="#FFFFFF"
                     android:clickable="true"
                     android:focusable="true"/>
             </LinearLayout>
@@ -136,7 +137,7 @@
                 android:id="@+id/tv_date_bengali"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="২৯ আষাঢ়, ১৪৩৩ বঙ্গাব্দ"
+                android:text="২৯ আষাঢ়, ১৪ ৩৩ বঙ্গাব্দ"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
                 android:textSize="9.5sp"
@@ -340,7 +341,7 @@
                 android:layout_width="21dp"
                 android:layout_height="21dp"
                 android:src="@drawable/ic_add"
-                android:tint="#FFFFFF" />
+                app:tint="#FFFFFF" />
         </LinearLayout>
 
         <!-- Add Debt/Credit Button -->
@@ -358,7 +359,7 @@
                 android:layout_width="21dp"
                 android:layout_height="21dp"
                 android:src="@drawable/ic_lend_borrow_new"
-                android:tint="#FFFFFF" />
+                app:tint="#FFFFFF" />
         </LinearLayout>
 
         <!-- Add Saving Button -->
@@ -376,7 +377,7 @@
                 android:layout_width="21dp"
                 android:layout_height="21dp"
                 android:src="@drawable/ic_card"
-                android:tint="#FFFFFF" />
+                app:tint="#FFFFFF" />
         </LinearLayout>
 
         <!-- Sync Button -->
@@ -394,7 +395,7 @@
                 android:layout_width="21dp"
                 android:layout_height="21dp"
                 android:src="@drawable/ic_sync_24"
-                android:tint="#FFFFFF" />
+                app:tint="#FFFFFF" />
         </LinearLayout>
     </LinearLayout>
 

@@ -6953,14 +6953,14 @@ fun DashboardScreen(
                                     .size(48.dp)
                                     .background(
                                         brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                                            colors = listOf(Color(0xFF10B981), Color(0xFF059669))
+                                            colors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient
                                         ),
                                         shape = RoundedCornerShape(14.dp)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Share,
+                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Download,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
@@ -6977,21 +6977,6 @@ fun DashboardScreen(
                                         fontWeight = FontWeight.ExtraBold,
                                         color = if (isDark) Color.White else Color(0xFF0F172A)
                                     )
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                color = Color(0xFF10B981).copy(alpha = 0.15f),
-                                                shape = RoundedCornerShape(6.dp)
-                                            )
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = if (language == AppLanguage.BN) "পিডিএফ / এক্সেল" else "PDF / EXCEL",
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF059669)
-                                        )
-                                    }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
