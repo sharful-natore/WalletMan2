@@ -2350,6 +2350,7 @@ fun FinanceNoteApp(
     val budgetSavings by viewModel.budgetSavings.collectAsState()
     var showExportDialog by remember { mutableStateOf(false) }
     var exportDialogInitialCategory by remember { mutableStateOf("ALL_DATA") }
+    var exportDialogInitialTimeFilter by remember { mutableStateOf<String?>(null) }
 
     if (showExportDialog) {
         ExportDialog(
@@ -2364,6 +2365,7 @@ fun FinanceNoteApp(
             defaultBudgetExpense = budgetExpense,
             defaultBudgetSavings = budgetSavings,
             initialCategory = exportDialogInitialCategory,
+            initialTimeFilter = exportDialogInitialTimeFilter,
             onDismiss = { showExportDialog = false }
         )
     }
@@ -3559,6 +3561,7 @@ fun FinanceNoteApp(
                                             onEditGradient = { editingBudgetGradientType = it },
                                             onExportRequest = { cat ->
                                                 exportDialogInitialCategory = cat
+                                                exportDialogInitialTimeFilter = timeFilter
                                                 showExportDialog = true
                                             }
                                         )
@@ -3592,6 +3595,7 @@ fun FinanceNoteApp(
                                             activeTab = activeTab,
                                             onExportRequest = { cat ->
                                                 exportDialogInitialCategory = cat
+                                                exportDialogInitialTimeFilter = timeFilter
                                                 showExportDialog = true
                                             }
                                         )
@@ -3613,6 +3617,7 @@ fun FinanceNoteApp(
                                             activeTab = activeTab,
                                             onExportRequest = { cat ->
                                                 exportDialogInitialCategory = cat
+                                                exportDialogInitialTimeFilter = timeFilter
                                                 showExportDialog = true
                                             }
                                         )
@@ -5986,7 +5991,7 @@ fun DashboardScreen(
     val budgetIncomeAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
         val ym = getYearMonthFromFilter(timeFilter)
         if (ym != null) {
-            monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.income ?: 0.0
+            monthlyBudgets.find { it.year == ym.first && (it.month == ym.second || it.month == ym.second - 1) }?.income ?: 0.0
         } else if (timeFilter == "ALL") {
             currentWorkspace.budgetIncome
         } else 0.0
@@ -5994,7 +5999,7 @@ fun DashboardScreen(
     val budgetExpenseAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
         val ym = getYearMonthFromFilter(timeFilter)
         if (ym != null) {
-            monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.expense ?: 0.0
+            monthlyBudgets.find { it.year == ym.first && (it.month == ym.second || it.month == ym.second - 1) }?.expense ?: 0.0
         } else if (timeFilter == "ALL") {
             currentWorkspace.budgetExpense
         } else 0.0
@@ -6002,7 +6007,7 @@ fun DashboardScreen(
     val budgetSavingsAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
         val ym = getYearMonthFromFilter(timeFilter)
         if (ym != null) {
-            monthlyBudgets.find { it.year == ym.first && it.month == ym.second }?.savings ?: 0.0
+            monthlyBudgets.find { it.year == ym.first && (it.month == ym.second || it.month == ym.second - 1) }?.savings ?: 0.0
         } else if (timeFilter == "ALL") {
             currentWorkspace.budgetSavings
         } else 0.0
@@ -8762,6 +8767,41 @@ fun TransactionsScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+        }
+
+        // Floating Action Button to Export Transactions
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !isSelectionMode,
+            enter = androidx.compose.animation.scaleIn() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 113.dp, end = 16.dp)
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    val cat = when (filter) {
+                        "INCOME" -> "ONLY_INCOME"
+                        "EXPENSE" -> "ONLY_EXPENSE"
+                        "DENA" -> "ONLY_DEBT"
+                        "PAWN" -> "ONLY_PAONA"
+                        else -> "TRANSACTIONS"
+                    }
+                    onExportRequest?.invoke(cat)
+                },
+                containerColor = FintechBlue,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .size(60.dp)
+                    .testTag("fab_export_transactions")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.FileDownload,
+                    contentDescription = "Export Transactions",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
             }
         }
     }

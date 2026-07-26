@@ -191,6 +191,7 @@ fun ExportDialog(
     defaultBudgetExpense: Double = 0.0,
     defaultBudgetSavings: Double = 0.0,
     initialCategory: String = "ALL_DATA",
+    initialTimeFilter: String? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -202,29 +203,156 @@ fun ExportDialog(
     var selectedFormat by remember { mutableStateOf("PDF") }
 
     // 2. Data Type state
-    var selectedCategory by remember { mutableStateOf(initialCategory) }
+    var selectedCategory by remember(initialCategory) { mutableStateOf(initialCategory) }
 
     // 3. Time Filter state
-    var selectedTimeFilter by remember { mutableStateOf("MONTH") }
+    var selectedTimeFilter by remember(initialTimeFilter) {
+        mutableStateOf(
+            when {
+                initialTimeFilter == null -> "MONTH"
+                initialTimeFilter == "ALL" -> "ALL_TIME"
+                initialTimeFilter == "TODAY" -> "DATE_RANGE"
+                initialTimeFilter == "MONTH" -> "MONTH"
+                initialTimeFilter.startsWith("CUSTOM_MONTH:") -> "MONTH"
+                initialTimeFilter.startsWith("CUSTOM_DATE:") -> "DATE_RANGE"
+                initialTimeFilter.startsWith("RANGE:") -> "DATE_RANGE"
+                initialTimeFilter.startsWith("MONTH_RANGE:") -> "MONTH_RANGE"
+                initialTimeFilter.startsWith("YEAR_RANGE:") -> "YEAR_RANGE"
+                else -> "MONTH"
+            }
+        )
+    }
 
     // Selected Month & Year
     val calendar = Calendar.getInstance()
-    var selectedMonth by remember { mutableStateOf(calendar.get(Calendar.MONTH)) }
-    var selectedYear by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
+    var selectedMonth by remember(initialTimeFilter) {
+        val mVal = when {
+            initialTimeFilter != null && initialTimeFilter.startsWith("CUSTOM_MONTH:") -> {
+                val parts = initialTimeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+                (parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+            }
+            initialTimeFilter != null && initialTimeFilter.startsWith("CUSTOM_DATE:") -> {
+                val parts = initialTimeFilter.substringAfter("CUSTOM_DATE:").split("-")
+                (parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+            }
+            else -> calendar.get(Calendar.MONTH)
+        }
+        mutableStateOf(mVal)
+    }
+
+    var selectedYear by remember(initialTimeFilter) {
+        val yVal = when {
+            initialTimeFilter != null && initialTimeFilter.startsWith("CUSTOM_MONTH:") -> {
+                val parts = initialTimeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+                parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+            }
+            initialTimeFilter != null && initialTimeFilter.startsWith("CUSTOM_DATE:") -> {
+                val parts = initialTimeFilter.substringAfter("CUSTOM_DATE:").split("-")
+                parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+            }
+            else -> calendar.get(Calendar.YEAR)
+        }
+        mutableStateOf(yVal)
+    }
 
     // Date range
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L) }
-    var endDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var startDateMillis by remember(initialTimeFilter) {
+        val startVal = when {
+            initialTimeFilter == "TODAY" -> {
+                Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            }
+            initialTimeFilter != null && initialTimeFilter.startsWith("CUSTOM_DATE:") -> {
+                val parts = initialTimeFilter.substringAfter("CUSTOM_DATE:").split("-")
+                val y = parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+                val m = (parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+                val d = parts.getOrNull(2)?.toIntOrNull() ?: 1
+                Calendar.getInstance().apply { set(y, m, d, 0, 0, 0) }.timeInMillis
+            }
+            initialTimeFilter != null && initialTimeFilter.startsWith("RANGE:") -> {
+                val parts = initialTimeFilter.substringAfter("RANGE:").split("-")
+                parts.getOrNull(0)?.toLongOrNull() ?: (System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L)
+            }
+            else -> System.currentTimeMillis() - 30 * 24 * 60 * 60 * 1000L
+        }
+        mutableStateOf(startVal)
+    }
+
+    var endDateMillis by remember(initialTimeFilter) {
+        val endVal = when {
+            initialTimeFilter == "TODAY" -> {
+                Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+            }
+            initialTimeFilter != null && initialTimeFilter.startsWith("CUSTOM_DATE:") -> {
+                val parts = initialTimeFilter.substringAfter("CUSTOM_DATE:").split("-")
+                val y = parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+                val m = (parts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+                val d = parts.getOrNull(2)?.toIntOrNull() ?: 1
+                Calendar.getInstance().apply { set(y, m, d, 23, 59, 59) }.timeInMillis
+            }
+            initialTimeFilter != null && initialTimeFilter.startsWith("RANGE:") -> {
+                val parts = initialTimeFilter.substringAfter("RANGE:").split("-")
+                parts.getOrNull(1)?.toLongOrNull() ?: System.currentTimeMillis()
+            }
+            else -> System.currentTimeMillis()
+        }
+        mutableStateOf(endVal)
+    }
 
     // Month range
-    var startMonth by remember { mutableStateOf(0) } // Jan
-    var startYear by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
-    var endMonth by remember { mutableStateOf(calendar.get(Calendar.MONTH)) }
-    var endYear by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
+    var startMonth by remember(initialTimeFilter) {
+        val valM = if (initialTimeFilter != null && initialTimeFilter.startsWith("MONTH_RANGE:")) {
+            val parts = initialTimeFilter.substringAfter("MONTH_RANGE:").split("-")
+            (parts.getOrNull(1)?.toIntOrNull() ?: 1) - 1
+        } else 0
+        mutableStateOf(valM)
+    }
+    var startYear by remember(initialTimeFilter) {
+        val valY = if (initialTimeFilter != null && initialTimeFilter.startsWith("MONTH_RANGE:")) {
+            val parts = initialTimeFilter.substringAfter("MONTH_RANGE:").split("-")
+            parts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+        } else calendar.get(Calendar.YEAR)
+        mutableStateOf(valY)
+    }
+    var endMonth by remember(initialTimeFilter) {
+        val valM = if (initialTimeFilter != null && initialTimeFilter.startsWith("MONTH_RANGE:")) {
+            val parts = initialTimeFilter.substringAfter("MONTH_RANGE:").split("-")
+            (parts.getOrNull(3)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+        } else calendar.get(Calendar.MONTH)
+        mutableStateOf(valM)
+    }
+    var endYear by remember(initialTimeFilter) {
+        val valY = if (initialTimeFilter != null && initialTimeFilter.startsWith("MONTH_RANGE:")) {
+            val parts = initialTimeFilter.substringAfter("MONTH_RANGE:").split("-")
+            parts.getOrNull(2)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+        } else calendar.get(Calendar.YEAR)
+        mutableStateOf(valY)
+    }
 
     // Year range
-    var startYearRange by remember { mutableStateOf(calendar.get(Calendar.YEAR) - 1) }
-    var endYearRange by remember { mutableStateOf(calendar.get(Calendar.YEAR)) }
+    var startYearRange by remember(initialTimeFilter) {
+        val valY = if (initialTimeFilter != null && initialTimeFilter.startsWith("YEAR_RANGE:")) {
+            val parts = initialTimeFilter.substringAfter("YEAR_RANGE:").split("-")
+            parts.getOrNull(0)?.toIntOrNull() ?: (calendar.get(Calendar.YEAR) - 1)
+        } else (calendar.get(Calendar.YEAR) - 1)
+        mutableStateOf(valY)
+    }
+    var endYearRange by remember(initialTimeFilter) {
+        val valY = if (initialTimeFilter != null && initialTimeFilter.startsWith("YEAR_RANGE:")) {
+            val parts = initialTimeFilter.substringAfter("YEAR_RANGE:").split("-")
+            parts.getOrNull(1)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+        } else calendar.get(Calendar.YEAR)
+        mutableStateOf(valY)
+    }
 
     // Person filter state
     var filterByPerson by remember { mutableStateOf(false) }
@@ -401,58 +529,103 @@ fun ExportDialog(
             return@remember emptyList<MonthlyBudget>()
         }
 
-        var list = monthlyBudgets
+        val list = monthlyBudgets
 
-        var filtered = when (selectedTimeFilter) {
-            "MONTH" -> {
-                list.filter {
-                    it.year == selectedYear && it.month == selectedMonth
-                }
-            }
-            "YEAR" -> {
-                list.filter {
-                    it.year == selectedYear
-                }
-            }
-            "DATE_RANGE" -> {
-                val startCal = Calendar.getInstance().apply { timeInMillis = startDateMillis }
-                val endCal = Calendar.getInstance().apply { timeInMillis = endDateMillis }
-                val startVal = startCal.get(Calendar.YEAR) * 12 + startCal.get(Calendar.MONTH)
-                val endVal = endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
-                list.filter {
-                    val currentVal = it.year * 12 + it.month
-                    currentVal in startVal..endVal
-                }
-            }
-            "MONTH_RANGE" -> {
-                val startVal = startYear * 12 + startMonth
-                val endVal = endYear * 12 + endMonth
-                list.filter {
-                    val currentVal = it.year * 12 + it.month
-                    currentVal in startVal..endVal
-                }
-            }
-            "YEAR_RANGE" -> {
-                list.filter {
-                    it.year in startYearRange..endYearRange
-                }
-            }
-            else -> list
-        }
-
-        if (filtered.isEmpty() && selectedCategory == "ONLY_BUDGET") {
-            filtered = listOf(
-                MonthlyBudget(
-                    year = selectedYear,
-                    month = selectedMonth,
-                    income = defaultBudgetIncome,
-                    expense = defaultBudgetExpense,
-                    savings = defaultBudgetSavings
+        if (selectedTimeFilter == "ALL_TIME") {
+            if (list.isEmpty() && (defaultBudgetIncome > 0 || defaultBudgetExpense > 0 || defaultBudgetSavings > 0)) {
+                listOf(
+                    MonthlyBudget(
+                        year = selectedYear,
+                        month = selectedMonth,
+                        income = defaultBudgetIncome,
+                        expense = defaultBudgetExpense,
+                        savings = defaultBudgetSavings
+                    )
                 )
-            )
-        }
+            } else {
+                list.map {
+                    MonthlyBudget(
+                        id = it.id,
+                        year = it.year,
+                        month = it.month,
+                        income = it.income ?: 0.0,
+                        expense = it.expense ?: 0.0,
+                        savings = it.savings ?: 0.0,
+                        workspaceId = it.workspaceId
+                    )
+                }.sortedWith(compareByDescending<MonthlyBudget> { it.year }.thenByDescending { it.month })
+            }
+        } else {
+            val requiredMonths = mutableListOf<Pair<Int, Int>>() // Pair(year, month 0..11)
+            when (selectedTimeFilter) {
+                "MONTH" -> {
+                    requiredMonths.add(Pair(selectedYear, selectedMonth))
+                }
+                "YEAR" -> {
+                    for (m in 0..11) {
+                        requiredMonths.add(Pair(selectedYear, m))
+                    }
+                }
+                "DATE_RANGE" -> {
+                    val startCal = Calendar.getInstance().apply { timeInMillis = startDateMillis }
+                    val endCal = Calendar.getInstance().apply { timeInMillis = endDateMillis }
+                    var currentVal = startCal.get(Calendar.YEAR) * 12 + startCal.get(Calendar.MONTH)
+                    val endVal = endCal.get(Calendar.YEAR) * 12 + endCal.get(Calendar.MONTH)
+                    while (currentVal <= endVal) {
+                        val y = currentVal / 12
+                        val m = currentVal % 12
+                        requiredMonths.add(Pair(y, m))
+                        currentVal++
+                    }
+                }
+                "MONTH_RANGE" -> {
+                    var currentVal = startYear * 12 + startMonth
+                    val endVal = endYear * 12 + endMonth
+                    while (currentVal <= endVal) {
+                        val y = currentVal / 12
+                        val m = currentVal % 12
+                        requiredMonths.add(Pair(y, m))
+                        currentVal++
+                    }
+                }
+                "YEAR_RANGE" -> {
+                    for (y in startYearRange..endYearRange) {
+                        for (m in 0..11) {
+                            requiredMonths.add(Pair(y, m))
+                        }
+                    }
+                }
+            }
 
-        filtered.sortedWith(compareByDescending<MonthlyBudget> { it.year }.thenByDescending { it.month })
+            val result = mutableListOf<MonthlyBudget>()
+            for ((y, m) in requiredMonths) {
+                val existing = list.find { it.year == y && (it.month == m || it.month == m + 1) }
+                if (existing != null) {
+                    result.add(
+                        MonthlyBudget(
+                            id = existing.id,
+                            year = y,
+                            month = m,
+                            income = existing.income ?: 0.0,
+                            expense = existing.expense ?: 0.0,
+                            savings = existing.savings ?: 0.0,
+                            workspaceId = existing.workspaceId
+                        )
+                    )
+                } else {
+                    result.add(
+                        MonthlyBudget(
+                            year = y,
+                            month = m,
+                            income = 0.0,
+                            expense = 0.0,
+                            savings = 0.0
+                        )
+                    )
+                }
+            }
+            result.sortedWith(compareByDescending<MonthlyBudget> { it.year }.thenByDescending { it.month })
+        }
     }
 
     // Month lists
@@ -2109,20 +2282,20 @@ private fun generatePdfFile(
     var canvas = currentPage.canvas
 
     val primaryPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#4F46E5") // Modern Indigo / Violet
+        color = android.graphics.Color.parseColor("#1E293B") // Executive Dark Slate
         textSize = 16f
         isFakeBoldText = true
         isAntiAlias = true
     }
 
     val subtitlePaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#64748B")
+        color = android.graphics.Color.parseColor("#64748B") // Slate Gray
         textSize = 9.5f
         isAntiAlias = true
     }
 
     val statsHeaderPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#4338CA")
+        color = android.graphics.Color.parseColor("#334155") // Medium Slate
         textSize = 9.5f
         isFakeBoldText = true
         isAntiAlias = true
@@ -2136,7 +2309,7 @@ private fun generatePdfFile(
     }
 
     val tableHeaderBgPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#4F46E5") // Indigo header
+        color = android.graphics.Color.parseColor("#334155") // Soft Slate Header
         isAntiAlias = true
     }
 
@@ -2161,11 +2334,11 @@ private fun generatePdfFile(
     }
 
     val zebraBgPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#F5F3FF") // Light soft purple row tint
+        color = android.graphics.Color.parseColor("#F8FAFC") // Soft clean off-white row tint
     }
 
     val dividerPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#E0E7FF")
+        color = android.graphics.Color.parseColor("#E2E8F0")
         style = Paint.Style.STROKE
         strokeWidth = 1f
     }
@@ -2190,7 +2363,7 @@ private fun generatePdfFile(
 
     // Top Header Gradient / Banner
     val headerBannerPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#6366F1")
+        color = android.graphics.Color.parseColor("#1E293B") // Executive Dark Navy Banner
         isAntiAlias = true
     }
     val headerRect = android.graphics.RectF(40f, 30f, 555f, 70f)
@@ -2204,7 +2377,7 @@ private fun generatePdfFile(
     canvas.drawCircle(58f, 50f, 12f, logoPaint)
 
     val symbolPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#6366F1")
+        color = android.graphics.Color.parseColor("#1E293B")
         textSize = 13f
         isFakeBoldText = true
         isAntiAlias = true
@@ -2220,7 +2393,7 @@ private fun generatePdfFile(
     canvas.drawText(if (isBn) "ফাইন্যান্স নোট" else "Finance Note App", 78f, 54f, appNamePaint)
 
     val appSubPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#E0E7FF")
+        color = android.graphics.Color.parseColor("#94A3B8")
         textSize = 9f
         isAntiAlias = true
     }
@@ -2241,10 +2414,10 @@ private fun generatePdfFile(
 
     // Category Specific Summary Box
     val cardBgPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#F5F3FF") // Light soft purple
+        color = android.graphics.Color.parseColor("#F8FAFC") // Soft clean off-white
     }
     val cardBorderPaint = Paint().apply {
-        color = android.graphics.Color.parseColor("#DDD6FE")
+        color = android.graphics.Color.parseColor("#E2E8F0")
         style = Paint.Style.STROKE
         strokeWidth = 1f
     }
@@ -2363,7 +2536,7 @@ private fun generatePdfFile(
     // 1. If ONLY_BUDGET, draw full budget & percentage breakdown tables
     if (selectedCategory == "ONLY_BUDGET") {
         val secTitlePaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#4338CA")
+            color = android.graphics.Color.parseColor("#1E293B")
             textSize = 10.5f
             isFakeBoldText = true
             isAntiAlias = true
@@ -2566,7 +2739,7 @@ private fun generatePdfFile(
         }
 
         val secTitlePaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#4338CA")
+            color = android.graphics.Color.parseColor("#1E293B")
             textSize = 11f
             isFakeBoldText = true
             isAntiAlias = true
