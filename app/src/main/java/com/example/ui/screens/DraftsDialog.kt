@@ -55,6 +55,7 @@ fun DraftsScratchpadDialog(
     val drafts by viewModel.draftTransactions.collectAsStateWithLifecycle()
     var noteText by remember { mutableStateOf("") }
     var editDraftMode by remember { mutableStateOf<DraftTransaction?>(null) }
+    var showInfoDialog by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -65,7 +66,7 @@ fun DraftsScratchpadDialog(
             if (spoken.isNotBlank()) {
                 val trimmed = spoken.trim()
                 val lower = trimmed.lowercase()
-                val saveKeywords = listOf("সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
+                val saveKeywords = listOf("ওকে", "ok", "okay", "সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
                 var autoSave = false
                 var cleanNote = trimmed
                 for (kw in saveKeywords) {
@@ -109,6 +110,10 @@ fun DraftsScratchpadDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        if (showInfoDialog) {
+            DraftInfoDialog(onDismiss = { showInfoDialog = false })
+        }
+
         Surface(
             modifier = Modifier
                 .fillMaxSize()
@@ -146,16 +151,32 @@ fun DraftsScratchpadDialog(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "লেনদেন খসড়া খাতা" else "Transaction Drafts",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                IconButton(
+                                    onClick = { showInfoDialog = true },
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Info,
+                                        contentDescription = "Info",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                             Text(
-                                text = if (language == AppLanguage.BN) "লেনদেন খসড়া খাতা" else "Transaction Drafts",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = if (language == AppLanguage.BN) "দ্রুত লেনদেন ড্রাফট করে রাখুন" else "Quickly save transaction drafts",
+                                text = if (language == AppLanguage.BN) "লেনদেনের ড্রাফটসমূহঃ" else "Transaction drafts:",
                                 fontSize = 12.sp,
-                                color = Color.White.copy(alpha = 0.8f)
+                                color = Color.White.copy(alpha = 0.9f)
                             )
                         }
                     }

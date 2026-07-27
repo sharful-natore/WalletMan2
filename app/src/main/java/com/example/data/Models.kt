@@ -93,6 +93,7 @@ data class FinanceBackup(
     val profileSocial: String = "",
     val profileAddress: String = "",
     val profilePhotoUri: String? = null,
+    val draftTransactions: List<DraftTransaction> = emptyList(),
     val customGradientsConfigSerialized: String? = null,
     val staticGradientOverridesSerialized: String? = null,
     val chartGradientsSerialized: String? = null,

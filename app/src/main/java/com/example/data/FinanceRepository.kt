@@ -75,7 +75,8 @@ class FinanceRepository(private val financeDao: FinanceDao) {
             savingsTransactions = financeDao.getAllSavingsTransactionsList(),
             workspaces = financeDao.getAllWorkspacesList(),
             trashItems = financeDao.getAllTrashItemsList(),
-            monthlyBudgets = financeDao.getAllMonthlyBudgetsAllWorkspacesList()
+            monthlyBudgets = financeDao.getAllMonthlyBudgetsAllWorkspacesList(),
+            draftTransactions = financeDao.getAllDraftTransactionsList()
         )
     }
 
@@ -85,13 +86,15 @@ class FinanceRepository(private val financeDao: FinanceDao) {
                 backup.savingsGoals.isEmpty() &&
                 backup.savingsTransactions.isEmpty() &&
                 backup.workspaces.isEmpty() &&
-                backup.monthlyBudgets.isEmpty()
+                backup.monthlyBudgets.isEmpty() &&
+                backup.draftTransactions.isEmpty()
         
         val currentLocalData = getBackupData()
         val isLocalEmpty = currentLocalData.persons.isEmpty() &&
                 currentLocalData.transactions.isEmpty() &&
                 currentLocalData.savingsGoals.isEmpty() &&
-                currentLocalData.savingsTransactions.isEmpty()
+                currentLocalData.savingsTransactions.isEmpty() &&
+                currentLocalData.draftTransactions.isEmpty()
 
         // Protect local database from being wiped out by a blank or corrupt cloud backup
         if (isBackupEmpty && !isLocalEmpty) {
@@ -105,6 +108,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         financeDao.deleteAllWorkspaces()
         financeDao.deleteAllTrashItems()
         financeDao.deleteAllMonthlyBudgets()
+        financeDao.deleteAllDraftTransactions()
 
         if (backup.persons.isNotEmpty()) financeDao.insertPersons(backup.persons)
         if (backup.transactions.isNotEmpty()) financeDao.insertTransactions(backup.transactions)
@@ -122,6 +126,9 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         }
         if (backup.monthlyBudgets.isNotEmpty()) {
             financeDao.insertMonthlyBudgets(backup.monthlyBudgets)
+        }
+        if (backup.draftTransactions.isNotEmpty()) {
+            financeDao.insertDraftTransactions(backup.draftTransactions)
         }
     }
 

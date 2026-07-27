@@ -267,6 +267,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val transactionAdapter = moshi.adapter(Transaction::class.java)
     private val savingsGoalAdapter = moshi.adapter(SavingsGoal::class.java)
     private val savingsTransactionAdapter = moshi.adapter(SavingsTransaction::class.java)
+    private val draftAdapter = moshi.adapter(DraftTransaction::class.java)
 
     private val personWithTxAdapter = moshi.adapter(com.example.data.PersonWithTransactions::class.java)
     private val goalWithTxAdapter = moshi.adapter(com.example.data.GoalWithTransactions::class.java)
@@ -305,6 +306,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
                 "SAVINGS_TRANSACTION" -> {
                     savingsTransactionAdapter.fromJson(item.itemJson)?.let { repository.insertSavingsTransaction(it) }
+                }
+                "DRAFT_TRANSACTION" -> {
+                    draftAdapter.fromJson(item.itemJson)?.let { repository.insertDraftTransaction(it) }
                 }
                 "WORKSPACE" -> {
                     backupAdapter.fromJson(item.itemJson)?.let { backup ->
@@ -678,9 +682,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         list.filter { it.workspaceId == activeId }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val draftTransactions: StateFlow<List<DraftTransaction>> = combine(repository.allDraftTransactions, currentWorkspaceId) { list, activeId ->
-        list.filter { it.workspaceId == activeId }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val draftTransactions: StateFlow<List<DraftTransaction>> = repository.allDraftTransactions
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val savingsGoals: StateFlow<List<SavingsGoal>> = combine(repository.allSavingsGoals, currentWorkspaceId) { list, activeId ->
         list.filter { it.workspaceId == activeId }
@@ -1045,6 +1048,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun deleteDraftTransaction(id: Int) {
         viewModelScope.launch {
+            val draftList = repository.getAllDraftTransactionsList()
+            val target = draftList.find { it.id == id }
+            if (target != null) {
+                repository.insertTrashItem(
+                    com.example.data.TrashItem(
+                        originalId = target.id,
+                        itemType = "DRAFT_TRANSACTION",
+                        itemJson = draftAdapter.toJson(target)
+                    )
+                )
+            }
             repository.deleteDraftTransaction(id)
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
@@ -2901,6 +2915,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         val dateText = sdf.format(java.util.Date(t.timestamp))
                         
                         "$typeLabel$typeText\n$amountLabel${t.amount}\n$dateLabel$dateText$notePart"
+                    } ?: item.itemJson
+                }
+                "DRAFT_TRANSACTION" -> {
+                    draftAdapter.fromJson(item.itemJson)?.let { d ->
+                        val label = if (language == com.example.ui.AppLanguage.BN) "খসড়া লেনদেন" else "Draft Transaction"
+                        val dateText = sdf.format(java.util.Date(d.timestamp))
+                        "$label\n${d.note}\n$dateText"
                     } ?: item.itemJson
                 }
                 "PERSON_WITH_TXS" -> {

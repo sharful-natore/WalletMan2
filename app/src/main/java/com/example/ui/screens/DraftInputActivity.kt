@@ -24,6 +24,8 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.foundation.verticalScroll
 import com.example.data.AppDatabase
 import com.example.data.DraftTransaction
 import com.example.data.DraftParseResult
@@ -87,11 +89,13 @@ class DraftInputActivity : ComponentActivity() {
         
         val isVoice = intent.getBooleanExtra("isVoice", false)
         val isEdit = intent.getBooleanExtra("isEdit", false)
+        val showInfoDialogExtra = intent.getBooleanExtra("showInfoDialog", false)
         val draftId = intent.getIntExtra("draft_id", -1)
 
         setContent {
             var draftText by remember { mutableStateOf("") }
             var isLoading by remember { mutableStateOf(isEdit) }
+            var showInfoDialogState by remember { mutableStateOf(showInfoDialogExtra) }
             val coroutineScope = rememberCoroutineScope()
             val context = androidx.compose.ui.platform.LocalContext.current
             val db = remember { AppDatabase.getDatabase(context) }
@@ -103,7 +107,7 @@ class DraftInputActivity : ComponentActivity() {
                     if (!spokenText.isNullOrBlank()) {
                         val trimmed = spokenText.trim()
                         val lower = trimmed.lowercase()
-                        val saveKeywords = listOf("সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
+                        val saveKeywords = listOf("ওকে", "ok", "okay", "সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
                         var autoSave = false
                         var cleanNote = trimmed
                         for (kw in saveKeywords) {
@@ -174,6 +178,14 @@ class DraftInputActivity : ComponentActivity() {
                                     val drafts = draftsDao.getAllDraftTransactionsList()
                                     val target = drafts.find { it.id == draftId }
                                     if (target != null) {
+                                        val moshi = com.squareup.moshi.Moshi.Builder().addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory()).build()
+                                        val adapter = moshi.adapter(DraftTransaction::class.java)
+                                        val trashItem = com.example.data.TrashItem(
+                                            originalId = target.id,
+                                            itemType = "DRAFT_TRANSACTION",
+                                            itemJson = adapter.toJson(target)
+                                        )
+                                        db.financeDao().insertTrashItem(trashItem)
                                         draftsDao.deleteDraftTransactionById(target.id)
                                         val updateIntent = android.content.Intent("com.example.UPDATE_DRAFT_WIDGET")
                                         updateIntent.setPackage(packageName)
@@ -215,13 +227,37 @@ class DraftInputActivity : ComponentActivity() {
                         Column(
                             modifier = Modifier.padding(24.dp)
                         ) {
-                            Text(
-                                text = if (isEdit) "Edit Draft Note" else "Add Draft Transaction",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            if (showInfoDialogState) {
+                                DraftInfoDialog(
+                                    onDismiss = {
+                                        showInfoDialogState = false
+                                        if (showInfoDialogExtra && !isEdit && draftText.isBlank()) {
+                                            finish()
+                                        }
+                                    }
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isEdit) "Edit Draft Note" else "Add Draft Transaction",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1E293B)
+                                )
+                                IconButton(onClick = { showInfoDialogState = true }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Info,
+                                        contentDescription = "Draft Info",
+                                        tint = Color(0xFF0284C7)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(
                                 value = draftText,
                                 onValueChange = { draftText = it },
@@ -385,4 +421,103 @@ class DraftInputActivity : ComponentActivity() {
             }
         }
     }
+}
+
+@Composable
+fun DraftInfoDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("বুঝতে পেরেছি", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = Color(0xFF0284C7),
+                    modifier = Modifier.size(26.dp)
+                )
+                Text(
+                    text = "লেনদেনের ড্রাফটসমূহ নির্দেশিকা",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A)
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Section 1: Why
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "১. কেন ব্যবহার করবেন? (Why)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF0284C7)
+                    )
+                    Text(
+                        text = "তাৎক্ষণিকভাবে কোনো লেনদেন ঘটে গেলে দ্রুত টুকে রাখার জন্য এটি তৈরি। পরবর্তীতে সময় সুযোগ নিয়ে সঠিক খাত, ক্যাটাগরি ও হিসাব মিলিয়ে মূল হিসাব বা ওয়ার্কস্পেস এ যুক্ত (Posting) করে নেওয়ার সুবিধা পাবেন।",
+                        fontSize = 13.sp,
+                        color = Color(0xFF334155),
+                        lineHeight = 18.sp
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                // Section 2: How to use
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "২. কীভাবে ড্রাফট করবেন? (How to use)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF0284C7)
+                    )
+                    Text(
+                        text = "• টাইপ করে বা উইজেটের মাইক্রোফোনে ভয়েস দিয়ে লিখুন (যেমন: \"বাজার ৫০০\" বা \"রহিম দিল ২০০০\")।\n• সিস্টেম নিজ থেকেই অ্যামাউন্ট ও টাইপ (আয়/ব্যয়/দেনা-পাওনা) চিনে নিবে।\n• ভয়েস ইনপুটের সময় শেষে \"ওকে\" বা \"সেভ\" বললে স্বয়ংক্রিয়ভাবে ড্রাফট হয়ে যাবে।",
+                        fontSize = 13.sp,
+                        color = Color(0xFF334155),
+                        lineHeight = 18.sp
+                    )
+                }
+
+                HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                // Section 3: How to post
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "৩. কীভাবে পোস্টিং করবেন? (How to post)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF0284C7)
+                    )
+                    Text(
+                        text = "• ড্রাফট লিস্টের যেকোনো আইটেমের পাশে থাকা 'পোস্ট' বাটনে ক্লিক করুন।\n• আপনার সুবিধাজনক সক্রিয় 'ওয়ার্কস্পেস' নির্বাচন করে নিশ্চিত করলেই ড্রাফটটি মূল লেনদেনে যুক্ত হবে এবং ড্রাফট খাতা থেকে সরে যাবে।",
+                        fontSize = 13.sp,
+                        color = Color(0xFF334155),
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        },
+        shape = RoundedCornerShape(20.dp),
+        containerColor = Color.White
+    )
 }

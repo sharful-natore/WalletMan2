@@ -130,6 +130,19 @@ class DraftWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_customize_button, customizePendingIntent)
+
+            // Intent for info button
+            val infoIntent = Intent(context, DraftInputActivity::class.java).apply {
+                putExtra("showInfoDialog", true)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val infoPendingIntent = PendingIntent.getActivity(
+                context,
+                30,
+                infoIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_info_button, infoPendingIntent)
             
             // Service intent for ListView
             val serviceIntent = Intent(context, DraftWidgetService::class.java).apply {

@@ -233,6 +233,9 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDraftTransaction(draft: DraftTransaction): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDraftTransactions(drafts: List<DraftTransaction>)
+
     @Update
     suspend fun updateDraftTransaction(draft: DraftTransaction)
 

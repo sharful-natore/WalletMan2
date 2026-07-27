@@ -3144,7 +3144,7 @@ fun FinanceNoteApp(
                                         androidx.compose.material3.Badge(
                                             containerColor = Color.Red,
                                             contentColor = Color.White,
-                                            modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                            modifier = Modifier.offset(x = 4.dp, y = (-4).dp)
                                         ) {
                                             Text("$draftCount", fontSize = 10.sp)
                                         }
