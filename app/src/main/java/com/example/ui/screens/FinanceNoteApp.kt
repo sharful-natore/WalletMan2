@@ -6044,8 +6044,9 @@ fun DashboardScreen(
     val isSelectionMode = selectedTxIds.isNotEmpty()
 
     var showWifiVoiceBanner by remember {
-        mutableStateOf(shouldShowWifiVoicePrompt(context))
+        mutableStateOf(shouldShowOfflineVoicePrompt(context))
     }
+    var showOfflineVoiceGuideOnDashboard by remember { mutableStateOf(false) }
 
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
         selectedTxIds = emptySet()
@@ -6528,6 +6529,13 @@ fun DashboardScreen(
                 }
             }
 
+            if (showOfflineVoiceGuideOnDashboard) {
+                OfflineVoiceGuideDialog(
+                    isBn = (language == AppLanguage.BN),
+                    onDismiss = { showOfflineVoiceGuideOnDashboard = false }
+                )
+            }
+
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -6540,8 +6548,7 @@ fun DashboardScreen(
                         OfflineVoiceWifiBanner(
                             isBn = (language == AppLanguage.BN),
                             onSetupClick = {
-                                openOfflineVoiceSettings(context)
-                                markVoicePackConfigured(context, true)
+                                showOfflineVoiceGuideOnDashboard = true
                                 showWifiVoiceBanner = false
                             },
                             onDismiss = {
@@ -14873,12 +14880,18 @@ fun SettingsScreen(
                     .getBoolean("offline_voice_pack_configured", false)
             )
         }
+        var isModelDownloaded by remember { mutableStateOf(isVoskDownloaded(context)) }
         var showOfflineGuideFromSettings by remember { mutableStateOf(false) }
 
         if (showOfflineGuideFromSettings) {
             OfflineVoiceGuideDialog(
                 isBn = (language == AppLanguage.BN),
-                onDismiss = { showOfflineGuideFromSettings = false }
+                onDismiss = {
+                    showOfflineGuideFromSettings = false
+                    isOfflineVoiceConfigured = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+                        .getBoolean("offline_voice_pack_configured", false)
+                    isModelDownloaded = isVoskDownloaded(context)
+                }
             )
         }
 
@@ -14953,17 +14966,89 @@ fun SettingsScreen(
 
                 HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
 
+                // --- Vosk Offline Model Setup Status Indicator ---
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isModelDownloaded) {
+                        if (isDark) Color(0xFF065F46).copy(alpha = 0.2f) else Color(0xFFD1FAE5)
+                    } else {
+                        if (isDark) Color(0xFF78350F).copy(alpha = 0.2f) else Color(0xFFFEF3C7)
+                    },
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isModelDownloaded) {
+                            if (isDark) Color(0xFF059669).copy(alpha = 0.4f) else Color(0xFF10B981).copy(alpha = 0.3f)
+                        } else {
+                            if (isDark) Color(0xFFD97706).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.3f)
+                        }
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isModelDownloaded) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = if (isModelDownloaded) Color(0xFF10B981) else Color(0xFFD97706),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isModelDownloaded) {
+                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা আছে" else "Vosk Offline Bangla Voice Model Set Up"
+                                } else {
+                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা নেই" else "Vosk Offline Bangla Voice Model Not Set Up"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = if (isModelDownloaded) {
+                                    if (isDark) Color(0xFF34D399) else Color(0xFF065F46)
+                                } else {
+                                    if (isDark) Color(0xFFFBBF24) else Color(0xFF78350F)
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isModelDownloaded) {
+                                    if (language == AppLanguage.BN) "আপনি ইন্টারনেট ছাড়াই সম্পূর্ণ অফলাইনে দ্রুততম গতিতে মুখে বলে খসড়া করতে পারবেন।" else "You can speak to type drafts fully offline at maximum speed without internet connection."
+                                } else {
+                                    if (language == AppLanguage.BN) "অফলাইনে ইন্টারনেট ছাড়া ভয়েস ইনপুটের সুবিধা পেতে ভয়েস মডেলটি ডাউনলোড করুন (৩৩ এমবি)।" else "Download the offline voice pack (33 MB) to use speech recognition without internet."
+                                },
+                                fontSize = 11.sp,
+                                color = if (isDark) Color.LightGray else Color(0xFF334155),
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Button(
                     onClick = { showOfflineGuideFromSettings = true },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isModelDownloaded) Color(0xFF475569) else Color(0xFFD97706)
+                    ),
                     contentPadding = PaddingValues(12.dp)
                 ) {
-                    Icon(imageVector = Icons.Rounded.Info, contentDescription = null, tint = Color.White)
+                    Icon(
+                        imageVector = if (isModelDownloaded) Icons.Rounded.CheckCircle else Icons.Rounded.Download,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (language == AppLanguage.BN) "অফলাইন ভয়েস গাইড ও ডাউনলোড" else "Offline Voice Guide & Setup",
+                        text = if (isModelDownloaded) {
+                            if (language == AppLanguage.BN) "ভয়েস গাইড ও সেটআপ পুনরায় দেখুন" else "Revisit Voice Guide & Setup"
+                        } else {
+                            if (language == AppLanguage.BN) "ভয়েস মডেল ডাউনলোড ও সেটআপ করুন" else "Download & Setup Voice Model"
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = Color.White

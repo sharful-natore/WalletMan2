@@ -57,6 +57,7 @@ fun DraftsScratchpadDialog(
     var editDraftMode by remember { mutableStateOf<DraftTransaction?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showOfflineGuideDialog by remember { mutableStateOf(false) }
+    var showVoskDialog by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -95,17 +96,23 @@ fun DraftsScratchpadDialog(
     }
 
     val triggerVoiceInput = {
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (language == AppLanguage.BN) "bn-BD" else "en-US")
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (language == AppLanguage.BN) "bn-BD" else "en-US"))
-            putExtra(RecognizerIntent.EXTRA_PROMPT, if (language == AppLanguage.BN) "লেনদেন খসড়া বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
-        }
-        try {
-            speechLauncher.launch(intent)
-        } catch (e: Exception) {
+        if (isVoskDownloaded(context)) {
+            showVoskDialog = true
+        } else if (!isInternetConnected(context)) {
             showOfflineGuideDialog = true
+        } else {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (language == AppLanguage.BN) "bn-BD" else "en-US")
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (language == AppLanguage.BN) "bn-BD" else "en-US"))
+                putExtra(RecognizerIntent.EXTRA_PROMPT, if (language == AppLanguage.BN) "লেনদেন খসড়া বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
+            }
+            try {
+                speechLauncher.launch(intent)
+            } catch (e: Exception) {
+                showOfflineGuideDialog = true
+            }
         }
     }
 
@@ -127,6 +134,16 @@ fun DraftsScratchpadDialog(
             OfflineVoiceGuideDialog(
                 isBn = (language == AppLanguage.BN),
                 onDismiss = { showOfflineGuideDialog = false }
+            )
+        }
+
+        if (showVoskDialog) {
+            VoskSpeechInputDialog(
+                isBn = (language == AppLanguage.BN),
+                onResult = { text ->
+                    noteText = text
+                },
+                onDismiss = { showVoskDialog = false }
             )
         }
 

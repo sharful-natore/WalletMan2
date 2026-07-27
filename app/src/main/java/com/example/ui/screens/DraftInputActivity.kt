@@ -57,6 +57,7 @@ class DraftInputActivity : ComponentActivity() {
             var isLoading by remember { mutableStateOf(isEdit) }
             var showInfoDialogState by remember { mutableStateOf(showInfoDialogExtra) }
             var showOfflineGuideDialog by remember { mutableStateOf(false) }
+            var showVoskDialog by remember { mutableStateOf(false) }
             val coroutineScope = rememberCoroutineScope()
             val context = androidx.compose.ui.platform.LocalContext.current
             val db = remember { AppDatabase.getDatabase(context) }
@@ -113,17 +114,23 @@ class DraftInputActivity : ComponentActivity() {
             }
 
             val triggerVoice = {
-                val voiceIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (isBn) "bn-BD" else "en-US")
-                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                    putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (isBn) "bn-BD" else "en-US"))
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBn) "লেনদেন ড্রাফট বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
-                }
-                try {
-                    speechLauncher.launch(voiceIntent)
-                } catch (e: Exception) {
+                if (isVoskDownloaded(context)) {
+                    showVoskDialog = true
+                } else if (!isInternetConnected(context)) {
                     showOfflineGuideDialog = true
+                } else {
+                    val voiceIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (isBn) "bn-BD" else "en-US")
+                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (isBn) "bn-BD" else "en-US"))
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBn) "লেনদেন ড্রাফট বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
+                    }
+                    try {
+                        speechLauncher.launch(voiceIntent)
+                    } catch (e: Exception) {
+                        showOfflineGuideDialog = true
+                    }
                 }
             }
 
@@ -221,6 +228,16 @@ class DraftInputActivity : ComponentActivity() {
                                 OfflineVoiceGuideDialog(
                                     isBn = isBn,
                                     onDismiss = { showOfflineGuideDialog = false }
+                                )
+                            }
+
+                            if (showVoskDialog) {
+                                VoskSpeechInputDialog(
+                                    isBn = isBn,
+                                    onResult = { text ->
+                                        draftText = text
+                                    },
+                                    onDismiss = { showVoskDialog = false }
                                 )
                             }
 
