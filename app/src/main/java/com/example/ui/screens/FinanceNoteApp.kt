@@ -10750,14 +10750,14 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
         if (initialDraft != null) viewModel.parseDraftDetails(initialDraft.note) else null
     }
     
-    var note by remember { mutableStateOf(editTransaction?.note ?: defaultParsed?.cleanedNote ?: initialDraft?.note ?: "") }
+    var note by remember { mutableStateOf(editTransaction?.note ?: initialDraft?.note ?: defaultParsed?.cleanedNote ?: "") }
     var customTimestamp by remember { mutableStateOf<Long?>(editTransaction?.timestamp) }
 
     // Dropdowns / Option selectors
-    var type by remember { mutableStateOf(editTransaction?.type ?: defaultParsed?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
+    var type by remember { mutableStateOf(editTransaction?.type ?: initialDraft?.type ?: defaultParsed?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
     var subType by remember { mutableStateOf(editTransaction?.subType ?: "CASH") } // CASH, CREDIT
     var selectedPersonId by remember { mutableStateOf<Int?>(editTransaction?.personId) }
-    var category by remember { mutableStateOf(editTransaction?.category ?: defaultParsed?.category ?: "Food") }
+    var category by remember { mutableStateOf(editTransaction?.category ?: initialDraft?.category ?: defaultParsed?.category ?: "Food") }
 
     var previousPersonIds by remember { mutableStateOf(persons.map { it.id }.toSet()) }
 
@@ -10799,6 +10799,9 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
         mutableStateOf(
             if (editTransaction != null) {
                 val amt = editTransaction.amount
+                if (amt % 1.0 == 0.0) amt.toLong().toString() else amt.toString()
+            } else if (initialDraft?.amount != null) {
+                val amt = initialDraft.amount!!
                 if (amt % 1.0 == 0.0) amt.toLong().toString() else amt.toString()
             } else if (defaultParsed != null && defaultParsed.amount != null) {
                 val amt = defaultParsed.amount!!

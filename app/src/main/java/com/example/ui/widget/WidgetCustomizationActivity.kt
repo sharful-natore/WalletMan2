@@ -314,8 +314,9 @@ fun WidgetPreview(config: WidgetDraftConfig) {
                                     fontWeight = FontWeight.Bold, 
                                     modifier = Modifier.padding(end = 8.dp)
                                 )
+                                val text = if (it == 0) "বাজার খরচ ৫০০৳" else "অফিস যাতায়াত ১০০৳"
                                 Text(
-                                    if (it == 0) "বাজার খরচ ৫০০ টাকা" else "অফিস যাতায়াত ১০০ টাকা", 
+                                    text, 
                                     color = Color(config.listItemTextColor), 
                                     fontWeight = FontWeight.Bold
                                 )
@@ -370,6 +371,8 @@ fun ColorPickerDialog(
         Color(0xFF1A1A1A), // 90% Black
         Color(0xFF595959), // 65% Black
         Color(0xFF333333), // 80% Black
+        Color(0xFF4D4D4D), // 70% Black
+        Color(0xFF666666), // 60% Black
         Color(0xFFE2E8F0),
         Color(0xCCFFFFFF), // 80% White
         Color(0x99FFFFFF)  // 60% White

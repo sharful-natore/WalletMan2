@@ -45,7 +45,15 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         val rv = RemoteViews(context.packageName, R.layout.widget_draft_item)
         val config = WidgetConfigManager.loadConfig(context)
 
-        rv.setTextViewText(R.id.widget_item_text, draft.note)
+        val amountStr = if (draft.amount != null) {
+            " " + draft.amount.toInt().toString()
+                .replace("0", "০").replace("1", "১").replace("2", "২")
+                .replace("3", "৩").replace("4", "৪").replace("5", "৫")
+                .replace("6", "৬").replace("7", "৭").replace("8", "৮")
+                .replace("9", "৯") + "৳"
+        } else ""
+        
+        rv.setTextViewText(R.id.widget_item_text, "${draft.note}$amountStr")
         rv.setTextColor(R.id.widget_item_text, config.listItemTextColor)
         rv.setTextColor(R.id.widget_item_serial, config.listItemTextColor)
         rv.setInt(R.id.widget_item_bg, "setColorFilter", config.listItemBg)

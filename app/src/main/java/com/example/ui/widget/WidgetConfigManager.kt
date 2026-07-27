@@ -41,13 +41,13 @@ object WidgetConfigManager {
     fun loadConfig(context: Context): WidgetDraftConfig {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return WidgetDraftConfig(
-            titleSectionBg = prefs.getInt("titleSectionBg", Color.TRANSPARENT),
-            listSectionBg = prefs.getInt("listSectionBg", Color.TRANSPARENT),
-            listItemBg = prefs.getInt("listItemBg", Color.parseColor("#E2E8F0")),
-            titleTextColor = prefs.getInt("titleTextColor", Color.parseColor("#1A1A1A")),
-            subtitleTextColor = prefs.getInt("subtitleTextColor", Color.parseColor("#595959")),
-            listItemTextColor = prefs.getInt("listItemTextColor", Color.parseColor("#333333")),
-            buttonTintColor = prefs.getInt("buttonTintColor", Color.parseColor("#1A1A1A")),
+            titleSectionBg = prefs.getInt("titleSectionBg", Color.parseColor("#CCFFFFFF")),
+            listSectionBg = prefs.getInt("listSectionBg", Color.parseColor("#99FFFFFF")),
+            listItemBg = prefs.getInt("listItemBg", Color.parseColor("#CCFFFFFF")),
+            titleTextColor = prefs.getInt("titleTextColor", Color.parseColor("#333333")),
+            subtitleTextColor = prefs.getInt("subtitleTextColor", Color.parseColor("#666666")),
+            listItemTextColor = prefs.getInt("listItemTextColor", Color.parseColor("#4D4D4D")),
+            buttonTintColor = prefs.getInt("buttonTintColor", Color.parseColor("#333333")),
             buttonBgColor = prefs.getInt("buttonBgColor", Color.WHITE),
             isTitleVisible = prefs.getBoolean("isTitleVisible", true),
             isSubtitleVisible = prefs.getBoolean("isSubtitleVisible", true),
