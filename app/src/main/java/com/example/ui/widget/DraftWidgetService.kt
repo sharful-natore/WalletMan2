@@ -41,32 +41,8 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
     override fun getViewTypeCount(): Int = 2
 
     private fun parseDetails(note: String): Pair<Double?, String?> {
-        var amount: Double? = null
-        val digitRegex = Regex("[0-9০-৯]+")
-        val matches = digitRegex.findAll(note)
-        for (match in matches) {
-            val numStr = match.value
-            val engNumStr = numStr.map { c ->
-                if (c in '০'..'৯') (c - '০' + 48).toChar().toString() else c.toString()
-            }.joinToString("")
-            val parsed = engNumStr.toDoubleOrNull()
-            if (parsed != null && parsed > 0) {
-                amount = parsed
-                break
-            }
-        }
-
-        val noteLower = note.lowercase()
-        val type = when {
-            noteLower.contains("সঞ্চয়") || noteLower.contains("savings") || noteLower.contains("ডিপোজিট") || noteLower.contains("সংরক্ষণ") -> "SAVINGS"
-            noteLower.contains("উত্তোলন") || noteLower.contains("withdraw") || noteLower.contains("উঠানো") || noteLower.contains("উঠালাম") || noteLower.contains("ক্যাশ আউট") -> "WITHDRAWAL"
-            noteLower.contains("আয়") || noteLower.contains("income") || noteLower.contains("বেতন") || noteLower.contains("salary") || noteLower.contains("পেলাম") -> "INCOME"
-            noteLower.contains("দেনা") || noteLower.contains("ধারে") || noteLower.contains("পাওনা") || noteLower.contains("lend") || noteLower.contains("borrow") || noteLower.contains("কর্য") || noteLower.contains("কর্জ") || noteLower.contains("ধার") -> {
-                if (noteLower.contains("দিলাম") || noteLower.contains("gave") || noteLower.contains("পাওনা")) "LEND" else "BORROW"
-            }
-            else -> "EXPENSE"
-        }
-        return Pair(amount, type)
+        val result = com.example.data.DraftParser.parse(note)
+        return Pair(result.amount, result.type)
     }
 
     private fun toBanglaDigits(str: String): String {

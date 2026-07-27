@@ -162,18 +162,18 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:paddingTop="10dp"
-            android:paddingBottom="10dp">
+            android:paddingTop="6dp"
+            android:paddingBottom="16dp"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp">
 
             <ListView
                 android:id="@+id/widget_list_view"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
                 android:clipToPadding="false"
                 android:divider="@android:color/transparent"
-                android:dividerHeight="10dp"
+                android:dividerHeight="8dp"
                 android:scrollbarStyle="outsideOverlay" />
         </LinearLayout>
     </FrameLayout>

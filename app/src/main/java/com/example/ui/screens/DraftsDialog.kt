@@ -338,8 +338,8 @@ fun DraftsScratchpadDialog(
                                     val types = listOf(
                                         Triple("EXPENSE", if (language == AppLanguage.BN) "ব্যয়" else "Expense", Color(0xFFEF4444)),
                                         Triple("INCOME", if (language == AppLanguage.BN) "আয়" else "Income", Color(0xFF10B981)),
-                                        Triple("LEND", if (language == AppLanguage.BN) "দেনা" else "Lend", Color(0xFF8B5CF6)),
-                                        Triple("BORROW", if (language == AppLanguage.BN) "পাওনা" else "Borrow", Color(0xFFF59E0B)),
+                                        Triple("LEND", if (language == AppLanguage.BN) "পাওনা" else "Lend", Color(0xFF8B5CF6)),
+                                        Triple("BORROW", if (language == AppLanguage.BN) "দেনা" else "Borrow", Color(0xFFF59E0B)),
                                         Triple("SAVINGS", if (language == AppLanguage.BN) "সঞ্চয়" else "Savings", Color(0xFF2563EB)),
                                         Triple("WITHDRAWAL", if (language == AppLanguage.BN) "উত্তোলন" else "Withdrawal", Color(0xFF0D9488))
                                     )
@@ -620,8 +620,8 @@ fun DraftItemCard(
                             val label = when (t) {
                                 "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
                                 "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
-                                "LEND" -> if (language == AppLanguage.BN) "দেনা" else "Lend"
-                                "BORROW" -> if (language == AppLanguage.BN) "পাওনা" else "Borrow"
+                                "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Lend"
+                                "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Borrow"
                                 "SAVINGS" -> if (language == AppLanguage.BN) "সঞ্চয়" else "Savings"
                                 "WITHDRAWAL" -> if (language == AppLanguage.BN) "উত্তোলন" else "Withdrawal"
                                 else -> t

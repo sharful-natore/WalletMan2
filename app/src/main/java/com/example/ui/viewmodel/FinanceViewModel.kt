@@ -969,56 +969,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun parseDraftDetails(note: String): DraftParseResult {
-        var amount: Double? = null
-        var cleanedNote = note
-        val digitRegex = Regex("[0-9০-৯]+")
-        val matches = digitRegex.findAll(note)
-        for (match in matches) {
-            val numStr = match.value
-            val engNumStr = numStr.map { c ->
-                if (c in '০'..'৯') (c - '০' + 48).toChar().toString() else c.toString()
-            }.joinToString("")
-            val parsed = engNumStr.toDoubleOrNull()
-            if (parsed != null && parsed > 0) {
-                amount = parsed
-                cleanedNote = note.replaceFirst(numStr, "").trim().replace(Regex("\\s+"), " ")
-                break
-            }
-        }
-
-        var type: String? = null
-        var category: String? = null
-        val noteLower = note.lowercase()
-        
-        if (noteLower.contains("সঞ্চয়") || noteLower.contains("savings") || noteLower.contains("ডিপোজিট") || noteLower.contains("সংরক্ষণ")) {
-            type = "SAVINGS"
-            category = "Savings"
-        } else if (noteLower.contains("উত্তোলন") || noteLower.contains("withdraw") || noteLower.contains("উঠানো") || noteLower.contains("উঠালাম") || noteLower.contains("ক্যাশ আউট")) {
-            type = "WITHDRAWAL"
-            category = "Withdrawal"
-        } else if (noteLower.contains("আয়") || noteLower.contains("income") || noteLower.contains("বেতন") || noteLower.contains("salary") || noteLower.contains("পেলাম")) {
-            type = "INCOME"
-            category = if (noteLower.contains("বেতন") || noteLower.contains("salary")) "Salary" else "Other"
-        } else if (noteLower.contains("দেনা") || noteLower.contains("ধারে") || noteLower.contains("পাওনা") || noteLower.contains("lend") || noteLower.contains("borrow") || noteLower.contains("কর্য") || noteLower.contains("কর্জ") || noteLower.contains("ধার")) {
-            if (noteLower.contains("দিলাম") || noteLower.contains("gave") || noteLower.contains("পাওনা")) {
-                type = "LEND"
-                category = "Lending"
-            } else {
-                type = "BORROW"
-                category = "Borrowing"
-            }
-        } else {
-            type = "EXPENSE"
-            category = when {
-                noteLower.contains("খাবার") || noteLower.contains("চা") || noteLower.contains("ভাত") || noteLower.contains("breakfast") || noteLower.contains("lunch") || noteLower.contains("dinner") || noteLower.contains("food") -> "Food"
-                noteLower.contains("বাজার") || noteLower.contains("grocery") -> "Grocery"
-                noteLower.contains("গাড়ি") || noteLower.contains("রিকশা") || noteLower.contains("বাস") || noteLower.contains("ভাড়া") || noteLower.contains("rent") || noteLower.contains("travel") || noteLower.contains("fare") -> "Transportation"
-                noteLower.contains("জামা") || noteLower.contains("কাপড়") || noteLower.contains("shopping") || noteLower.contains("কেনাকাটা") -> "Shopping"
-                else -> "Other"
-            }
-        }
-        
-        return DraftParseResult(amount, type, category, cleanedNote)
+        return com.example.data.DraftParser.parse(note)
     }
 
     fun addDraftTransaction(note: String, overrideType: String? = null) {
