@@ -114,8 +114,8 @@ fun isInternetConnected(context: Context): Boolean {
 }
 
 fun isVoskDownloaded(context: Context): Boolean {
-    val modelDir = File(context.filesDir, "vosk-model-bn")
-    return modelDir.exists() && modelDir.isDirectory && File(modelDir, "am").exists()
+    val modelDir = File(context.filesDir, "vosk-model-small-streaming-bn")
+    return modelDir.exists() && modelDir.isDirectory && (File(modelDir, "am-onnx").exists() || File(modelDir, "am").exists() || File(modelDir, "lang").exists())
 }
 
 fun shouldShowOfflineVoicePrompt(context: Context): Boolean {
@@ -160,88 +160,122 @@ object VoskDownloader {
         if (_downloadState.value is DownloadState.Downloading || _downloadState.value is DownloadState.Extracting) return
 
         downloadJob = coroutineScope.launch(Dispatchers.IO) {
-            val urls = listOf(
-                "https://downloads.alphacephei.com/vosk/models/vosk-model-small-bn-0.3.zip",
-                "https://alphacephei.com/vosk/models/vosk-model-small-bn-0.3.zip",
-                "https://huggingface.co/alphacephei/vosk-model-small-bn/resolve/main/vosk-model-small-bn-0.3.zip",
-                "https://sourceforge.net/projects/alphacephei/files/vosk-model-small-bn-0.3.zip/download"
-            )
-
             var lastException: Exception? = null
             var success = false
 
-            for (urlStr in urls) {
-                try {
-                    _downloadState.value = DownloadState.Downloading(0)
-                    
-                    var url = URL(urlStr)
-                    var connection = url.openConnection() as java.net.HttpURLConnection
+            try {
+                _downloadState.value = DownloadState.Downloading(0)
+                
+                var downloadUrl = "https://drive.google.com/uc?export=download&id=13cKS23QLODXFYZYZZ9xvFqgOuVqJuiJ_&confirm=t"
+                var url = URL(downloadUrl)
+                var connection = url.openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 30000
+                connection.readTimeout = 30000
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+                connection.instanceFollowRedirects = true
+                
+                var status = connection.responseCode
+                var cookiesList = connection.headerFields["Set-Cookie"]
+                
+                // Read the content type to check if we received HTML (warning page) instead of raw ZIP stream
+                val contentType = connection.contentType ?: ""
+                if (contentType.contains("text/html") || (status == java.net.HttpURLConnection.HTTP_OK && contentType.isEmpty())) {
+                    // Read HTML to parse the confirmation token
+                    val htmlBuilder = StringBuilder()
+                    connection.inputStream.bufferedReader().use { reader ->
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            htmlBuilder.append(line)
+                        }
+                    }
+                    connection.disconnect()
+
+                    val html = htmlBuilder.toString()
+                    val confirmRegex = "confirm=([a-zA-Z0-9_-]+)".toRegex()
+                    val match = confirmRegex.find(html)
+                    val confirmToken = match?.groupValues?.get(1) ?: "t"
+
+                    downloadUrl = "https://drive.google.com/uc?export=download&confirm=$confirmToken&id=13cKS23QLODXFYZYZZ9xvFqgOuVqJuiJ_"
+                    url = URL(downloadUrl)
+                    connection = url.openConnection() as java.net.HttpURLConnection
                     connection.connectTimeout = 30000
                     connection.readTimeout = 30000
                     connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+                    if (cookiesList != null) {
+                        val cookieString = cookiesList.joinToString("; ") { it.split(";")[0] }
+                        connection.setRequestProperty("Cookie", cookieString)
+                    }
                     connection.instanceFollowRedirects = true
-                    
-                    var status = connection.responseCode
-                    var redirectCount = 0
-                    while ((status == java.net.HttpURLConnection.HTTP_MOVED_TEMP || 
-                            status == java.net.HttpURLConnection.HTTP_MOVED_PERM || 
-                            status == 307 || status == 308) && redirectCount < 5) {
-                        val newUrl = connection.getHeaderField("Location") ?: break
-                        connection.disconnect()
-                        url = URL(url, newUrl)
-                        connection = url.openConnection() as java.net.HttpURLConnection
-                        connection.connectTimeout = 30000
-                        connection.readTimeout = 30000
-                        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
-                        connection.instanceFollowRedirects = true
-                        status = connection.responseCode
-                        redirectCount++
-                    }
-
-                    if (status != java.net.HttpURLConnection.HTTP_OK) {
-                        throw java.io.IOException("Server returned HTTP response code: $status for URL: $urlStr")
-                    }
-
-                    val fileLength = connection.contentLength
-                    val input = BufferedInputStream(connection.getInputStream())
-                    val zipFile = File(context.cacheDir, "vosk_model_bn.zip")
-                    val output = FileOutputStream(zipFile)
-
-                    val data = ByteArray(16384)
-                    var total: Long = 0
-                    var count: Int
-                    while (input.read(data).also { count = it } != -1) {
-                        total += count
-                        if (fileLength > 0) {
-                            _downloadState.value = DownloadState.Downloading(((total * 100) / fileLength).toInt())
-                        }
-                        output.write(data, 0, count)
-                    }
-                    output.flush()
-                    output.close()
-                    input.close()
-                    connection.disconnect()
-
-                    _downloadState.value = DownloadState.Extracting
-                    unzipModel(zipFile, context)
-                    
-                    if (zipFile.exists()) {
-                        zipFile.delete()
-                    }
-
-                    _downloadState.value = DownloadState.Success
-                    context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-                        .edit()
-                        .putBoolean("offline_voice_pack_configured", true)
-                        .apply()
-                    
-                    success = true
-                    break // Download succeeded, break the URL loop
-
-                } catch (e: Exception) {
-                    lastException = e
-                    // Continue to next URL in case of failure
+                    status = connection.responseCode
                 }
+
+                // Handle redirects after confirmed URL (e.g., to actual Google user content storage server)
+                var redirectCount = 0
+                while ((status == java.net.HttpURLConnection.HTTP_MOVED_TEMP || 
+                        status == java.net.HttpURLConnection.HTTP_MOVED_PERM || 
+                        status == 307 || status == 308) && redirectCount < 5) {
+                    val newUrl = connection.getHeaderField("Location") ?: break
+                    connection.disconnect()
+                    url = URL(url, newUrl)
+                    connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.connectTimeout = 30000
+                    connection.readTimeout = 30000
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+                    if (cookiesList != null) {
+                        val cookieString = cookiesList.joinToString("; ") { it.split(";")[0] }
+                        connection.setRequestProperty("Cookie", cookieString)
+                    }
+                    connection.instanceFollowRedirects = true
+                    status = connection.responseCode
+                    redirectCount++
+                }
+
+                if (status != java.net.HttpURLConnection.HTTP_OK) {
+                    throw java.io.IOException("Google Drive server returned HTTP response code: $status")
+                }
+
+                val fileLength = connection.contentLength
+                val input = BufferedInputStream(connection.getInputStream())
+                val zipFile = File(context.cacheDir, "vosk_model_bn.zip")
+                val output = FileOutputStream(zipFile)
+
+                val data = ByteArray(16384)
+                var total: Long = 0
+                var count: Int
+                while (input.read(data).also { count = it } != -1) {
+                    total += count
+                    if (fileLength > 0) {
+                        _downloadState.value = DownloadState.Downloading(((total * 100) / fileLength).toInt())
+                    } else {
+                        // Estimate progress if fileLength is not provided
+                        val mb = (total / (1024 * 1024)).toInt()
+                        val progress = if (mb < 33) (mb * 100 / 33) else 99
+                        _downloadState.value = DownloadState.Downloading(progress)
+                    }
+                    output.write(data, 0, count)
+                }
+                output.flush()
+                output.close()
+                input.close()
+                connection.disconnect()
+
+                _downloadState.value = DownloadState.Extracting
+                unzipModel(zipFile, context)
+                
+                if (zipFile.exists()) {
+                    zipFile.delete()
+                }
+
+                _downloadState.value = DownloadState.Success
+                context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("offline_voice_pack_configured", true)
+                    .apply()
+                
+                success = true
+
+            } catch (e: Exception) {
+                lastException = e
             }
 
             if (!success) {
@@ -252,7 +286,7 @@ object VoskDownloader {
     }
 
     private fun unzipModel(zipFile: File, context: Context) {
-        val targetDir = File(context.filesDir, "vosk-model-bn")
+        val targetDir = File(context.filesDir, "vosk-model-small-streaming-bn")
         if (targetDir.exists()) {
             targetDir.deleteRecursively()
         }
@@ -274,7 +308,7 @@ object VoskDownloader {
                     FileOutputStream(file).use { fos ->
                         val buffer = ByteArray(16384)
                         var len: Int
-                        while (zis.read(buffer).also { len = it } > 0) {
+                        while (zis.read(buffer).also { len = it } != -1) {
                             fos.write(buffer, 0, len)
                         }
                     }
@@ -283,10 +317,10 @@ object VoskDownloader {
             }
         }
 
-        // Flatten nested vosk-model-small-bn-0.3 sub-directory contents
+        // Flatten any nested folder if one exists (just in case they zipped a folder)
         val subDirs = targetDir.listFiles()
-        val nestedDir = subDirs?.find { it.isDirectory && it.name.contains("vosk-model-small-bn") }
-        if (nestedDir != null && nestedDir.exists()) {
+        val nestedDir = subDirs?.find { it.isDirectory && (it.name.contains("vosk-model") || it.name.contains("bn") || it.name.contains("streaming")) }
+        if (nestedDir != null && nestedDir.exists() && !nestedDir.name.equals("am-onnx") && !nestedDir.name.equals("lang") && !nestedDir.name.equals("am")) {
             val contents = nestedDir.listFiles()
             if (contents != null) {
                 for (contentFile in contents) {
@@ -643,7 +677,7 @@ fun VoskSpeechInputDialog(
         if (hasAudioPermission) {
             withContext(Dispatchers.IO) {
                 try {
-                    val modelDir = File(context.filesDir, "vosk-model-bn")
+                    val modelDir = File(context.filesDir, "vosk-model-small-streaming-bn")
                     if (modelDir.exists() && modelDir.isDirectory) {
                         voskModel = Model(modelDir.absolutePath)
                         isInitializing = false
