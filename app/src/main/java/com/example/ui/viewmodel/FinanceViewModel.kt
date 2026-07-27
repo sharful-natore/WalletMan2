@@ -23,6 +23,7 @@ import com.example.data.Transaction
 import com.example.data.SavingsGoal
 import com.example.data.SavingsTransaction
 import com.example.data.DraftTransaction
+import com.example.data.DraftParseResult
 import com.example.data.FinanceRepository
 import com.example.data.FinanceBackup
 import com.example.data.AppDatabase
@@ -964,8 +965,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
-    fun parseDraftDetails(note: String): Triple<Double?, String?, String?> {
+    fun parseDraftDetails(note: String): DraftParseResult {
         var amount: Double? = null
+        var cleanedNote = note
         val digitRegex = Regex("[0-9০-৯]+")
         val matches = digitRegex.findAll(note)
         for (match in matches) {
@@ -976,6 +978,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             val parsed = engNumStr.toDoubleOrNull()
             if (parsed != null && parsed > 0) {
                 amount = parsed
+                cleanedNote = note.replaceFirst(numStr, "").trim().replace(Regex("\\s+"), " ")
                 break
             }
         }
@@ -1006,18 +1009,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
         }
         
-        return Triple(amount, type, category)
+        return DraftParseResult(amount, type, category, cleanedNote)
     }
 
     fun addDraftTransaction(note: String) {
         viewModelScope.launch {
-            val (parsedAmt, parsedType, parsedCat) = parseDraftDetails(note)
+            val parseResult = parseDraftDetails(note)
             repository.insertDraftTransaction(
                 DraftTransaction(
-                    amount = parsedAmt,
-                    type = parsedType,
-                    category = parsedCat,
-                    note = note,
+                    amount = parseResult.amount,
+                    type = parseResult.type,
+                    category = parseResult.category,
+                    note = parseResult.cleanedNote,
                     workspaceId = _currentWorkspaceId.value
                 )
             )

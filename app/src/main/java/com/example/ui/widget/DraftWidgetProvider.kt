@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.RemoteViews
 import com.example.R
+import com.example.MainActivity
 import com.example.ui.screens.DraftInputActivity
 
 class DraftWidgetProvider : AppWidgetProvider() {
@@ -18,18 +19,48 @@ class DraftWidgetProvider : AppWidgetProvider() {
     ) {
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId)
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_list_view)
         }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE || 
-            intent.action == "com.example.UPDATE_DRAFT_WIDGET") {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(
-                android.content.ComponentName(context, DraftWidgetProvider::class.java)
-            )
-            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.widget_list_view)
+        when (intent.action) {
+            "com.example.UPDATE_DRAFT_WIDGET" -> {
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val appWidgetIds = appWidgetManager.getAppWidgetIds(
+                    android.content.ComponentName(context, DraftWidgetProvider::class.java)
+                )
+                for (appWidgetId in appWidgetIds) {
+                    updateAppWidget(context, appWidgetManager, appWidgetId)
+                }
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.widget_list_view)
+            }
+            "com.example.WIDGET_ITEM_ACTION" -> {
+                val draftId = intent.getIntExtra("draft_id", -1)
+                val actionType = intent.getStringExtra("action_type") ?: "edit"
+                
+                if (draftId != -1) {
+                    when (actionType) {
+                        "edit" -> {
+                            val editIntent = Intent(context, DraftInputActivity::class.java).apply {
+                                putExtra("draft_id", draftId)
+                                putExtra("isEdit", true)
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(editIntent)
+                        }
+                        "post" -> {
+                            val postIntent = Intent(context, MainActivity::class.java).apply {
+                                action = "ACTION_POST_DRAFT"
+                                putExtra("EXTRA_TARGET_DRAFT_ID", draftId)
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(postIntent)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -40,7 +71,32 @@ class DraftWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int
         ) {
             val views = RemoteViews(context.packageName, R.layout.widget_draft)
+            val config = WidgetConfigManager.loadConfig(context)
+
+            // Apply configurations
+            views.setInt(R.id.widget_header_container, "setBackgroundColor", config.titleSectionBg)
+            views.setInt(R.id.widget_list_container, "setBackgroundColor", config.listSectionBg)
             
+            views.setTextColor(R.id.widget_title, config.titleTextColor)
+            views.setViewVisibility(R.id.widget_title, if (config.isTitleVisible) android.view.View.VISIBLE else android.view.View.GONE)
+            
+            views.setTextColor(R.id.widget_subtitle, config.subtitleTextColor)
+            views.setViewVisibility(R.id.widget_subtitle, if (config.isSubtitleVisible) android.view.View.VISIBLE else android.view.View.GONE)
+            
+            views.setViewVisibility(R.id.widget_list_container, if (config.isListVisible) android.view.View.VISIBLE else android.view.View.GONE)
+
+            // Button configs
+            val buttonConfigs = listOf(
+                R.id.widget_add_button to (R.id.widget_add_button_bg to R.id.widget_add_button_icon),
+                R.id.widget_voice_button to (R.id.widget_voice_button_bg to R.id.widget_voice_button_icon),
+                R.id.widget_customize_button to (R.id.widget_customize_button_bg to R.id.widget_customize_button_icon)
+            )
+            for ((containerId, pair) in buttonConfigs) {
+                val (bgId, iconId) = pair
+                views.setInt(bgId, "setColorFilter", config.buttonBgColor)
+                views.setInt(iconId, "setColorFilter", config.buttonTintColor)
+            }
+
             // Intent for add button (manual)
             val addIntent = Intent(context, DraftInputActivity::class.java).apply {
                 putExtra("isVoice", false)
@@ -59,11 +115,21 @@ class DraftWidgetProvider : AppWidgetProvider() {
             }
             val voicePendingIntent = PendingIntent.getActivity(
                 context,
-                2,
+                10,
                 voiceIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_voice_button, voicePendingIntent)
+
+            // Intent for customize button
+            val customizeIntent = Intent(context, WidgetCustomizationActivity::class.java)
+            val customizePendingIntent = PendingIntent.getActivity(
+                context,
+                20,
+                customizeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_customize_button, customizePendingIntent)
             
             // Service intent for ListView
             val serviceIntent = Intent(context, DraftWidgetService::class.java).apply {
@@ -72,9 +138,11 @@ class DraftWidgetProvider : AppWidgetProvider() {
             }
             views.setRemoteAdapter(R.id.widget_list_view, serviceIntent)
             
-            // Template for ListView items
-            val templateIntent = Intent(context, DraftInputActivity::class.java)
-            val templatePendingIntent = PendingIntent.getActivity(
+            // Template for ListView items - use Broadcast instead of direct Activity
+            val templateIntent = Intent(context, DraftWidgetProvider::class.java).apply {
+                action = "com.example.WIDGET_ITEM_ACTION"
+            }
+            val templatePendingIntent = PendingIntent.getBroadcast(
                 context,
                 1,
                 templateIntent,

@@ -8876,7 +8876,7 @@ fun TransactionsScreen(
                     }
                     onExportRequest?.invoke(cat)
                 },
-                expanded = true,
+                expanded = false,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_custom_export),
@@ -9382,7 +9382,7 @@ fun DebtsScreen(
         ) {
             ExtendedFloatingActionButton(
                 onClick = { onAddPersonClick() },
-                expanded = true,
+                expanded = false,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_add_debt_credit), 
@@ -10252,7 +10252,7 @@ fun SavingsScreen(
 
             ExtendedFloatingActionButton(
                 onClick = { onAddSavingsGoalClick() },
-                expanded = true,
+                expanded = false,
                 icon = {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_add_savings), 
@@ -10750,14 +10750,14 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
         if (initialDraft != null) viewModel.parseDraftDetails(initialDraft.note) else null
     }
     
-    var note by remember { mutableStateOf(editTransaction?.note ?: initialDraft?.note ?: "") }
+    var note by remember { mutableStateOf(editTransaction?.note ?: defaultParsed?.cleanedNote ?: initialDraft?.note ?: "") }
     var customTimestamp by remember { mutableStateOf<Long?>(editTransaction?.timestamp) }
 
     // Dropdowns / Option selectors
-    var type by remember { mutableStateOf(editTransaction?.type ?: defaultParsed?.second ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
+    var type by remember { mutableStateOf(editTransaction?.type ?: defaultParsed?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
     var subType by remember { mutableStateOf(editTransaction?.subType ?: "CASH") } // CASH, CREDIT
     var selectedPersonId by remember { mutableStateOf<Int?>(editTransaction?.personId) }
-    var category by remember { mutableStateOf(editTransaction?.category ?: defaultParsed?.third ?: "Food") }
+    var category by remember { mutableStateOf(editTransaction?.category ?: defaultParsed?.category ?: "Food") }
 
     var previousPersonIds by remember { mutableStateOf(persons.map { it.id }.toSet()) }
 
@@ -10795,7 +10795,17 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
     val chipBg = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9)
 
-    var amountInputState by remember { mutableStateOf(editTransaction?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: defaultParsed?.first?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "") }
+    var amountInputState by remember { 
+        mutableStateOf(
+            if (editTransaction != null) {
+                val amt = editTransaction.amount
+                if (amt % 1.0 == 0.0) amt.toLong().toString() else amt.toString()
+            } else if (defaultParsed != null && defaultParsed.amount != null) {
+                val amt = defaultParsed.amount!!
+                if (amt % 1.0 == 0.0) amt.toLong().toString() else amt.toString()
+            } else ""
+        )
+    }
     var showTxCalculator by remember { mutableStateOf(false) }
     val context = LocalContext.current
 

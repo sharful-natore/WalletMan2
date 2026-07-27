@@ -397,11 +397,11 @@ fun ExportDialog(
         list = when (selectedCategory) {
             "ALL_DATA", "TRANSACTIONS", "ONLY_BUDGET" -> list
             "DEBT_REPAYMENT" -> list.filter { it.type == "LEND" || it.type == "BORROW" || it.type == "REPAY_PAID" || it.type == "REPAY_RECEIVED" }
-            "INCOME_EXPENSE" -> list.filter { it.type == "INCOME" || it.type == "EXPENSE" }
+            "INCOME_EXPENSE" -> list.filter { it.type == "INCOME" || it.type == "EXPENSE" || (it.type == "LEND" && it.subType == "CREDIT") || (it.type == "BORROW" && it.subType == "CREDIT") }
             "ONLY_DEBT" -> list.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
             "ONLY_PAONA" -> list.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
-            "ONLY_INCOME" -> list.filter { it.type == "INCOME" }
-            "ONLY_EXPENSE" -> list.filter { it.type == "EXPENSE" }
+            "ONLY_INCOME" -> list.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+            "ONLY_EXPENSE" -> list.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
             "ONLY_SAVINGS" -> emptyList()
             else -> list
         }

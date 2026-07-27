@@ -16,15 +16,19 @@ class DraftWidgetService : RemoteViewsService() {
 }
 
 class DraftWidgetFactory(private val context: Context) : RemoteViewsService.RemoteViewsFactory {
-    private val db = AppDatabase.getDatabase(context)
-    private val draftsDao = db.financeDao()
     private var draftsList: List<DraftTransaction> = emptyList()
 
     override fun onCreate() { }
 
     override fun onDataSetChanged() {
         runBlocking {
-            draftsList = draftsDao.getAllDraftTransactionsList()
+            try {
+                val db = AppDatabase.getDatabase(context.applicationContext)
+                val draftsDao = db.financeDao()
+                draftsList = draftsDao.getAllDraftTransactionsList()
+            } catch (e: Exception) {
+                draftsList = emptyList()
+            }
         }
     }
 
@@ -34,12 +38,17 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
 
     override fun getCount(): Int = draftsList.size
 
-    override fun getViewAt(position: Int): RemoteViews {
-        if (position >= draftsList.size) return RemoteViews(context.packageName, R.layout.widget_draft_item)
+    override fun getViewAt(position: Int): RemoteViews? {
+        if (position < 0 || position >= draftsList.size) return null
+        
         val draft = draftsList[position]
         val rv = RemoteViews(context.packageName, R.layout.widget_draft_item)
-        
+        val config = WidgetConfigManager.loadConfig(context)
+
         rv.setTextViewText(R.id.widget_item_text, draft.note)
+        rv.setTextColor(R.id.widget_item_text, config.listItemTextColor)
+        rv.setTextColor(R.id.widget_item_serial, config.listItemTextColor)
+        rv.setInt(R.id.widget_item_bg, "setColorFilter", config.listItemBg)
         
         val serial = (position + 1).toString()
             .replace("0", "০").replace("1", "১").replace("2", "২")
@@ -48,9 +57,12 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
             .replace("9", "৯")
         rv.setTextViewText(R.id.widget_item_serial, "$serial.")
 
-        // Set fill in intent if needed
-        val fillInIntent = Intent()
-        rv.setOnClickFillInIntent(R.id.widget_item_container, fillInIntent)
+        // Intent for item click (Open Edit Dialog Activity)
+        val editIntent = Intent().apply {
+            putExtra("draft_id", draft.id)
+            putExtra("action_type", "edit")
+        }
+        rv.setOnClickFillInIntent(R.id.widget_item_container, editIntent)
         
         return rv
     }

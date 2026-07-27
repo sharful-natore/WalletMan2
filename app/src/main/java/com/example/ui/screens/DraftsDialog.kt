@@ -33,6 +33,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.DraftTransaction
+import com.example.data.DraftParseResult
 import com.example.data.Person
 import com.example.ui.AppLanguage
 import com.example.ui.theme.FintechBlue
@@ -247,47 +248,47 @@ fun DraftsScratchpadDialog(
                             enter = fadeIn() + expandVertically(),
                             exit = fadeOut() + shrinkVertically()
                         ) {
-                            parsedPreview?.let { (amount, type, category) ->
-                                Row(
-                                    modifier = Modifier
-                                        .padding(top = 12.dp)
-                                        .fillMaxWidth()
-                                        .background(
-                                            if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(
-                                                alpha = 0.6f
-                                            ), RoundedCornerShape(12.dp)
-                                        )
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = if (isDark) Color(0xFFF59E0B) else Color(0xFFD97706),
-                                        modifier = Modifier.size(16.dp)
+                        parsedPreview?.let { preview ->
+                            Row(
+                                modifier = Modifier
+                                    .padding(top = 12.dp)
+                                    .fillMaxWidth()
+                                    .background(
+                                        if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(
+                                            alpha = 0.6f
+                                        ), RoundedCornerShape(12.dp)
                                     )
-                                    Text(
-                                        text = buildString {
-                                            append(if (language == AppLanguage.BN) "আন্দাজ করা লজিক: " else "Inferred details: ")
-                                            if (amount != null) append("${if (language == AppLanguage.BN) "পরিমাণ" else "Amount"}: ${amount.toInt()}৳ ")
-                                            if (type != null) {
-                                                val typeText = when (type) {
-                                                    "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
-                                                    "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
-                                                    "LEND" -> if (language == AppLanguage.BN) "দেনা (ধার দেওয়া)" else "Lend"
-                                                    "BORROW" -> if (language == AppLanguage.BN) "পাওনা (ধার নেওয়া)" else "Borrow"
-                                                    else -> type
-                                                }
-                                                append("($typeText)")
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color(0xFFF59E0B) else Color(0xFFD97706),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = buildString {
+                                        append(if (language == AppLanguage.BN) "আন্দাজ করা লজিক: " else "Inferred details: ")
+                                        if (preview.amount != null) append("${if (language == AppLanguage.BN) "পরিমাণ" else "Amount"}: ${preview.amount.toInt()}৳ ")
+                                        if (preview.type != null) {
+                                            val typeText = when (preview.type) {
+                                                "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
+                                                "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
+                                                "LEND" -> if (language == AppLanguage.BN) "দেনা (ধার দেওয়া)" else "Lend"
+                                                "BORROW" -> if (language == AppLanguage.BN) "পাওনা (ধার নেওয়া)" else "Borrow"
+                                                else -> preview.type
                                             }
-                                        },
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (isDark) Color.White else Color(0xFF78350F)
-                                    )
-                                }
+                                            append("($typeText)")
+                                        }
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isDark) Color.White else Color(0xFF78350F)
+                                )
                             }
+                        }
                         }
                     }
                 }
@@ -390,10 +391,10 @@ fun DraftsScratchpadDialog(
                         val parsed = viewModel.parseDraftDetails(tempText)
                         viewModel.updateDraftTransaction(
                             editingDraft.copy(
-                                note = tempText,
-                                amount = parsed.first,
-                                type = parsed.second,
-                                category = parsed.third
+                                note = parsed.cleanedNote,
+                                amount = parsed.amount,
+                                type = parsed.type,
+                                category = parsed.category
                             )
                         )
                         editDraftMode = null

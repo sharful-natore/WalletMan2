@@ -187,6 +187,13 @@ data class DeletedGDriveBackup(
     val backupJson: String
 )
 
+data class DraftParseResult(
+    val amount: Double?,
+    val type: String?,
+    val category: String?,
+    val cleanedNote: String
+)
+
 data class WorkspaceStats(
     val workspace: Workspace,
     val profileName: String,

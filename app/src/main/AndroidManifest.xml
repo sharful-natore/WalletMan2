@@ -55,21 +55,23 @@
         </activity>
 
         <activity
+            android:name="com.example.ui.widget.WidgetCustomizationActivity"
+            android:exported="true"
+            android:label="Widget Customization"
+            android:theme="@style/Theme.FinanceNote" />
+
+        <activity
             android:name="com.example.ui.screens.DraftInputActivity"
             android:exported="true"
             android:theme="@style/Theme.FinanceNote.Dialog"
             android:windowSoftInputMode="adjustResize" />
 
-        <activity
-            android:name="com.example.ui.screens.DraftDeleteConfirmActivity"
-            android:exported="true"
-            android:theme="@style/Theme.FinanceNote.Dialog"
-            android:excludeFromRecents="true" />
 
         <receiver android:name="com.example.ui.widget.DraftWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.example.UPDATE_DRAFT_WIDGET" />
+                <action android:name="com.example.WIDGET_ITEM_ACTION" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/draft_widget_info" />
         </receiver>
