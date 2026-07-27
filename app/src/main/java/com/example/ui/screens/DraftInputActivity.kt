@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.foundation.verticalScroll
 import com.example.data.AppDatabase
 import com.example.data.DraftTransaction
@@ -55,6 +56,7 @@ class DraftInputActivity : ComponentActivity() {
             var draftText by remember { mutableStateOf("") }
             var isLoading by remember { mutableStateOf(isEdit) }
             var showInfoDialogState by remember { mutableStateOf(showInfoDialogExtra) }
+            var showOfflineGuideDialog by remember { mutableStateOf(false) }
             val coroutineScope = rememberCoroutineScope()
             val context = androidx.compose.ui.platform.LocalContext.current
             val db = remember { AppDatabase.getDatabase(context) }
@@ -101,6 +103,12 @@ class DraftInputActivity : ComponentActivity() {
                             }
                         }
                     }
+                } else {
+                    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                    val isConnected = cm?.activeNetworkInfo?.isConnected == true
+                    if (!isConnected) {
+                        showOfflineGuideDialog = true
+                    }
                 }
             }
 
@@ -108,12 +116,14 @@ class DraftInputActivity : ComponentActivity() {
                 val voiceIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                     putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (isBn) "bn-BD" else "en-US")
-                    putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBn) "লেনদেন ড্রাফট বলুন..." else "Speak transaction draft...")
+                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                    putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (isBn) "bn-BD" else "en-US"))
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBn) "লেনদেন ড্রাফট বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
                 }
                 try {
                     speechLauncher.launch(voiceIntent)
                 } catch (e: Exception) {
-                    Toast.makeText(context, if (isBn) "ভয়েস ইনপুট সমর্থিত নয়" else "Voice input not supported on this device", Toast.LENGTH_SHORT).show()
+                    showOfflineGuideDialog = true
                 }
             }
 
@@ -207,6 +217,13 @@ class DraftInputActivity : ComponentActivity() {
                                 )
                             }
 
+                            if (showOfflineGuideDialog) {
+                                OfflineVoiceGuideDialog(
+                                    isBn = isBn,
+                                    onDismiss = { showOfflineGuideDialog = false }
+                                )
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -222,12 +239,21 @@ class DraftInputActivity : ComponentActivity() {
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF1E293B)
                                 )
-                                IconButton(onClick = { showInfoDialogState = true }) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Info,
-                                        contentDescription = "Draft Info",
-                                        tint = Color(0xFF0284C7)
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = { showOfflineGuideDialog = true }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Warning,
+                                            contentDescription = "Offline Voice Guide",
+                                            tint = Color(0xFFD97706)
+                                        )
+                                    }
+                                    IconButton(onClick = { showInfoDialogState = true }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Info,
+                                            contentDescription = "Draft Info",
+                                            tint = Color(0xFF0284C7)
+                                        )
+                                    }
                                 }
                             }
                             Spacer(modifier = Modifier.height(12.dp))
@@ -237,12 +263,22 @@ class DraftInputActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text(if (isBn) "আজকের খরচ বা লেনদেন ড্রাফট করুন..." else "Jot down today's expense...") },
                                 trailingIcon = {
-                                    IconButton(onClick = triggerVoice) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Mic,
-                                            contentDescription = "Voice Input",
-                                            tint = Color(0xFFD97706)
-                                        )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { showOfflineGuideDialog = true }) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Info,
+                                                contentDescription = "Offline Voice Settings",
+                                                tint = Color(0xFFD97706).copy(alpha = 0.7f),
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        IconButton(onClick = triggerVoice) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Mic,
+                                                contentDescription = "Voice Input",
+                                                tint = Color(0xFFD97706)
+                                            )
+                                        }
                                     }
                                 },
                                 maxLines = 3,

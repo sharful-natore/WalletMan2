@@ -6043,6 +6043,10 @@ fun DashboardScreen(
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
 
+    var showWifiVoiceBanner by remember {
+        mutableStateOf(shouldShowWifiVoicePrompt(context))
+    }
+
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
         selectedTxIds = emptySet()
     }
@@ -6531,6 +6535,23 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 90.dp)
             ) {
+                if (showWifiVoiceBanner) {
+                    item {
+                        OfflineVoiceWifiBanner(
+                            isBn = (language == AppLanguage.BN),
+                            onSetupClick = {
+                                openOfflineVoiceSettings(context)
+                                markVoicePackConfigured(context, true)
+                                showWifiVoiceBanner = false
+                            },
+                            onDismiss = {
+                                snoozeVoicePackPrompt(context)
+                                showWifiVoiceBanner = false
+                            },
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+                }
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
             FintechGradientCard(
@@ -14841,6 +14862,112 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // --- 9.5 OFFLINE VOICE INPUT CARD ---
+        var isOfflineVoiceConfigured by remember {
+            mutableStateOf(
+                context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+                    .getBoolean("offline_voice_pack_configured", false)
+            )
+        }
+        var showOfflineGuideFromSettings by remember { mutableStateOf(false) }
+
+        if (showOfflineGuideFromSettings) {
+            OfflineVoiceGuideDialog(
+                isBn = (language == AppLanguage.BN),
+                onDismiss = { showOfflineGuideFromSettings = false }
+            )
+        }
+
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অফলাইন ভয়েস সেটিংস" else "Offline Voice Settings",
+            isDark = isDark,
+            icon = Icons.Rounded.Mic,
+            initiallyExpanded = filter == "offline_voice"
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = if (language == AppLanguage.BN)
+                        "ইন্টারনেট বা ওয়াইফাই সংযোগ ছাড়া অফলাইনে মুখে বলে খসড়া বা লেনদেন রেকর্ড করার জন্য এটি কাস্টমাইজ করুন।"
+                    else
+                        "Configure settings to record transactions and draft notes offline by voice without active internet.",
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.Gray else Color(0xFF64748B)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFFD97706).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Mic,
+                            contentDescription = null,
+                            tint = Color(0xFFD97706),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "বাংলা ভয়েস প্যাক ইনস্টলড" else "Bangla Voice Pack Installed",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "ফোনে অফলাইন বাংলা ভয়েস প্যাক নামানো হয়ে থাকলে এটি চালু করুন" else "Enable this if you have downloaded the Bengali offline voice package on your phone",
+                            fontSize = 11.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B),
+                            lineHeight = 15.sp
+                        )
+                    }
+                    Switch(
+                        checked = isOfflineVoiceConfigured,
+                        onCheckedChange = { checked ->
+                            isOfflineVoiceConfigured = checked
+                            context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+                                .edit()
+                                .putBoolean("offline_voice_pack_configured", checked)
+                                .apply()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFFD97706),
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
+                    )
+                }
+
+                HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+
+                Button(
+                    onClick = { showOfflineGuideFromSettings = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706)),
+                    contentPadding = PaddingValues(12.dp)
+                ) {
+                    Icon(imageVector = Icons.Rounded.Info, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "অফলাইন ভয়েস গাইড ও ডাউনলোড" else "Offline Voice Guide & Setup",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
                 }
             }
         }

@@ -56,6 +56,7 @@ fun DraftsScratchpadDialog(
     var noteText by remember { mutableStateOf("") }
     var editDraftMode by remember { mutableStateOf<DraftTransaction?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showOfflineGuideDialog by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -84,6 +85,12 @@ fun DraftsScratchpadDialog(
                     Toast.makeText(context, if (language == AppLanguage.BN) "ভয়েস সেভ সম্পন্ন হয়েছে!" else "Voice draft auto-saved!", Toast.LENGTH_SHORT).show()
                 }
             }
+        } else {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val isConnected = cm?.activeNetworkInfo?.isConnected == true
+            if (!isConnected) {
+                showOfflineGuideDialog = true
+            }
         }
     }
 
@@ -91,12 +98,14 @@ fun DraftsScratchpadDialog(
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (language == AppLanguage.BN) "bn-BD" else "en-US")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, if (language == AppLanguage.BN) "লেনদেন খসড়া বলুন..." else "Speak transaction draft...")
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (language == AppLanguage.BN) "bn-BD" else "en-US"))
+            putExtra(RecognizerIntent.EXTRA_PROMPT, if (language == AppLanguage.BN) "লেনদেন খসড়া বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
         }
         try {
             speechLauncher.launch(intent)
         } catch (e: Exception) {
-            Toast.makeText(context, if (language == AppLanguage.BN) "ভয়েস ইনপুট সমর্থিত নয়" else "Speech recognition not supported", Toast.LENGTH_SHORT).show()
+            showOfflineGuideDialog = true
         }
     }
 
@@ -112,6 +121,13 @@ fun DraftsScratchpadDialog(
     ) {
         if (showInfoDialog) {
             DraftInfoDialog(onDismiss = { showInfoDialog = false })
+        }
+
+        if (showOfflineGuideDialog) {
+            OfflineVoiceGuideDialog(
+                isBn = (language == AppLanguage.BN),
+                onDismiss = { showOfflineGuideDialog = false }
+            )
         }
 
         Surface(
@@ -161,6 +177,17 @@ fun DraftsScratchpadDialog(
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
+                                IconButton(
+                                    onClick = { showOfflineGuideDialog = true },
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Warning,
+                                        contentDescription = "Offline Voice Guide",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                                 IconButton(
                                     onClick = { showInfoDialog = true },
                                     modifier = Modifier.size(26.dp)
