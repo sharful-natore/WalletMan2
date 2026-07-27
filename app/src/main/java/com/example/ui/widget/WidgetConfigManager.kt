@@ -47,8 +47,8 @@ object WidgetConfigManager {
             titleTextColor = prefs.getInt("titleTextColor", Color.parseColor("#333333")),
             subtitleTextColor = prefs.getInt("subtitleTextColor", Color.parseColor("#666666")),
             listItemTextColor = prefs.getInt("listItemTextColor", Color.parseColor("#4D4D4D")),
-            buttonTintColor = prefs.getInt("buttonTintColor", Color.parseColor("#333333")),
-            buttonBgColor = prefs.getInt("buttonBgColor", Color.WHITE),
+            buttonTintColor = prefs.getInt("buttonTintColor", Color.parseColor("#0284C7")),
+            buttonBgColor = prefs.getInt("buttonBgColor", Color.parseColor("#E0F2FE")),
             isTitleVisible = prefs.getBoolean("isTitleVisible", true),
             isSubtitleVisible = prefs.getBoolean("isSubtitleVisible", true),
             isListVisible = prefs.getBoolean("isListVisible", true)

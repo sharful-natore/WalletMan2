@@ -27,6 +27,10 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import com.example.data.AppDatabase
 import com.example.data.DraftTransaction
 import com.example.data.DraftParseResult
+import com.example.ui.widget.DraftWidgetProvider
+import android.appwidget.AppWidgetManager
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import kotlinx.coroutines.launch
 
 class DraftInputActivity : ComponentActivity() {
@@ -97,7 +101,37 @@ class DraftInputActivity : ComponentActivity() {
                 if (result.resultCode == Activity.RESULT_OK) {
                     val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
                     if (!spokenText.isNullOrBlank()) {
-                        draftText = spokenText
+                        val trimmed = spokenText.trim()
+                        val lower = trimmed.lowercase()
+                        val saveKeywords = listOf("সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
+                        var autoSave = false
+                        var cleanNote = trimmed
+                        for (kw in saveKeywords) {
+                            if (lower.endsWith(kw)) {
+                                cleanNote = trimmed.substring(0, trimmed.length - kw.length).trim()
+                                autoSave = true
+                                break
+                            }
+                        }
+
+                        draftText = cleanNote
+                        if (autoSave && cleanNote.isNotBlank()) {
+                            coroutineScope.launch {
+                                val parseResult = parseDraftDetails(cleanNote)
+                                draftsDao.insertDraftTransaction(DraftTransaction(
+                                    note = parseResult.cleanedNote,
+                                    amount = parseResult.amount,
+                                    type = parseResult.type,
+                                    category = parseResult.category
+                                ))
+                                val intent = Intent(context, DraftWidgetProvider::class.java).apply {
+                                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                                }
+                                context.sendBroadcast(intent)
+                                Toast.makeText(context, "ভয়েস সেভ সম্পন্ন হয়েছে!", Toast.LENGTH_SHORT).show()
+                                (context as? Activity)?.finish()
+                            }
+                        }
                     }
                 }
             }
@@ -206,58 +240,90 @@ class DraftInputActivity : ComponentActivity() {
                             val parsedPreview = remember(draftText) {
                                 if (draftText.isBlank()) null else parseDraftDetails(draftText)
                             }
+                            var selectedTypeOverride by remember(draftText) { mutableStateOf<String?>(null) }
                             
                             AnimatedVisibility(
                                 visible = parsedPreview != null,
                                 enter = fadeIn() + expandVertically(),
                                 exit = fadeOut() + shrinkVertically()
                             ) {
-                            parsedPreview?.let { preview ->
-                                Row(
-                                    modifier = Modifier
-                                        .padding(top = 12.dp)
-                                        .fillMaxWidth()
-                                        .background(Color(0xFFFEF3C7).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = Color(0xFFD97706),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Column {
-                                        Text(
-                                            text = buildString {
-                                                append("Inferred: ")
-                                                if (preview.amount != null) append("Amt: ${preview.amount.toInt()}৳ ")
-                                                if (preview.type != null) {
-                                                    val typeText = when (preview.type) {
-                                                        "INCOME" -> "Income"
-                                                        "EXPENSE" -> "Expense"
-                                                        "LEND" -> "Lend"
-                                                        "BORROW" -> "Borrow"
-                                                        else -> preview.type
-                                                    }
-                                                    append("($typeText)")
-                                                }
-                                            },
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Color(0xFF78350F)
-                                        )
-                                        if (preview.cleanedNote != draftText) {
+                                parsedPreview?.let { preview ->
+                                    val currentSelectedType = selectedTypeOverride ?: preview.type ?: "EXPENSE"
+                                    
+                                    Column(
+                                        modifier = Modifier
+                                            .padding(top = 12.dp)
+                                            .fillMaxWidth()
+                                            .background(Color(0xFFFEF3C7).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                            .padding(10.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = Color(0xFFD97706),
+                                                modifier = Modifier.size(16.dp)
+                                            )
                                             Text(
-                                                text = "Note: ${preview.cleanedNote}",
+                                                text = buildString {
+                                                    append("অনুমান: ")
+                                                    if (preview.amount != null) append("${preview.amount.toInt()}৳ ")
+                                                },
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF78350F)
+                                            )
+                                            Text(
+                                                text = "(ধরণ সিলেক্ট করতে ট্যাপ করুন)",
                                                 fontSize = 10.sp,
                                                 color = Color(0xFF92400E)
                                             )
                                         }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Type selection chips (Horizontal scrollable)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            val types = listOf(
+                                                Triple("EXPENSE", "ব্যয়", Color(0xFFEF4444)),
+                                                Triple("INCOME", "আয়", Color(0xFF10B981)),
+                                                Triple("LEND", "দেনা", Color(0xFF8B5CF6)),
+                                                Triple("BORROW", "পাওনা", Color(0xFFF59E0B)),
+                                                Triple("SAVINGS", "সঞ্চয়", Color(0xFF2563EB)),
+                                                Triple("WITHDRAWAL", "উত্তোলন", Color(0xFF0D9488))
+                                            )
+
+                                            for (item in types) {
+                                                val typeKey = item.first
+                                                val label = item.second
+                                                val brandColor = item.third
+                                                val isSelected = currentSelectedType == typeKey
+                                                Surface(
+                                                    onClick = { selectedTypeOverride = typeKey },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = if (isSelected) brandColor else brandColor.copy(alpha = 0.12f)
+                                                ) {
+                                                    Text(
+                                                        text = label,
+                                                        color = if (isSelected) Color.White else brandColor,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                            }
                             }
 
                             Spacer(modifier = Modifier.height(24.dp))
@@ -279,24 +345,24 @@ class DraftInputActivity : ComponentActivity() {
                                     onClick = {
                                         if (draftText.isNotBlank()) {
                                             coroutineScope.launch {
+                                                val parseResult = parseDraftDetails(draftText)
+                                                val finalType = selectedTypeOverride ?: parseResult.type ?: "EXPENSE"
                                                 if (isEdit && draftId != -1) {
                                                     val drafts = draftsDao.getAllDraftTransactionsList()
                                                     val target = drafts.find { it.id == draftId }
                                                     if (target != null) {
-                                                        val parseResult = parseDraftDetails(draftText)
                                                         draftsDao.updateDraftTransaction(target.copy(
                                                             note = parseResult.cleanedNote,
                                                             amount = parseResult.amount,
-                                                            type = parseResult.type,
+                                                            type = finalType,
                                                             category = parseResult.category
                                                         ))
                                                     }
                                                 } else {
-                                                    val parseResult = parseDraftDetails(draftText)
                                                     draftsDao.insertDraftTransaction(DraftTransaction(
                                                         note = parseResult.cleanedNote,
                                                         amount = parseResult.amount,
-                                                        type = parseResult.type,
+                                                        type = finalType,
                                                         category = parseResult.category
                                                     ))
                                                 }

@@ -3,118 +3,141 @@
     android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_draft_glassy_bg"
+    android:background="@android:color/transparent"
     android:orientation="vertical">
 
-    <!-- Header -->
-    <LinearLayout
+    <!-- Header Container -->
+    <FrameLayout
         android:id="@+id/widget_header_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/widget_draft_header_bg"
-        android:orientation="horizontal"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="18dp"
-        android:gravity="center_vertical">
-        
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView
-                android:id="@+id/widget_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Finance Note"
-                android:textColor="#1A1A1A"
-                android:textSize="20sp"
-                android:textStyle="bold" />
-            <TextView
-                android:id="@+id/widget_subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="দ্রুত লেনদেন ড্রাফট করে রাখুন"
-                android:textColor="#595959"
-                android:textSize="12sp"
-                android:layout_marginTop="2dp" />
-        </LinearLayout>
+        android:layout_height="wrap_content">
 
-        <FrameLayout
-            android:id="@+id/widget_customize_button"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:layout_marginEnd="8dp">
-            <ImageView
-                android:id="@+id/widget_customize_button_bg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/widget_circle_solid" />
-            <ImageView
-                android:id="@+id/widget_customize_button_icon"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="8dp"
-                android:src="@drawable/ic_palette"
-                android:scaleType="fitCenter" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_voice_button"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:layout_marginEnd="8dp">
-            <ImageView
-                android:id="@+id/widget_voice_button_bg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/widget_circle_solid" />
-            <ImageView
-                android:id="@+id/widget_voice_button_icon"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="8dp"
-                android:src="@drawable/ic_widget_mic_dark"
-                android:scaleType="fitCenter" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_add_button"
-            android:layout_width="34dp"
-            android:layout_height="34dp">
-            <ImageView
-                android:id="@+id/widget_add_button_bg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:src="@drawable/widget_circle_solid" />
-            <ImageView
-                android:id="@+id/widget_add_button_icon"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="8dp"
-                android:src="@drawable/ic_widget_add_dark"
-                android:scaleType="fitCenter" />
-        </FrameLayout>
-    </LinearLayout>
-
-    <!-- List Section -->
-    <LinearLayout
-        android:id="@+id/widget_list_container"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp">
-
-        <ListView
-            android:id="@+id/widget_list_view"
+        <ImageView
+            android:id="@+id/widget_header_bg"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:clipToPadding="false"
-            android:divider="@android:color/transparent"
-            android:dividerHeight="10dp"
-            android:scrollbarStyle="outsideOverlay" />
-    </LinearLayout>
+            android:src="@drawable/widget_draft_header_bg"
+            android:scaleType="fitXY" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="20dp"
+            android:paddingVertical="18dp"
+            android:gravity="center_vertical">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Finance Note"
+                    android:textColor="#1A1A1A"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/widget_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="দ্রুত লেনদেন ড্রাফট করে রাখুন"
+                    android:textColor="#595959"
+                    android:textSize="12sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_customize_button"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="8dp">
+                <ImageView
+                    android:id="@+id/widget_customize_button_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/widget_circle_solid" />
+                <ImageView
+                    android:id="@+id/widget_customize_button_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_palette"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_voice_button"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginEnd="8dp">
+                <ImageView
+                    android:id="@+id/widget_voice_button_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/widget_circle_solid" />
+                <ImageView
+                    android:id="@+id/widget_voice_button_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_widget_mic_dark"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_add_button"
+                android:layout_width="34dp"
+                android:layout_height="34dp">
+                <ImageView
+                    android:id="@+id/widget_add_button_bg"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/widget_circle_solid" />
+                <ImageView
+                    android:id="@+id/widget_add_button_icon"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_widget_add_dark"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- List Section -->
+    <FrameLayout
+        android:id="@+id/widget_list_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/widget_list_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/widget_draft_list_bg"
+            android:scaleType="fitXY" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp">
+
+            <ListView
+                android:id="@+id/widget_list_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:clipToPadding="false"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="10dp"
+                android:scrollbarStyle="outsideOverlay" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

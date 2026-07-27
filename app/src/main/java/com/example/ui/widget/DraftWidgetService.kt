@@ -36,21 +36,127 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         draftsList = emptyList()
     }
 
-    override fun getCount(): Int = draftsList.size
+    override fun getCount(): Int = if (draftsList.isEmpty()) 0 else draftsList.size + 1
+
+    override fun getViewTypeCount(): Int = 2
+
+    private fun parseDetails(note: String): Pair<Double?, String?> {
+        var amount: Double? = null
+        val digitRegex = Regex("[0-9০-৯]+")
+        val matches = digitRegex.findAll(note)
+        for (match in matches) {
+            val numStr = match.value
+            val engNumStr = numStr.map { c ->
+                if (c in '০'..'৯') (c - '০' + 48).toChar().toString() else c.toString()
+            }.joinToString("")
+            val parsed = engNumStr.toDoubleOrNull()
+            if (parsed != null && parsed > 0) {
+                amount = parsed
+                break
+            }
+        }
+
+        val noteLower = note.lowercase()
+        val type = when {
+            noteLower.contains("সঞ্চয়") || noteLower.contains("savings") || noteLower.contains("ডিপোজিট") || noteLower.contains("সংরক্ষণ") -> "SAVINGS"
+            noteLower.contains("উত্তোলন") || noteLower.contains("withdraw") || noteLower.contains("উঠানো") || noteLower.contains("উঠালাম") || noteLower.contains("ক্যাশ আউট") -> "WITHDRAWAL"
+            noteLower.contains("আয়") || noteLower.contains("income") || noteLower.contains("বেতন") || noteLower.contains("salary") || noteLower.contains("পেলাম") -> "INCOME"
+            noteLower.contains("দেনা") || noteLower.contains("ধারে") || noteLower.contains("পাওনা") || noteLower.contains("lend") || noteLower.contains("borrow") || noteLower.contains("কর্য") || noteLower.contains("কর্জ") || noteLower.contains("ধার") -> {
+                if (noteLower.contains("দিলাম") || noteLower.contains("gave") || noteLower.contains("পাওনা")) "LEND" else "BORROW"
+            }
+            else -> "EXPENSE"
+        }
+        return Pair(amount, type)
+    }
+
+    private fun toBanglaDigits(str: String): String {
+        return str.replace("0", "০").replace("1", "১").replace("2", "২")
+            .replace("3", "৩").replace("4", "৪").replace("5", "৫")
+            .replace("6", "৬").replace("7", "৭").replace("8", "৮")
+            .replace("9", "৯")
+    }
 
     override fun getViewAt(position: Int): RemoteViews? {
-        if (position < 0 || position >= draftsList.size) return null
-        
-        val draft = draftsList[position]
-        val rv = RemoteViews(context.packageName, R.layout.widget_draft_item)
+        if (position < 0 || position > draftsList.size) return null
         val config = WidgetConfigManager.loadConfig(context)
 
-        val amountStr = if (draft.amount != null) {
-            " " + draft.amount.toInt().toString()
-                .replace("0", "০").replace("1", "১").replace("2", "২")
-                .replace("3", "৩").replace("4", "৪").replace("5", "৫")
-                .replace("6", "৬").replace("7", "৭").replace("8", "৮")
-                .replace("9", "৯") + "৳"
+        // Summary item
+        if (position == draftsList.size) {
+            val rv = RemoteViews(context.packageName, R.layout.widget_draft_summary_item)
+
+            var totalIncome = 0.0
+            var totalExpense = 0.0
+            var totalLend = 0.0
+            var totalBorrow = 0.0
+            var totalSavings = 0.0
+            var totalWithdrawal = 0.0
+
+            for (d in draftsList) {
+                val (inferredAmt, inferredType) = parseDetails(d.note)
+                val amt = d.amount ?: inferredAmt ?: 0.0
+                val t = d.type ?: inferredType ?: "EXPENSE"
+                when (t) {
+                    "INCOME" -> totalIncome += amt
+                    "EXPENSE" -> totalExpense += amt
+                    "LEND" -> totalLend += amt
+                    "BORROW" -> totalBorrow += amt
+                    "SAVINGS" -> totalSavings += amt
+                    "WITHDRAWAL" -> totalWithdrawal += amt
+                }
+            }
+
+            val netIncExp = totalIncome - totalExpense
+            val incExpStr = if (netIncExp > 0) {
+                "আয় ${toBanglaDigits(netIncExp.toInt().toString())}৳"
+            } else if (netIncExp < 0) {
+                "ব্যয় ${toBanglaDigits((-netIncExp).toInt().toString())}৳"
+            } else if (totalIncome > 0 || totalExpense > 0) {
+                "আয়/ব্যয় ০৳"
+            } else null
+
+            val netLendBorrow = totalLend - totalBorrow
+            val lendBorrowStr = if (netLendBorrow > 0) {
+                "দেনা ${toBanglaDigits(netLendBorrow.toInt().toString())}৳"
+            } else if (netLendBorrow < 0) {
+                "পাওনা ${toBanglaDigits((-netLendBorrow).toInt().toString())}৳"
+            } else if (totalLend > 0 || totalBorrow > 0) {
+                "দেনা/পাওনা ০৳"
+            } else null
+
+            val netSavWith = totalSavings - totalWithdrawal
+            val savWithStr = if (netSavWith > 0) {
+                "সঞ্চয় ${toBanglaDigits(netSavWith.toInt().toString())}৳"
+            } else if (netSavWith < 0) {
+                "উত্তোলন ${toBanglaDigits((-netSavWith).toInt().toString())}৳"
+            } else if (totalSavings > 0 || totalWithdrawal > 0) {
+                "সঞ্চয়/উত্তোলন ০৳"
+            } else null
+
+            val summaryParts = listOfNotNull(incExpStr, lendBorrowStr, savWithStr)
+            val summaryText = if (summaryParts.isNotEmpty()) {
+                summaryParts.joinToString("  |  ")
+            } else {
+                "মোট ${toBanglaDigits(draftsList.size.toString())} টি"
+            }
+
+            rv.setTextViewText(R.id.widget_summary_text, summaryText)
+            rv.setTextColor(R.id.widget_summary_title, config.listItemTextColor)
+            rv.setTextColor(R.id.widget_summary_text, config.listItemTextColor)
+            rv.setInt(R.id.widget_summary_bg, "setColorFilter", config.listItemBg)
+
+            return rv
+        }
+
+        // Regular Draft Item
+        val draft = draftsList[position]
+        val rv = RemoteViews(context.packageName, R.layout.widget_draft_item)
+
+        val (inferredAmt, inferredType) = parseDetails(draft.note)
+        val finalAmt = draft.amount ?: inferredAmt
+        val finalType = draft.type ?: inferredType ?: "EXPENSE"
+
+        val amountStr = if (finalAmt != null) {
+            " " + toBanglaDigits(finalAmt.toInt().toString()) + "৳"
         } else ""
         
         rv.setTextViewText(R.id.widget_item_text, "${draft.note}$amountStr")
@@ -58,12 +164,21 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         rv.setTextColor(R.id.widget_item_serial, config.listItemTextColor)
         rv.setInt(R.id.widget_item_bg, "setColorFilter", config.listItemBg)
         
-        val serial = (position + 1).toString()
-            .replace("0", "০").replace("1", "১").replace("2", "২")
-            .replace("3", "৩").replace("4", "৪").replace("5", "৫")
-            .replace("6", "৬").replace("7", "৭").replace("8", "৮")
-            .replace("9", "৯")
+        val serial = toBanglaDigits((position + 1).toString())
         rv.setTextViewText(R.id.widget_item_serial, "$serial.")
+
+        // Tag text and color
+        val (tagText, tagColor) = when (finalType) {
+            "INCOME" -> "আয়" to android.graphics.Color.parseColor("#059669")
+            "EXPENSE" -> "ব্যয়" to android.graphics.Color.parseColor("#DC2626")
+            "LEND" -> "দেনা" to android.graphics.Color.parseColor("#7C3AED")
+            "BORROW" -> "পাওনা" to android.graphics.Color.parseColor("#D97706")
+            "SAVINGS" -> "সঞ্চয়" to android.graphics.Color.parseColor("#2563EB")
+            "WITHDRAWAL" -> "উত্তোলন" to android.graphics.Color.parseColor("#0D9488")
+            else -> "ব্যয়" to android.graphics.Color.parseColor("#DC2626")
+        }
+        rv.setTextViewText(R.id.widget_item_tag, tagText)
+        rv.setTextColor(R.id.widget_item_tag, tagColor)
 
         // Intent for item click (Open Edit Dialog Activity)
         val editIntent = Intent().apply {
@@ -76,7 +191,6 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
     }
 
     override fun getLoadingView(): RemoteViews? = null
-    override fun getViewTypeCount(): Int = 1
-    override fun getItemId(position: Int): Long = draftsList[position].id.toLong()
+    override fun getItemId(position: Int): Long = if (position < draftsList.size) draftsList[position].id.toLong() else 999999L
     override fun hasStableIds(): Boolean = true
 }

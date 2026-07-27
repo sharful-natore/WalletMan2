@@ -394,7 +394,7 @@
             <ImageView
                 android:layout_width="21dp"
                 android:layout_height="21dp"
-                android:src="@drawable/ic_sync_24"
+                android:src="@drawable/ic_widget_draft"
                 app:tint="#FFFFFF" />
         </LinearLayout>
     </LinearLayout>

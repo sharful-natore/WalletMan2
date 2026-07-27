@@ -74,8 +74,8 @@ class DraftWidgetProvider : AppWidgetProvider() {
             val config = WidgetConfigManager.loadConfig(context)
 
             // Apply configurations
-            views.setInt(R.id.widget_header_container, "setBackgroundColor", config.titleSectionBg)
-            views.setInt(R.id.widget_list_container, "setBackgroundColor", config.listSectionBg)
+            views.setInt(R.id.widget_header_bg, "setColorFilter", config.titleSectionBg)
+            views.setInt(R.id.widget_list_bg, "setColorFilter", config.listSectionBg)
             
             views.setTextColor(R.id.widget_title, config.titleTextColor)
             views.setViewVisibility(R.id.widget_title, if (config.isTitleVisible) android.view.View.VISIBLE else android.view.View.GONE)

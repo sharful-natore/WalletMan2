@@ -63,7 +63,25 @@ fun DraftsScratchpadDialog(
             val results = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             val spoken = results?.firstOrNull() ?: ""
             if (spoken.isNotBlank()) {
-                noteText = spoken
+                val trimmed = spoken.trim()
+                val lower = trimmed.lowercase()
+                val saveKeywords = listOf("সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
+                var autoSave = false
+                var cleanNote = trimmed
+                for (kw in saveKeywords) {
+                    if (lower.endsWith(kw)) {
+                        cleanNote = trimmed.substring(0, trimmed.length - kw.length).trim()
+                        autoSave = true
+                        break
+                    }
+                }
+
+                noteText = cleanNote
+                if (autoSave && cleanNote.isNotBlank()) {
+                    viewModel.addDraftTransaction(cleanNote, null)
+                    noteText = ""
+                    Toast.makeText(context, if (language == AppLanguage.BN) "ভয়েস সেভ সম্পন্ন হয়েছে!" else "Voice draft auto-saved!", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -81,10 +99,11 @@ fun DraftsScratchpadDialog(
         }
     }
 
-    // Dynamic NLP Preview
+    // Dynamic NLP Preview & Type Selection
     val parsedPreview = remember(noteText) {
         if (noteText.isBlank()) null else viewModel.parseDraftDetails(noteText)
     }
+    var selectedTypeOverride by remember(noteText) { mutableStateOf<String?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -223,7 +242,7 @@ fun DraftsScratchpadDialog(
                             IconButton(
                                 onClick = {
                                     if (noteText.isNotBlank()) {
-                                        viewModel.addDraftTransaction(noteText)
+                                        viewModel.addDraftTransaction(noteText, selectedTypeOverride)
                                         noteText = ""
                                     }
                                 },
@@ -249,7 +268,8 @@ fun DraftsScratchpadDialog(
                             exit = fadeOut() + shrinkVertically()
                         ) {
                         parsedPreview?.let { preview ->
-                            Row(
+                            val currentSelectedType = selectedTypeOverride ?: preview.type ?: "EXPENSE"
+                            Column(
                                 modifier = Modifier
                                     .padding(top = 12.dp)
                                     .fillMaxWidth()
@@ -258,35 +278,72 @@ fun DraftsScratchpadDialog(
                                             alpha = 0.6f
                                         ), RoundedCornerShape(12.dp)
                                     )
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    .padding(10.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.AutoAwesome,
-                                    contentDescription = null,
-                                    tint = if (isDark) Color(0xFFF59E0B) else Color(0xFFD97706),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = buildString {
-                                        append(if (language == AppLanguage.BN) "আন্দাজ করা লজিক: " else "Inferred details: ")
-                                        if (preview.amount != null) append("${if (language == AppLanguage.BN) "পরিমাণ" else "Amount"}: ${preview.amount.toInt()}৳ ")
-                                        if (preview.type != null) {
-                                            val typeText = when (preview.type) {
-                                                "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
-                                                "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
-                                                "LEND" -> if (language == AppLanguage.BN) "দেনা (ধার দেওয়া)" else "Lend"
-                                                "BORROW" -> if (language == AppLanguage.BN) "পাওনা (ধার নেওয়া)" else "Borrow"
-                                                else -> preview.type
-                                            }
-                                            append("($typeText)")
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = if (isDark) Color(0xFFF59E0B) else Color(0xFFD97706),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = buildString {
+                                            append(if (language == AppLanguage.BN) "অনুমান: " else "Inferred: ")
+                                            if (preview.amount != null) append("${if (language == AppLanguage.BN) "পরিমাণ" else "Amt"}: ${preview.amount.toInt()}৳ ")
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else Color(0xFF78350F)
+                                    )
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "(ট্যাপ করে সিলেক্ট করুন)" else "(Tap to select)",
+                                        fontSize = 10.sp,
+                                        color = if (isDark) Color.LightGray else Color(0xFF92400E)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val types = listOf(
+                                        Triple("EXPENSE", if (language == AppLanguage.BN) "ব্যয়" else "Expense", Color(0xFFEF4444)),
+                                        Triple("INCOME", if (language == AppLanguage.BN) "আয়" else "Income", Color(0xFF10B981)),
+                                        Triple("LEND", if (language == AppLanguage.BN) "দেনা" else "Lend", Color(0xFF8B5CF6)),
+                                        Triple("BORROW", if (language == AppLanguage.BN) "পাওনা" else "Borrow", Color(0xFFF59E0B)),
+                                        Triple("SAVINGS", if (language == AppLanguage.BN) "সঞ্চয়" else "Savings", Color(0xFF2563EB)),
+                                        Triple("WITHDRAWAL", if (language == AppLanguage.BN) "উত্তোলন" else "Withdrawal", Color(0xFF0D9488))
+                                    )
+
+                                    for (item in types) {
+                                        val typeKey = item.first
+                                        val label = item.second
+                                        val brandColor = item.third
+                                        val isSelected = currentSelectedType == typeKey
+                                        Surface(
+                                            onClick = { selectedTypeOverride = typeKey },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isSelected) brandColor else brandColor.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                color = if (isSelected) Color.White else brandColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                            )
                                         }
-                                    },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (isDark) Color.White else Color(0xFF78350F)
-                                )
+                                    }
+                                }
                             }
                         }
                         }
@@ -361,6 +418,15 @@ fun DraftsScratchpadDialog(
                                 onPost = { onPostDraft(draft) },
                                 onDelete = { viewModel.deleteDraftTransaction(draft.id) },
                                 onEdit = { editDraftMode = draft }
+                            )
+                        }
+
+                        item {
+                            DraftsSummaryCard(
+                                drafts = drafts,
+                                viewModel = viewModel,
+                                language = language,
+                                isDark = isDark
                             )
                         }
                     }
@@ -535,6 +601,8 @@ fun DraftItemCard(
                                 "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
                                 "LEND" -> if (language == AppLanguage.BN) "দেনা" else "Lend"
                                 "BORROW" -> if (language == AppLanguage.BN) "পাওনা" else "Borrow"
+                                "SAVINGS" -> if (language == AppLanguage.BN) "সঞ্চয়" else "Savings"
+                                "WITHDRAWAL" -> if (language == AppLanguage.BN) "উত্তোলন" else "Withdrawal"
                                 else -> t
                             }
                             Surface(
@@ -590,5 +658,133 @@ fun DraftItemCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun DraftsSummaryCard(
+    drafts: List<DraftTransaction>,
+    viewModel: FinanceViewModel,
+    language: AppLanguage,
+    isDark: Boolean
+) {
+    var totalIncome = 0.0
+    var totalExpense = 0.0
+    var totalLend = 0.0
+    var totalBorrow = 0.0
+    var totalSavings = 0.0
+    var totalWithdrawal = 0.0
+
+    for (d in drafts) {
+        val parsed = viewModel.parseDraftDetails(d.note)
+        val amt = d.amount ?: parsed.amount ?: 0.0
+        val t = d.type ?: parsed.type ?: "EXPENSE"
+        when (t) {
+            "INCOME" -> totalIncome += amt
+            "EXPENSE" -> totalExpense += amt
+            "LEND" -> totalLend += amt
+            "BORROW" -> totalBorrow += amt
+            "SAVINGS" -> totalSavings += amt
+            "WITHDRAWAL" -> totalWithdrawal += amt
+        }
+    }
+
+    val netIncExp = totalIncome - totalExpense
+    val incExpStr = if (netIncExp > 0) {
+        (if (language == AppLanguage.BN) "আয় " else "Inc ") + "${netIncExp.toInt()}৳"
+    } else if (netIncExp < 0) {
+        (if (language == AppLanguage.BN) "ব্যয় " else "Exp ") + "${(-netIncExp).toInt()}৳"
+    } else if (totalIncome > 0 || totalExpense > 0) {
+        if (language == AppLanguage.BN) "আয়/ব্যয় ০৳" else "Inc/Exp 0৳"
+    } else null
+
+    val netLendBorrow = totalLend - totalBorrow
+    val lendBorrowStr = if (netLendBorrow > 0) {
+        (if (language == AppLanguage.BN) "দেনা " else "Lend ") + "${netLendBorrow.toInt()}৳"
+    } else if (netLendBorrow < 0) {
+        (if (language == AppLanguage.BN) "পাওনা " else "Borrow ") + "${(-netLendBorrow).toInt()}৳"
+    } else if (totalLend > 0 || totalBorrow > 0) {
+        if (language == AppLanguage.BN) "দেনা/পাওনা ০৳" else "Lend/Borrow 0৳"
+    } else null
+
+    val netSavWith = totalSavings - totalWithdrawal
+    val savWithStr = if (netSavWith > 0) {
+        (if (language == AppLanguage.BN) "সঞ্চয় " else "Savings ") + "${netSavWith.toInt()}৳"
+    } else if (netSavWith < 0) {
+        (if (language == AppLanguage.BN) "উত্তোলন " else "Withdrawal ") + "${(-netSavWith).toInt()}৳"
+    } else if (totalSavings > 0 || totalWithdrawal > 0) {
+        if (language == AppLanguage.BN) "সঞ্চয়/উত্তোলন ০৳" else "Savings/Withdrawal 0৳"
+    } else null
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.BarChart,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "📊 ড্রাফট নিট হিসাব সামারি:" else "📊 Draft Net Summary:",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.White else Color(0xFF0F172A)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (incExpStr != null) {
+                    SummaryChip(text = incExpStr, color = if (netIncExp >= 0) Color(0xFF10B981) else Color(0xFFEF4444))
+                }
+                if (lendBorrowStr != null) {
+                    SummaryChip(text = lendBorrowStr, color = if (netLendBorrow >= 0) Color(0xFF8B5CF6) else Color(0xFFF59E0B))
+                }
+                if (savWithStr != null) {
+                    SummaryChip(text = savWithStr, color = if (netSavWith >= 0) Color(0xFF2563EB) else Color(0xFF0D9488))
+                }
+                if (incExpStr == null && lendBorrowStr == null && savWithStr == null) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "মোট ${drafts.size} টি ড্রাফট" else "Total ${drafts.size} drafts",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.LightGray else Color(0xFF475569)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SummaryChip(text: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = color.copy(alpha = 0.15f)
+    ) {
+        Text(
+            text = text,
+            color = color,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        )
     }
 }

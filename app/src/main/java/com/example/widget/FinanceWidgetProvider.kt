@@ -8,6 +8,7 @@ import android.content.Intent
 import android.widget.RemoteViews
 import com.example.MainActivity
 import com.example.R
+import com.example.ui.screens.DraftInputActivity
 import com.example.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -107,10 +108,9 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
     }
 
-    val syncIntent = Intent(context, MainActivity::class.java).apply {
-        action = "ACTION_SYNC_TRIGGER"
-        putExtra("EXTRA_TARGET_WORKSPACE_ID", widgetWorkspaceId)
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+    val draftIntent = Intent(context, DraftInputActivity::class.java).apply {
+        putExtra("isVoice", false)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
     }
 
     val profilePendingIntent = PendingIntent.getActivity(context, 14, profileIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -118,7 +118,7 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
     views.setOnClickPendingIntent(R.id.btn_add_tx, PendingIntent.getActivity(context, 1, txIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_person, PendingIntent.getActivity(context, 2, personIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.btn_add_saving, PendingIntent.getActivity(context, 3, savingIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-    views.setOnClickPendingIntent(R.id.btn_sync, PendingIntent.getActivity(context, 4, syncIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+    views.setOnClickPendingIntent(R.id.btn_sync, PendingIntent.getActivity(context, 4, draftIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     
     views.setOnClickPendingIntent(R.id.card_income, PendingIntent.getActivity(context, 10, incomeViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     views.setOnClickPendingIntent(R.id.card_expense, PendingIntent.getActivity(context, 11, expenseViewIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))

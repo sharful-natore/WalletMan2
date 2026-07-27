@@ -4,14 +4,14 @@
     android:layout_height="wrap_content">
 
     <ImageView
-        android:id="@+id/widget_item_bg"
+        android:id="@+id/widget_summary_bg"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:src="@drawable/widget_rounded_rect_bg"
         android:scaleType="fitXY" />
 
     <LinearLayout
-        android:id="@+id/widget_item_container"
+        android:id="@+id/widget_summary_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingLeft="14dp"
@@ -22,34 +22,25 @@
         android:gravity="center_vertical">
 
         <TextView
-            android:id="@+id/widget_item_serial"
+            android:id="@+id/widget_summary_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#333333"
-            android:textSize="15sp"
+            android:text="📊 নিট হিসাব:"
+            android:textColor="#1E293B"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:layout_marginRight="8dp" />
+            android:layout_marginRight="6dp" />
 
         <TextView
-            android:id="@+id/widget_item_text"
+            android:id="@+id/widget_summary_text"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#333333"
-            android:textSize="15sp"
+            android:textColor="#0F172A"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:maxLines="2"
+            android:gravity="right"
+            android:maxLines="1"
             android:ellipsize="end" />
-
-        <TextView
-            android:id="@+id/widget_item_tag"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:paddingHorizontal="7dp"
-            android:paddingVertical="3dp"
-            android:layout_marginLeft="6dp" />
     </LinearLayout>
 </FrameLayout>

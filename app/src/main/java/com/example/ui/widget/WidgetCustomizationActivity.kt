@@ -30,6 +30,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import com.example.ui.theme.FinanceNoteTheme
 
 class WidgetCustomizationActivity : ComponentActivity() {
@@ -241,16 +243,52 @@ fun ColorSettingItem(label: String, currentColor: Color, onClick: () -> Unit) {
 
 @Composable
 fun WidgetPreview(config: WidgetDraftConfig) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val wallpaperImageBitmap = remember(context) {
+        try {
+            val wallpaperManager = android.app.WallpaperManager.getInstance(context)
+            val drawable = wallpaperManager.drawable
+            drawable?.let {
+                val bitmap = it.toBitmap()
+                bitmap.asImageBitmap()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .height(240.dp),
+            .height(240.dp)
+            .clip(RoundedCornerShape(24.dp)),
         contentAlignment = Alignment.Center
     ) {
+        // Wallpaper Backdrop
+        if (wallpaperImageBitmap != null) {
+            androidx.compose.foundation.Image(
+                bitmap = wallpaperImageBitmap,
+                contentDescription = "Wallpaper Backdrop",
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            listOf(Color(0xFF3B0764), Color(0xFF1E1B4B), Color(0xFF0F172A))
+                        )
+                    )
+            )
+        }
+
         // Outer Container (The actual widget background)
         Box(
             modifier = Modifier
+                .padding(10.dp)
                 .fillMaxSize()
                 .clip(RoundedCornerShape(20.dp))
         ) {

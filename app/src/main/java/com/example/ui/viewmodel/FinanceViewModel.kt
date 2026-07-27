@@ -987,7 +987,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         var category: String? = null
         val noteLower = note.lowercase()
         
-        if (noteLower.contains("আয়") || noteLower.contains("income") || noteLower.contains("বেতন") || noteLower.contains("salary") || noteLower.contains("পেলাম")) {
+        if (noteLower.contains("সঞ্চয়") || noteLower.contains("savings") || noteLower.contains("ডিপোজিট") || noteLower.contains("সংরক্ষণ")) {
+            type = "SAVINGS"
+            category = "Savings"
+        } else if (noteLower.contains("উত্তোলন") || noteLower.contains("withdraw") || noteLower.contains("উঠানো") || noteLower.contains("উঠালাম") || noteLower.contains("ক্যাশ আউট")) {
+            type = "WITHDRAWAL"
+            category = "Withdrawal"
+        } else if (noteLower.contains("আয়") || noteLower.contains("income") || noteLower.contains("বেতন") || noteLower.contains("salary") || noteLower.contains("পেলাম")) {
             type = "INCOME"
             category = if (noteLower.contains("বেতন") || noteLower.contains("salary")) "Salary" else "Other"
         } else if (noteLower.contains("দেনা") || noteLower.contains("ধারে") || noteLower.contains("পাওনা") || noteLower.contains("lend") || noteLower.contains("borrow") || noteLower.contains("কর্য") || noteLower.contains("কর্জ") || noteLower.contains("ধার")) {
@@ -1012,13 +1018,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         return DraftParseResult(amount, type, category, cleanedNote)
     }
 
-    fun addDraftTransaction(note: String) {
+    fun addDraftTransaction(note: String, overrideType: String? = null) {
         viewModelScope.launch {
             val parseResult = parseDraftDetails(note)
             repository.insertDraftTransaction(
                 DraftTransaction(
                     amount = parseResult.amount,
-                    type = parseResult.type,
+                    type = overrideType ?: parseResult.type,
                     category = parseResult.category,
                     note = parseResult.cleanedNote,
                     workspaceId = _currentWorkspaceId.value
