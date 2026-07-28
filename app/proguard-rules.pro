@@ -50,3 +50,7 @@
 # Keep Kotlin Coroutines
 -keep class kotlinx.coroutines.** { *; }
 -keepclassmembers class kotlinx.coroutines.** { *; }
+
+# Keep Sherpa ONNX JNI components
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-keepclassmembers class com.k2fsa.sherpa.onnx.** { *; }
