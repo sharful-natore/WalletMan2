@@ -56,7 +56,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 // Model URL on alphacephei (approx. 33MB)
-private const val VOSK_BN_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-bn-0.3.zip"
+private const val SHERPA_BN_MODEL_URL = "https://alphacephei.com/sherpa/models/sherpa-model-small-bn-0.3.zip"
 
 fun openOfflineVoiceSettings(context: Context) {
     val intents = listOf(
@@ -113,7 +113,7 @@ fun isInternetConnected(context: Context): Boolean {
     }
 }
 
-fun isVoskDownloaded(context: Context): Boolean {
+fun isSherpaDownloaded(context: Context): Boolean {
     val modelDir = File(context.filesDir, "sherpa-model-bn")
     return SherpaModelFinder.findModelRoot(modelDir) != null
 }
@@ -122,7 +122,7 @@ fun shouldShowOfflineVoicePrompt(context: Context): Boolean {
     val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
     val alreadyConfigured = prefs.getBoolean("offline_voice_pack_configured", false)
     if (alreadyConfigured) return false
-    if (isVoskDownloaded(context)) return false
+    if (isSherpaDownloaded(context)) return false
     
     val ignoreUntil = prefs.getLong("offline_voice_ignore_until", 0L)
     if (System.currentTimeMillis() < ignoreUntil) return false
@@ -142,7 +142,7 @@ fun snoozeVoicePackPrompt(context: Context) {
     prefs.edit().putLong("offline_voice_ignore_until", snoozeTime).apply()
 }
 
-suspend fun fetchVoskLink(context: Context): String = suspendCancellableCoroutine { continuation ->
+suspend fun fetchSherpaLink(context: Context): String = suspendCancellableCoroutine { continuation ->
     try {
         com.example.FinanceApplication.ensureFirebaseInitialized(context)
         val remoteConfig = FirebaseRemoteConfig.getInstance()
@@ -153,7 +153,7 @@ suspend fun fetchVoskLink(context: Context): String = suspendCancellableCoroutin
         
         remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                val link = remoteConfig.getString("Vosk_link")
+                val link = remoteConfig.getString("Sherpa_link")
                 continuation.resume(link)
             } else {
                 continuation.resume("")
@@ -174,7 +174,7 @@ sealed class DownloadState {
     data class Error(val message: String) : DownloadState()
 }
 
-object VoskDownloader {
+object SherpaDownloader {
     private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val downloadState: StateFlow<DownloadState> = _downloadState
 
@@ -191,9 +191,9 @@ object VoskDownloader {
                 _downloadState.value = DownloadState.Downloading(0)
                 
                 // Fetch download link from Remote Config
-                var downloadUrl = fetchVoskLink(context).trim()
+                var downloadUrl = fetchSherpaLink(context).trim()
                 if (downloadUrl.isEmpty()) {
-                    throw Exception("রিমোট কনফিগ থেকে Vosk_link পাওয়া যায়নি!")
+                    throw Exception("রিমোট কনফিগ থেকে Sherpa_link পাওয়া যায়নি!")
                 }
 
                 // Handle Dropbox shared links conversion to direct download links
@@ -470,12 +470,12 @@ fun OfflineVoiceGuideDialog(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val downloadState by VoskDownloader.downloadState.collectAsState()
+    val downloadState by SherpaDownloader.downloadState.collectAsState()
 
     DisposableEffect(Unit) {
         onDispose {
             if (downloadState is DownloadState.Success || downloadState is DownloadState.Error) {
-                VoskDownloader.reset()
+                SherpaDownloader.reset()
             }
         }
     }
@@ -511,9 +511,9 @@ fun OfflineVoiceGuideDialog(
                     is DownloadState.Idle -> {
                         Text(
                             text = if (isBn) 
-                                "ইন্টারনেট বা ওয়াইফাই সংযোগ ছাড়া অফলাইনে মুখে বলে লেনদেন খসড়া করার জন্য 'Vosk Small Bangla Model' নামিয়ে নিন।" 
+                                "ইন্টারনেট বা ওয়াইফাই সংযোগ ছাড়া অফলাইনে মুখে বলে লেনদেন খসড়া করার জন্য 'Sherpa Small Bangla Model' নামিয়ে নিন।" 
                             else 
-                                "To use voice-to-text fully offline without internet connection, download the 'Vosk Small Bangla Model'.",
+                                "To use voice-to-text fully offline without internet connection, download the 'Sherpa Small Bangla Model'.",
                             fontSize = 13.sp,
                             color = Color(0xFF334155),
                             lineHeight = 18.sp
@@ -623,7 +623,7 @@ fun OfflineVoiceGuideDialog(
                 is DownloadState.Idle -> {
                     Button(
                         onClick = {
-                            VoskDownloader.startDownload(context, coroutineScope)
+                            SherpaDownloader.startDownload(context, coroutineScope)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
                     ) {
@@ -647,8 +647,8 @@ fun OfflineVoiceGuideDialog(
                 is DownloadState.Error -> {
                     Button(
                         onClick = {
-                            VoskDownloader.reset()
-                            VoskDownloader.startDownload(context, coroutineScope)
+                            SherpaDownloader.reset()
+                            SherpaDownloader.startDownload(context, coroutineScope)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD97706))
                     ) {
@@ -671,10 +671,10 @@ fun OfflineVoiceGuideDialog(
 }
 
 /**
- * Highly interactive, fully offline speech input overlay using Vosk
+ * Highly interactive, fully offline speech input overlay using Sherpa
  */
 @Composable
-fun VoskSpeechInputDialog(
+fun SherpaSpeechInputDialog(
     isBn: Boolean,
     onResult: (String) -> Unit,
     onDismiss: () -> Unit

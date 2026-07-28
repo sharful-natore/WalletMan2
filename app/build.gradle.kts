@@ -25,7 +25,7 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     
     ndk {
-        abiFilters.addAll(setOf("arm64-v8a", "x86_64"))
+        abiFilters.addAll(setOf("arm64-v8a"))
     }
     
     val configFile = file("${rootDir}/firebase-applet-config.json")

@@ -14880,7 +14880,7 @@ fun SettingsScreen(
                     .getBoolean("offline_voice_pack_configured", false)
             )
         }
-        var isModelDownloaded by remember { mutableStateOf(isVoskDownloaded(context)) }
+        var isModelDownloaded by remember { mutableStateOf(isSherpaDownloaded(context)) }
         var showOfflineGuideFromSettings by remember { mutableStateOf(false) }
 
         if (showOfflineGuideFromSettings) {
@@ -14890,7 +14890,7 @@ fun SettingsScreen(
                     showOfflineGuideFromSettings = false
                     isOfflineVoiceConfigured = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
                         .getBoolean("offline_voice_pack_configured", false)
-                    isModelDownloaded = isVoskDownloaded(context)
+                    isModelDownloaded = isSherpaDownloaded(context)
                 }
             )
         }
@@ -14966,7 +14966,7 @@ fun SettingsScreen(
 
                 HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
 
-                // --- Vosk Offline Model Setup Status Indicator ---
+                // --- Sherpa Offline Model Setup Status Indicator ---
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -14999,9 +14999,9 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (isModelDownloaded) {
-                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা আছে" else "Vosk Offline Bangla Voice Model Set Up"
+                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা আছে" else "Sherpa Offline Bangla Voice Model Set Up"
                                 } else {
-                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা নেই" else "Vosk Offline Bangla Voice Model Not Set Up"
+                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা নেই" else "Sherpa Offline Bangla Voice Model Not Set Up"
                                 },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,

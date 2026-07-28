@@ -57,7 +57,7 @@ class DraftInputActivity : ComponentActivity() {
             var isLoading by remember { mutableStateOf(isEdit) }
             var showInfoDialogState by remember { mutableStateOf(showInfoDialogExtra) }
             var showOfflineGuideDialog by remember { mutableStateOf(false) }
-            var showVoskDialog by remember { mutableStateOf(false) }
+            var showSherpaDialog by remember { mutableStateOf(false) }
             val coroutineScope = rememberCoroutineScope()
             val context = androidx.compose.ui.platform.LocalContext.current
             val db = remember { AppDatabase.getDatabase(context) }
@@ -125,17 +125,17 @@ class DraftInputActivity : ComponentActivity() {
                     try {
                         speechLauncher.launch(voiceIntent)
                     } catch (e: Exception) {
-                        // If Google STT intent fails, fallback to Vosk if downloaded, else show guide
-                        if (isVoskDownloaded(context)) {
-                            showVoskDialog = true
+                        // If Google STT intent fails, fallback to Sherpa if downloaded, else show guide
+                        if (isSherpaDownloaded(context)) {
+                            showSherpaDialog = true
                         } else {
                             showOfflineGuideDialog = true
                         }
                     }
                 } else {
-                    // Offline Mode - Use Vosk
-                    if (isVoskDownloaded(context)) {
-                        showVoskDialog = true
+                    // Offline Mode - Use Sherpa
+                    if (isSherpaDownloaded(context)) {
+                        showSherpaDialog = true
                     } else {
                         showOfflineGuideDialog = true
                     }
@@ -239,13 +239,13 @@ class DraftInputActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showVoskDialog) {
-                                VoskSpeechInputDialog(
+                            if (showSherpaDialog) {
+                                SherpaSpeechInputDialog(
                                     isBn = isBn,
                                     onResult = { text ->
                                         draftText = text
                                     },
-                                    onDismiss = { showVoskDialog = false }
+                                    onDismiss = { showSherpaDialog = false }
                                 )
                             }
 

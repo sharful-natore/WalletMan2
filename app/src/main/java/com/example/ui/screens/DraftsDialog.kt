@@ -57,7 +57,7 @@ fun DraftsScratchpadDialog(
     var editDraftMode by remember { mutableStateOf<DraftTransaction?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showOfflineGuideDialog by remember { mutableStateOf(false) }
-    var showVoskDialog by remember { mutableStateOf(false) }
+    var showSherpaDialog by remember { mutableStateOf(false) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -107,17 +107,17 @@ fun DraftsScratchpadDialog(
             try {
                 speechLauncher.launch(intent)
             } catch (e: Exception) {
-                // If Google STT intent fails, fallback to Vosk if downloaded, else show guide
-                if (isVoskDownloaded(context)) {
-                    showVoskDialog = true
+                // If Google STT intent fails, fallback to Sherpa if downloaded, else show guide
+                if (isSherpaDownloaded(context)) {
+                    showSherpaDialog = true
                 } else {
                     showOfflineGuideDialog = true
                 }
             }
         } else {
-            // Offline Mode - Use Vosk
-            if (isVoskDownloaded(context)) {
-                showVoskDialog = true
+            // Offline Mode - Use Sherpa
+            if (isSherpaDownloaded(context)) {
+                showSherpaDialog = true
             } else {
                 showOfflineGuideDialog = true
             }
@@ -145,13 +145,13 @@ fun DraftsScratchpadDialog(
             )
         }
 
-        if (showVoskDialog) {
-            VoskSpeechInputDialog(
+        if (showSherpaDialog) {
+            SherpaSpeechInputDialog(
                 isBn = (language == AppLanguage.BN),
                 onResult = { text ->
                     noteText = text
                 },
-                onDismiss = { showVoskDialog = false }
+                onDismiss = { showSherpaDialog = false }
             )
         }
 
