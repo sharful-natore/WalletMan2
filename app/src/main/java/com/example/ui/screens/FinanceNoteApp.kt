@@ -6033,7 +6033,16 @@ fun AppLockOverlay(
     onUnlock: () -> Unit
 ) {
     val context = LocalContext.current
-    val activity = context as? androidx.fragment.app.FragmentActivity
+    val activity = run {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is androidx.fragment.app.FragmentActivity) {
+                return@run ctx
+            }
+            ctx = ctx.baseContext
+        }
+        null
+    }
 
     var showPinFallback by remember { mutableStateOf(!com.example.util.BiometricHelper.isBiometricAvailable(context)) }
     var enteredPin by remember { mutableStateOf("") }
@@ -14530,7 +14539,16 @@ fun SettingsScreen(
                     Switch(
                         checked = isBiometricEnabled,
                         onCheckedChange = { enable ->
-                            val fragmentActivity = context as? androidx.fragment.app.FragmentActivity
+                            val fragmentActivity = run {
+                                var ctx = context
+                                while (ctx is android.content.ContextWrapper) {
+                                    if (ctx is androidx.fragment.app.FragmentActivity) {
+                                        return@run ctx
+                                    }
+                                    ctx = ctx.baseContext
+                                }
+                                null
+                            }
                             if (enable) {
                                 if (fragmentActivity == null) {
                                     viewModel.triggerCustomNotification(
