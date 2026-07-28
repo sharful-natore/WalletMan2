@@ -17589,7 +17589,7 @@ fun AnimatedAppLogo(
     val logoScale = remember { androidx.compose.animation.core.Animatable(0.92f) }
 
     LaunchedEffect(Unit) {
-        // Step 1: Arrow draws from start to end (450ms)
+        // Step 1: Purple Arrow sweeps along its curve from start to tip
         arrowProgress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
@@ -17597,35 +17597,36 @@ fun AnimatedAppLogo(
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
-        // Step 2: Bar 1 (Green) rises from bottom to top
+        // Step 2: Green Bar (Bar 1) rises from bottom to top
         bar1Progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 300,
+                durationMillis = 280,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
-        // Step 3: Bar 2 (Orange) rises from bottom to top
+        // Step 3: Orange Bar (Bar 2) rises from bottom to top
         bar2Progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 300,
+                durationMillis = 280,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
-        // Step 4: Bar 3 (Blue) rises from bottom to top
+        // Step 4: Blue Bar (Bar 3) rises from bottom to top
         bar3Progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 300,
+                durationMillis = 280,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
-        // Step 5: Gentle spring bounce settle
+        // Step 5: Gentle spring bounce settle for complete logo
         logoScale.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.spring(
-                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
             )
         )
     }
@@ -17641,22 +17642,30 @@ fun AnimatedAppLogo(
         val w = size.width
         val h = size.height
 
-        // 1. Arrow / Background Layer
+        // White circle background (solid, non-clipping)
+        drawCircle(
+            color = Color.White,
+            radius = w * 0.49f,
+            center = androidx.compose.ui.geometry.Offset(w / 2f, h / 2f)
+        )
+
+        // 1. Purple Arrow & Arc Layer (Sweeps along curve from start to tip)
         if (arrowProgress.value >= 1f) {
             with(painterArrow) { draw(size) }
         } else if (arrowProgress.value > 0f) {
             val sweepPath = androidx.compose.ui.graphics.Path().apply {
                 val cx = w / 2f
                 val cy = h / 2f
+                val r = Math.max(w, h) * 1.5f
                 moveTo(cx, cy)
                 arcTo(
                     rect = androidx.compose.ui.geometry.Rect(
-                        left = cx - w,
-                        top = cy - h,
-                        right = cx + w,
-                        bottom = cy + h
+                        left = cx - r,
+                        top = cy - r,
+                        right = cx + r,
+                        bottom = cy + r
                     ),
-                    startAngleDegrees = 110f,
+                    startAngleDegrees = 140f,
                     sweepAngleDegrees = 360f * arrowProgress.value,
                     forceMoveTo = false
                 )
@@ -17667,7 +17676,7 @@ fun AnimatedAppLogo(
             }
         }
 
-        // 2. Bar 1 (Green)
+        // 2. Bar 1 (Green: grows upwards from bottom)
         if (bar1Progress.value >= 1f) {
             with(painterBar1) { draw(size) }
         } else if (bar1Progress.value > 0f) {
@@ -17679,7 +17688,7 @@ fun AnimatedAppLogo(
             }
         }
 
-        // 3. Bar 2 (Orange)
+        // 3. Bar 2 (Orange: grows upwards from bottom)
         if (bar2Progress.value >= 1f) {
             with(painterBar2) { draw(size) }
         } else if (bar2Progress.value > 0f) {
@@ -17691,7 +17700,7 @@ fun AnimatedAppLogo(
             }
         }
 
-        // 4. Bar 3 (Blue)
+        // 4. Bar 3 (Blue: grows upwards from bottom)
         if (bar3Progress.value >= 1f) {
             with(painterBar3) { draw(size) }
         } else if (bar3Progress.value > 0f) {
