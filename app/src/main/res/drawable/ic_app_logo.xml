@@ -1,17 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="100dp"
-    android:height="100dp"
-    android:viewportWidth="100"
-    android:viewportHeight="100">
-    <path
-        android:fillColor="#3F8CFF"
-        android:pathData="M50,50m-50,0a50,50 0,1 1,100 0a50,50 0,1 1,-100 0" />
-    <!-- Receipt Long style white icon -->
+    android:width="522dp"
+    android:height="522dp"
+    android:viewportWidth="522.26"
+    android:viewportHeight="522.26">
+    <!-- White Circle Background -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M32,25h36v50l-6,-4l-6,4l-6,-4l-6,4l-6,-4l-6,4z" />
+        android:pathData="M5.13,261.13a256,256 90,1 0,512 0a256,256 90,1 0,-512 0z"/>
+    <!-- Chart Bar 1 (Green) -->
     <path
-        android:fillColor="#3F8CFF"
-        android:pathData="M38,34h24v3h-24zM38,42h24v3h-24zM38,50h16v3h-16zM38,58h24v3h-24z" />
+        android:fillColor="#00C800"
+        android:pathData="M101.5,318.6L156.63,275.92L156.9,158.9L101.42,159.19L101.5,318.6Z"/>
+    <!-- Chart Bar 2 (Orange) -->
+    <path
+        android:fillColor="#FF8A00"
+        android:pathData="M173.07,263.79L196.7,246.07L228.59,259.43L228.12,69.32L173.12,69.31L173.07,263.79Z"/>
+    <!-- Chart Bar 3 (Blue) -->
+    <path
+        android:fillColor="#3082FF"
+        android:pathData="M245.02,266.3L273.59,278.26L299.27,243.05L300.21,101.59L244.71,101.58L245.02,266.3Z"/>
+    <!-- Trend Arc / Arrow (Periwinkle Violet) -->
+    <path
+        android:fillColor="#6C71F6"
+        android:fillType="evenOdd"
+        android:pathData="M311.73,102.18L311.62,129.95C367.75,150.49 407.71,204.48 407.45,267.71C407.13,348.36 341.48,413.47 260.83,413.15C209.54,412.94 164.53,386.32 138.65,346.2L201.57,297.11L290.83,330.96L351.34,247.64L369.59,261.26L377.04,188.3L309.51,217.09L327.16,230.94L279.48,295.81L197.89,262.72L124.21,317.16C124.17,317.04 124.26,317.29 124.21,317.16L102.23,333.41C106.08,342.65 110.95,351.32 116.28,359.67L117.78,362.48L118.08,362.25C148.85,408.48 201.02,439.28 260.73,439.52C355.94,439.91 433.44,363.03 433.82,267.82C434.13,189.85 382.66,123.77 311.73,102.18Z"/>
 </vector>

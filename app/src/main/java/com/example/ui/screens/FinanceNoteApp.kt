@@ -17336,21 +17336,66 @@ fun ChartSection(
 }
 
 @Composable
+fun ModernSplashProgressIndicator(
+    modifier: Modifier = Modifier,
+    size: Dp = 46.dp,
+    strokeWidth: Dp = 3.5.dp
+) {
+    val primaryColor = FintechBlue
+    val infiniteTransition = rememberInfiniteTransition(label = "ModernProgress")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Rotation"
+    )
+
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            val canvasSize = size.toPx()
+            val strokePx = strokeWidth.toPx()
+            val arcSize = canvasSize - strokePx
+
+            // Subtle background track ring
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.08f),
+                radius = arcSize / 2f,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx)
+            )
+
+            // Dynamic rotating gradient arc
+            rotate(rotation) {
+                drawArc(
+                    brush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                        colors = listOf(
+                            primaryColor.copy(alpha = 0.05f),
+                            primaryColor,
+                            Color(0xFF00C853)
+                        )
+                    ),
+                    startAngle = 0f,
+                    sweepAngle = 270f,
+                    useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = strokePx,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun SplashScreen(isDark: Boolean) {
     // Force white background as requested
     val bgColor = Color.White
-    
-    // Pulse animation for the logo, optimized within bounds (0.85f to 1.0f) to prevent clipping
-    val infiniteTransition = rememberInfiniteTransition(label = "Pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.00f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "LogoScale"
-    )
 
     BoxWithConstraints(
         modifier = Modifier
@@ -17358,7 +17403,7 @@ fun SplashScreen(isDark: Boolean) {
             .background(bgColor)
     ) {
         val screenWidth = maxWidth
-        // App Logo with pulsing animation, positioned slightly above center
+        // App Logo without pulse animation, positioned slightly above center
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -17370,24 +17415,18 @@ fun SplashScreen(isDark: Boolean) {
                 contentDescription = "App Logo",
                 contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                 modifier = Modifier
-                    .size(screenWidth * 0.45f) // Optimized size with safe padding to ensure no clipping
+                    .size(screenWidth * 0.45f)
                     .padding(12.dp)
-                    .graphicsLayer(
-                        scaleX = scale,
-                        scaleY = scale
-                    )
             )
         }
 
         // Modern loading circle at the bottom
-        CircularProgressIndicator(
+        ModernSplashProgressIndicator(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 80.dp)
-                .size(44.dp),
-            color = FintechBlue,
-            strokeWidth = 4.dp,
-            trackColor = Color.Black.copy(alpha = 0.05f)
+                .padding(bottom = 80.dp),
+            size = 46.dp,
+            strokeWidth = 3.5.dp
         )
     }
 }
@@ -18216,20 +18255,12 @@ fun LoginScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            modifier = Modifier.size(64.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = FintechBlue.copy(alpha = 0.15f)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.AccountBalanceWallet,
-                                    contentDescription = null,
-                                    tint = FintechBlue,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-                        }
+                        Image(
+                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.app_logo_new),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.size(72.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "Finance Note অ্যাপটি ব্যবহার করতে আপনার একাউন্ট লগিন করুন" else "Please login to your account to use Finance Note app",
