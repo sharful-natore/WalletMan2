@@ -42,8 +42,6 @@ secretsGradlePlugin = "2.0.1"
 googleServices = "4.5.0"
 googleFonts = "1.7.5"
 ucrop = "2.2.8"
-vosk = "0.3.38"
-sherpaOnnx = "v1.13.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -101,8 +99,6 @@ firebase-appcheck-recaptcha = { group = "com.google.firebase", name = "firebase-
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 androidx-compose-ui-text-google-fonts = { group = "androidx.compose.ui", name = "ui-text-google-fonts", version.ref = "googleFonts" }
 ucrop = { group = "com.github.yalantis", name = "ucrop", version.ref = "ucrop" }
-vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
-sherpa-onnx = { group = "com.github.k2-fsa", name = "sherpa-onnx", version.ref = "sherpaOnnx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

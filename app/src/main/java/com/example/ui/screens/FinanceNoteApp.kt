@@ -6043,11 +6043,6 @@ fun DashboardScreen(
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
 
-    var showWifiVoiceBanner by remember {
-        mutableStateOf(shouldShowOfflineVoicePrompt(context))
-    }
-    var showOfflineVoiceGuideOnDashboard by remember { mutableStateOf(false) }
-
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
         selectedTxIds = emptySet()
     }
@@ -6529,13 +6524,6 @@ fun DashboardScreen(
                 }
             }
 
-            if (showOfflineVoiceGuideOnDashboard) {
-                OfflineVoiceGuideDialog(
-                    isBn = (language == AppLanguage.BN),
-                    onDismiss = { showOfflineVoiceGuideOnDashboard = false }
-                )
-            }
-
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -6543,22 +6531,6 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 90.dp)
             ) {
-                if (showWifiVoiceBanner) {
-                    item {
-                        OfflineVoiceWifiBanner(
-                            isBn = (language == AppLanguage.BN),
-                            onSetupClick = {
-                                showOfflineVoiceGuideOnDashboard = true
-                                showWifiVoiceBanner = false
-                            },
-                            onDismiss = {
-                                snoozeVoicePackPrompt(context)
-                                showWifiVoiceBanner = false
-                            },
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
-                }
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
             FintechGradientCard(
@@ -14869,190 +14841,6 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-
-        // --- 9.5 OFFLINE VOICE INPUT CARD ---
-        var isOfflineVoiceConfigured by remember {
-            mutableStateOf(
-                context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
-                    .getBoolean("offline_voice_pack_configured", false)
-            )
-        }
-        var isModelDownloaded by remember { mutableStateOf(isSherpaDownloaded(context)) }
-        var showOfflineGuideFromSettings by remember { mutableStateOf(false) }
-
-        if (showOfflineGuideFromSettings) {
-            OfflineVoiceGuideDialog(
-                isBn = (language == AppLanguage.BN),
-                onDismiss = {
-                    showOfflineGuideFromSettings = false
-                    isOfflineVoiceConfigured = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
-                        .getBoolean("offline_voice_pack_configured", false)
-                    isModelDownloaded = isSherpaDownloaded(context)
-                }
-            )
-        }
-
-        SettingCategory(
-            title = if (language == AppLanguage.BN) "অফলাইন ভয়েস সেটিংস" else "Offline Voice Settings",
-            isDark = isDark,
-            icon = Icons.Rounded.Mic,
-            initiallyExpanded = filter == "offline_voice"
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = if (language == AppLanguage.BN)
-                        "ইন্টারনেট বা ওয়াইফাই সংযোগ ছাড়া অফলাইনে মুখে বলে খসড়া বা লেনদেন রেকর্ড করার জন্য এটি কাস্টমাইজ করুন।"
-                    else
-                        "Configure settings to record transactions and draft notes offline by voice without active internet.",
-                    fontSize = 13.sp,
-                    color = if (isDark) Color.Gray else Color(0xFF64748B)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(Color(0xFFD97706).copy(alpha = 0.12f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Mic,
-                            contentDescription = null,
-                            tint = Color(0xFFD97706),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (language == AppLanguage.BN) "বাংলা ভয়েস প্যাক ইনস্টলড" else "Bangla Voice Pack Installed",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isDark) Color.White else Color(0xFF1E293B)
-                        )
-                        Text(
-                            text = if (language == AppLanguage.BN) "ফোনে অফলাইন বাংলা ভয়েস প্যাক নামানো হয়ে থাকলে এটি চালু করুন" else "Enable this if you have downloaded the Bengali offline voice package on your phone",
-                            fontSize = 11.sp,
-                            color = if (isDark) Color.Gray else Color(0xFF64748B),
-                            lineHeight = 15.sp
-                        )
-                    }
-                    Switch(
-                        checked = isOfflineVoiceConfigured,
-                        onCheckedChange = { checked ->
-                            isOfflineVoiceConfigured = checked
-                            context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
-                                .edit()
-                                .putBoolean("offline_voice_pack_configured", checked)
-                                .apply()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFFD97706),
-                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
-                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
-                        )
-                    )
-                }
-
-                HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
-
-                // --- Sherpa Offline Model Setup Status Indicator ---
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isModelDownloaded) {
-                        if (isDark) Color(0xFF065F46).copy(alpha = 0.2f) else Color(0xFFD1FAE5)
-                    } else {
-                        if (isDark) Color(0xFF78350F).copy(alpha = 0.2f) else Color(0xFFFEF3C7)
-                    },
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isModelDownloaded) {
-                            if (isDark) Color(0xFF059669).copy(alpha = 0.4f) else Color(0xFF10B981).copy(alpha = 0.3f)
-                        } else {
-                            if (isDark) Color(0xFFD97706).copy(alpha = 0.4f) else Color(0xFFF59E0B).copy(alpha = 0.3f)
-                        }
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isModelDownloaded) Icons.Rounded.CheckCircle else Icons.Rounded.Warning,
-                            contentDescription = null,
-                            tint = if (isModelDownloaded) Color(0xFF10B981) else Color(0xFFD97706),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isModelDownloaded) {
-                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা আছে" else "Sherpa Offline Bangla Voice Model Set Up"
-                                } else {
-                                    if (language == AppLanguage.BN) "বাংলা অফলাইন ভয়েস মডেল সেটআপ করা নেই" else "Sherpa Offline Bangla Voice Model Not Set Up"
-                                },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = if (isModelDownloaded) {
-                                    if (isDark) Color(0xFF34D399) else Color(0xFF065F46)
-                                } else {
-                                    if (isDark) Color(0xFFFBBF24) else Color(0xFF78350F)
-                                }
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isModelDownloaded) {
-                                    if (language == AppLanguage.BN) "আপনি ইন্টারনেট ছাড়াই সম্পূর্ণ অফলাইনে দ্রুততম গতিতে মুখে বলে খসড়া করতে পারবেন।" else "You can speak to type drafts fully offline at maximum speed without internet connection."
-                                } else {
-                                    if (language == AppLanguage.BN) "অফলাইনে ইন্টারনেট ছাড়া ভয়েস ইনপুটের সুবিধা পেতে ভয়েস মডেলটি ডাউনলোড করুন (৮৩ এমবি)।" else "Download the offline voice pack (83 MB) to use speech recognition without internet."
-                                },
-                                fontSize = 11.sp,
-                                color = if (isDark) Color.LightGray else Color(0xFF334155),
-                                lineHeight = 15.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Button(
-                    onClick = { showOfflineGuideFromSettings = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isModelDownloaded) Color(0xFF475569) else Color(0xFFD97706)
-                    ),
-                    contentPadding = PaddingValues(12.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isModelDownloaded) Icons.Rounded.CheckCircle else Icons.Rounded.Download,
-                        contentDescription = null,
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isModelDownloaded) {
-                            if (language == AppLanguage.BN) "ভয়েস গাইড ও সেটআপ পুনরায় দেখুন" else "Revisit Voice Guide & Setup"
-                        } else {
-                            if (language == AppLanguage.BN) "ভয়েস মডেল ডাউনলোড ও সেটআপ করুন" else "Download & Setup Voice Model"
-                        },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
                 }
             }
         }

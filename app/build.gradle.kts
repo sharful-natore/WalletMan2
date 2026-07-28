@@ -24,10 +24,6 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     
-    ndk {
-        abiFilters.addAll(setOf("arm64-v8a"))
-    }
-    
     val configFile = file("${rootDir}/firebase-applet-config.json")
     var oauthClientId = ""
     var projectId = ""
@@ -134,7 +130,6 @@ dependencies {
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   implementation(libs.play.services.auth)
-  implementation(libs.sherpa.onnx)
   
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.test.core)
