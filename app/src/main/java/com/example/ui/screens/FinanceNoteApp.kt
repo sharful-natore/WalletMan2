@@ -14531,23 +14531,55 @@ fun SettingsScreen(
                         checked = isBiometricEnabled,
                         onCheckedChange = { enable ->
                             val fragmentActivity = context as? androidx.fragment.app.FragmentActivity
-                            if (enable && fragmentActivity != null) {
-                                com.example.util.BiometricHelper.showBiometricPrompt(
-                                    activity = fragmentActivity,
-                                    title = if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি সক্রিয় করুন" else "Enable Biometric Security",
-                                    subtitle = if (language == AppLanguage.BN) "ফিঙ্গারপ্রিন্ট বা ফেস আইডি দিয়ে নিশ্চিত করুন" else "Confirm with Fingerprint or Face ID",
-                                    onSuccess = {
-                                        viewModel.setBiometricEnabled(context, true)
-                                        viewModel.triggerCustomNotification(
-                                            if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি সফলভাবে চালু করা হয়েছে!" else "Biometric security successfully enabled!",
-                                            isSuccess = true,
-                                            type = "SUCCESS"
+                            if (enable) {
+                                if (fragmentActivity == null) {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "সিস্টেম ত্রুটির কারণে বায়োমেট্রিক চালু করা সম্ভব হলোনা" else "Could not enable biometric due to a system error",
+                                        isSuccess = false,
+                                        type = "ERROR"
+                                    )
+                                } else {
+                                    val status = com.example.util.BiometricHelper.getBiometricStatus(context)
+                                    if (status != com.example.util.BiometricHelper.BiometricStatus.AVAILABLE) {
+                                        val errorMsg = when (status) {
+                                            com.example.util.BiometricHelper.BiometricStatus.NO_HARDWARE ->
+                                                if (language == AppLanguage.BN) "ডিভাইসে কোনো বায়োমেট্রিক হার্ডওয়্যার নেই, তাই বায়োমেট্রিক সিকিউরিটি চালু করা সম্ভব হলোনা" else "Device lacks biometric hardware, so biometric security cannot be enabled"
+                                            com.example.util.BiometricHelper.BiometricStatus.NOT_ENROLLED ->
+                                                if (language == AppLanguage.BN) "ফোনের সেটিংসে কোনো বায়োমেট্রিক (ফিঙ্গারপ্রিন্ট/ফেস) যোগ করা নেই, তাই চালু করা সম্ভব হলোনা" else "No biometric (fingerprint/face) enrolled in settings, so it cannot be enabled"
+                                            else ->
+                                                if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি বর্তমানে এই ডিভাইসে কাজ করছেনা, তাই চালু করা সম্ভব হলোনা" else "Biometric security is currently unavailable on this device, so it cannot be enabled"
+                                        }
+                                        viewModel.triggerCustomNotification(errorMsg, isSuccess = false, type = "ERROR")
+                                    } else {
+                                        com.example.util.BiometricHelper.showBiometricPrompt(
+                                            activity = fragmentActivity,
+                                            title = if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি সক্রিয় করুন" else "Enable Biometric Security",
+                                            subtitle = if (language == AppLanguage.BN) "ফিঙ্গারপ্রিন্ট বা ফেস আইডি দিয়ে নিশ্চিত করুন" else "Confirm with Fingerprint or Face ID",
+                                            onSuccess = {
+                                                viewModel.setBiometricEnabled(context, true)
+                                                viewModel.triggerCustomNotification(
+                                                    if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি সফলভাবে চালু করা হয়েছে!" else "Biometric security successfully enabled!",
+                                                    isSuccess = true,
+                                                    type = "SUCCESS"
+                                                )
+                                            },
+                                            onUsePinFallback = {
+                                                viewModel.triggerCustomNotification(
+                                                    if (language == AppLanguage.BN) "বায়োমেট্রিক প্রমাণীকরণ বাতিল বা ব্যর্থ হয়েছে, তাই চালু করা সম্ভব হলোনা" else "Biometric verification cancelled or failed, so it could not be enabled",
+                                                    isSuccess = false,
+                                                    type = "ERROR"
+                                                )
+                                            },
+                                            onError = { err ->
+                                                viewModel.triggerCustomNotification(
+                                                    if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি চালু করা সম্ভব হলোনা: $err" else "Could not enable biometric security: $err",
+                                                    isSuccess = false,
+                                                    type = "ERROR"
+                                                )
+                                            }
                                         )
-                                    },
-                                    onError = { err ->
-                                        viewModel.triggerCustomNotification(err, isSuccess = false, type = "ERROR")
                                     }
-                                )
+                                }
                             } else {
                                 viewModel.setBiometricEnabled(context, enable)
                                 if (!enable) {
@@ -18348,13 +18380,13 @@ fun AnimatedAppLogo(
     // 2. Unconditional live equalizer animations using infinite transition with varying properties
     val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "LiveEqualizer")
 
-    // Bar 1 (Green) live scale between 0.45f and 1.25f (smooth, medium speed)
+    // Bar 1 (Green) live scale between 0.45f and 1.25f (smooth, slower speed)
     val bar1LiveValue by infiniteTransition.animateFloat(
         initialValue = 0.45f,
         targetValue = 1.25f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             animation = androidx.compose.animation.core.tween(
-                durationMillis = 480,
+                durationMillis = 1400,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             ),
             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
@@ -18362,13 +18394,13 @@ fun AnimatedAppLogo(
         label = "Bar1"
     )
 
-    // Bar 2 (Orange) live scale between 0.35f and 1.35f (smooth, faster speed)
+    // Bar 2 (Orange) live scale between 0.35f and 0.95f (smooth, slower speed)
     val bar2LiveValue by infiniteTransition.animateFloat(
         initialValue = 0.35f,
-        targetValue = 1.35f,
+        targetValue = 0.95f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             animation = androidx.compose.animation.core.tween(
-                durationMillis = 360,
+                durationMillis = 1100,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             ),
             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
@@ -18382,7 +18414,7 @@ fun AnimatedAppLogo(
         targetValue = 1.15f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
             animation = androidx.compose.animation.core.tween(
-                durationMillis = 580,
+                durationMillis = 1700,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             ),
             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
