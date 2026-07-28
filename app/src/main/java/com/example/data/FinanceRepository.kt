@@ -76,7 +76,8 @@ class FinanceRepository(private val financeDao: FinanceDao) {
             workspaces = financeDao.getAllWorkspacesList(),
             trashItems = financeDao.getAllTrashItemsList(),
             monthlyBudgets = financeDao.getAllMonthlyBudgetsAllWorkspacesList(),
-            draftTransactions = financeDao.getAllDraftTransactionsList()
+            draftTransactions = financeDao.getAllDraftTransactionsList(),
+            autoEntries = financeDao.getAllAutoEntriesAllWorkspacesList()
         )
     }
 
@@ -87,14 +88,16 @@ class FinanceRepository(private val financeDao: FinanceDao) {
                 backup.savingsTransactions.isEmpty() &&
                 backup.workspaces.isEmpty() &&
                 backup.monthlyBudgets.isEmpty() &&
-                backup.draftTransactions.isEmpty()
+                backup.draftTransactions.isEmpty() &&
+                backup.autoEntries.isEmpty()
         
         val currentLocalData = getBackupData()
         val isLocalEmpty = currentLocalData.persons.isEmpty() &&
                 currentLocalData.transactions.isEmpty() &&
                 currentLocalData.savingsGoals.isEmpty() &&
                 currentLocalData.savingsTransactions.isEmpty() &&
-                currentLocalData.draftTransactions.isEmpty()
+                currentLocalData.draftTransactions.isEmpty() &&
+                currentLocalData.autoEntries.isEmpty()
 
         // Protect local database from being wiped out by a blank or corrupt cloud backup
         if (isBackupEmpty && !isLocalEmpty) {
@@ -109,6 +112,7 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         financeDao.deleteAllTrashItems()
         financeDao.deleteAllMonthlyBudgets()
         financeDao.deleteAllDraftTransactions()
+        financeDao.deleteAllAutoEntries()
 
         if (backup.persons.isNotEmpty()) financeDao.insertPersons(backup.persons)
         if (backup.transactions.isNotEmpty()) financeDao.insertTransactions(backup.transactions)
@@ -129,6 +133,9 @@ class FinanceRepository(private val financeDao: FinanceDao) {
         }
         if (backup.draftTransactions.isNotEmpty()) {
             financeDao.insertDraftTransactions(backup.draftTransactions)
+        }
+        if (backup.autoEntries.isNotEmpty()) {
+            financeDao.insertAutoEntries(backup.autoEntries)
         }
     }
 
@@ -177,5 +184,17 @@ class FinanceRepository(private val financeDao: FinanceDao) {
     suspend fun updateDraftTransaction(draft: DraftTransaction) = financeDao.updateDraftTransaction(draft)
     suspend fun deleteDraftTransaction(id: Int) = financeDao.deleteDraftTransactionById(id)
     suspend fun deleteAllDraftTransactions() = financeDao.deleteAllDraftTransactions()
+
+    // Auto Entries
+    fun getAllAutoEntries(workspaceId: String): Flow<List<AutoEntry>> = financeDao.getAllAutoEntries(workspaceId)
+    suspend fun getAllAutoEntriesList(workspaceId: String): List<AutoEntry> = financeDao.getAllAutoEntriesList(workspaceId)
+    suspend fun getAllAutoEntriesAllWorkspacesList(): List<AutoEntry> = financeDao.getAllAutoEntriesAllWorkspacesList()
+    suspend fun getAutoEntryById(id: Int): AutoEntry? = financeDao.getAutoEntryById(id)
+    suspend fun insertAutoEntry(autoEntry: AutoEntry): Long = financeDao.insertAutoEntry(autoEntry)
+    suspend fun insertAutoEntries(autoEntries: List<AutoEntry>) = financeDao.insertAutoEntries(autoEntries)
+    suspend fun updateAutoEntry(autoEntry: AutoEntry) = financeDao.updateAutoEntry(autoEntry)
+    suspend fun deleteAutoEntry(id: Int) = financeDao.deleteAutoEntryById(id)
+    suspend fun deleteAllAutoEntriesByWorkspace(workspaceId: String) = financeDao.deleteAllAutoEntriesByWorkspace(workspaceId)
+    suspend fun deleteAllAutoEntries() = financeDao.deleteAllAutoEntries()
 }
 

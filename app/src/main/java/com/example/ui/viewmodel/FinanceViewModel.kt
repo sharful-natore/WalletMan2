@@ -4,6 +4,8 @@ import com.example.BuildConfig
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
 import android.net.Uri
 import androidx.core.content.ContextCompat
 import android.Manifest
@@ -422,6 +424,203 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val monthlyBudgets: StateFlow<List<com.example.data.MonthlyBudget>> = _currentWorkspaceId
         .flatMapLatest { workspaceId -> repository.getAllMonthlyBudgets(workspaceId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val autoEntries: StateFlow<List<com.example.data.AutoEntry>> = _currentWorkspaceId
+        .flatMapLatest { workspaceId -> repository.getAllAutoEntries(workspaceId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _dueAutoEntriesPrompt = MutableStateFlow<List<com.example.data.AutoEntry>>(emptyList())
+    val dueAutoEntriesPrompt: StateFlow<List<com.example.data.AutoEntry>> = _dueAutoEntriesPrompt.asStateFlow()
+
+    fun isAutoEntryDue(entry: com.example.data.AutoEntry, nowTime: Long = System.currentTimeMillis()): Boolean {
+        if (!entry.isEnabled) return false
+
+        val nowCal = java.util.Calendar.getInstance().apply { timeInMillis = nowTime }
+        val nowYear = nowCal.get(java.util.Calendar.YEAR)
+        val nowMonth = nowCal.get(java.util.Calendar.MONTH) + 1
+        val nowDay = nowCal.get(java.util.Calendar.DAY_OF_MONTH)
+        val nowWeek = nowCal.get(java.util.Calendar.WEEK_OF_YEAR)
+        val nowDayOfWeek = when (nowCal.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> 1
+            java.util.Calendar.TUESDAY -> 2
+            java.util.Calendar.WEDNESDAY -> 3
+            java.util.Calendar.THURSDAY -> 4
+            java.util.Calendar.FRIDAY -> 5
+            java.util.Calendar.SATURDAY -> 6
+            java.util.Calendar.SUNDAY -> 7
+            else -> 1
+        }
+
+        if (entry.lastExecutedTime > 0) {
+            val lastCal = java.util.Calendar.getInstance().apply { timeInMillis = entry.lastExecutedTime }
+            val lastYear = lastCal.get(java.util.Calendar.YEAR)
+            val lastMonth = lastCal.get(java.util.Calendar.MONTH) + 1
+            val lastDay = lastCal.get(java.util.Calendar.DAY_OF_MONTH)
+            val lastWeek = lastCal.get(java.util.Calendar.WEEK_OF_YEAR)
+
+            when (entry.frequency) {
+                "DAILY" -> {
+                    if (lastYear == nowYear && lastMonth == nowMonth && lastDay == nowDay) return false
+                }
+                "WEEKLY" -> {
+                    if (lastYear == nowYear && lastWeek == nowWeek) return false
+                }
+                "MONTHLY" -> {
+                    if (lastYear == nowYear && lastMonth == nowMonth) return false
+                }
+                "YEARLY" -> {
+                    if (lastYear == nowYear) return false
+                }
+            }
+        }
+
+        return when (entry.frequency) {
+            "DAILY" -> true
+            "WEEKLY" -> nowDayOfWeek >= entry.dayOfWeek
+            "MONTHLY" -> nowDay >= entry.dayOfMonth
+            "YEARLY" -> {
+                if (nowMonth > entry.monthOfYear) true
+                else if (nowMonth == entry.monthOfYear) nowDay >= entry.dayOfMonth
+                else false
+            }
+            else -> true
+        }
+    }
+
+    private fun sendAutoEntryNotification(context: Context, title: String, message: String) {
+        try {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channelId = "finance_auto_entry_notifications"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    if (_language.value == AppLanguage.BN) "অটো এন্ট্রি নোটিফিকেশন" else "Auto Entry Notifications",
+                    NotificationManager.IMPORTANCE_HIGH
+                )
+                notificationManager.createNotificationChannel(channel)
+            }
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                200,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val builder = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(R.drawable.app_logo_new)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+
+            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), builder.build())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun checkAndProcessAutoEntries(context: Context) {
+        viewModelScope.launch {
+            val workspaceId = _currentWorkspaceId.value
+            val entries = repository.getAllAutoEntriesList(workspaceId)
+            val duePrompts = mutableListOf<com.example.data.AutoEntry>()
+            val now = System.currentTimeMillis()
+
+            for (entry in entries) {
+                if (!entry.isEnabled) continue
+                if (isAutoEntryDue(entry, now)) {
+                    if (entry.askBeforeAdding) {
+                        duePrompts.add(entry)
+                    } else {
+                        val tx = com.example.data.Transaction(
+                            amount = entry.amount,
+                            type = entry.type,
+                            category = entry.category,
+                            timestamp = now,
+                            note = if (entry.note.isNotBlank()) "${entry.title} (${entry.note})" else entry.title,
+                            workspaceId = workspaceId,
+                            subType = entry.subType ?: "CASH"
+                        )
+                        repository.insertTransaction(tx)
+                        repository.updateAutoEntry(entry.copy(lastExecutedTime = now))
+                        sendAutoEntryNotification(
+                            context = context,
+                            title = if (_language.value == AppLanguage.BN) "অটো এন্ট্রি সফলভাবে যুক্ত হয়েছে" else "Auto Entry Added Successfully",
+                            message = if (_language.value == AppLanguage.BN) "'${entry.title}' (৳${entry.amount.toInt()}) স্বয়ংক্রিয়ভাবে যোগ করা হয়েছে।" else "'${entry.title}' (৳${entry.amount.toInt()}) auto added."
+                        )
+                        onLocalDatabaseChanged()
+                    }
+                }
+            }
+
+            _dueAutoEntriesPrompt.value = duePrompts
+            if (duePrompts.isNotEmpty()) {
+                val first = duePrompts.first()
+                sendAutoEntryNotification(
+                    context = context,
+                    title = if (_language.value == AppLanguage.BN) "অটো এন্ট্রি অনুমোদন রিমাইন্ডার" else "Auto Entry Approval Reminder",
+                    message = if (_language.value == AppLanguage.BN) "${duePrompts.size}টি লেনদেন নিশ্চিত করার অপেক্ষা করছে: '${first.title}' (৳${first.amount.toInt()})" else "${duePrompts.size} entry waiting for confirmation: '${first.title}' (৳${first.amount.toInt()})"
+                )
+            }
+        }
+    }
+
+    fun confirmAutoEntry(context: Context, entry: com.example.data.AutoEntry, customAmount: Double? = null, customDate: Long? = null) {
+        viewModelScope.launch {
+            val now = customDate ?: System.currentTimeMillis()
+            val amount = customAmount ?: entry.amount
+            val tx = com.example.data.Transaction(
+                amount = amount,
+                type = entry.type,
+                category = entry.category,
+                timestamp = now,
+                note = if (entry.note.isNotBlank()) "${entry.title} (${entry.note})" else entry.title,
+                workspaceId = _currentWorkspaceId.value,
+                subType = entry.subType ?: "CASH"
+            )
+            repository.insertTransaction(tx)
+            repository.updateAutoEntry(entry.copy(lastExecutedTime = System.currentTimeMillis()))
+            _dueAutoEntriesPrompt.value = _dueAutoEntriesPrompt.value.filter { it.id != entry.id }
+            onLocalDatabaseChanged()
+            Toast.makeText(
+                context,
+                if (_language.value == AppLanguage.BN) "'${entry.title}' সফলভাবে লেনদেনে যুক্ত করা হয়েছে!" else "'${entry.title}' added to transactions!",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    fun skipAutoEntry(entry: com.example.data.AutoEntry) {
+        viewModelScope.launch {
+            repository.updateAutoEntry(entry.copy(lastExecutedTime = System.currentTimeMillis()))
+            _dueAutoEntriesPrompt.value = _dueAutoEntriesPrompt.value.filter { it.id != entry.id }
+        }
+    }
+
+    fun insertAutoEntry(entry: com.example.data.AutoEntry) {
+        viewModelScope.launch {
+            repository.insertAutoEntry(entry.copy(workspaceId = _currentWorkspaceId.value))
+            onLocalDatabaseChanged()
+        }
+    }
+
+    fun updateAutoEntry(entry: com.example.data.AutoEntry) {
+        viewModelScope.launch {
+            repository.updateAutoEntry(entry)
+            onLocalDatabaseChanged()
+        }
+    }
+
+    fun deleteAutoEntry(id: Int) {
+        viewModelScope.launch {
+            repository.deleteAutoEntry(id)
+            onLocalDatabaseChanged()
+        }
+    }
 
     fun setMonthlyBudget(year: Int, month: Int, income: Double?, expense: Double?, savings: Double?) {
         viewModelScope.launch {

@@ -244,5 +244,36 @@ interface FinanceDao {
 
     @Query("DELETE FROM draft_transactions")
     suspend fun deleteAllDraftTransactions()
+
+    // Auto Entries
+    @Query("SELECT * FROM auto_entries WHERE workspaceId = :workspaceId ORDER BY id DESC")
+    fun getAllAutoEntries(workspaceId: String): Flow<List<AutoEntry>>
+
+    @Query("SELECT * FROM auto_entries WHERE workspaceId = :workspaceId ORDER BY id DESC")
+    suspend fun getAllAutoEntriesList(workspaceId: String): List<AutoEntry>
+
+    @Query("SELECT * FROM auto_entries")
+    suspend fun getAllAutoEntriesAllWorkspacesList(): List<AutoEntry>
+
+    @Query("SELECT * FROM auto_entries WHERE id = :id LIMIT 1")
+    suspend fun getAutoEntryById(id: Int): AutoEntry?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAutoEntry(autoEntry: AutoEntry): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAutoEntries(autoEntries: List<AutoEntry>)
+
+    @Update
+    suspend fun updateAutoEntry(autoEntry: AutoEntry)
+
+    @Query("DELETE FROM auto_entries WHERE id = :id")
+    suspend fun deleteAutoEntryById(id: Int)
+
+    @Query("DELETE FROM auto_entries WHERE workspaceId = :workspaceId")
+    suspend fun deleteAllAutoEntriesByWorkspace(workspaceId: String)
+
+    @Query("DELETE FROM auto_entries")
+    suspend fun deleteAllAutoEntries()
 }
 

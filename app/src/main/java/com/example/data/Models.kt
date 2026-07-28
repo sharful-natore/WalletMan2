@@ -94,6 +94,7 @@ data class FinanceBackup(
     val profileAddress: String = "",
     val profilePhotoUri: String? = null,
     val draftTransactions: List<DraftTransaction> = emptyList(),
+    val autoEntries: List<AutoEntry> = emptyList(),
     val customGradientsConfigSerialized: String? = null,
     val staticGradientOverridesSerialized: String? = null,
     val chartGradientsSerialized: String? = null,
@@ -148,6 +149,27 @@ data class DraftTransaction(
     val category: String? = null,
     val note: String,
     val timestamp: Long = System.currentTimeMillis(),
+    val workspaceId: String = "default"
+)
+
+@Entity(tableName = "auto_entries")
+@JsonClass(generateAdapter = true)
+data class AutoEntry(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val title: String,
+    val amount: Double,
+    val type: String, // "EXPENSE", "INCOME", "LEND", "BORROW"
+    val category: String,
+    val note: String = "",
+    val subType: String? = "CASH", // "CASH", "CREDIT"
+    val frequency: String, // "DAILY", "WEEKLY", "MONTHLY", "YEARLY"
+    val timeOfDay: String = "09:00", // HH:mm format
+    val dayOfWeek: Int = 1, // 1 = Monday ... 7 = Sunday
+    val dayOfMonth: Int = 1, // 1..31
+    val monthOfYear: Int = 1, // 1..12
+    val askBeforeAdding: Boolean = true, // true = Ask Before Adding, false = Auto Add
+    val isEnabled: Boolean = true,
+    val lastExecutedTime: Long = 0L,
     val workspaceId: String = "default"
 )
 

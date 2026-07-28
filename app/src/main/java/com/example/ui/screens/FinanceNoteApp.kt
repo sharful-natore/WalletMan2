@@ -2164,7 +2164,8 @@ fun FinanceNoteApp(
     var showSplash by remember { mutableStateOf(true) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadProfile(context)
-        kotlinx.coroutines.delay(2000)
+        viewModel.checkAndProcessAutoEntries(context)
+        kotlinx.coroutines.delay(2800)
         showSplash = false
     }
 
@@ -2566,6 +2567,7 @@ fun FinanceNoteApp(
     var showProfileSetup by remember { mutableStateOf(false) }
     var showEnhancedProfileMenu by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
+    var showAutoEntryScreen by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
     var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -2923,7 +2925,20 @@ fun FinanceNoteApp(
             onDrafts = {
                 showEnhancedProfileMenu = false
                 showDraftsDialog = true
+            },
+            onAutoEntry = {
+                showEnhancedProfileMenu = false
+                showAutoEntryScreen = true
             }
+        )
+    }
+
+    if (showAutoEntryScreen) {
+        com.example.ui.screens.AutoEntryScreen(
+            viewModel = viewModel,
+            language = language,
+            isDark = isDarkTheme,
+            onDismiss = { showAutoEntryScreen = false }
         )
     }
 
@@ -6032,6 +6047,8 @@ fun DashboardScreen(
     onExportRequest: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val dueAutoEntriesPrompt by viewModel?.dueAutoEntriesPrompt?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyList()) }
+    var editingPromptEntry by remember { mutableStateOf<com.example.data.AutoEntry?>(null) }
     val workspaces by viewModel?.workspaces?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val currentWorkspace by viewModel?.currentWorkspace?.collectAsState(initial = com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) ?: remember { mutableStateOf(com.example.data.Workspace(id = "default", name = "ব্যক্তিগত")) }
     val workspaceStatsList by viewModel?.workspaceStatsList?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -6531,6 +6548,127 @@ fun DashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 90.dp)
             ) {
+        if (dueAutoEntriesPrompt.isNotEmpty()) {
+            item {
+                val prompt = dueAutoEntriesPrompt.first()
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDark) Color(0xFF2A2111) else Color(0xFFFFFBEB)
+                    ),
+                    border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFF59E0B).copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Autorenew,
+                                        contentDescription = null,
+                                        tint = Color(0xFFF59E0B),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "অটো এন্ট্রি অনুমোদন প্রয়োজন (Ask Before Adding)" else "Auto Entry Pending Approval",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFD97706)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${prompt.title} - ${formatCurrency(prompt.amount, language)}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = if (isDark) Color.White else Color.Black
+                                    )
+                                }
+                            }
+
+                            if (dueAutoEntriesPrompt.size > 1) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "+${dueAutoEntriesPrompt.size - 1}টি বাকি" else "+${dueAutoEntriesPrompt.size - 1} more",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFD97706),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = {
+                                    viewModel?.confirmAutoEntry(context, prompt)
+                                },
+                                modifier = Modifier.weight(1f).height(38.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (language == AppLanguage.BN) "যুক্ত করুন" else "Add Now", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    editingPromptEntry = prompt
+                                },
+                                modifier = Modifier.height(38.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B))
+                            ) {
+                                Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFFD97706))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(if (language == AppLanguage.BN) "সম্পাদনা" else "Edit", fontSize = 12.sp, color = Color(0xFFD97706))
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    viewModel?.skipAutoEntry(prompt)
+                                },
+                                modifier = Modifier.height(38.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text(if (language == AppLanguage.BN) "এড়িয়ে যান" else "Skip", fontSize = 12.sp, color = Color.Gray)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
             FintechGradientCard(
@@ -7832,6 +7970,54 @@ fun DashboardScreen(
                         text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
                         color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
                     )
+                }
+            }
+        )
+    }
+
+    if (editingPromptEntry != null) {
+        val prompt = editingPromptEntry!!
+        var customAmountText by remember { mutableStateOf(prompt.amount.toInt().toString()) }
+        AlertDialog(
+            onDismissRequest = { editingPromptEntry = null },
+            title = {
+                Text(
+                    text = if (language == AppLanguage.BN) "'${prompt.title}' নিশ্চিত করে যুক্ত করুন" else "Confirm '${prompt.title}'",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "আজকের লেনদেনে কত টাকা যুক্ত করতে চান?" else "Amount to record for today's transaction:",
+                        fontSize = 13.sp
+                    )
+                    OutlinedTextField(
+                        value = customAmountText,
+                        onValueChange = { customAmountText = it },
+                        label = { Text(if (language == AppLanguage.BN) "পরিমাণ (৳)" else "Amount (৳)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val amt = customAmountText.toDoubleOrNull() ?: prompt.amount
+                        viewModel?.confirmAutoEntry(context, prompt, customAmount = amt)
+                        editingPromptEntry = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    Text(if (language == AppLanguage.BN) "নিশ্চিত করুন" else "Confirm", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingPromptEntry = null }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
                 }
             }
         )
@@ -17393,41 +17579,192 @@ fun ModernSplashProgressIndicator(
 }
 
 @Composable
-fun SplashScreen(isDark: Boolean) {
-    // Force white background as requested
-    val bgColor = Color.White
+fun AnimatedAppLogo(
+    modifier: Modifier = Modifier
+) {
+    val arrowProgress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val bar1Progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val bar2Progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val bar3Progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    val logoScale = remember { androidx.compose.animation.core.Animatable(0.92f) }
 
+    LaunchedEffect(Unit) {
+        // Step 1: Arrow draws from start to end
+        arrowProgress.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 700,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        // Step 2: Bar 1 (Green) rises from bottom to top
+        bar1Progress.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 350,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        // Step 3: Bar 2 (Orange) rises from bottom to top
+        bar2Progress.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 350,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        // Step 4: Bar 3 (Blue) rises from bottom to top
+        bar3Progress.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 350,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        // Step 5: Gentle spring bounce settle
+        logoScale.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy
+            )
+        )
+    }
+
+    val arrowPathData = "M311.73,102.18L311.62,129.95C367.75,150.49 407.71,204.48 407.45,267.71C407.13,348.36 341.48,413.47 260.83,413.15C209.54,412.94 164.53,386.32 138.65,346.2L201.57,297.11L290.83,330.96L351.34,247.64L369.59,261.26L377.04,188.3L309.51,217.09L327.16,230.94L279.48,295.81L197.89,262.72L124.21,317.16C124.17,317.04 124.26,317.29 124.21,317.16L102.23,333.41C106.08,342.65 110.95,351.32 116.28,359.67L117.78,362.48L118.08,362.25C148.85,408.48 201.02,439.28 260.73,439.52C355.94,439.91 433.44,363.03 433.82,267.82C434.13,189.85 382.66,123.77 311.73,102.18Z"
+    val bar1PathData = "M101.5,318.6L156.63,275.92L156.9,158.9L101.42,159.19L101.5,318.6Z"
+    val bar2PathData = "M173.07,263.79L196.7,246.07L228.59,259.43L228.12,69.32L173.12,69.31L173.07,263.79Z"
+    val bar3PathData = "M245.02,266.3L273.59,278.26L299.27,243.05L300.21,101.59L244.71,101.58L245.02,266.3Z"
+
+    val arrowPath = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(arrowPathData).toPath() }
+    val bar1Path = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(bar1PathData).toPath() }
+    val bar2Path = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(bar2PathData).toPath() }
+    val bar3Path = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(bar3PathData).toPath() }
+
+    androidx.compose.foundation.Canvas(
+        modifier = modifier.scale(logoScale.value)
+    ) {
+        val w = size.width
+        val h = size.height
+        val viewportSize = 522.26f
+        val scaleX = w / viewportSize
+        val scaleY = h / viewportSize
+
+        // 0. White Circle Background
+        drawCircle(
+            color = Color.White,
+            radius = 256f * scaleX,
+            center = androidx.compose.ui.geometry.Offset(261.13f * scaleX, 261.13f * scaleY)
+        )
+
+        // 1. Arrow Animation (Periwinkle Violet: #6C71F6)
+        if (arrowProgress.value > 0f) {
+            val sweepClip = androidx.compose.ui.graphics.Path().apply {
+                val cx = 261.13f * scaleX
+                val cy = 261.13f * scaleY
+                moveTo(cx, cy)
+                arcTo(
+                    rect = androidx.compose.ui.geometry.Rect(
+                        left = cx - 310f * scaleX,
+                        top = cy - 310f * scaleY,
+                        right = cx + 310f * scaleX,
+                        bottom = cy + 310f * scaleY
+                    ),
+                    startAngleDegrees = 110f,
+                    sweepAngleDegrees = 340f * arrowProgress.value,
+                    forceMoveTo = false
+                )
+                close()
+            }
+            clipPath(sweepClip) {
+                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                    drawPath(
+                        path = arrowPath,
+                        color = Color(0xFF6C71F6)
+                    )
+                }
+            }
+        }
+
+        // 2. Bar 1 Animation (Green: #00C800)
+        if (bar1Progress.value > 0f) {
+            val bottomY = 318.6f * scaleY
+            val height = 159.7f * scaleY
+            val currentTop = bottomY - (height * bar1Progress.value)
+            clipRect(
+                left = 0f,
+                top = currentTop,
+                right = w,
+                bottom = bottomY + 10f
+            ) {
+                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                    drawPath(
+                        path = bar1Path,
+                        color = Color(0xFF00C800)
+                    )
+                }
+            }
+        }
+
+        // 3. Bar 2 Animation (Orange: #FF8A00)
+        if (bar2Progress.value > 0f) {
+            val bottomY = 263.8f * scaleY
+            val height = 194.5f * scaleY
+            val currentTop = bottomY - (height * bar2Progress.value)
+            clipRect(
+                left = 0f,
+                top = currentTop,
+                right = w,
+                bottom = bottomY + 10f
+            ) {
+                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                    drawPath(
+                        path = bar2Path,
+                        color = Color(0xFFFF8A00)
+                    )
+                }
+            }
+        }
+
+        // 4. Bar 3 Animation (Blue: #3082FF)
+        if (bar3Progress.value > 0f) {
+            val bottomY = 278.3f * scaleY
+            val height = 176.7f * scaleY
+            val currentTop = bottomY - (height * bar3Progress.value)
+            clipRect(
+                left = 0f,
+                top = currentTop,
+                right = w,
+                bottom = bottomY + 10f
+            ) {
+                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
+                    drawPath(
+                        path = bar3Path,
+                        color = Color(0xFF3082FF)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SplashScreen(isDark: Boolean) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgColor)
+            .background(Color.White)
     ) {
         val screenWidth = maxWidth
-        // App Logo without pulse animation, positioned slightly above center
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = (-40).dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        // Animated App Logo with width >= 45% of screen width, perfectly centered without bottom progress
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.app_logo_new),
-                contentDescription = "App Logo",
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            AnimatedAppLogo(
                 modifier = Modifier
-                    .size(screenWidth * 0.45f)
-                    .padding(12.dp)
+                    .size(screenWidth * 0.48f)
             )
         }
-
-        // Modern loading circle at the bottom
-        ModernSplashProgressIndicator(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 80.dp),
-            size = 46.dp,
-            strokeWidth = 3.5.dp
-        )
     }
 }
 
@@ -18125,61 +18462,12 @@ fun SyncStatusBadge(
 
 @Composable
 fun GoogleLogoIcon(modifier: Modifier = Modifier.size(22.dp)) {
-    androidx.compose.foundation.Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-        val strokeWidth = width * 0.18f
-        val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
-        val radius = (width - strokeWidth) / 2f
-
-        // Top arc (Red)
-        drawArc(
-            color = Color(0xFFEA4335),
-            startAngle = -145f,
-            sweepAngle = 110f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
-            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
-        )
-        // Left arc (Yellow)
-        drawArc(
-            color = Color(0xFFFBBC05),
-            startAngle = -215f,
-            sweepAngle = 70f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
-            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
-        )
-        // Bottom arc (Green)
-        drawArc(
-            color = Color(0xFF34A853),
-            startAngle = 35f,
-            sweepAngle = 110f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
-            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
-        )
-        // Right arc (Blue)
-        drawArc(
-            color = Color(0xFF4285F4),
-            startAngle = -35f,
-            sweepAngle = 70f,
-            useCenter = false,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
-            topLeft = androidx.compose.ui.geometry.Offset(strokeWidth / 2f, strokeWidth / 2f),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
-        )
-        // Blue horizontal bar
-        drawLine(
-            color = Color(0xFF4285F4),
-            start = androidx.compose.ui.geometry.Offset(center.x, center.y),
-            end = androidx.compose.ui.geometry.Offset(center.x + radius, center.y),
-            strokeWidth = strokeWidth
-        )
-    }
+    Icon(
+        painter = painterResource(id = com.example.R.drawable.ic_google_logo),
+        contentDescription = "Google Logo",
+        tint = Color.Unspecified,
+        modifier = modifier
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -18804,7 +19092,8 @@ fun EnhancedProfileMenu(
     onBackupRestore: () -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
-    onDrafts: () -> Unit
+    onDrafts: () -> Unit,
+    onAutoEntry: () -> Unit = {}
 ) {
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
@@ -18926,6 +19215,13 @@ fun EnhancedProfileMenu(
                     isDark = isDark,
                     badgeCount = draftsList.size,
                     onClick = onDrafts
+                )
+
+                ProfileMenuItem(
+                    icon = Icons.Rounded.Autorenew,
+                    label = if (language == AppLanguage.BN) "স্বয়ংক্রিয় এন্ট্রি (অটো এন্ট্রি)" else "Auto Entry System",
+                    isDark = isDark,
+                    onClick = onAutoEntry
                 )
 
                 HorizontalDivider(color = if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f))
