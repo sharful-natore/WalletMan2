@@ -26,14 +26,18 @@ object BiometricHelper {
                 BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> BiometricStatus.NOT_ENROLLED
                 else -> BiometricStatus.UNAVAILABLE
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             BiometricStatus.UNAVAILABLE
         }
     }
 
     fun isBiometricAvailable(context: Context): Boolean {
-        val status = getBiometricStatus(context)
-        return status == BiometricStatus.AVAILABLE
+        return try {
+            val status = getBiometricStatus(context)
+            status == BiometricStatus.AVAILABLE
+        } catch (e: Throwable) {
+            false
+        }
     }
 
     /**
@@ -49,55 +53,64 @@ object BiometricHelper {
         onUsePinFallback: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
-        val status = getBiometricStatus(activity)
-        if (status != BiometricStatus.AVAILABLE) {
-            // Hardware missing, not enrolled, or unavailable -> Fallback to PIN
-            onUsePinFallback()
-            return
-        }
-
-        val executor = ContextCompat.getMainExecutor(activity)
-        val callback = object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onSuccess()
+        try {
+            val status = getBiometricStatus(activity)
+            if (status != BiometricStatus.AVAILABLE) {
+                // Hardware missing, not enrolled, or unavailable -> Fallback to PIN
+                onUsePinFallback()
+                return
             }
 
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || 
-                    errorCode == BiometricPrompt.ERROR_USER_CANCELED) {
-                    onUsePinFallback()
-                } else if (errorCode == BiometricPrompt.ERROR_LOCKOUT || 
-                           errorCode == BiometricPrompt.ERROR_LOCKOUT_PERMANENT ||
-                           errorCode == BiometricPrompt.ERROR_NO_BIOMETRICS ||
-                           errorCode == BiometricPrompt.ERROR_HW_UNAVAILABLE) {
-                    onUsePinFallback()
-                } else {
-                    onError(errString.toString())
+            val executor = ContextCompat.getMainExecutor(activity)
+            val callback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    try {
+                        onSuccess()
+                    } catch (t: Throwable) {
+                        t.printStackTrace()
+                    }
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    try {
+                        if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || 
+                            errorCode == BiometricPrompt.ERROR_USER_CANCELED) {
+                            onUsePinFallback()
+                        } else if (errorCode == BiometricPrompt.ERROR_LOCKOUT || 
+                                   errorCode == BiometricPrompt.ERROR_LOCKOUT_PERMANENT ||
+                                   errorCode == BiometricPrompt.ERROR_NO_BIOMETRICS ||
+                                   errorCode == BiometricPrompt.ERROR_HW_UNAVAILABLE) {
+                            onUsePinFallback()
+                        } else {
+                            onError(errString.toString())
+                        }
+                    } catch (t: Throwable) {
+                        t.printStackTrace()
+                    }
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
                 }
             }
 
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-            }
-        }
+            val biometricPrompt = BiometricPrompt(activity, executor, callback)
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .setNegativeButtonText(negativeButtonText)
+                .build()
 
-        val biometricPrompt = BiometricPrompt(activity, executor, callback)
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(title)
-            .setSubtitle(subtitle)
-            .setNegativeButtonText(negativeButtonText)
-            .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or 
-                BiometricManager.Authenticators.BIOMETRIC_WEAK
-            )
-            .build()
-
-        try {
             biometricPrompt.authenticate(promptInfo)
-        } catch (e: Exception) {
-            onUsePinFallback()
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            try {
+                onUsePinFallback()
+            } catch (t: Throwable) {
+                t.printStackTrace()
+            }
         }
     }
 

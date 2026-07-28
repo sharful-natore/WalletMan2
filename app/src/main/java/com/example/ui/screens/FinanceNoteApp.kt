@@ -1968,43 +1968,14 @@ fun FinanceNoteApp(
     targetWorkspaceId: String? = null,
     targetDraftId: Int? = null
 ) {
-    val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
-    val autoLockTimeoutSeconds by viewModel.autoLockTimeoutSeconds.collectAsState()
-    val reauthRequest by viewModel.reauthRequest.collectAsState()
-    var isAppUnlocked by remember { mutableStateOf(!isBiometricEnabled) }
-    var lastBackgroundTime by remember { mutableStateOf(0L) }
-
-    LaunchedEffect(isBiometricEnabled) {
-        if (!isBiometricEnabled) {
-            isAppUnlocked = true
-        }
-    }
-
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, isBiometricEnabled, autoLockTimeoutSeconds) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && isBiometricEnabled) {
-                lastBackgroundTime = System.currentTimeMillis()
-                if (autoLockTimeoutSeconds == 0L) {
-                    isAppUnlocked = false
-                }
-            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_START && isBiometricEnabled) {
-                if (lastBackgroundTime != 0L) {
-                    val elapsedSeconds = (System.currentTimeMillis() - lastBackgroundTime) / 1000L
-                    if (elapsedSeconds >= autoLockTimeoutSeconds) {
-                        isAppUnlocked = false
-                    }
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+
+    BiometricLockWrapper(
+        viewModel = viewModel,
+        language = language,
+        isDarkTheme = isDarkTheme
+    ) {
     val selectedThemeIndex by viewModel.selectedThemeGradientIndex.collectAsState()
     val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
     val themeGradient = if (selectedThemeIndex in allGradientsList.indices) allGradientsList[selectedThemeIndex] else activeThemeGradientConfig
@@ -2206,7 +2177,7 @@ fun FinanceNoteApp(
 
     if (showSplash) {
         SplashScreen(isDark = isDarkTheme)
-        return
+        return@BiometricLockWrapper
     }
 
     if (showGoogleEmailFallbackDialog) {
@@ -5984,30 +5955,72 @@ fun FinanceNoteApp(
             }
         }
     }
-
-    if (isBiometricEnabled && !isAppUnlocked) {
-        AppLockOverlay(
-            viewModel = viewModel,
-            language = language,
-            isDark = isDarkTheme,
-            onUnlock = { isAppUnlocked = true }
-        )
-    }
-
-    reauthRequest?.let { request ->
-        AppLockOverlay(
-            viewModel = viewModel,
-            language = language,
-            isDark = isDarkTheme,
-            titleOverride = request.title,
-            subtitleOverride = request.subtitle,
-            onUnlock = {
-                request.onConfirm()
-                viewModel.clearReauthentication()
-            }
-        )
-    }
 }
+}
+}
+
+@Composable
+fun BiometricLockWrapper(
+    viewModel: FinanceViewModel,
+    language: AppLanguage,
+    isDarkTheme: Boolean,
+    content: @Composable () -> Unit
+) {
+    val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
+    val autoLockTimeoutSeconds by viewModel.autoLockTimeoutSeconds.collectAsState()
+    val reauthRequest by viewModel.reauthRequest.collectAsState()
+    var isAppUnlocked by remember { mutableStateOf(!isBiometricEnabled) }
+    var lastBackgroundTime by remember { mutableStateOf(0L) }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, isBiometricEnabled, autoLockTimeoutSeconds) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && isBiometricEnabled) {
+                lastBackgroundTime = System.currentTimeMillis()
+                if (autoLockTimeoutSeconds == 0L) {
+                    isAppUnlocked = false
+                }
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_START && isBiometricEnabled) {
+                if (lastBackgroundTime != 0L) {
+                    val elapsedSeconds = (System.currentTimeMillis() - lastBackgroundTime) / 1000L
+                    if (elapsedSeconds >= autoLockTimeoutSeconds) {
+                        isAppUnlocked = false
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        content()
+
+        if (isBiometricEnabled && !isAppUnlocked) {
+            AppLockOverlay(
+                viewModel = viewModel,
+                language = language,
+                isDark = isDarkTheme,
+                onUnlock = { isAppUnlocked = true }
+            )
+        }
+
+        reauthRequest?.let { request ->
+            AppLockOverlay(
+                viewModel = viewModel,
+                language = language,
+                isDark = isDarkTheme,
+                titleOverride = request.title,
+                subtitleOverride = request.subtitle,
+                onUnlock = {
+                    request.onConfirm()
+                    viewModel.clearReauthentication()
+                }
+            )
+        }
+    }
 }
 
 @Composable
@@ -7090,24 +7103,16 @@ fun DashboardScreen(
                         )
                     }
 
-                    // Bottom-right decorative card chip icon with matching border and pulsing scale applied to both container and image
+                    // Bottom-right decorative app logo with splash screen style continuous animation, clickable to go to charts
                     Box(
                         modifier = Modifier
-                            .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale)
                             .size(41.4.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
-                            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
                             .clickable { onNavigate("charts", "") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_custom_pie_chart),
-                            contentDescription = "Charts",
-                            modifier = Modifier
-                                .size(21.6.dp)
-                                .graphicsLayer(scaleX = pulseScale, scaleY = pulseScale),
-                            colorFilter = ColorFilter.tint(Color.White)
+                        AnimatedAppLogo(
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
@@ -18391,15 +18396,15 @@ fun AnimatedAppLogo(
     val bar3Scale = 1.0f + (bar3LiveValue - 1.0f) * equalizerAlpha.value
 
     val painterArrow = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_circle_arrow)
-    val painterBar1 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar1)
-    val painterBar2 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar2)
-    val painterBar3 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar3)
 
     androidx.compose.foundation.Canvas(
         modifier = modifier.scale(logoScale.value)
     ) {
         val w = size.width
         val h = size.height
+
+        val scaleX = w / 522.26f
+        val scaleY = h / 522.26f
 
         // White circle background
         drawCircle(
@@ -18413,23 +18418,79 @@ fun AnimatedAppLogo(
             draw(size, alpha = 1f)
         }
 
-        // 2. Bar 1 (Green: scales upwards from its fixed bottom line)
-        val bottomY1 = 318.6f / 522.26f * h
-        scale(scaleX = 1f, scaleY = bar1Scale, pivot = androidx.compose.ui.geometry.Offset(w / 2f, bottomY1)) {
-            with(painterBar1) { draw(size) }
+        // 2. Bar 1 (Green) with 100% fixed bottom edge
+        val path1 = androidx.compose.ui.graphics.Path().apply {
+            val xBL = 101.5f * scaleX
+            val yBL = 318.6f * scaleY
+            
+            val xBR = 156.63f * scaleX
+            val yBR = 275.92f * scaleY
+            
+            val xTR = 156.9f * scaleX
+            val yTR = (275.92f - 117.02f * bar1Scale) * scaleY
+            
+            val xTL = 101.42f * scaleX
+            val yTL = (318.6f - 159.41f * bar1Scale) * scaleY
+            
+            moveTo(xBL, yBL)
+            lineTo(xBR, yBR)
+            lineTo(xTR, yTR)
+            lineTo(xTL, yTL)
+            close()
         }
+        drawPath(path1, color = Color(0xFF00C800))
 
-        // 3. Bar 2 (Orange: scales upwards from its fixed bottom line)
-        val bottomY2 = 263.8f / 522.26f * h
-        scale(scaleX = 1f, scaleY = bar2Scale, pivot = androidx.compose.ui.geometry.Offset(w / 2f, bottomY2)) {
-            with(painterBar2) { draw(size) }
+        // 3. Bar 2 (Orange) with 100% fixed pointed bottom
+        val path2 = androidx.compose.ui.graphics.Path().apply {
+            val xBL = 173.07f * scaleX
+            val yBL = 263.79f * scaleY
+            
+            val xBM = 196.7f * scaleX
+            val yBM = 246.07f * scaleY
+            
+            val xBR = 228.59f * scaleX
+            val yBR = 259.43f * scaleY
+            
+            val xTR = 228.12f * scaleX
+            val yTR = (259.43f - 190.11f * bar2Scale) * scaleY
+            
+            val xTL = 173.12f * scaleX
+            val yTL = (263.79f - 194.48f * bar2Scale) * scaleY
+            
+            moveTo(xBL, yBL)
+            lineTo(xBM, yBM)
+            lineTo(xBR, yBR)
+            lineTo(xTR, yTR)
+            lineTo(xTL, yTL)
+            close()
         }
+        drawPath(path2, color = Color(0xFFFF8A00))
 
-        // 4. Bar 3 (Blue: scales upwards from its fixed bottom line)
-        val bottomY3 = 278.3f / 522.26f * h
-        scale(scaleX = 1f, scaleY = bar3Scale, pivot = androidx.compose.ui.geometry.Offset(w / 2f, bottomY3)) {
-            with(painterBar3) { draw(size) }
+        // 4. Bar 3 (Blue) with 100% fixed pointed bottom
+        val path3 = androidx.compose.ui.graphics.Path().apply {
+            val xBL = 245.02f * scaleX
+            val yBL = 266.3f * scaleY
+            
+            val xBM = 273.59f * scaleX
+            val yBM = 278.26f * scaleY
+            
+            val xBR = 299.27f * scaleX
+            val yBR = 243.05f * scaleY
+            
+            val xTR = 300.21f * scaleX
+            val yTR = (243.05f - 141.46f * bar3Scale) * scaleY
+            
+            val xTL = 244.71f * scaleX
+            val yTL = (266.3f - 164.72f * bar3Scale) * scaleY
+            
+            moveTo(xBL, yBL)
+            lineTo(xBM, yBM)
+            lineTo(xBR, yBR)
+            lineTo(xTR, yTR)
+            lineTo(xTL, yTL)
+            close()
         }
+        drawPath(path3, color = Color(0xFF3082FF))
     }
 }
 

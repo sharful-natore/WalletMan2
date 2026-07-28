@@ -249,7 +249,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _autoLockTimeoutSeconds = MutableStateFlow(0L) // 0s = Immediately, 60s = 1 Min, 300s = 5 Mins
     val autoLockTimeoutSeconds: StateFlow<Long> = _autoLockTimeoutSeconds.asStateFlow()
 
-    private val _isScreenSecurityEnabled = MutableStateFlow(true) // FLAG_SECURE
+    private val _isScreenSecurityEnabled = MutableStateFlow(false) // FLAG_SECURE
     val isScreenSecurityEnabled: StateFlow<Boolean> = _isScreenSecurityEnabled.asStateFlow()
 
     // Profile Settings States
@@ -2126,7 +2126,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _isBiometricEnabled.value = prefs.getBoolean("biometric_lock_enabled", false)
         _appLockPin.value = prefs.getString("app_lock_pin", "1234") ?: "1234"
         _autoLockTimeoutSeconds.value = prefs.getLong("auto_lock_timeout_seconds", 0L)
-        _isScreenSecurityEnabled.value = prefs.getBoolean("screen_security_flag_secure", true)
+        _isScreenSecurityEnabled.value = prefs.getBoolean("screen_security_flag_secure", false)
         
         // Also initialize Google Drive state to ensure persistence
         initGoogleDrive(context)
