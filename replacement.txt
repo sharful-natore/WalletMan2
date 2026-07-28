@@ -1,0 +1,179 @@
+@Composable
+fun VoskSpeechInputDialog(
+    isBn: Boolean,
+    onResult: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    var partialText by remember { mutableStateOf("") }
+    var resultText by remember { mutableStateOf("") }
+    var isListening by remember { mutableStateOf(false) }
+    var isInitializing by remember { mutableStateOf(true) }
+    var statusMessage by remember { mutableStateOf(if (isBn) "অফলাইন মডেল লোড হচ্ছে..." else "Loading offline model...") }
+    
+    var recognizer by remember { mutableStateOf<com.k2fsa.sherpa.onnx.OnlineRecognizer?>(null) }
+    var audioRecord by remember { mutableStateOf<android.media.AudioRecord?>(null) }
+
+    val infiniteTransition = rememberInfiniteTransition()
+    val micScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isListening) 1.25f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasAudioPermission = granted
+        if (!granted) {
+            Toast.makeText(context, if (isBn) "ভয়েস রেকর্ডের পারমিশন প্রয়োজন।" else "Microphone permission is required.", Toast.LENGTH_SHORT).show()
+            onDismiss()
+        }
+    }
+
+    LaunchedEffect(hasAudioPermission) {
+        if (!hasAudioPermission) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    LaunchedEffect(hasAudioPermission) {
+        if (hasAudioPermission) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val rootDir = File(context.filesDir, "sherpa-model-bn")
+                    val modelDir = SherpaModelFinder.findModelRoot(rootDir)
+                    if (modelDir != null) {
+                        val config = SherpaModelFinder.buildConfig(modelDir)
+                        recognizer = com.k2fsa.sherpa.onnx.OnlineRecognizer(config = config)
+                        isInitializing = false
+                        statusMessage = if (isBn) "বলুন, আমি শুনছি..." else "Listening..."
+                        isListening = true
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, if (isBn) "ভয়েস মডেল খুঁজে পাওয়া যায়নি!" else "Model files not found!", Toast.LENGTH_LONG).show()
+                            onDismiss()
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Sherpa Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        onDismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(recognizer, isListening) {
+        val rec = recognizer
+        if (rec != null && isListening) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val sampleRateInHz = 16000
+                    val channelConfig = android.media.AudioFormat.CHANNEL_IN_MONO
+                    val audioFormat = android.media.AudioFormat.ENCODING_PCM_16BIT
+                    val numBytes = android.media.AudioRecord.getMinBufferSize(sampleRateInHz, channelConfig, audioFormat)
+                    
+                    val record = android.media.AudioRecord(
+                        android.media.MediaRecorder.AudioSource.MIC,
+                        sampleRateInHz,
+                        channelConfig,
+                        audioFormat,
+                        numBytes * 2
+                    )
+                    audioRecord = record
+                    
+                    record.startRecording()
+                    
+                    val stream = rec.createStream()
+                    val interval = 0.1
+                    val bufferSize = (interval * sampleRateInHz).toInt()
+                    val buffer = ShortArray(bufferSize)
+                    
+                    while (isListening) {
+                        val ret = record.read(buffer, 0, buffer.size)
+                        if (ret > 0) {
+                            val samples = FloatArray(ret) { buffer[it] / 32768.0f }
+                            stream.acceptWaveform(samples, sampleRate = sampleRateInHz)
+                            
+                            while (rec.isReady(stream)) {
+                                rec.decode(stream)
+                            }
+                            
+                            val isEndpoint = rec.isEndpoint(stream)
+                            var text = rec.getResult(stream).text
+                            
+                            if (isEndpoint && rec.config.modelConfig.paraformer.encoder.isNotBlank()) {
+                                val tailPaddings = FloatArray((0.8 * sampleRateInHz).toInt())
+                                stream.acceptWaveform(tailPaddings, sampleRate = sampleRateInHz)
+                                while (rec.isReady(stream)) {
+                                    rec.decode(stream)
+                                }
+                                text = rec.getResult(stream).text
+                            }
+                            
+                            withContext(Dispatchers.Main) {
+                                if (text.isNotBlank()) {
+                                    if (isEndpoint) {
+                                        resultText = if (resultText.isBlank()) text else "$resultText $text"
+                                        partialText = ""
+                                        rec.reset(stream)
+                                    } else {
+                                        partialText = text
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    record.stop()
+                    record.release()
+                    stream.release()
+                    
+                } catch (e: Exception) {
+                    isListening = false
+                }
+            }
+        } else {
+            audioRecord?.stop()
+            audioRecord?.release()
+            audioRecord = null
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            isListening = false
+            audioRecord?.stop()
+            audioRecord?.release()
+        }
+    }
+
+    LaunchedEffect(resultText, partialText) {
+        val currentText = if (partialText.isNotBlank()) "$resultText $partialText" else resultText
+        if (currentText.isNotBlank()) {
+            val lower = currentText.trim().lowercase()
+            val saveKeywords = listOf("ওকে", "ok", "okay", "সেভ করো", "সেভ করুন", "সেভ কর", "সেভ", "সংরক্ষণ", "save it", "save")
+            for (kw in saveKeywords) {
+                if (lower.endsWith(kw)) {
+                    val cleanText = currentText.trim().substring(0, currentText.trim().length - kw.length).trim()
+                    onResult(cleanText)
+                    Toast.makeText(context, if (isBn) "ভয়েস সেভ সম্পন্ন হয়েছে!" else "Voice draft saved!", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                    break
+                }
+            }
+        }
+    }

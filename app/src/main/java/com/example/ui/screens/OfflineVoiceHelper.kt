@@ -44,10 +44,6 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import org.vosk.Model
-import org.vosk.Recognizer
-import org.vosk.android.SpeechService
-import org.vosk.android.RecognitionListener
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.File
@@ -79,7 +75,7 @@ fun openOfflineVoiceSettings(context: Context) {
             context.startActivity(intent)
             opened = true
             break
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // continue
         }
     }
@@ -118,10 +114,8 @@ fun isInternetConnected(context: Context): Boolean {
 }
 
 fun isVoskDownloaded(context: Context): Boolean {
-    val modelDir = File(context.filesDir, "vosk-model-small-streaming-bn")
-    val hasAm = File(modelDir, "am-onnx").exists() || File(modelDir, "am").exists()
-    val hasLang = File(modelDir, "lang").exists()
-    return modelDir.exists() && modelDir.isDirectory && hasAm && hasLang
+    val modelDir = File(context.filesDir, "sherpa-model-bn")
+    return SherpaModelFinder.findModelRoot(modelDir) != null
 }
 
 fun shouldShowOfflineVoicePrompt(context: Context): Boolean {
@@ -167,7 +161,7 @@ suspend fun fetchVoskLink(context: Context): String = suspendCancellableCoroutin
         }.addOnFailureListener { exception ->
             continuation.resume("")
         }
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
         continuation.resume("")
     }
 }
@@ -190,7 +184,7 @@ object VoskDownloader {
         if (_downloadState.value is DownloadState.Downloading || _downloadState.value is DownloadState.Extracting) return
 
         downloadJob = coroutineScope.launch(Dispatchers.IO) {
-            var lastException: Exception? = null
+            var lastException: Throwable? = null
             var success = false
 
             try {
@@ -247,7 +241,7 @@ object VoskDownloader {
 
                 val fileLength = connection.contentLength
                 val input = BufferedInputStream(connection.getInputStream())
-                val zipFile = File(context.cacheDir, "vosk_model_bn.zip")
+                val zipFile = File(context.cacheDir, "sherpa_model_bn.zip")
                 val output = FileOutputStream(zipFile)
 
                 val data = ByteArray(16384)
@@ -258,9 +252,9 @@ object VoskDownloader {
                     if (fileLength > 0) {
                         _downloadState.value = DownloadState.Downloading(((total * 100) / fileLength).toInt())
                     } else {
-                        // Estimate progress if fileLength is not provided (assume ~33MB size)
+                        // Estimate progress if fileLength is not provided (assume ~83MB size)
                         val mb = (total / (1024 * 1024)).toInt()
-                        val progress = if (mb < 33) (mb * 100 / 33) else 99
+                        val progress = if (mb < 83) (mb * 100 / 83) else 99
                         _downloadState.value = DownloadState.Downloading(progress)
                     }
                     output.write(data, 0, count)
@@ -285,7 +279,7 @@ object VoskDownloader {
                 
                 success = true
 
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 lastException = e
             }
 
@@ -297,7 +291,7 @@ object VoskDownloader {
     }
 
     private fun unzipModel(zipFile: File, context: Context) {
-        val targetDir = File(context.filesDir, "vosk-model-small-streaming-bn")
+        val targetDir = File(context.filesDir, "sherpa-model-bn")
         if (targetDir.exists()) {
             targetDir.deleteRecursively()
         }
@@ -357,8 +351,8 @@ object VoskDownloader {
         
         val files = dir.listFiles() ?: return null
         
-        val hasAm = files.any { it.isDirectory && (it.name == "am-onnx" || it.name == "am") }
-        val hasLang = files.any { it.isDirectory && it.name == "lang" }
+        val hasAm = files.any { it.name == "tokens.txt" }
+        val hasLang = files.any { it.name.endsWith(".onnx") }
         
         if (hasAm || hasLang) {
             return dir
@@ -430,9 +424,9 @@ fun OfflineVoiceWifiBanner(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = if (isBn) 
-                        "সম্পূর্ণ অফলাইনে ইন্টারনেট ছাড়া ভয়েস ইনপুট পেতে বাংলা অফলাইন মডেলটি এখনই ডাউনলোড করুন (৩৩ এমবি)।" 
+                        "সম্পূর্ণ অফলাইনে ইন্টারনেট ছাড়া ভয়েস ইনপুট পেতে বাংলা অফলাইন মডেলটি এখনই ডাউনলোড করুন (৮৩ এমবি)।" 
                     else 
-                        "Download Bengali offline speech recognition model (33 MB) to type by voice fully offline.",
+                        "Download Bengali offline speech recognition model (83 MB) to type by voice fully offline.",
                     fontSize = 12.sp,
                     color = Color(0xFF78350F),
                     lineHeight = 16.sp
@@ -543,12 +537,12 @@ fun OfflineVoiceGuideDialog(
                                 Text(
                                     text = if (isBn)
                                         "• সম্পূর্ণ অফলাইন - কোন ইন্টারনেট লাগবেনা।\n" +
-                                        "• ৩৩ এমবি সাইজ - ওয়াইফাই বা সেলুলার ডাটা দিয়ে সহজে ডাউনলোড।\n" +
+                                        "• ৮৩ এমবি সাইজ - ওয়াইফাই বা সেলুলার ডাটা দিয়ে সহজে ডাউনলোড।\n" +
                                         "• সরাসরি অ্যাপের ভেতর সুরক্ষিত ও দ্রুত ডাউনলোড সম্পন্ন হবে।\n" +
                                         "• ডাটা সাশ্রয়ী - আপনার কোন ভয়েস ডেটা ইন্টারনেটে যাবে না।"
                                     else
                                         "• 100% Offline - No internet connection required.\n" +
-                                        "• ~33 MB Size - Easy download via Wi-Fi or Mobile Data.\n" +
+                                        "• ~83 MB Size - Easy download via Wi-Fi or Mobile Data.\n" +
                                         "• Directly downloaded and securely stored inside the app.\n" +
                                         "• Complete Privacy - Your voice data stays on-device.",
                                     fontSize = 11.sp,
@@ -572,7 +566,7 @@ fun OfflineVoiceGuideDialog(
                             trackColor = Color(0xFFFEF3C7)
                         )
                         Text(
-                            text = if (isBn) "অগ্রগতি: ${state.progress}% (৩৩ এমবি)" else "Progress: ${state.progress}% of ~33MB",
+                            text = if (isBn) "অগ্রগতি: ${state.progress}% (৮৩ এমবি)" else "Progress: ${state.progress}% of ~83MB",
                             fontSize = 12.sp,
                             color = Color(0xFF64748B),
                             textAlign = TextAlign.End,
@@ -694,10 +688,9 @@ fun VoskSpeechInputDialog(
     var isInitializing by remember { mutableStateOf(true) }
     var statusMessage by remember { mutableStateOf(if (isBn) "অফলাইন মডেল লোড হচ্ছে..." else "Loading offline model...") }
     
-    var voskModel by remember { mutableStateOf<Model?>(null) }
-    var speechService by remember { mutableStateOf<SpeechService?>(null) }
+    var recognizer by remember { mutableStateOf<com.k2fsa.sherpa.onnx.OnlineRecognizer?>(null) }
+    var audioRecord by remember { mutableStateOf<android.media.AudioRecord?>(null) }
 
-    // Pulse animation for mic icon
     val infiniteTransition = rememberInfiniteTransition()
     val micScale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -708,7 +701,6 @@ fun VoskSpeechInputDialog(
         )
     )
 
-    // Handle permission request inside dialog
     var hasAudioPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -731,14 +723,15 @@ fun VoskSpeechInputDialog(
         }
     }
 
-    // Initialize Vosk Model in background
     LaunchedEffect(hasAudioPermission) {
         if (hasAudioPermission) {
             withContext(Dispatchers.IO) {
                 try {
-                    val modelDir = File(context.filesDir, "vosk-model-small-streaming-bn")
-                    if (modelDir.exists() && modelDir.isDirectory) {
-                        voskModel = Model(modelDir.absolutePath)
+                    val rootDir = File(context.filesDir, "sherpa-model-bn")
+                    val modelDir = SherpaModelFinder.findModelRoot(rootDir)
+                    if (modelDir != null) {
+                        val config = SherpaModelFinder.buildConfig(modelDir)
+                        recognizer = com.k2fsa.sherpa.onnx.OnlineRecognizer(config = config)
                         isInitializing = false
                         statusMessage = if (isBn) "বলুন, আমি শুনছি..." else "Listening..."
                         isListening = true
@@ -748,9 +741,9 @@ fun VoskSpeechInputDialog(
                             onDismiss()
                         }
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Vosk Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Sherpa Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                         onDismiss()
                     }
                 }
@@ -758,86 +751,95 @@ fun VoskSpeechInputDialog(
         }
     }
 
-    // Manage SpeechService lifecycle
-    LaunchedEffect(voskModel, isListening) {
-        val model = voskModel
-        if (model != null && isListening) {
-            withContext(Dispatchers.Default) {
+    LaunchedEffect(recognizer, isListening) {
+        val rec = recognizer
+        if (rec != null && isListening) {
+            withContext(Dispatchers.IO) {
                 try {
-                    val rec = Recognizer(model, 16000.0f)
-                    val service = SpeechService(rec, 16000.0f)
-                    speechService = service
+                    val sampleRateInHz = 16000
+                    val channelConfig = android.media.AudioFormat.CHANNEL_IN_MONO
+                    val audioFormat = android.media.AudioFormat.ENCODING_PCM_16BIT
+                                        val numBytes = android.media.AudioRecord.getMinBufferSize(sampleRateInHz, channelConfig, audioFormat)
+                    if (numBytes <= 0) throw Exception("AudioRecord unsupported")
                     
-                    service.startListening(object : RecognitionListener {
-                        override fun onResult(hypothesis: String?) {
-                            hypothesis?.let {
-                                try {
-                                    val json = JSONObject(it)
-                                    val text = json.optString("text", "")
-                                    if (text.isNotBlank()) {
+                    val record = android.media.AudioRecord(
+                        android.media.MediaRecorder.AudioSource.MIC,
+                        sampleRateInHz,
+                        channelConfig,
+                        audioFormat,
+                        numBytes * 2
+                    )
+                    if (record.state != android.media.AudioRecord.STATE_INITIALIZED) {
+                        throw Exception("AudioRecord failed to initialize")
+                    }
+                    audioRecord = record
+                    
+                    record.startRecording()
+                    
+                    val stream = rec.createStream()
+                    val interval = 0.1
+                    val bufferSize = (interval * sampleRateInHz).toInt()
+                    val buffer = ShortArray(bufferSize)
+                    
+                    while (isListening) {
+                        val ret = record.read(buffer, 0, buffer.size)
+                        if (ret > 0) {
+                            val samples = FloatArray(ret) { buffer[it] / 32768.0f }
+                            stream.acceptWaveform(samples, sampleRate = sampleRateInHz)
+                            
+                            while (rec.isReady(stream)) {
+                                rec.decode(stream)
+                            }
+                            
+                            val isEndpoint = rec.isEndpoint(stream)
+                            var text = rec.getResult(stream).text
+                            
+                            if (isEndpoint && rec.config.modelConfig.paraformer.encoder.isNotBlank()) {
+                                val tailPaddings = FloatArray((0.8 * sampleRateInHz).toInt())
+                                stream.acceptWaveform(tailPaddings, sampleRate = sampleRateInHz)
+                                while (rec.isReady(stream)) {
+                                    rec.decode(stream)
+                                }
+                                text = rec.getResult(stream).text
+                            }
+                            
+                            withContext(Dispatchers.Main) {
+                                if (text.isNotBlank()) {
+                                    if (isEndpoint) {
                                         resultText = if (resultText.isBlank()) text else "$resultText $text"
                                         partialText = ""
+                                        rec.reset(stream)
+                                    } else {
+                                        partialText = text
                                     }
-                                } catch (e: Exception) {
-                                    // ignore
                                 }
                             }
                         }
-
-                        override fun onPartialResult(hypothesis: String?) {
-                            hypothesis?.let {
-                                try {
-                                    val json = JSONObject(it)
-                                    val partial = json.optString("partial", "")
-                                    if (partial.isNotBlank()) {
-                                        partialText = partial
-                                    }
-                                } catch (e: Exception) {
-                                    // ignore
-                                }
-                            }
-                        }
-
-                        override fun onFinalResult(hypothesis: String?) {
-                            hypothesis?.let {
-                                try {
-                                    val json = JSONObject(it)
-                                    val text = json.optString("text", "")
-                                    if (text.isNotBlank()) {
-                                        resultText = if (resultText.isBlank()) text else "$resultText $text"
-                                    }
-                                } catch (e: Exception) {
-                                    // ignore
-                                }
-                            }
-                        }
-
-                        override fun onError(exception: java.lang.Exception?) {
-                            // handle error
-                        }
-
-                        override fun onTimeout() {
-                            isListening = false
-                        }
-                    })
-                } catch (e: Exception) {
-                    // handle error
+                    }
+                    
+                    record.stop()
+                    record.release()
+                    stream.release()
+                    
+                } catch (e: Throwable) {
+                    isListening = false
                 }
             }
         } else {
-            speechService?.stop()
-            speechService = null
+            audioRecord?.stop()
+            audioRecord?.release()
+            audioRecord = null
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            speechService?.stop()
-            speechService?.shutdown()
+            isListening = false
+            audioRecord?.stop()
+            audioRecord?.release()
         }
     }
 
-    // Standard NLP Auto-Save Check
     LaunchedEffect(resultText, partialText) {
         val currentText = if (partialText.isNotBlank()) "$resultText $partialText" else resultText
         if (currentText.isNotBlank()) {

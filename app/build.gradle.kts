@@ -134,7 +134,7 @@ dependencies {
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   implementation(libs.play.services.auth)
-  implementation(libs.vosk.android)
+  implementation(libs.sherpa.onnx)
   
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.test.core)

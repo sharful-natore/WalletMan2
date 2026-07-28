@@ -15016,7 +15016,7 @@ fun SettingsScreen(
                                 text = if (isModelDownloaded) {
                                     if (language == AppLanguage.BN) "আপনি ইন্টারনেট ছাড়াই সম্পূর্ণ অফলাইনে দ্রুততম গতিতে মুখে বলে খসড়া করতে পারবেন।" else "You can speak to type drafts fully offline at maximum speed without internet connection."
                                 } else {
-                                    if (language == AppLanguage.BN) "অফলাইনে ইন্টারনেট ছাড়া ভয়েস ইনপুটের সুবিধা পেতে ভয়েস মডেলটি ডাউনলোড করুন (৩৩ এমবি)।" else "Download the offline voice pack (33 MB) to use speech recognition without internet."
+                                    if (language == AppLanguage.BN) "অফলাইনে ইন্টারনেট ছাড়া ভয়েস ইনপুটের সুবিধা পেতে ভয়েস মডেলটি ডাউনলোড করুন (৮৩ এমবি)।" else "Download the offline voice pack (83 MB) to use speech recognition without internet."
                                 },
                                 fontSize = 11.sp,
                                 color = if (isDark) Color.LightGray else Color(0xFF334155),

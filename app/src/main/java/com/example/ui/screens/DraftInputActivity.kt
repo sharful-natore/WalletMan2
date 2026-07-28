@@ -114,21 +114,29 @@ class DraftInputActivity : ComponentActivity() {
             }
 
             val triggerVoice = {
-                if (isVoskDownloaded(context)) {
-                    showVoskDialog = true
-                } else if (!isInternetConnected(context)) {
-                    showOfflineGuideDialog = true
-                } else {
+                if (isInternetConnected(context)) {
                     val voiceIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                         putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (isBn) "bn-BD" else "en-US")
                         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                         putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(if (isBn) "bn-BD" else "en-US"))
-                        putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBn) "লেনদেন ড্রাফট বলুন (অফলাইন সমর্থিত)..." else "Speak transaction draft...")
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, if (isBn) "লেনদেন ড্রাফট বলুন..." else "Speak transaction draft...")
                     }
                     try {
                         speechLauncher.launch(voiceIntent)
                     } catch (e: Exception) {
+                        // If Google STT intent fails, fallback to Vosk if downloaded, else show guide
+                        if (isVoskDownloaded(context)) {
+                            showVoskDialog = true
+                        } else {
+                            showOfflineGuideDialog = true
+                        }
+                    }
+                } else {
+                    // Offline Mode - Use Vosk
+                    if (isVoskDownloaded(context)) {
+                        showVoskDialog = true
+                    } else {
                         showOfflineGuideDialog = true
                     }
                 }
