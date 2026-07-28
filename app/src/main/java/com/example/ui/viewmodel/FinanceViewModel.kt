@@ -240,6 +240,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
 
+    private val _isBiometricEnabled = MutableStateFlow(false)
+    val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
+
+    private val _appLockPin = MutableStateFlow("1234")
+    val appLockPin: StateFlow<String> = _appLockPin.asStateFlow()
+
+    private val _autoLockTimeoutSeconds = MutableStateFlow(0L) // 0s = Immediately, 60s = 1 Min, 300s = 5 Mins
+    val autoLockTimeoutSeconds: StateFlow<Long> = _autoLockTimeoutSeconds.asStateFlow()
+
+    private val _isScreenSecurityEnabled = MutableStateFlow(true) // FLAG_SECURE
+    val isScreenSecurityEnabled: StateFlow<Boolean> = _isScreenSecurityEnabled.asStateFlow()
+
     // Profile Settings States
     private val _profileName = MutableStateFlow("")
     val profileName: StateFlow<String> = _profileName.asStateFlow()
@@ -2111,6 +2123,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
         
         _isNotificationEnabled.value = notifEnabled
+        _isBiometricEnabled.value = prefs.getBoolean("biometric_lock_enabled", false)
+        _appLockPin.value = prefs.getString("app_lock_pin", "1234") ?: "1234"
+        _autoLockTimeoutSeconds.value = prefs.getLong("auto_lock_timeout_seconds", 0L)
+        _isScreenSecurityEnabled.value = prefs.getBoolean("screen_security_flag_secure", true)
         
         // Also initialize Google Drive state to ensure persistence
         initGoogleDrive(context)
@@ -2130,6 +2146,43 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 }
             } catch (e: Exception) { e.printStackTrace() }
         }
+    }
+
+    fun setBiometricEnabled(context: Context, enabled: Boolean) {
+        _isBiometricEnabled.value = enabled
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("biometric_lock_enabled", enabled)
+            .apply()
+    }
+
+    fun setAppLockPin(context: Context, pin: String) {
+        _appLockPin.value = pin
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("app_lock_pin", pin)
+            .apply()
+    }
+
+    fun setAutoLockTimeoutSeconds(context: Context, seconds: Long) {
+        _autoLockTimeoutSeconds.value = seconds
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putLong("auto_lock_timeout_seconds", seconds)
+            .apply()
+    }
+
+    fun setScreenSecurityEnabled(context: Context, enabled: Boolean) {
+        _isScreenSecurityEnabled.value = enabled
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("screen_security_flag_secure", enabled)
+            .apply()
+    }
+
+    fun verifyPin(inputPin: String): Boolean {
+        val currentPin = _appLockPin.value.ifBlank { "1234" }
+        return inputPin == currentPin
     }
 
     fun loadCustomGradients(context: Context) {
@@ -4417,6 +4470,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         } catch (e: Exception) {
             onError(e.localizedMessage ?: "Error verifying code")
         }
+    }
+
+    data class ReauthRequest(
+        val title: String,
+        val subtitle: String,
+        val onConfirm: () -> Unit
+    )
+
+    private val _reauthRequest = MutableStateFlow<ReauthRequest?>(null)
+    val reauthRequest: StateFlow<ReauthRequest?> = _reauthRequest.asStateFlow()
+
+    fun triggerReauthentication(title: String, subtitle: String, onConfirm: () -> Unit) {
+        _reauthRequest.value = ReauthRequest(title, subtitle, onConfirm)
+    }
+
+    fun clearReauthentication() {
+        _reauthRequest.value = null
     }
 }
 

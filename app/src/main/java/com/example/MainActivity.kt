@@ -1,7 +1,7 @@
 package com.example
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -18,7 +18,7 @@ import com.example.ui.theme.FinanceNoteTheme
 import com.example.ui.viewmodel.FinanceViewModel
 import com.example.ui.viewmodel.FinanceViewModelFactory
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val actionState = androidx.compose.runtime.mutableStateOf<String?>(null)
     private val targetWorkspaceState = androidx.compose.runtime.mutableStateOf<String?>(null)
     private val targetDraftIdState = androidx.compose.runtime.mutableStateOf<Int?>(null)
@@ -78,9 +78,21 @@ class MainActivity : ComponentActivity() {
             val language by viewModel.language.collectAsState()
             val themeGradientIndex by viewModel.selectedThemeGradientIndex.collectAsState()
             val allGradientsConfig by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
+            val isScreenSecurityEnabled by viewModel.isScreenSecurityEnabled.collectAsState()
             val action by actionState
             val targetWorkspaceId by targetWorkspaceState
             val targetDraftId by targetDraftIdState
+            
+            LaunchedEffect(isScreenSecurityEnabled) {
+                if (isScreenSecurityEnabled) {
+                    window.setFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE
+                    )
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
             
             val activeThemeGradient = remember(allGradientsConfig, themeGradientIndex) {
                 if (themeGradientIndex in allGradientsConfig.indices) allGradientsConfig[themeGradientIndex]

@@ -1968,6 +1968,41 @@ fun FinanceNoteApp(
     targetWorkspaceId: String? = null,
     targetDraftId: Int? = null
 ) {
+    val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
+    val autoLockTimeoutSeconds by viewModel.autoLockTimeoutSeconds.collectAsState()
+    val reauthRequest by viewModel.reauthRequest.collectAsState()
+    var isAppUnlocked by remember { mutableStateOf(!isBiometricEnabled) }
+    var lastBackgroundTime by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(isBiometricEnabled) {
+        if (!isBiometricEnabled) {
+            isAppUnlocked = true
+        }
+    }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, isBiometricEnabled, autoLockTimeoutSeconds) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && isBiometricEnabled) {
+                lastBackgroundTime = System.currentTimeMillis()
+                if (autoLockTimeoutSeconds == 0L) {
+                    isAppUnlocked = false
+                }
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_START && isBiometricEnabled) {
+                if (lastBackgroundTime != 0L) {
+                    val elapsedSeconds = (System.currentTimeMillis() - lastBackgroundTime) / 1000L
+                    if (elapsedSeconds >= autoLockTimeoutSeconds) {
+                        isAppUnlocked = false
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val selectedThemeIndex by viewModel.selectedThemeGradientIndex.collectAsState()
@@ -5949,7 +5984,338 @@ fun FinanceNoteApp(
             }
         }
     }
+
+    if (isBiometricEnabled && !isAppUnlocked) {
+        AppLockOverlay(
+            viewModel = viewModel,
+            language = language,
+            isDark = isDarkTheme,
+            onUnlock = { isAppUnlocked = true }
+        )
+    }
+
+    reauthRequest?.let { request ->
+        AppLockOverlay(
+            viewModel = viewModel,
+            language = language,
+            isDark = isDarkTheme,
+            titleOverride = request.title,
+            subtitleOverride = request.subtitle,
+            onUnlock = {
+                request.onConfirm()
+                viewModel.clearReauthentication()
+            }
+        )
+    }
 }
+}
+
+@Composable
+fun AppLockOverlay(
+    viewModel: FinanceViewModel,
+    language: AppLanguage,
+    isDark: Boolean,
+    titleOverride: String? = null,
+    subtitleOverride: String? = null,
+    onUnlock: () -> Unit
+) {
+    val context = LocalContext.current
+    val activity = context as? androidx.fragment.app.FragmentActivity
+
+    var showPinFallback by remember { mutableStateOf(!com.example.util.BiometricHelper.isBiometricAvailable(context)) }
+    var enteredPin by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun triggerPrompt() {
+        if (activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+            com.example.util.BiometricHelper.showBiometricPrompt(
+                activity = activity,
+                title = titleOverride ?: (if (language == AppLanguage.BN) "ফাইন্যান্স নোট আনলক করুন" else "Unlock Finance Note"),
+                subtitle = subtitleOverride ?: (if (language == AppLanguage.BN) "আপনার ফিঙ্গারপ্রিন্ট বা ফেস লক ব্যবহার করুন" else "Use your fingerprint or face to access your account"),
+                negativeButtonText = if (language == AppLanguage.BN) "পিন ব্যবহার করুন" else "Use PIN",
+                onSuccess = {
+                    onUnlock()
+                },
+                onUsePinFallback = {
+                    showPinFallback = true
+                },
+                onError = { err ->
+                    showPinFallback = true
+                }
+            )
+        } else {
+            showPinFallback = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        triggerPrompt()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC))
+            .clickable(enabled = true) {},
+        contentAlignment = Alignment.Center
+    ) {
+        if (!showPinFallback) {
+            // Standard Biometric Landing
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = "Locked",
+                        tint = Color.White,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = titleOverride ?: (if (language == AppLanguage.BN) "ফাইন্যান্স নোট সুরক্ষিত" else "Finance Note is Locked"),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Text(
+                        text = subtitleOverride ?: (if (language == AppLanguage.BN) "অ্যাপের তথ্য সুরক্ষায় বায়োমেট্রিক সিকিউরিটি চালু আছে" else "Biometric security is enabled to protect your financial data"),
+                        fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = { triggerPrompt() },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6366F1)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Fingerprint,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "বায়োমেট্রিক দিয়ে আনলক করুন" else "Unlock with Biometrics",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                TextButton(
+                    onClick = { showPinFallback = true }
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "পিন (PIN) ব্যবহার করুন" else "Use Custom PIN",
+                        color = Color(0xFF6366F1),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        } else {
+            // Custom PIN fallback screen
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 48.dp, horizontal = 24.dp)
+            ) {
+                // Top Header Section
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = Color(0xFF6366F1),
+                        modifier = Modifier.size(48.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = if (language == AppLanguage.BN) "আনলক করতে পিন দিন" else "Enter PIN to Unlock",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "আপনার ৪-সংখ্যার সিকিউরিটি পিন দিন" else "Please enter your 4-digit security PIN",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                    )
+                }
+
+                // PIN indicators (Dots)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (i in 0 until 4) {
+                            val isFilled = i < enteredPin.length
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isFilled) Color(0xFF6366F1)
+                                        else Color.Transparent
+                                    )
+                                    .border(
+                                        width = 2.dp,
+                                        color = if (isFilled) Color(0xFF6366F1) else (if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)),
+                                        shape = CircleShape
+                                    )
+                            )
+                        }
+                    }
+
+                    errorMessage?.let { error ->
+                        Text(
+                            text = error,
+                            color = Color(0xFFEF4444),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    } ?: Spacer(modifier = Modifier.height(20.dp))
+                }
+
+                // Custom Numeric Keypad
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val buttonBg = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.04f)
+                    val contentColor = if (isDark) Color.White else Color(0xFF0F172A)
+                    
+                    val keys = listOf(
+                        listOf("1", "2", "3"),
+                        listOf("4", "5", "6"),
+                        listOf("7", "8", "9"),
+                        listOf("BIO", "0", "DEL")
+                    )
+
+                    for (row in keys) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            for (key in row) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                if (key.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(CircleShape)
+                                            .background(if (key == "BIO" || key == "DEL") Color.Transparent else buttonBg)
+                                            .clickable {
+                                                errorMessage = null
+                                                when (key) {
+                                                    "DEL" -> {
+                                                        if (enteredPin.isNotEmpty()) {
+                                                            enteredPin = enteredPin.dropLast(1)
+                                                        }
+                                                    }
+                                                    "BIO" -> {
+                                                        if (com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+                                                            triggerPrompt()
+                                                        }
+                                                    }
+                                                    else -> {
+                                                        if (enteredPin.length < 4) {
+                                                            enteredPin += key
+                                                            if (enteredPin.length == 4) {
+                                                                if (viewModel.verifyPin(enteredPin)) {
+                                                                    onUnlock()
+                                                                } else {
+                                                                    errorMessage = if (language == AppLanguage.BN) "ভুল পিন। আবার চেষ্টা করুন।" else "Incorrect PIN. Please try again."
+                                                                    enteredPin = ""
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        when (key) {
+                                            "DEL" -> {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Rounded.Backspace,
+                                                    contentDescription = "Delete",
+                                                    tint = contentColor,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+                                            "BIO" -> {
+                                                if (com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Fingerprint,
+                                                        contentDescription = "Biometrics",
+                                                        tint = Color(0xFF6366F1),
+                                                        modifier = Modifier.size(28.dp)
+                                                    )
+                                                }
+                                            }
+                                            else -> {
+                                                Text(
+                                                    text = key,
+                                                    fontSize = 24.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = contentColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -14013,6 +14379,375 @@ fun SettingsScreen(
             }
         }
 
+        // --- 4. SECURITY & BIOMETRIC LOCK CARD ---
+        val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
+        var showChangePinDialog by remember { mutableStateOf(false) }
+
+        if (showChangePinDialog) {
+            var newPin by remember { mutableStateOf("") }
+            var pinConfirm by remember { mutableStateOf("") }
+            var dialogError by remember { mutableStateOf<String?>(null) }
+            
+            AlertDialog(
+                onDismissRequest = { showChangePinDialog = false },
+                title = { 
+                    Text(
+                        text = if (language == AppLanguage.BN) "সিকিউরিটি পিন সেট করুন" else "Set Security PIN",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "৪-সংখ্যার একটি নতুন পিন দিন যা বায়োমেট্রিক কাজ না করলে ব্যাকআপ হিসেবে ব্যবহার হবে" else "Enter a 4-digit numeric PIN to use as a fallback.",
+                            fontSize = 13.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                        
+                        OutlinedTextField(
+                            value = newPin,
+                            onValueChange = { input ->
+                                if (input.length <= 4 && input.all { it.isDigit() }) {
+                                    newPin = input
+                                    dialogError = null
+                                }
+                            },
+                            label = { Text(if (language == AppLanguage.BN) "নতুন পিন (New PIN)" else "New PIN") },
+                            placeholder = { Text("••••") },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = pinConfirm,
+                            onValueChange = { input ->
+                                if (input.length <= 4 && input.all { it.isDigit() }) {
+                                    pinConfirm = input
+                                    dialogError = null
+                                }
+                            },
+                            label = { Text(if (language == AppLanguage.BN) "পিন নিশ্চিত করুন" else "Confirm PIN") },
+                            placeholder = { Text("••••") },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        dialogError?.let { err ->
+                            Text(err, color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newPin.length != 4) {
+                                dialogError = if (language == AppLanguage.BN) "পিন অবশ্যই ৪-সংখ্যার হতে হবে" else "PIN must be exactly 4 digits."
+                            } else if (newPin != pinConfirm) {
+                                dialogError = if (language == AppLanguage.BN) "পিন দুটি মেলেনি!" else "PINs do not match!"
+                            } else {
+                                viewModel.setAppLockPin(context, newPin)
+                                showChangePinDialog = false
+                                viewModel.triggerCustomNotification(
+                                    if (language == AppLanguage.BN) "পিন সফলভাবে আপডেট করা হয়েছে!" else "PIN successfully updated!",
+                                    isSuccess = true,
+                                    type = "SUCCESS"
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                    ) {
+                        Text(if (language == AppLanguage.BN) "সংরক্ষণ করুন" else "Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showChangePinDialog = false }) {
+                        Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                    }
+                }
+            )
+        }
+
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "সিকিউরিটি ও অ্যাপ লক" else "Security & App Lock",
+            isDark = isDark,
+            icon = Icons.Rounded.Security,
+            initiallyExpanded = filter == "security"
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Row 1: Biometric Security Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFF10B981).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Fingerprint,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি" else "Biometric Security",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "অ্যাপ চালু করার সময় ফিঙ্গারপ্রিন্ট / ফেস আনলক বা পিন সিকিউরিটি চান" else "Require Fingerprint / Face Unlock or PIN when opening the app",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Switch(
+                        checked = isBiometricEnabled,
+                        onCheckedChange = { enable ->
+                            val fragmentActivity = context as? androidx.fragment.app.FragmentActivity
+                            if (enable && fragmentActivity != null) {
+                                com.example.util.BiometricHelper.showBiometricPrompt(
+                                    activity = fragmentActivity,
+                                    title = if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি সক্রিয় করুন" else "Enable Biometric Security",
+                                    subtitle = if (language == AppLanguage.BN) "ফিঙ্গারপ্রিন্ট বা ফেস আইডি দিয়ে নিশ্চিত করুন" else "Confirm with Fingerprint or Face ID",
+                                    onSuccess = {
+                                        viewModel.setBiometricEnabled(context, true)
+                                        viewModel.triggerCustomNotification(
+                                            if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি সফলভাবে চালু করা হয়েছে!" else "Biometric security successfully enabled!",
+                                            isSuccess = true,
+                                            type = "SUCCESS"
+                                        )
+                                    },
+                                    onError = { err ->
+                                        viewModel.triggerCustomNotification(err, isSuccess = false, type = "ERROR")
+                                    }
+                                )
+                            } else {
+                                viewModel.setBiometricEnabled(context, enable)
+                                if (!enable) {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "বায়োমেট্রিক সিকিউরিটি বন্ধ করা হয়েছে" else "Biometric security disabled",
+                                        isSuccess = true,
+                                        type = "INFO"
+                                    )
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF10B981),
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
+                    )
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+                )
+
+                // Row 2: Change PIN
+                val appLockPin by viewModel.appLockPin.collectAsState()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showChangePinDialog = true },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFF6366F1).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.VpnKey,
+                            contentDescription = null,
+                            tint = Color(0xFF6366F1),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "কাস্টম ব্যাকআপ পিন (PIN)" else "Custom Fallback PIN",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "পিন পরিবর্তন করতে স্পর্শ করুন" else "Tap to update your 4-digit backup PIN",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Text(
+                        text = "••••",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.LightGray else Color.DarkGray,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+                )
+
+                // Row 3: Auto-Lock Delay
+                val autoLockTimeoutSeconds by viewModel.autoLockTimeoutSeconds.collectAsState()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color(0xFF8B5CF6).copy(alpha = 0.12f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Schedule,
+                                contentDescription = null,
+                                tint = Color(0xFF8B5CF6),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "অটো-লক সময়সীমা" else "Auto-Lock Timeout",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                            Text(
+                                text = if (language == AppLanguage.BN) "অ্যাপ ব্যাকগ্রাউন্ডে গেলে কতক্ষণ পর লক হবে" else "Specify the time delay before the app auto-locks",
+                                fontSize = 12.sp,
+                                color = if (isDark) Color.Gray else Color(0xFF64748B)
+                            )
+                        }
+                    }
+                    
+                    val lockOptions = listOf(
+                        0L to (if (language == AppLanguage.BN) "তাত্ক্ষণিক" else "Immediately"),
+                        60L to (if (language == AppLanguage.BN) "১ মিনিট" else "1 Minute"),
+                        300L to (if (language == AppLanguage.BN) "৫ মিনিট" else "5 Minutes")
+                    )
+                    
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 56.dp)
+                    ) {
+                        lockOptions.forEach { (seconds, label) ->
+                            val isSelected = autoLockTimeoutSeconds == seconds
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isSelected) Color(0xFF8B5CF6)
+                                        else (if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                                    )
+                                    .clickable {
+                                        viewModel.setAutoLockTimeoutSeconds(context, seconds)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color.White else (if (isDark) Color.LightGray else Color(0xFF475569))
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+                )
+
+                // Row 4: Screen Security (FLAG_SECURE)
+                val isScreenSecurityEnabled by viewModel.isScreenSecurityEnabled.collectAsState()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.VisibilityOff,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "স্ক্রিন সিকিউরিটি (প্রাইভেসি)" else "Screen Security (Privacy)",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "সাম্প্রতিক অ্যাপস সুইচারে স্ক্রিন ব্লার করুন ও স্ক্রিনশট নেওয়া বন্ধ করুন" else "Hide preview in recent apps switcher and prevent screenshots",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Switch(
+                        checked = isScreenSecurityEnabled,
+                        onCheckedChange = { enabled ->
+                            viewModel.setScreenSecurityEnabled(context, enabled)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFFEF4444),
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
+                    )
+                }
+            }
+        }
+
         // --- 5. DATA BACKUP & RESTORE CARD ---
         var pendingLocalRestoreData by remember { mutableStateOf<com.example.data.FinanceBackup?>(null) }
         var pendingLocalRestoreStats by remember { mutableStateOf<com.example.ui.viewmodel.BackupStats?>(null) }
@@ -17582,46 +18317,12 @@ fun ModernSplashProgressIndicator(
 fun AnimatedAppLogo(
     modifier: Modifier = Modifier
 ) {
-    val arrowProgress = remember { androidx.compose.animation.core.Animatable(0f) }
-    val bar1Progress = remember { androidx.compose.animation.core.Animatable(0f) }
-    val bar2Progress = remember { androidx.compose.animation.core.Animatable(0f) }
-    val bar3Progress = remember { androidx.compose.animation.core.Animatable(0f) }
-    val logoScale = remember { androidx.compose.animation.core.Animatable(0.92f) }
+    // 1. Entrance animation values
+    val logoScale = remember { androidx.compose.animation.core.Animatable(0f) }
+    val equalizerAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Step 1: Purple Arrow sweeps along its curve from start to tip
-        arrowProgress.animateTo(
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 500,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
-        // Step 2: Green Bar (Bar 1) rises from bottom to top
-        bar1Progress.animateTo(
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 280,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
-        // Step 3: Orange Bar (Bar 2) rises from bottom to top
-        bar2Progress.animateTo(
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 280,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
-        // Step 4: Blue Bar (Bar 3) rises from bottom to top
-        bar3Progress.animateTo(
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 280,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
-        // Step 5: Gentle spring bounce settle for complete logo
+        // Step 1: Scale up the whole logo from small to large with a bouncy settle
         logoScale.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.spring(
@@ -17629,7 +18330,65 @@ fun AnimatedAppLogo(
                 stiffness = androidx.compose.animation.core.Spring.StiffnessLow
             )
         )
+        // Step 2: Smoothly start the live equalizer bar animation
+        equalizerAlpha.animateTo(
+            targetValue = 1f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 600,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
     }
+
+    // 2. Unconditional live equalizer animations using infinite transition with varying properties
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "LiveEqualizer")
+
+    // Bar 1 (Green) live scale between 0.45f and 1.25f (smooth, medium speed)
+    val bar1LiveValue by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1.25f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(
+                durationMillis = 480,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            ),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "Bar1"
+    )
+
+    // Bar 2 (Orange) live scale between 0.35f and 1.35f (smooth, faster speed)
+    val bar2LiveValue by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.35f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(
+                durationMillis = 360,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            ),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "Bar2"
+    )
+
+    // Bar 3 (Blue) live scale between 0.5f and 1.15f (smooth, slower speed)
+    val bar3LiveValue by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.15f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(
+                durationMillis = 580,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            ),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "Bar3"
+    )
+
+    // Interpolate the bar scales smoothly from 1f (initial static state) to their live values
+    val bar1Scale = 1.0f + (bar1LiveValue - 1.0f) * equalizerAlpha.value
+    val bar2Scale = 1.0f + (bar2LiveValue - 1.0f) * equalizerAlpha.value
+    val bar3Scale = 1.0f + (bar3LiveValue - 1.0f) * equalizerAlpha.value
 
     val painterArrow = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_circle_arrow)
     val painterBar1 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar1)
@@ -17642,74 +18401,34 @@ fun AnimatedAppLogo(
         val w = size.width
         val h = size.height
 
-        // White circle background (solid, non-clipping)
+        // White circle background
         drawCircle(
             color = Color.White,
             radius = w * 0.49f,
             center = androidx.compose.ui.geometry.Offset(w / 2f, h / 2f)
         )
 
-        // 1. Purple Arrow & Arc Layer (Sweeps along curve from start to tip)
-        if (arrowProgress.value >= 1f) {
-            with(painterArrow) { draw(size) }
-        } else if (arrowProgress.value > 0f) {
-            val sweepPath = androidx.compose.ui.graphics.Path().apply {
-                val cx = w / 2f
-                val cy = h / 2f
-                val r = Math.max(w, h) * 1.5f
-                moveTo(cx, cy)
-                arcTo(
-                    rect = androidx.compose.ui.geometry.Rect(
-                        left = cx - r,
-                        top = cy - r,
-                        right = cx + r,
-                        bottom = cy + r
-                    ),
-                    startAngleDegrees = 140f,
-                    sweepAngleDegrees = 360f * arrowProgress.value,
-                    forceMoveTo = false
-                )
-                close()
-            }
-            clipPath(sweepPath) {
-                with(painterArrow) { draw(size) }
-            }
+        // 1. Purple Arrow & Arc Layer: Completely stable and fixed!
+        with(painterArrow) {
+            draw(size, alpha = 1f)
         }
 
-        // 2. Bar 1 (Green: grows upwards from bottom)
-        if (bar1Progress.value >= 1f) {
+        // 2. Bar 1 (Green: scales upwards from its fixed bottom line)
+        val bottomY1 = 318.6f / 522.26f * h
+        scale(scaleX = 1f, scaleY = bar1Scale, pivot = androidx.compose.ui.geometry.Offset(w / 2f, bottomY1)) {
             with(painterBar1) { draw(size) }
-        } else if (bar1Progress.value > 0f) {
-            val bottomY = 318.6f / 522.26f * h
-            val height = 159.7f / 522.26f * h
-            val currentTop = bottomY - (height * bar1Progress.value)
-            clipRect(left = 0f, top = currentTop, right = w, bottom = h) {
-                with(painterBar1) { draw(size) }
-            }
         }
 
-        // 3. Bar 2 (Orange: grows upwards from bottom)
-        if (bar2Progress.value >= 1f) {
+        // 3. Bar 2 (Orange: scales upwards from its fixed bottom line)
+        val bottomY2 = 263.8f / 522.26f * h
+        scale(scaleX = 1f, scaleY = bar2Scale, pivot = androidx.compose.ui.geometry.Offset(w / 2f, bottomY2)) {
             with(painterBar2) { draw(size) }
-        } else if (bar2Progress.value > 0f) {
-            val bottomY = 263.8f / 522.26f * h
-            val height = 194.5f / 522.26f * h
-            val currentTop = bottomY - (height * bar2Progress.value)
-            clipRect(left = 0f, top = currentTop, right = w, bottom = h) {
-                with(painterBar2) { draw(size) }
-            }
         }
 
-        // 4. Bar 3 (Blue: grows upwards from bottom)
-        if (bar3Progress.value >= 1f) {
+        // 4. Bar 3 (Blue: scales upwards from its fixed bottom line)
+        val bottomY3 = 278.3f / 522.26f * h
+        scale(scaleX = 1f, scaleY = bar3Scale, pivot = androidx.compose.ui.geometry.Offset(w / 2f, bottomY3)) {
             with(painterBar3) { draw(size) }
-        } else if (bar3Progress.value > 0f) {
-            val bottomY = 278.3f / 522.26f * h
-            val height = 176.7f / 522.26f * h
-            val currentTop = bottomY - (height * bar3Progress.value)
-            clipRect(left = 0f, top = currentTop, right = w, bottom = h) {
-                with(painterBar3) { draw(size) }
-            }
         }
     }
 }
