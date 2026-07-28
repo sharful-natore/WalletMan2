@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="522dp"
+    android:height="522dp"
+    android:viewportWidth="522.26"
+    android:viewportHeight="522.26">
+    <!-- White Circle Background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5.13,261.13a256,256 90,1 0,512 0a256,256 90,1 0,-512 0z"/>
+    <!-- Trend Arc / Arrow (Periwinkle Violet) -->
+    <path
+        android:fillColor="#6C71F6"
+        android:fillType="evenOdd"
+        android:pathData="M311.73,102.18L311.62,129.95C367.75,150.49 407.71,204.48 407.45,267.71C407.13,348.36 341.48,413.47 260.83,413.15C209.54,412.94 164.53,386.32 138.65,346.2L201.57,297.11L290.83,330.96L351.34,247.64L369.59,261.26L377.04,188.3L309.51,217.09L327.16,230.94L279.48,295.81L197.89,262.72L124.21,317.16C124.17,317.04 124.26,317.29 124.21,317.16L102.23,333.41C106.08,342.65 110.95,351.32 116.28,359.67L117.78,362.48L118.08,362.25C148.85,408.48 201.02,439.28 260.73,439.52C355.94,439.91 433.44,363.03 433.82,267.82C434.13,189.85 382.66,123.77 311.73,102.18Z"/>
+</vector>

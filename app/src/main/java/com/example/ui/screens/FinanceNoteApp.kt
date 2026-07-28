@@ -17589,11 +17589,11 @@ fun AnimatedAppLogo(
     val logoScale = remember { androidx.compose.animation.core.Animatable(0.92f) }
 
     LaunchedEffect(Unit) {
-        // Step 1: Arrow draws from start to end
+        // Step 1: Arrow draws from start to end (450ms)
         arrowProgress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 700,
+                durationMillis = 500,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
@@ -17601,7 +17601,7 @@ fun AnimatedAppLogo(
         bar1Progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 350,
+                durationMillis = 300,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
@@ -17609,7 +17609,7 @@ fun AnimatedAppLogo(
         bar2Progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 350,
+                durationMillis = 300,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
@@ -17617,7 +17617,7 @@ fun AnimatedAppLogo(
         bar3Progress.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 350,
+                durationMillis = 300,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
@@ -17630,118 +17630,76 @@ fun AnimatedAppLogo(
         )
     }
 
-    val arrowPathData = "M311.73,102.18L311.62,129.95C367.75,150.49 407.71,204.48 407.45,267.71C407.13,348.36 341.48,413.47 260.83,413.15C209.54,412.94 164.53,386.32 138.65,346.2L201.57,297.11L290.83,330.96L351.34,247.64L369.59,261.26L377.04,188.3L309.51,217.09L327.16,230.94L279.48,295.81L197.89,262.72L124.21,317.16C124.17,317.04 124.26,317.29 124.21,317.16L102.23,333.41C106.08,342.65 110.95,351.32 116.28,359.67L117.78,362.48L118.08,362.25C148.85,408.48 201.02,439.28 260.73,439.52C355.94,439.91 433.44,363.03 433.82,267.82C434.13,189.85 382.66,123.77 311.73,102.18Z"
-    val bar1PathData = "M101.5,318.6L156.63,275.92L156.9,158.9L101.42,159.19L101.5,318.6Z"
-    val bar2PathData = "M173.07,263.79L196.7,246.07L228.59,259.43L228.12,69.32L173.12,69.31L173.07,263.79Z"
-    val bar3PathData = "M245.02,266.3L273.59,278.26L299.27,243.05L300.21,101.59L244.71,101.58L245.02,266.3Z"
-
-    val arrowPath = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(arrowPathData).toPath() }
-    val bar1Path = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(bar1PathData).toPath() }
-    val bar2Path = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(bar2PathData).toPath() }
-    val bar3Path = remember { androidx.compose.ui.graphics.vector.PathParser().parsePathString(bar3PathData).toPath() }
+    val painterArrow = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_circle_arrow)
+    val painterBar1 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar1)
+    val painterBar2 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar2)
+    val painterBar3 = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_bar3)
 
     androidx.compose.foundation.Canvas(
         modifier = modifier.scale(logoScale.value)
     ) {
         val w = size.width
         val h = size.height
-        val viewportSize = 522.26f
-        val scaleX = w / viewportSize
-        val scaleY = h / viewportSize
 
-        // 0. White Circle Background
-        drawCircle(
-            color = Color.White,
-            radius = 256f * scaleX,
-            center = androidx.compose.ui.geometry.Offset(261.13f * scaleX, 261.13f * scaleY)
-        )
-
-        // 1. Arrow Animation (Periwinkle Violet: #6C71F6)
-        if (arrowProgress.value > 0f) {
-            val sweepClip = androidx.compose.ui.graphics.Path().apply {
-                val cx = 261.13f * scaleX
-                val cy = 261.13f * scaleY
+        // 1. Arrow / Background Layer
+        if (arrowProgress.value >= 1f) {
+            with(painterArrow) { draw(size) }
+        } else if (arrowProgress.value > 0f) {
+            val sweepPath = androidx.compose.ui.graphics.Path().apply {
+                val cx = w / 2f
+                val cy = h / 2f
                 moveTo(cx, cy)
                 arcTo(
                     rect = androidx.compose.ui.geometry.Rect(
-                        left = cx - 310f * scaleX,
-                        top = cy - 310f * scaleY,
-                        right = cx + 310f * scaleX,
-                        bottom = cy + 310f * scaleY
+                        left = cx - w,
+                        top = cy - h,
+                        right = cx + w,
+                        bottom = cy + h
                     ),
                     startAngleDegrees = 110f,
-                    sweepAngleDegrees = 340f * arrowProgress.value,
+                    sweepAngleDegrees = 360f * arrowProgress.value,
                     forceMoveTo = false
                 )
                 close()
             }
-            clipPath(sweepClip) {
-                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-                    drawPath(
-                        path = arrowPath,
-                        color = Color(0xFF6C71F6)
-                    )
-                }
+            clipPath(sweepPath) {
+                with(painterArrow) { draw(size) }
             }
         }
 
-        // 2. Bar 1 Animation (Green: #00C800)
-        if (bar1Progress.value > 0f) {
-            val bottomY = 318.6f * scaleY
-            val height = 159.7f * scaleY
+        // 2. Bar 1 (Green)
+        if (bar1Progress.value >= 1f) {
+            with(painterBar1) { draw(size) }
+        } else if (bar1Progress.value > 0f) {
+            val bottomY = 318.6f / 522.26f * h
+            val height = 159.7f / 522.26f * h
             val currentTop = bottomY - (height * bar1Progress.value)
-            clipRect(
-                left = 0f,
-                top = currentTop,
-                right = w,
-                bottom = bottomY + 10f
-            ) {
-                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-                    drawPath(
-                        path = bar1Path,
-                        color = Color(0xFF00C800)
-                    )
-                }
+            clipRect(left = 0f, top = currentTop, right = w, bottom = h) {
+                with(painterBar1) { draw(size) }
             }
         }
 
-        // 3. Bar 2 Animation (Orange: #FF8A00)
-        if (bar2Progress.value > 0f) {
-            val bottomY = 263.8f * scaleY
-            val height = 194.5f * scaleY
+        // 3. Bar 2 (Orange)
+        if (bar2Progress.value >= 1f) {
+            with(painterBar2) { draw(size) }
+        } else if (bar2Progress.value > 0f) {
+            val bottomY = 263.8f / 522.26f * h
+            val height = 194.5f / 522.26f * h
             val currentTop = bottomY - (height * bar2Progress.value)
-            clipRect(
-                left = 0f,
-                top = currentTop,
-                right = w,
-                bottom = bottomY + 10f
-            ) {
-                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-                    drawPath(
-                        path = bar2Path,
-                        color = Color(0xFFFF8A00)
-                    )
-                }
+            clipRect(left = 0f, top = currentTop, right = w, bottom = h) {
+                with(painterBar2) { draw(size) }
             }
         }
 
-        // 4. Bar 3 Animation (Blue: #3082FF)
-        if (bar3Progress.value > 0f) {
-            val bottomY = 278.3f * scaleY
-            val height = 176.7f * scaleY
+        // 4. Bar 3 (Blue)
+        if (bar3Progress.value >= 1f) {
+            with(painterBar3) { draw(size) }
+        } else if (bar3Progress.value > 0f) {
+            val bottomY = 278.3f / 522.26f * h
+            val height = 176.7f / 522.26f * h
             val currentTop = bottomY - (height * bar3Progress.value)
-            clipRect(
-                left = 0f,
-                top = currentTop,
-                right = w,
-                bottom = bottomY + 10f
-            ) {
-                scale(scaleX, scaleY, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-                    drawPath(
-                        path = bar3Path,
-                        color = Color(0xFF3082FF)
-                    )
-                }
+            clipRect(left = 0f, top = currentTop, right = w, bottom = h) {
+                with(painterBar3) { draw(size) }
             }
         }
     }

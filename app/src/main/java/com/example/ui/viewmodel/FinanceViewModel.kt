@@ -3972,16 +3972,25 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun checkDebtReminders() {
         viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val lastGlobalCheck = prefs.getLong("last_global_debt_check_time", 0L)
+            val oneHourMs = 60 * 60 * 1000L
+            if (now - lastGlobalCheck < oneHourMs) {
+                return@launch
+            }
+            prefs.edit().putLong("last_global_debt_check_time", now).apply()
+
             val allPersons = repository.allPersons.first()
             val allTransactions = repository.allTransactions.first()
             val language = _language.value
             
+            val fiveDaysMs = 5L * 24 * 60 * 60 * 1000L
             val eligiblePersons = allPersons.filter { person ->
                 val personTx = allTransactions.filter { it.personId == person.id }
                 if (personTx.isEmpty()) return@filter false
                 
                 val oldestTx = personTx.minByOrNull { it.timestamp } ?: return@filter false
-                val daysOld = (System.currentTimeMillis() - oldestTx.timestamp) / (1000L * 60 * 60 * 24)
+                val daysOld = (now - oldestTx.timestamp) / (1000L * 60 * 60 * 24)
                 
                 if (daysOld < 7) return@filter false
                 
@@ -3995,9 +4004,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 
                 val log = repository.getDebtNotificationLog(person.id)
                 val lastNotified = log?.lastNotifiedAt ?: 0L
-                val daysSinceLastNotify = (System.currentTimeMillis() - lastNotified) / (1000L * 60 * 60 * 24)
+                val timeSinceLastNotify = now - lastNotified
                 
-                daysSinceLastNotify >= 3
+                timeSinceLastNotify >= fiveDaysMs
             }
             
             if (eligiblePersons.isNotEmpty()) {

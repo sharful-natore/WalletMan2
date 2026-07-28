@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="522dp"
+    android:height="522dp"
+    android:viewportWidth="522.26"
+    android:viewportHeight="522.26">
+    <!-- Chart Bar 2 (Orange) -->
+    <path
+        android:fillColor="#FF8A00"
+        android:pathData="M173.07,263.79L196.7,246.07L228.59,259.43L228.12,69.32L173.12,69.31L173.07,263.79Z"/>
+</vector>

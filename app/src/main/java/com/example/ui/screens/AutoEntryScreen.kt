@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -503,14 +505,15 @@ fun AutoEntryFormDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .wrapContentHeight(),
+                .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(24.dp),
             color = if (isDark) Color(0xFF1E1E1E) else Color.White
         ) {
             Column(
                 modifier = Modifier
+                    .fillMaxSize()
                     .padding(20.dp)
-                    .wrapContentHeight(),
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
