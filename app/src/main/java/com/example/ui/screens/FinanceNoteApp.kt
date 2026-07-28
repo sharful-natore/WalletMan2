@@ -15628,6 +15628,45 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // App Logo Section
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                            .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.app_logo_new),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Text(
+                        text = "Finance Note",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "আপনার বিশ্বস্ত পার্সোনাল ফাইন্যান্স অ্যাসিস্ট্যান্ট" else "Your Trusted Personal Finance Assistant",
+                        fontSize = 11.sp,
+                        color = if (isDark) Color.Gray else Color(0xFF64748B),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                
+                HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -16015,22 +16054,29 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "১. তথ্য সংগ্রহ ও ব্যবহার:\nFinance Note একটি আধুনিক ও নিরাপদ পার্সোনাল ফাইন্যান্স ম্যানেজার। আপনার এন্ট্রি করা সমস্ত ডাটা ডিফল্টভাবে আপনার ডিভাইসের লোকাল SQLite (Room) ডাটাবেজে অত্যন্ত সুরক্ষিতভাবে সংরক্ষিত থাকে। আপনি যদি স্বেচ্ছায় 'ক্লাউড সিঙ্ক' অপশনটি চালু করেন তবেই তা আমাদের এনক্রিপ্টেড ফায়ারবেস ক্লাউড সার্ভারে সিঙ্ক হবে।"
-                            else "1. Data Collection & Usage:\nFinance Note is a modern and secure personal finance manager. By default, all your data is stored locally on your device in a secure SQLite (Room) database. Data is only synchronized with our encrypted Firebase Cloud server if you explicitly enable the 'Cloud Sync' feature.",
+                            "১. তথ্য সংগ্রহ ও ব্যবহার:\nFinance Note একটি আধুনিক ও নিরাপদ পার্সোনাল ফাইন্যান্স ম্যানেজার। আপনার এন্ট্রি করা সমস্ত ডাটা (লেনদেন, বাজেট, ঋণ, সঞ্চয় লক্ষ্য ও একাধিক ওয়ার্কস্পেস) ডিফল্টভাবে আপনার ডিভাইসের লোকাল SQLite (Room) ডাটাবেজে অত্যন্ত সুরক্ষিতভাবে সংরক্ষিত থাকে। আপনার সম্মতি ছাড়া কোনো তথ্য আমাদের সার্ভারে যাবে না।"
+                            else "1. Data Collection & Usage:\nFinance Note is a modern and secure personal finance manager. By default, all your entry data (transactions, budgets, debts, savings goals, and multiple workspaces) is stored locally on your device in a secure SQLite (Room) database. No data is sent to our servers without your explicit consent.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "২. এন্ড-টু-এন্ড AES-256 এনক্রিপশন:\nআপনার সর্বোচ্চ নিরাপত্তার কথা মাথায় রেখে, গুগল ড্রাইভ ব্যাকআপ, ক্লাউড সিঙ্ক, এবং লোকাল ব্যাকআপ ফাইলসহ সকল প্রকার তথ্য মিলিটারী-গ্রেড AES-256 এনক্রিপশন দ্বারা এনক্রিপ্ট করা হয়। যার ফলে আপনার পাসওয়ার্ড বা ব্যাকআপ কোড ছাড়া কেউ আপনার তথ্য ডিক্রিপ্ট করতে পারবে না।"
-                            else "2. End-to-End AES-256 Encryption:\nFor your maximum security, all backup formats—including Google Drive backups, cloud sync records, and local files—are encrypted using military-grade AES-256 encryption. This ensures that only you, with your unique backup code, can access your data.",
+                            "২. এন্ড-টু-এন্ড AES-256 এনক্রিপশন:\nআপনার সর্বোচ্চ নিরাপত্তার কথা মাথায় রেখে, গুগল ড্রাইভ ব্যাকআপ, ক্লাউড সিঙ্ক, এবং লোকাল ব্যাকআপ ফাইলসহ সকল প্রকার ব্যাকআপ ফাইল মিলিটারী-গ্রেড AES-256 এনক্রিপশন দ্বারা এনক্রিপ্ট করা হয়। যার ফলে আপনার সিক্রেট পাসওয়ার্ড বা ব্যাকআপ কোড ছাড়া কেউ আপনার তথ্য ডিক্রিপ্ট করতে পারবে না।"
+                            else "2. End-to-End AES-256 Encryption:\nFor your maximum security, all backup formats—including Google Drive backups, cloud sync records, and local files—are encrypted on-device using military-grade AES-256 encryption. This ensures that only you, with your unique backup code or password, can decrypt and access your data.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "৩. নিরাপদ ব্যাকআপ পলিসি:\n Finance Note আপনার কোনো ব্যক্তিগত তথ্য বা পাসওয়ার্ড আমাদের সার্ভারে জমা রাখে না। আপনার গুগল ড্রাইভ ব্যাকআপ আপনার নিজস্ব ড্রাইভ ফোল্ডারে সংরক্ষিত থাকে যা সম্পূর্ণ আপনার নিয়ন্ত্রণাধীন।"
-                            else "3. Secure Backup Policy:\nFinance Note does not store any of your private credentials or passwords on our servers. Your Google Drive backups are stored in your own personal drive folder, remaining under your full control at all times.",
+                            "৩. বায়োমেট্রিক ও স্ক্রিন সিকিউরিটি:\nআপনার ফিন্যান্সিয়াল তথ্যের গোপনীয়তা রক্ষায় অ্যাপে ফিঙ্গারপ্রিন্ট/ফেইস লক এবং স্ক্রিনশট প্রতিরোধ ব্যবস্থা (FLAG_SECURE) যুক্ত করা হয়েছে। আপনার বায়োমেট্রিক ডাটা কখনোই অ্যাপ বা আমাদের সার্ভারে সংরক্ষিত হয় না; এটি সম্পূর্ণ অ্যান্ড্রয়েড অপারেটিং সিস্টেমের নিরাপদ কী-স্টোরে পরিচালিত হয়। স্ক্রিনশট ব্লক থাকার কারণে অন্য কেউ আপনার অজান্তে অ্যাপের কোনো স্ক্রিনশট বা স্ক্রিন রেকর্ড করতে পারবে না।"
+                            else "3. Biometrics & Screen Security:\nTo protect your financial privacy, Finance Note supports Biometric App Lock (Fingerprint/Face unlock) and anti-screenshot protection (FLAG_SECURE). Your biometric credentials are never collected or stored by the app or our servers; they are processed entirely through Android's secure hardware enclave. Screen protection prevents unauthorized screen captures, screen sharing, or recent task view exposures of your financial sheets.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.LightGray else Color(0xFF334155)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "৪. ভয়েস ও ড্রাফট উইজেট পলিসি:\nলেনদেনের ড্রাফট এবং ভয়েস ইনপুট ফিচারগুলি ব্যবহারের সময় আপনার ভয়েস এবং টাইপ করা টেক্সট অন-ডিভাইস প্রসেসিং এর মাধ্যমে বিশ্লেষণ করা হয়, যা সম্পূর্ণ গোপনীয় এবং কোনো থার্ড-পার্টি বা ক্লাউডে আপলোড করা হয় না।"
+                            else "4. Voice & Draft Widget Privacy:\nWhen utilizing voice input and draft features, all audio recordings and text inputs are processed locally on your device, ensuring maximum privacy without third-party exposure.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
@@ -16063,22 +16109,29 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "১. অ্যাপের ব্যবহার:\nFinance Note অ্যাপটি শুধুমাত্র ব্যক্তিগত ব্যবহারের জন্য তৈরি। ভুল এন্ট্রি, ডিভাইসের হার্ডওয়্যার ত্রুটি বা পাসওয়ার্ড ভুলে যাওয়ার কারণে ডাটা নষ্ট হলে কর্তৃপক্ষ দায়ী থাকবে না। তবে আমরা সর্বদা আপনার ডাটা সুরক্ষিত রাখতে সচেষ্ট।"
-                            else "1. App Usage:\nFinance Note is strictly for personal financial management. The developers are not liable for data loss caused by incorrect manual entries, hardware failure, or forgotten backup passwords.",
+                            "১. অ্যাপের ব্যবহার ও দ্বায়বদ্ধতা:\nFinance Note অ্যাপটি ব্যক্তিগত ব্যবহারের জন্য তৈরি। ভুল এন্ট্রি, ডিভাইসের হার্ডওয়্যার বা সফটওয়্যার ত্রুটির কারণে ডাটা নষ্ট হলে বা ইউজার নিজের পাসওয়ার্ড/ব্যাকআপ কোড ভুলে গেলে কর্তৃপক্ষ দায়ী থাকবে না। তবে ডাটা নিরাপদে ব্যাকআপ রাখতে আমরা ক্লাউড ও ড্রাইভ ব্যাকআপ ফিচার প্রদান করেছি।"
+                            else "1. App Usage & Responsibility:\nFinance Note is built strictly for personal financial management. The developers are not liable for data loss caused by incorrect manual entries, hardware/software failure, or forgotten backup codes/passwords. Users are highly encouraged to perform regular local, Google Drive, or cloud backups.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "২. ক্লাউড ও সিকিউরিটি:\nক্লাউড সিঙ্ক এবং গুগল ড্রাইভ ব্যাকআপ ফিচার ব্যবহারের জন্য ইন্টারনেট সংযোগ আবশ্যক। আপনার সিকিউরিটির স্বার্থে সমস্ত ব্যাকআপ ফাইল ডিভাইস থেকেই এনক্রিপ্ট হয়ে আপলোড হয়।"
-                            else "2. Cloud & Security:\nAn active internet connection is required for Cloud Sync and Google Drive backup features. For your security, all backup files are encrypted on-device before being uploaded.",
+                            "২. সিকিউরিটি এবং বায়োমেট্রিক লক:\nঅ্যাপটি সুরক্ষিত রাখতে বায়োমেট্রিক এবং পিন লক ফিচার দেওয়া হয়েছে। আপনার ডিভাইসের ওএস সেটিংসে ফিঙ্গারপ্রিন্ট/ফেস লক সঠিকভাবে কনফিগার করা থাকা বাঞ্ছনীয়। লক ফিচার সঠিকভাবে কাজ করার জন্য সামঞ্জস্যপূর্ণ অ্যান্ড্রয়েড ডিভাইস প্রয়োজন।"
+                            else "2. Security & Biometric Lock:\nTo secure your personal data, the app provides Biometric and PIN Lock features. It is the user's responsibility to properly configure their device's native lock systems (fingerprint, face unlock, or system PIN). Biometric authentication capability is dependent on device compatibility and Android version.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
                     Text(
                         text = if (language == AppLanguage.BN)
-                            "৩. পলিসি পরিবর্তন:\nইউজার এক্সপেরিয়েন্স এবং সিকিউরিটি আপডেট বজায় রাখতে Finance Note যেকোনো সময় অ্যাপের শর্তাবলী ও ফিচার পরিবর্তন করার অধিকার সংরক্ষণ করে।"
-                            else "3. Policy Changes:\nFinance Note reserves the right to update these terms and features at any time to ensure the highest standards of security and user experience.",
+                            "৩. ড্রাফট উইজেট ও কাস্টমাইজেশন:\nড্রাফট উইজেট এবং উইজেট কাস্টমাইজেশন ফিচারগুলি অ্যান্ড্রয়েড হোম স্ক্রিন উইজেট এপিআই ব্যবহার করে। সিস্টেম লঞ্চার বা মেমরির সীমাবদ্ধতার কারণে উইজেট আপডেট হতে দেরি হলে সেটি ফোনের কনফিগারেশনের উপর নির্ভর করে।"
+                            else "3. Draft Widgets & Customization:\nDraft widgets and home-screen customization settings rely on native Android AppWidget APIs. Performance or update intervals may vary depending on device memory, battery-saving policies, or system launcher behaviors.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.LightGray else Color(0xFF334155)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "৪. পলিসি ও ফিচার পরিবর্তন:\nউত্তম সেবা এবং সর্বোচ্চ সিকিউরিটি বজায় রাখতে Finance Note যেকোনো সময় অ্যাপের শর্তাবলী, ইন্টারফেস এবং ফিচার পরিবর্তন করার পূর্ণ অধিকার সংরক্ষণ করে।"
+                            else "4. Policy & Feature Updates:\nTo ensure the best user experience and highest standards of security, Finance Note reserves the right to update these terms, interfaces, and features at any time.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )

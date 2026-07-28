@@ -18,8 +18,8 @@ object BiometricHelper {
     fun getBiometricStatus(context: Context): BiometricStatus {
         return try {
             val biometricManager = BiometricManager.from(context)
-            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or 
-                    BiometricManager.Authenticators.BIOMETRIC_WEAK
+            // Target only BIOMETRIC_STRONG to bypass weak non-standard 2D face unlock bugs on devices like Oppo/Vivo/MIUI
+            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
             when (biometricManager.canAuthenticate(authenticators)) {
                 BiometricManager.BIOMETRIC_SUCCESS -> BiometricStatus.AVAILABLE
                 BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> BiometricStatus.NO_HARDWARE
@@ -27,6 +27,7 @@ object BiometricHelper {
                 else -> BiometricStatus.UNAVAILABLE
             }
         } catch (e: Throwable) {
+            e.printStackTrace()
             BiometricStatus.UNAVAILABLE
         }
     }
@@ -56,7 +57,12 @@ object BiometricHelper {
         try {
             val status = getBiometricStatus(activity)
             if (status != BiometricStatus.AVAILABLE) {
-                // Hardware missing, not enrolled, or unavailable -> Fallback to PIN
+                val errorMsg = when (status) {
+                    BiometricStatus.NO_HARDWARE -> "No biometric hardware detected."
+                    BiometricStatus.NOT_ENROLLED -> "No biometrics enrolled on this device."
+                    else -> "Biometric security is currently unavailable."
+                }
+                onError(errorMsg)
                 onUsePinFallback()
                 return
             }
@@ -69,6 +75,7 @@ object BiometricHelper {
                         onSuccess()
                     } catch (t: Throwable) {
                         t.printStackTrace()
+                        onError(t.localizedMessage ?: "Success handler exception")
                     }
                 }
 
@@ -77,11 +84,6 @@ object BiometricHelper {
                     try {
                         if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON || 
                             errorCode == BiometricPrompt.ERROR_USER_CANCELED) {
-                            onUsePinFallback()
-                        } else if (errorCode == BiometricPrompt.ERROR_LOCKOUT || 
-                                   errorCode == BiometricPrompt.ERROR_LOCKOUT_PERMANENT ||
-                                   errorCode == BiometricPrompt.ERROR_NO_BIOMETRICS ||
-                                   errorCode == BiometricPrompt.ERROR_HW_UNAVAILABLE) {
                             onUsePinFallback()
                         } else {
                             onError(errString.toString())
@@ -96,17 +98,50 @@ object BiometricHelper {
                 }
             }
 
-            val biometricPrompt = BiometricPrompt(activity, executor, callback)
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle(title)
-                .setSubtitle(subtitle)
-                .setNegativeButtonText(negativeButtonText)
-                .build()
+            val biometricPrompt = try {
+                BiometricPrompt(activity, executor, callback)
+            } catch (e: Throwable) {
+                e.printStackTrace()
+                onError("Initialization failed: ${e.localizedMessage}")
+                onUsePinFallback()
+                return
+            }
 
-            biometricPrompt.authenticate(promptInfo)
+            val promptInfo = try {
+                BiometricPrompt.PromptInfo.Builder()
+                    .setTitle(title)
+                    .setSubtitle(subtitle)
+                    .setNegativeButtonText(negativeButtonText)
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build()
+            } catch (e: Throwable) {
+                e.printStackTrace()
+                // Fallback to standard builder without explicit strong requirement if API doesn't support setAllowedAuthenticators on older SDK
+                try {
+                    BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(title)
+                        .setSubtitle(subtitle)
+                        .setNegativeButtonText(negativeButtonText)
+                        .build()
+                } catch (ex: Throwable) {
+                    ex.printStackTrace()
+                    onError("Prompt builder failed: ${ex.localizedMessage}")
+                    onUsePinFallback()
+                    return
+                }
+            }
+
+            try {
+                biometricPrompt.authenticate(promptInfo)
+            } catch (e: Throwable) {
+                e.printStackTrace()
+                onError("Failed to launch authenticating prompt: ${e.localizedMessage}")
+                onUsePinFallback()
+            }
         } catch (e: Throwable) {
             e.printStackTrace()
             try {
+                onError("System error: ${e.localizedMessage}")
                 onUsePinFallback()
             } catch (t: Throwable) {
                 t.printStackTrace()

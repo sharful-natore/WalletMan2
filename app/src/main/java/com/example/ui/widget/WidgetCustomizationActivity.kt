@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -156,6 +157,11 @@ fun WidgetCustomizationScreen(onBackPressed: () -> Unit) {
                         activeColorPicker = "buttonBgColor" 
                     }
                 }
+                item {
+                    ColorSettingItem("Info Icon Color", Color(config.infoIconColor)) { 
+                        activeColorPicker = "infoIconColor" 
+                    }
+                }
 
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -186,6 +192,7 @@ fun WidgetCustomizationScreen(onBackPressed: () -> Unit) {
                     "listItemTextColor" -> Color(config.listItemTextColor)
                     "buttonTintColor" -> Color(config.buttonTintColor)
                     "buttonBgColor" -> Color(config.buttonBgColor)
+                    "infoIconColor" -> Color(config.infoIconColor)
                     else -> Color.White
                 },
                 onDismiss = { activeColorPicker = null },
@@ -199,6 +206,7 @@ fun WidgetCustomizationScreen(onBackPressed: () -> Unit) {
                         "listItemTextColor" -> config.copy(listItemTextColor = selectedColor.toArgb())
                         "buttonTintColor" -> config.copy(buttonTintColor = selectedColor.toArgb())
                         "buttonBgColor" -> config.copy(buttonBgColor = selectedColor.toArgb())
+                        "infoIconColor" -> config.copy(infoIconColor = selectedColor.toArgb())
                         else -> config
                     }
                     activeColorPicker = null
@@ -312,11 +320,23 @@ fun WidgetPreview(config: WidgetDraftConfig) {
                             )
                         }
                         if (config.isSubtitleVisible) {
-                            Text(
-                                "দ্রুত লেনদেন ড্রাফট করে রাখুন",
-                                color = Color(config.subtitleTextColor),
-                                fontSize = 11.sp
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Text(
+                                    "দ্রুত লেনদেন ড্রাফট করে রাখুন",
+                                    color = Color(config.subtitleTextColor),
+                                    fontSize = 11.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Info",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color(config.infoIconColor)
+                                )
+                            }
                         }
                     }
                     

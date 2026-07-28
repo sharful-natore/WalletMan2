@@ -82,6 +82,8 @@ class DraftWidgetProvider : AppWidgetProvider() {
             
             views.setTextColor(R.id.widget_subtitle, config.subtitleTextColor)
             views.setViewVisibility(R.id.widget_subtitle, if (config.isSubtitleVisible) android.view.View.VISIBLE else android.view.View.GONE)
+            views.setViewVisibility(R.id.widget_info_button, if (config.isSubtitleVisible) android.view.View.VISIBLE else android.view.View.GONE)
+            views.setInt(R.id.widget_info_button, "setColorFilter", config.infoIconColor)
             
             views.setViewVisibility(R.id.widget_list_container, if (config.isListVisible) android.view.View.VISIBLE else android.view.View.GONE)
 
