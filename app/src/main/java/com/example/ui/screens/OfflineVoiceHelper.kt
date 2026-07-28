@@ -54,6 +54,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
 import java.util.zip.ZipInputStream
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 // Model URL on alphacephei (approx. 33MB)
 private const val VOSK_BN_MODEL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-bn-0.3.zip"
@@ -115,7 +119,9 @@ fun isInternetConnected(context: Context): Boolean {
 
 fun isVoskDownloaded(context: Context): Boolean {
     val modelDir = File(context.filesDir, "vosk-model-small-streaming-bn")
-    return modelDir.exists() && modelDir.isDirectory && (File(modelDir, "am-onnx").exists() || File(modelDir, "am").exists() || File(modelDir, "lang").exists())
+    val hasAm = File(modelDir, "am-onnx").exists() || File(modelDir, "am").exists()
+    val hasLang = File(modelDir, "lang").exists()
+    return modelDir.exists() && modelDir.isDirectory && hasAm && hasLang
 }
 
 fun shouldShowOfflineVoicePrompt(context: Context): Boolean {
@@ -142,6 +148,30 @@ fun snoozeVoicePackPrompt(context: Context) {
     prefs.edit().putLong("offline_voice_ignore_until", snoozeTime).apply()
 }
 
+suspend fun fetchVoskLink(context: Context): String = suspendCancellableCoroutine { continuation ->
+    try {
+        com.example.FinanceApplication.ensureFirebaseInitialized(context)
+        val remoteConfig = FirebaseRemoteConfig.getInstance()
+        val configSettings = FirebaseRemoteConfigSettings.Builder()
+            .setMinimumFetchIntervalInSeconds(0)
+            .build()
+        remoteConfig.setConfigSettingsAsync(configSettings)
+        
+        remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val link = remoteConfig.getString("Vosk_link")
+                continuation.resume(link)
+            } else {
+                continuation.resume("")
+            }
+        }.addOnFailureListener { exception ->
+            continuation.resume("")
+        }
+    } catch (e: Exception) {
+        continuation.resume("")
+    }
+}
+
 sealed class DownloadState {
     object Idle : DownloadState()
     data class Downloading(val progress: Int) : DownloadState()
@@ -166,7 +196,25 @@ object VoskDownloader {
             try {
                 _downloadState.value = DownloadState.Downloading(0)
                 
-                var downloadUrl = "https://drive.google.com/uc?export=download&id=13cKS23QLODXFYZYZZ9xvFqgOuVqJuiJ_&confirm=t"
+                // Fetch download link from Remote Config
+                var downloadUrl = fetchVoskLink(context).trim()
+                if (downloadUrl.isEmpty()) {
+                    throw Exception("রিমোট কনফিগ থেকে Vosk_link পাওয়া যায়নি!")
+                }
+
+                // Handle Dropbox shared links conversion to direct download links
+                if (downloadUrl.contains("dropbox.com")) {
+                    if (downloadUrl.contains("dl=0")) {
+                        downloadUrl = downloadUrl.replace("dl=0", "dl=1")
+                    } else if (!downloadUrl.contains("dl=1")) {
+                        downloadUrl = if (downloadUrl.contains("?")) {
+                            "$downloadUrl&dl=1"
+                        } else {
+                            "$downloadUrl?dl=1"
+                        }
+                    }
+                }
+
                 var url = URL(downloadUrl)
                 var connection = url.openConnection() as java.net.HttpURLConnection
                 connection.connectTimeout = 30000
@@ -175,41 +223,8 @@ object VoskDownloader {
                 connection.instanceFollowRedirects = true
                 
                 var status = connection.responseCode
-                var cookiesList = connection.headerFields["Set-Cookie"]
                 
-                // Read the content type to check if we received HTML (warning page) instead of raw ZIP stream
-                val contentType = connection.contentType ?: ""
-                if (contentType.contains("text/html") || (status == java.net.HttpURLConnection.HTTP_OK && contentType.isEmpty())) {
-                    // Read HTML to parse the confirmation token
-                    val htmlBuilder = StringBuilder()
-                    connection.inputStream.bufferedReader().use { reader ->
-                        var line: String?
-                        while (reader.readLine().also { line = it } != null) {
-                            htmlBuilder.append(line)
-                        }
-                    }
-                    connection.disconnect()
-
-                    val html = htmlBuilder.toString()
-                    val confirmRegex = "confirm=([a-zA-Z0-9_-]+)".toRegex()
-                    val match = confirmRegex.find(html)
-                    val confirmToken = match?.groupValues?.get(1) ?: "t"
-
-                    downloadUrl = "https://drive.google.com/uc?export=download&confirm=$confirmToken&id=13cKS23QLODXFYZYZZ9xvFqgOuVqJuiJ_"
-                    url = URL(downloadUrl)
-                    connection = url.openConnection() as java.net.HttpURLConnection
-                    connection.connectTimeout = 30000
-                    connection.readTimeout = 30000
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
-                    if (cookiesList != null) {
-                        val cookieString = cookiesList.joinToString("; ") { it.split(";")[0] }
-                        connection.setRequestProperty("Cookie", cookieString)
-                    }
-                    connection.instanceFollowRedirects = true
-                    status = connection.responseCode
-                }
-
-                // Handle redirects after confirmed URL (e.g., to actual Google user content storage server)
+                // Handle redirects (critical for Dropbox links)
                 var redirectCount = 0
                 while ((status == java.net.HttpURLConnection.HTTP_MOVED_TEMP || 
                         status == java.net.HttpURLConnection.HTTP_MOVED_PERM || 
@@ -221,17 +236,13 @@ object VoskDownloader {
                     connection.connectTimeout = 30000
                     connection.readTimeout = 30000
                     connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
-                    if (cookiesList != null) {
-                        val cookieString = cookiesList.joinToString("; ") { it.split(";")[0] }
-                        connection.setRequestProperty("Cookie", cookieString)
-                    }
                     connection.instanceFollowRedirects = true
                     status = connection.responseCode
                     redirectCount++
                 }
 
                 if (status != java.net.HttpURLConnection.HTTP_OK) {
-                    throw java.io.IOException("Google Drive server returned HTTP response code: $status")
+                    throw java.io.IOException("Server returned HTTP response code: $status")
                 }
 
                 val fileLength = connection.contentLength
@@ -247,7 +258,7 @@ object VoskDownloader {
                     if (fileLength > 0) {
                         _downloadState.value = DownloadState.Downloading(((total * 100) / fileLength).toInt())
                     } else {
-                        // Estimate progress if fileLength is not provided
+                        // Estimate progress if fileLength is not provided (assume ~33MB size)
                         val mb = (total / (1024 * 1024)).toInt()
                         val progress = if (mb < 33) (mb * 100 / 33) else 99
                         _downloadState.value = DownloadState.Downloading(progress)
@@ -317,18 +328,66 @@ object VoskDownloader {
             }
         }
 
-        // Flatten any nested folder if one exists (just in case they zipped a folder)
-        val subDirs = targetDir.listFiles()
-        val nestedDir = subDirs?.find { it.isDirectory && (it.name.contains("vosk-model") || it.name.contains("bn") || it.name.contains("streaming")) }
-        if (nestedDir != null && nestedDir.exists() && !nestedDir.name.equals("am-onnx") && !nestedDir.name.equals("lang") && !nestedDir.name.equals("am")) {
-            val contents = nestedDir.listFiles()
+        // Search recursively for model folders and flatten them into the targetDir root
+        findAndFlattenModel(targetDir)
+    }
+
+    private fun findAndFlattenModel(targetDir: File) {
+        val modelRoot = findModelRoot(targetDir) ?: return
+        
+        if (modelRoot.absolutePath != targetDir.absolutePath) {
+            val contents = modelRoot.listFiles()
             if (contents != null) {
-                for (contentFile in contents) {
-                    val dest = File(targetDir, contentFile.name)
-                    contentFile.renameTo(dest)
+                for (file in contents) {
+                    val dest = File(targetDir, file.name)
+                    if (dest.exists()) {
+                        dest.deleteRecursively()
+                    }
+                    file.renameTo(dest)
                 }
             }
-            nestedDir.deleteRecursively()
+            
+            // Clean up empty folders recursively
+            deleteEmptyDirectories(targetDir)
+        }
+    }
+
+    private fun findModelRoot(dir: File): File? {
+        if (!dir.exists() || !dir.isDirectory) return null
+        
+        val files = dir.listFiles() ?: return null
+        
+        val hasAm = files.any { it.isDirectory && (it.name == "am-onnx" || it.name == "am") }
+        val hasLang = files.any { it.isDirectory && it.name == "lang" }
+        
+        if (hasAm || hasLang) {
+            return dir
+        }
+        
+        for (file in files) {
+            if (file.isDirectory) {
+                val found = findModelRoot(file)
+                if (found != null) {
+                    return found
+                }
+            }
+        }
+        
+        return null
+    }
+
+    private fun deleteEmptyDirectories(dir: File) {
+        val files = dir.listFiles() ?: return
+        for (file in files) {
+            if (file.isDirectory) {
+                if (file.name == "am-onnx" || file.name == "am" || file.name == "lang") {
+                    continue
+                }
+                deleteEmptyDirectories(file)
+                if (file.listFiles()?.isEmpty() == true) {
+                    file.delete()
+                }
+            }
         }
     }
     
