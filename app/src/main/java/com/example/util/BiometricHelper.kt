@@ -16,19 +16,65 @@ object BiometricHelper {
     }
 
     fun getBiometricStatus(context: Context): BiometricStatus {
+        val sdkVersion = android.os.Build.VERSION.SDK_INT
+        if (sdkVersion < 29) {
+            // For API < 29 (Android 8.1/8.0/7.0), use FingerprintManagerCompat directly.
+            // This is 100% safe and avoids loading any BiometricManager class references that cause crashes on custom OEM ROMs like Oppo ColorOS.
+            return try {
+                val fm = androidx.core.hardware.fingerprint.FingerprintManagerCompat.from(context)
+                if (!fm.isHardwareDetected) {
+                    BiometricStatus.NO_HARDWARE
+                } else if (!fm.hasEnrolledFingerprints()) {
+                    BiometricStatus.NOT_ENROLLED
+                } else {
+                    BiometricStatus.AVAILABLE
+                }
+            } catch (e: Throwable) {
+                e.printStackTrace()
+                BiometricStatus.UNAVAILABLE
+            }
+        }
+
         return try {
             val biometricManager = BiometricManager.from(context)
-            // Target only BIOMETRIC_STRONG to bypass weak non-standard 2D face unlock bugs on devices like Oppo/Vivo/MIUI
-            val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
-            when (biometricManager.canAuthenticate(authenticators)) {
+            // Use 255 (BIOMETRIC_STRONG constant value) safely without referencing the Authenticator class if it fails class verification on some devices
+            val result = if (sdkVersion >= 30) {
+                biometricManager.canAuthenticate(255) // 255 is BiometricManager.Authenticators.BIOMETRIC_STRONG
+            } else {
+                biometricManager.canAuthenticate()
+            }
+            
+            when (result) {
                 BiometricManager.BIOMETRIC_SUCCESS -> BiometricStatus.AVAILABLE
                 BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> BiometricStatus.NO_HARDWARE
                 BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> BiometricStatus.NOT_ENROLLED
-                else -> BiometricStatus.UNAVAILABLE
+                else -> {
+                    // Fallback to FingerprintManagerCompat as a safety measure
+                    try {
+                        val fm = androidx.core.hardware.fingerprint.FingerprintManagerCompat.from(context)
+                        if (fm.isHardwareDetected) {
+                            if (fm.hasEnrolledFingerprints()) BiometricStatus.AVAILABLE else BiometricStatus.NOT_ENROLLED
+                        } else {
+                            BiometricStatus.UNAVAILABLE
+                        }
+                    } catch (e: Throwable) {
+                        BiometricStatus.UNAVAILABLE
+                    }
+                }
             }
         } catch (e: Throwable) {
             e.printStackTrace()
-            BiometricStatus.UNAVAILABLE
+            // Final fail-safe fallback
+            try {
+                val fm = androidx.core.hardware.fingerprint.FingerprintManagerCompat.from(context)
+                if (fm.isHardwareDetected) {
+                    if (fm.hasEnrolledFingerprints()) BiometricStatus.AVAILABLE else BiometricStatus.NOT_ENROLLED
+                } else {
+                    BiometricStatus.UNAVAILABLE
+                }
+            } catch (ex: Throwable) {
+                BiometricStatus.UNAVAILABLE
+            }
         }
     }
 
@@ -108,12 +154,14 @@ object BiometricHelper {
             }
 
             val promptInfo = try {
-                BiometricPrompt.PromptInfo.Builder()
+                val builder = BiometricPrompt.PromptInfo.Builder()
                     .setTitle(title)
                     .setSubtitle(subtitle)
                     .setNegativeButtonText(negativeButtonText)
-                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                    .build()
+                if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    builder.setAllowedAuthenticators(255) // 255 is BiometricManager.Authenticators.BIOMETRIC_STRONG
+                }
+                builder.build()
             } catch (e: Throwable) {
                 e.printStackTrace()
                 // Fallback to standard builder without explicit strong requirement if API doesn't support setAllowedAuthenticators on older SDK
