@@ -6422,8 +6422,7 @@ fun AnimatedFingerprintKey(
             modifier = Modifier
                 .size(44.dp)
                 .background(
-                    if (isSuccess) Color(0xFF10B981).copy(alpha = 0.25f)
-                    else Color(0xFF10B981).copy(alpha = 0.12f),
+                    Color.White,
                     CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -6431,7 +6430,7 @@ fun AnimatedFingerprintKey(
             Icon(
                 imageVector = Icons.Rounded.Fingerprint,
                 contentDescription = "Biometrics",
-                tint = Color.White,
+                tint = if (isSuccess) Color(0xFF059669) else Color(0xFF1E293B),
                 modifier = Modifier
                     .size(28.dp)
                     .then(
@@ -6442,10 +6441,10 @@ fun AnimatedFingerprintKey(
                                     drawContent()
                                     val glowGradient = Brush.linearGradient(
                                         colors = listOf(
-                                            Color(0xFF10B981),
-                                            Color(0xFF3B82F6),
-                                            Color(0xFF8B5CF6),
-                                            Color(0xFF10B981)
+                                            Color(0xFF0284C7),
+                                            Color(0xFF7C3AED),
+                                            Color(0xFFEC4899),
+                                            Color(0xFF0284C7)
                                         ),
                                         start = Offset(
                                             x = -size.width + (gradientPhase * size.width * 2f),
@@ -6467,7 +6466,7 @@ fun AnimatedFingerprintKey(
                                 .drawWithContent {
                                     drawContent()
                                     drawRect(
-                                        color = Color(0xFF10B981),
+                                        color = if (isSuccess) Color(0xFF059669) else Color(0xFF1E293B),
                                         blendMode = BlendMode.SrcIn
                                     )
                                 }
@@ -8557,10 +8556,10 @@ fun CategoryBadge(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(8.dp))
             .background(softBg)
-            .border(0.8.dp, borderCol, RoundedCornerShape(50))
-            .padding(horizontal = 6.dp, vertical = 1.dp),
+            .border(0.8.dp, borderCol, RoundedCornerShape(8.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
