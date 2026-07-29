@@ -92,9 +92,9 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
 
             val netLendBorrow = totalLend - totalBorrow
             val lendBorrowStr = if (netLendBorrow > 0) {
-                "দেনা ${toBanglaDigits(netLendBorrow.toInt().toString())}৳"
+                "পাওনা ${toBanglaDigits(netLendBorrow.toInt().toString())}৳"
             } else if (netLendBorrow < 0) {
-                "পাওনা ${toBanglaDigits((-netLendBorrow).toInt().toString())}৳"
+                "দেনা ${toBanglaDigits((-netLendBorrow).toInt().toString())}৳"
             } else if (totalLend > 0 || totalBorrow > 0) {
                 "দেনা/পাওনা ০৳"
             } else null
@@ -147,8 +147,8 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         val (tagText, tagColor) = when (finalType) {
             "INCOME" -> "আয়" to android.graphics.Color.parseColor("#059669")
             "EXPENSE" -> "ব্যয়" to android.graphics.Color.parseColor("#DC2626")
-            "LEND" -> "দেনা" to android.graphics.Color.parseColor("#7C3AED")
-            "BORROW" -> "পাওনা" to android.graphics.Color.parseColor("#D97706")
+            "LEND" -> "পাওনা" to android.graphics.Color.parseColor("#7C3AED")
+            "BORROW" -> "দেনা" to android.graphics.Color.parseColor("#D97706")
             "SAVINGS" -> "সঞ্চয়" to android.graphics.Color.parseColor("#2563EB")
             "WITHDRAWAL" -> "উত্তোলন" to android.graphics.Color.parseColor("#0D9488")
             else -> "ব্যয়" to android.graphics.Color.parseColor("#DC2626")
@@ -168,5 +168,5 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
 
     override fun getLoadingView(): RemoteViews? = null
     override fun getItemId(position: Int): Long = if (position < draftsList.size) draftsList[position].id.toLong() else 999999L
-    override fun hasStableIds(): Boolean = true
+    override fun hasStableIds(): Boolean = false
 }

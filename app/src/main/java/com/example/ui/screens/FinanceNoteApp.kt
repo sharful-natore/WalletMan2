@@ -1976,7 +1976,7 @@ fun FinanceNoteApp(
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadProfile(context)
         viewModel.checkAndProcessAutoEntries(context)
-        kotlinx.coroutines.delay(2800)
+        kotlinx.coroutines.delay(4000)
         showSplash = false
     }
 
@@ -7657,7 +7657,7 @@ fun DashboardScreen(
             // Export Menu Option (প্রফেশনাল এক্সপোর্ট মেনু)
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                 border = BorderStroke(
                     1.5.dp,
                     androidx.compose.ui.graphics.Brush.linearGradient(
@@ -7676,12 +7676,16 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                colors = listOf(
-                                    FintechBlue.copy(alpha = 0.08f),
-                                    Color(0xFF10B981).copy(alpha = 0.05f)
+                            if (isDark) {
+                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                    colors = listOf(
+                                        FintechBlue.copy(alpha = 0.08f),
+                                        Color(0xFF10B981).copy(alpha = 0.05f)
+                                    )
                                 )
-                            )
+                            } else {
+                                androidx.compose.ui.graphics.SolidColor(Color.White)
+                            }
                         )
                 ) {
                     Row(
@@ -14947,7 +14951,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "সিকিউরিটি ও অ্যাপ লক" else "Security & App Lock",
             isDark = isDark,
             icon = Icons.Rounded.Security,
-            initiallyExpanded = filter == "security"
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -15385,7 +15389,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "ডাটা ব্যাকআপ ও রিস্টোর" else "Data Backup & Restore",
             isDark = isDark,
             icon = Icons.Rounded.Backup,
-            initiallyExpanded = filter == "backup"
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -15843,7 +15847,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "নোটিফিকেশন সেটিংস" else "Notification Settings",
             isDark = isDark,
             icon = Icons.Rounded.NotificationsActive,
-            initiallyExpanded = filter == "notifications"
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -16240,7 +16244,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "অ্যাপ ইনফো" else "App Info",
             isDark = isDark,
             icon = Icons.Rounded.Info,
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -16371,7 +16375,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "অ্যাপটি শেয়ার করুন" else "Share App",
             isDark = isDark,
             icon = Icons.Rounded.Share,
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -16426,7 +16430,7 @@ fun SettingsScreen(
             title = if (language == AppLanguage.BN) "আমাদের ওয়েবসাইট ভিজিট করুন" else "Visit Our Website",
             isDark = isDark,
             icon = Icons.Rounded.Public,
-            initiallyExpanded = true
+            initiallyExpanded = false
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -18991,19 +18995,52 @@ fun AnimatedAppLogo(
     val equalizerAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
 
     LaunchedEffect(Unit) {
-        // Step 1: Scale up the whole logo from small to large with a bouncy settle
+        // Cycle 1: scale up the whole logo with a bouncy settle
         logoScale.animateTo(
-            targetValue = 1f,
+            targetValue = 1.15f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 700,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        logoScale.animateTo(
+            targetValue = 1.0f,
             animationSpec = androidx.compose.animation.core.spring(
                 dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
                 stiffness = androidx.compose.animation.core.Spring.StiffnessLow
             )
         )
+
+        kotlinx.coroutines.delay(300)
+
+        // Cycle 2: second pulse animation (scale down slightly, then bounce up and settle)
+        logoScale.animateTo(
+            targetValue = 0.85f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 450,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        logoScale.animateTo(
+            targetValue = 1.15f,
+            animationSpec = androidx.compose.animation.core.tween(
+                durationMillis = 450,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        )
+        logoScale.animateTo(
+            targetValue = 1.0f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+            )
+        )
+
         // Step 2: Smoothly start the live equalizer bar animation
         equalizerAlpha.animateTo(
             targetValue = 1f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 600,
+                durationMillis = 500,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )

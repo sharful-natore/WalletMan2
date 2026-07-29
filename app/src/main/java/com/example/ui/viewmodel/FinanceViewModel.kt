@@ -1207,11 +1207,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun addDraftTransaction(note: String, overrideType: String? = null) {
         viewModelScope.launch {
             val parseResult = parseDraftDetails(note)
+            val finalType = overrideType ?: parseResult.type
+            val finalCategory = if (overrideType != null) {
+                com.example.data.DraftParser.getCategoryForType(overrideType)
+            } else {
+                parseResult.category
+            }
             repository.insertDraftTransaction(
                 DraftTransaction(
                     amount = parseResult.amount,
-                    type = overrideType ?: parseResult.type,
-                    category = parseResult.category,
+                    type = finalType,
+                    category = finalCategory,
                     note = parseResult.cleanedNote,
                     workspaceId = _currentWorkspaceId.value
                 )

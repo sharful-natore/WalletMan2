@@ -364,7 +364,13 @@ class DraftInputActivity : ComponentActivity() {
                                         if (draftText.isNotBlank()) {
                                             coroutineScope.launch {
                                                 val parseResult = parseDraftDetails(draftText)
-                                                val finalType = selectedTypeOverride ?: parseResult.type ?: "EXPENSE"
+                                                val typeOverride = selectedTypeOverride
+                                                val finalType = typeOverride ?: parseResult.type ?: "EXPENSE"
+                                                val finalCategory = if (typeOverride != null) {
+                                                    com.example.data.DraftParser.getCategoryForType(typeOverride)
+                                                } else {
+                                                    parseResult.category ?: "Other"
+                                                }
                                                 if (isEdit && draftId != -1) {
                                                     val drafts = draftsDao.getAllDraftTransactionsList()
                                                     val target = drafts.find { it.id == draftId }
@@ -373,7 +379,7 @@ class DraftInputActivity : ComponentActivity() {
                                                             note = parseResult.cleanedNote,
                                                             amount = parseResult.amount,
                                                             type = finalType,
-                                                            category = parseResult.category
+                                                            category = finalCategory
                                                         ))
                                                     }
                                                 } else {
@@ -381,7 +387,7 @@ class DraftInputActivity : ComponentActivity() {
                                                         note = parseResult.cleanedNote,
                                                         amount = parseResult.amount,
                                                         type = finalType,
-                                                        category = parseResult.category
+                                                        category = finalCategory
                                                     ))
                                                 }
                                                 val updateIntent = android.content.Intent("com.example.UPDATE_DRAFT_WIDGET")

@@ -246,8 +246,51 @@ object DraftParser {
 
         val isExpenseExplicit = noteLower.contains("ব্যয়") || noteLower.contains("খরচ") || noteLower.contains("expense") || noteLower.contains("cost")
         val isIncomeExplicit = noteLower.contains("আয়") || noteLower.contains("ইনকাম") || noteLower.contains("income") || noteLower.contains("earning")
-        val isBorrowExplicit = noteLower.contains("দেনা") || noteLower.contains("ধার নেওয়া") || noteLower.contains("ধার নিলাম") || noteLower.contains("কর্জ") || noteLower.contains("কর্য") || noteLower.contains("borrow") || noteLower.contains("debt")
-        val isLendExplicit = noteLower.contains("পাওনা") || noteLower.contains("ধার দেওয়া") || noteLower.contains("ধার দিলাম") || noteLower.contains("ধারে দিলাম") || noteLower.contains("lend") || noteLower.contains("receivable")
+        val isBorrowExplicit = noteLower.contains("দেনা") || 
+                noteLower.contains("ধার নেওয়া") || 
+                noteLower.contains("ধার নিলাম") || 
+                noteLower.contains("ধার নিছি") || 
+                noteLower.contains("ধার নিয়েছি") || 
+                noteLower.contains("ধার আনলাম") || 
+                noteLower.contains("ধার এনেছি") || 
+                noteLower.contains("ধার আনা") || 
+                noteLower.contains("কর্জ নিলাম") || 
+                noteLower.contains("কর্জ নিছি") || 
+                noteLower.contains("কর্জ নিয়েছি") || 
+                noteLower.contains("কর্জ নেওয়া") || 
+                noteLower.contains("কর্জ") || 
+                noteLower.contains("কর্য") || 
+                noteLower.contains("পাবে") || 
+                noteLower.contains("পাবে আমার কাছে") || 
+                noteLower.contains("দিতে হবে") || 
+                noteLower.contains("ঋণ নিলাম") || 
+                noteLower.contains("ঋণ নেওয়া") || 
+                noteLower.contains("ঋণ নিছি") || 
+                noteLower.contains("ঋণ নিয়েছি") || 
+                noteLower.contains("borrow") || 
+                noteLower.contains("debt") || 
+                noteLower.contains("payable") || 
+                noteLower.contains("borrowed")
+
+        val isLendExplicit = noteLower.contains("পাওনা") || 
+                noteLower.contains("পাওনা আছে") || 
+                noteLower.contains("ধার দেওয়া") || 
+                noteLower.contains("ধার দিলাম") || 
+                noteLower.contains("ধার দিয়েছি") || 
+                noteLower.contains("ধার দিছি") || 
+                noteLower.contains("ধারে দিলাম") || 
+                noteLower.contains("ধারে দিয়েছি") || 
+                noteLower.contains("কর্জ দিলাম") || 
+                noteLower.contains("কর্জ দিয়েছি") || 
+                noteLower.contains("কর্জ দিছি") || 
+                (noteLower.contains("পাব") && !noteLower.contains("পাবে") && !noteLower.contains("পাবে আমার কাছে")) || 
+                noteLower.contains("পাবো") || 
+                noteLower.contains("ঋণ দিলাম") || 
+                noteLower.contains("ঋণ দেওয়া") || 
+                noteLower.contains("ঋণ দিয়েছি") || 
+                noteLower.contains("lend") || 
+                noteLower.contains("receivable") || 
+                noteLower.contains("lent")
         val isSavingsExplicit = noteLower.contains("সঞ্চয়") || noteLower.contains("savings") || noteLower.contains("ডিপোজিট") || noteLower.contains("সংরক্ষণ")
         val isWithdrawalExplicit = noteLower.contains("উত্তোলন") || noteLower.contains("withdraw") || noteLower.contains("উঠালাম") || noteLower.contains("ক্যাশ আউট")
 
@@ -324,6 +367,18 @@ object DraftParser {
         }
 
         return DraftParseResult(amount, type, category, cleaned)
+    }
+
+    fun getCategoryForType(type: String): String {
+        return when (type) {
+            "INCOME" -> "Salary"
+            "EXPENSE" -> "Expense"
+            "LEND" -> "Lending"
+            "BORROW" -> "Borrowing"
+            "SAVINGS" -> "Savings"
+            "WITHDRAWAL" -> "Withdrawal"
+            else -> "Other"
+        }
     }
 }
 

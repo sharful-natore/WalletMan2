@@ -721,9 +721,9 @@ fun DraftsSummaryCard(
 
     val netLendBorrow = totalLend - totalBorrow
     val lendBorrowStr = if (netLendBorrow > 0) {
-        (if (language == AppLanguage.BN) "দেনা " else "Lend ") + "${netLendBorrow.toInt()}৳"
+        (if (language == AppLanguage.BN) "পাওনা " else "Lend ") + "${netLendBorrow.toInt()}৳"
     } else if (netLendBorrow < 0) {
-        (if (language == AppLanguage.BN) "পাওনা " else "Borrow ") + "${(-netLendBorrow).toInt()}৳"
+        (if (language == AppLanguage.BN) "দেনা " else "Borrow ") + "${(-netLendBorrow).toInt()}৳"
     } else if (totalLend > 0 || totalBorrow > 0) {
         if (language == AppLanguage.BN) "দেনা/পাওনা ০৳" else "Lend/Borrow 0৳"
     } else null
