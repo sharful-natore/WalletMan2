@@ -6422,7 +6422,7 @@ fun AnimatedFingerprintKey(
             modifier = Modifier
                 .size(44.dp)
                 .background(
-                    Color.White,
+                    if (isSuccess) Color(0xFFD1FAE5) else Color(0xFFEDE9FE),
                     CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -6430,7 +6430,7 @@ fun AnimatedFingerprintKey(
             Icon(
                 imageVector = Icons.Rounded.Fingerprint,
                 contentDescription = "Biometrics",
-                tint = if (isSuccess) Color(0xFF059669) else Color.Black.copy(alpha = 0.30f),
+                tint = if (isSuccess) Color(0xFF059669) else Color(0xFF7C3AED),
                 modifier = Modifier
                     .size(28.dp)
                     .then(
@@ -6441,9 +6441,9 @@ fun AnimatedFingerprintKey(
                                     drawContent()
                                     val glowGradient = Brush.linearGradient(
                                         colors = listOf(
-                                            Color.Black.copy(alpha = 0.30f),
-                                            Color(0xFF0284C7),
-                                            Color.Black.copy(alpha = 0.30f)
+                                            Color(0xFF7C3AED),
+                                            Color(0xFFA855F7),
+                                            Color(0xFF7C3AED)
                                         ),
                                         start = Offset(
                                             x = -size.width + (gradientPhase * size.width * 2f),
@@ -6465,7 +6465,7 @@ fun AnimatedFingerprintKey(
                                 .drawWithContent {
                                     drawContent()
                                     drawRect(
-                                        color = if (isSuccess) Color(0xFF059669) else Color.Black.copy(alpha = 0.30f),
+                                        color = if (isSuccess) Color(0xFF059669) else Color(0xFF7C3AED),
                                         blendMode = BlendMode.SrcIn
                                     )
                                 }
@@ -14613,18 +14613,19 @@ fun SettingsScreen(
 
         // --- 4. SECURITY & BIOMETRIC LOCK CARD ---
         val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
+        var showVerifyCurrentPinDialog by remember { mutableStateOf(false) }
+        var showSecurityQuestionDialog by remember { mutableStateOf(false) }
         var showChangePinDialog by remember { mutableStateOf(false) }
 
-        if (showChangePinDialog) {
-            var newPin by remember { mutableStateOf("") }
-            var pinConfirm by remember { mutableStateOf("") }
-            var dialogError by remember { mutableStateOf<String?>(null) }
-            
+        if (showVerifyCurrentPinDialog) {
+            var inputCurrentPin by remember { mutableStateOf("") }
+            var verifyError by remember { mutableStateOf<String?>(null) }
+
             AlertDialog(
-                onDismissRequest = { showChangePinDialog = false },
-                title = { 
+                onDismissRequest = { showVerifyCurrentPinDialog = false },
+                title = {
                     Text(
-                        text = if (language == AppLanguage.BN) "সিকিউরিটি পিন সেট করুন" else "Set Security PIN",
+                        text = if (language == AppLanguage.BN) "সিকিউরিটি যাচাইকরণ" else "Security Verification",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color(0xFF0F172A)
@@ -14632,12 +14633,214 @@ fun SettingsScreen(
                 },
                 text = {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = if (language == AppLanguage.BN) "৪-সংখ্যার একটি নতুন পিন দিন যা বায়োমেট্রিক কাজ না করলে ব্যাকআপ হিসেবে ব্যবহার হবে" else "Enter a 4-digit numeric PIN to use as a fallback.",
+                            text = if (language == AppLanguage.BN) "পিন পরিবর্তন করতে আপনার বর্তমান ৪-সংখ্যার পিন দিন" else "Enter your current 4-digit PIN to make changes.",
                             fontSize = 13.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+
+                        OutlinedTextField(
+                            value = inputCurrentPin,
+                            onValueChange = { input ->
+                                if (input.length <= 4 && input.all { it.isDigit() }) {
+                                    inputCurrentPin = input
+                                    verifyError = null
+                                }
+                            },
+                            label = { Text(if (language == AppLanguage.BN) "বর্তমান পিন (Current PIN)" else "Current PIN") },
+                            placeholder = { Text("••••") },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                            ),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        verifyError?.let { err ->
+                            Text(err, color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+
+                        HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+
+                        OutlinedButton(
+                            onClick = {
+                                val fragmentActivity = run {
+                                    var ctx = context
+                                    while (ctx is android.content.ContextWrapper) {
+                                        if (ctx is androidx.fragment.app.FragmentActivity) return@run ctx
+                                        ctx = ctx.baseContext
+                                    }
+                                    null
+                                }
+                                if (fragmentActivity != null) {
+                                    com.example.util.BiometricHelper.showBiometricPrompt(
+                                        activity = fragmentActivity,
+                                        title = if (language == AppLanguage.BN) "সিকিউরিটি যাচাইকরণ" else "Security Verification",
+                                        subtitle = if (language == AppLanguage.BN) "ফিঙ্গারপ্রিন্ট দিয়ে পিন পরিবর্তন নিশ্চিত করুন" else "Confirm with fingerprint to update PIN",
+                                        onSuccess = {
+                                            showVerifyCurrentPinDialog = false
+                                            showChangePinDialog = true
+                                        },
+                                        onUsePinFallback = {},
+                                        onError = { err -> verifyError = err }
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Rounded.Fingerprint, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (language == AppLanguage.BN) "বায়োমেট্রিক / ফোন লক দিয়ে ভেরিফাই করুন" else "Verify with Biometrics / Screen Lock")
+                        }
+
+                        TextButton(
+                            onClick = {
+                                showVerifyCurrentPinDialog = false
+                                showSecurityQuestionDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "পিন ভুলে গেছেন? প্রশ্ন দিয়ে ভেরিফাই করুন" else "Forgot PIN? Reset via Security Question",
+                                fontSize = 12.sp,
+                                color = Color(0xFF6366F1),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (viewModel.verifyPin(inputCurrentPin)) {
+                                showVerifyCurrentPinDialog = false
+                                showChangePinDialog = true
+                            } else {
+                                verifyError = if (language == AppLanguage.BN) "বর্তমান পিনটি সঠিক নয়!" else "Current PIN is incorrect!"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                    ) {
+                        Text(if (language == AppLanguage.BN) "পরবর্তী" else "Next")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showVerifyCurrentPinDialog = false }) {
+                        Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showSecurityQuestionDialog) {
+            val savedQuestion by viewModel.securityQuestion.collectAsState()
+            val savedAnswer by viewModel.securityAnswer.collectAsState()
+            var inputAnswer by remember { mutableStateOf("") }
+            var questError by remember { mutableStateOf<String?>(null) }
+
+            AlertDialog(
+                onDismissRequest = { showSecurityQuestionDialog = false },
+                title = {
+                    Text(
+                        text = if (language == AppLanguage.BN) "সিকিউরিটি প্রশ্ন দিয়ে রিসেট" else "Reset via Security Question",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (savedAnswer.isBlank()) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "পূর্বে কোনো সিকিউরিটি উত্তর সেট করা হয়নি। অনুগ্রহ করে বায়োমেট্রিক দিয়ে ভেরিফাই করুন।" else "No security answer set previously. Please use biometrics verification.",
+                                fontSize = 13.sp,
+                                color = Color(0xFFEF4444)
+                            )
+                        } else {
+                            Text(
+                                text = "${if (language == AppLanguage.BN) "প্রশ্ন: " else "Question: "}$savedQuestion",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+
+                            OutlinedTextField(
+                                value = inputAnswer,
+                                onValueChange = {
+                                    inputAnswer = it
+                                    questError = null
+                                },
+                                label = { Text(if (language == AppLanguage.BN) "আপনার উত্তর" else "Your Answer") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            questError?.let { err ->
+                                Text(err, color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (savedAnswer.isNotBlank()) {
+                        Button(
+                            onClick = {
+                                if (viewModel.verifySecurityAnswer(inputAnswer)) {
+                                    showSecurityQuestionDialog = false
+                                    showChangePinDialog = true
+                                } else {
+                                    questError = if (language == AppLanguage.BN) "উত্তরটি সঠিক নয়!" else "Answer is incorrect!"
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                        ) {
+                            Text(if (language == AppLanguage.BN) "যাচাই করুন" else "Verify")
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showSecurityQuestionDialog = false }) {
+                        Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showChangePinDialog) {
+            var newPin by remember { mutableStateOf("") }
+            var pinConfirm by remember { mutableStateOf("") }
+            val savedQuestion by viewModel.securityQuestion.collectAsState()
+            val savedAnswer by viewModel.securityAnswer.collectAsState()
+
+            var selectedQuestion by remember { mutableStateOf(savedQuestion.ifBlank { "আপনার প্রিয় রঙ কী?" }) }
+            var answerInput by remember { mutableStateOf(savedAnswer) }
+            var dialogError by remember { mutableStateOf<String?>(null) }
+            
+            AlertDialog(
+                onDismissRequest = { showChangePinDialog = false },
+                title = { 
+                    Text(
+                        text = if (language == AppLanguage.BN) "নতুন সিকিউরিটি পিন সেট করুন" else "Set New Security PIN",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "৪-সংখ্যার একটি নতুন পিন এবং রিকভারির জন্য সিকিউরিটি প্রশ্ন সেট করুন" else "Enter a 4-digit numeric PIN and recovery security question.",
+                            fontSize = 12.sp,
                             color = if (isDark) Color.Gray else Color(0xFF64748B)
                         )
                         
@@ -14677,6 +14880,31 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
 
+                        HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+
+                        Text(
+                            text = if (language == AppLanguage.BN) "সিকিউরিটি প্রশ্ন (পিন ভুলে গেলে রিসেটের জন্য):" else "Security Question (for PIN recovery):",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+
+                        OutlinedTextField(
+                            value = selectedQuestion,
+                            onValueChange = { selectedQuestion = it },
+                            label = { Text(if (language == AppLanguage.BN) "সিকিউরিটি প্রশ্ন" else "Security Question") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = answerInput,
+                            onValueChange = { answerInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "প্রশ্নটির উত্তর (Answer)" else "Security Answer") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         dialogError?.let { err ->
                             Text(err, color = Color(0xFFEF4444), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         }
@@ -14686,14 +14914,17 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             if (newPin.length != 4) {
-                                dialogError = if (language == AppLanguage.BN) "পিন অবশ্যই ৪-সংখ্যার হতে হবে" else "PIN must be exactly 4 digits."
+                                dialogError = if (language == AppLanguage.BN) "পিন অবশ্যই ৪-সংখ্যার হতে হতে হবে" else "PIN must be exactly 4 digits."
                             } else if (newPin != pinConfirm) {
-                                dialogError = if (language == AppLanguage.BN) "পিন দুটি মেলেনি!" else "PINs do not match!"
+                                dialogError = if (language == AppLanguage.BN) "নতুন পিন দুটি মেলেনি!" else "PINs do not match!"
                             } else {
                                 viewModel.setAppLockPin(context, newPin)
+                                if (selectedQuestion.isNotBlank() && answerInput.isNotBlank()) {
+                                    viewModel.setSecurityQuestionAndAnswer(context, selectedQuestion, answerInput)
+                                }
                                 showChangePinDialog = false
                                 viewModel.triggerCustomNotification(
-                                    if (language == AppLanguage.BN) "পিন সফলভাবে আপডেট করা হয়েছে!" else "PIN successfully updated!",
+                                    if (language == AppLanguage.BN) "সিকিউরিটি পিন ও সিকিউরিটি প্রশ্ন সফলভাবে আপডেট করা হয়েছে!" else "PIN and Security Question successfully updated!",
                                     isSuccess = true,
                                     type = "SUCCESS"
                                 )
@@ -14749,7 +14980,7 @@ fun SettingsScreen(
                             color = if (isDark) Color.White else Color(0xFF1E293B)
                         )
                         Text(
-                            text = if (language == AppLanguage.BN) "অ্যাপ চালু করার সময় ফিঙ্গারপ্রিন্ট / ফেস আনলক বা পিন সিকিউরিটি চান" else "Require Fingerprint / Face Unlock or PIN when opening the app",
+                            text = if (language == AppLanguage.BN) "অ্যাপ চালু করার সময় ফিঙ্গারপ্রিন্ট বা পিন সিকিউরিটি চান" else "Require Fingerprint or PIN security when opening the app",
                             fontSize = 12.sp,
                             color = if (isDark) Color.Gray else Color(0xFF64748B)
                         )
@@ -14846,7 +15077,13 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showChangePinDialog = true },
+                        .clickable {
+                            if (appLockPin.isNotBlank()) {
+                                showVerifyCurrentPinDialog = true
+                            } else {
+                                showChangePinDialog = true
+                            }
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -15603,58 +15840,164 @@ fun SettingsScreen(
         }
 
         SettingCategory(
-            title = if (language == AppLanguage.BN) "কুইক একশন উইজেট" else "Quick Action Widget",
+            title = if (language == AppLanguage.BN) "নোটিফিকেশন সেটিংস" else "Notification Settings",
             isDark = isDark,
             icon = Icons.Rounded.NotificationsActive,
-            initiallyExpanded = false
+            initiallyExpanded = filter == "notifications"
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center
+                // 1. Quick Settings Bar Notification Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.SmartButton,
-                        contentDescription = null,
-                        tint = FintechBlue,
-                        modifier = Modifier.size(20.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.SmartButton,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "কুইক সেটিংস নোটিফিকেশন" else "Quick Settings Notification",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "দ্রুত একশন বাটনগুলো নোটিফিকেশন বারে দেখান" else "Show quick action buttons in notification bar",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Switch(
+                        checked = notificationEnabled,
+                        onCheckedChange = { 
+                            if (!notificationEnabled && android.os.Build.VERSION.SDK_INT >= 33) {
+                                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                viewModel.toggleNotification(context)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = FintechBlue,
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
                     )
                 }
-                Column(modifier = Modifier.weight(1f)) {
+
+                HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+
+                // 2. Debt & Loan Alert Notification Toggle
+                val isDebtAlertEnabled by viewModel.isDebtAlertEnabled.collectAsState()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFF8B5CF6).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Notifications,
+                            contentDescription = null,
+                            tint = Color(0xFF8B5CF6),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "দেনাপাওনা অ্যালার্ট নোটিফিকেশন" else "Debt & Loan Alert Notifications",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "পাওনা বা দেনার নিয়মিত অ্যালার্ট ও রিমাইন্ডার নোটিফিকেশন চালু রাখুন" else "Keep debt and loan alert reminder notifications active",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Switch(
+                        checked = isDebtAlertEnabled,
+                        onCheckedChange = { viewModel.setDebtAlertEnabled(context, it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF8B5CF6),
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
+                    )
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+
+                // 3. Debt Reminder Interval Selector
+                val debtReminderIntervalDays by viewModel.debtReminderIntervalDays.collectAsState()
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        text = if (language == AppLanguage.BN) "নটিফিকেশন বার উইজেট" else "Notification Bar Widget",
-                        fontSize = 16.sp,
+                        text = if (language == AppLanguage.BN) "দেনাপাওনা রিমাইন্ডার নোটিফিকেশন কতদিন পর পর দেখাবে:" else "Debt Reminder Notification Interval:",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isDark) Color.White else Color(0xFF1E293B)
                     )
-                    Text(
-                        text = if (language == AppLanguage.BN) "দ্রুত একশন বাটনগুলো নটিফিকেশন বারে দেখান" else "Show quick action buttons in notification bar",
-                        fontSize = 12.sp,
-                        color = if (isDark) Color.Gray else Color(0xFF64748B)
+
+                    val intervalOptions = listOf(
+                        1 to (if (language == AppLanguage.BN) "১ দিন পর পর" else "Every 1 Day"),
+                        3 to (if (language == AppLanguage.BN) "৩ দিন পর পর" else "Every 3 Days"),
+                        7 to (if (language == AppLanguage.BN) "৭ দিন (১ সপ্তাহ)" else "Every 7 Days"),
+                        15 to (if (language == AppLanguage.BN) "১৫ দিন পর পর" else "Every 15 Days"),
+                        30 to (if (language == AppLanguage.BN) "৩০ দিন (১ মাস)" else "Every 30 Days")
                     )
-                }
-                Switch(
-                    checked = notificationEnabled,
-                    onCheckedChange = { 
-                        if (!notificationEnabled && android.os.Build.VERSION.SDK_INT >= 33) {
-                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            viewModel.toggleNotification(context)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        intervalOptions.forEach { (days, label) ->
+                            val isSelected = debtReminderIntervalDays == days
+                            Surface(
+                                onClick = { viewModel.setDebtReminderIntervalDays(context, days) },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) Color(0xFF6366F1) else (if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)),
+                                border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else (if (isDark) Color.LightGray else Color(0xFF475569)),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = FintechBlue,
-                        uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
-                        uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
-                    )
-                )
+                    }
+                }
             }
         }
 

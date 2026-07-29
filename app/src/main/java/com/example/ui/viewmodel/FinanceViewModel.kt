@@ -261,6 +261,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isScreenSecurityEnabled = MutableStateFlow(false) // FLAG_SECURE
     val isScreenSecurityEnabled: StateFlow<Boolean> = _isScreenSecurityEnabled.asStateFlow()
 
+    private val _securityQuestion = MutableStateFlow("আপনার প্রিয় রঙ কী?")
+    val securityQuestion: StateFlow<String> = _securityQuestion.asStateFlow()
+
+    private val _securityAnswer = MutableStateFlow("")
+    val securityAnswer: StateFlow<String> = _securityAnswer.asStateFlow()
+
+    private val _isDebtAlertEnabled = MutableStateFlow(true)
+    val isDebtAlertEnabled: StateFlow<Boolean> = _isDebtAlertEnabled.asStateFlow()
+
+    private val _debtReminderIntervalDays = MutableStateFlow(7)
+    val debtReminderIntervalDays: StateFlow<Int> = _debtReminderIntervalDays.asStateFlow()
+
     // Profile Settings States
     private val _profileName = MutableStateFlow("")
     val profileName: StateFlow<String> = _profileName.asStateFlow()
@@ -2137,6 +2149,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _appLockPin.value = prefs.getString("app_lock_pin", "1234") ?: "1234"
         _autoLockTimeoutSeconds.value = prefs.getLong("auto_lock_timeout_seconds", 0L)
         _isScreenSecurityEnabled.value = prefs.getBoolean("screen_security_flag_secure", false)
+        _securityQuestion.value = prefs.getString("security_question", "আপনার প্রিয় রঙ কী?") ?: "আপনার প্রিয় রঙ কী?"
+        _securityAnswer.value = prefs.getString("security_answer", "") ?: ""
+        _isDebtAlertEnabled.value = prefs.getBoolean("debt_alert_enabled", true)
+        _debtReminderIntervalDays.value = prefs.getInt("debt_reminder_interval_days", 7)
         
         // Also initialize Google Drive state to ensure persistence
         initGoogleDrive(context)
@@ -2194,6 +2210,37 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun verifyPin(inputPin: String): Boolean {
         val currentPin = _appLockPin.value.ifBlank { "1234" }
         return inputPin == currentPin
+    }
+
+    fun setSecurityQuestionAndAnswer(context: Context, question: String, answer: String) {
+        _securityQuestion.value = question
+        _securityAnswer.value = answer.trim().lowercase()
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("security_question", question)
+            .putString("security_answer", answer.trim().lowercase())
+            .apply()
+    }
+
+    fun verifySecurityAnswer(inputAnswer: String): Boolean {
+        val saved = _securityAnswer.value.trim().lowercase()
+        return saved.isNotEmpty() && saved == inputAnswer.trim().lowercase()
+    }
+
+    fun setDebtAlertEnabled(context: Context, enabled: Boolean) {
+        _isDebtAlertEnabled.value = enabled
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("debt_alert_enabled", enabled)
+            .apply()
+    }
+
+    fun setDebtReminderIntervalDays(context: Context, days: Int) {
+        _debtReminderIntervalDays.value = days
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putInt("debt_reminder_interval_days", days)
+            .apply()
     }
 
     fun loadCustomGradients(context: Context) {

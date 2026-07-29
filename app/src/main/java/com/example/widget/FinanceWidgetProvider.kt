@@ -545,8 +545,11 @@ private fun getBengaliDate(cal: java.util.Calendar, isBn: Boolean): String {
 
 private fun getIslamicDate(cal: java.util.Calendar, isBn: Boolean): String {
     try {
+        val adjustedCal = (cal.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.DAY_OF_MONTH, 1)
+        }
         val islamic = android.icu.util.IslamicCalendar()
-        islamic.time = cal.time
+        islamic.time = adjustedCal.time
         val hYear = islamic.get(android.icu.util.Calendar.YEAR)
         val hMonth = islamic.get(android.icu.util.Calendar.MONTH)
         val hDay = islamic.get(android.icu.util.Calendar.DAY_OF_MONTH)
