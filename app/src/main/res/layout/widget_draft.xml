@@ -61,13 +61,14 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:layout_marginTop="2dp">
+                    android:layout_marginTop="2dp"
+                    android:layout_marginStart="28dp">
 
                     <TextView
                         android:id="@+id/widget_subtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="লেনদেনের ড্রাফটসমূহঃ"
+                        android:text="খসরা লেনদেন"
                         android:textColor="#595959"
                         android:textSize="12sp" />
 

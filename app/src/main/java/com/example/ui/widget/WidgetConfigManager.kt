@@ -4,9 +4,9 @@ import android.content.Context
 import android.graphics.Color
 
 data class WidgetDraftConfig(
-    val titleSectionBg: Int = Color.parseColor("#D9FFFFFF"),
-    val listSectionBg: Int = Color.parseColor("#99FFFFFF"),
-    val listItemBg: Int = Color.parseColor("#CCFFFFFF"),
+    val titleSectionBg: Int = Color.parseColor("#E6FFFFFF"),
+    val listSectionBg: Int = Color.parseColor("#BFFFFFFF"),
+    val listItemBg: Int = Color.parseColor("#D9FFFFFF"),
     val titleTextColor: Int = Color.parseColor("#333333"),
     val subtitleTextColor: Int = Color.parseColor("#666666"),
     val listItemTextColor: Int = Color.parseColor("#4D4D4D"),
@@ -43,9 +43,9 @@ object WidgetConfigManager {
     fun loadConfig(context: Context): WidgetDraftConfig {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return WidgetDraftConfig(
-            titleSectionBg = prefs.getInt("titleSectionBg", Color.parseColor("#D9FFFFFF")),
-            listSectionBg = prefs.getInt("listSectionBg", Color.parseColor("#99FFFFFF")),
-            listItemBg = prefs.getInt("listItemBg", Color.parseColor("#CCFFFFFF")),
+            titleSectionBg = prefs.getInt("titleSectionBg", Color.parseColor("#E6FFFFFF")),
+            listSectionBg = prefs.getInt("listSectionBg", Color.parseColor("#BFFFFFFF")),
+            listItemBg = prefs.getInt("listItemBg", Color.parseColor("#D9FFFFFF")),
             titleTextColor = prefs.getInt("titleTextColor", Color.parseColor("#333333")),
             subtitleTextColor = prefs.getInt("subtitleTextColor", Color.parseColor("#666666")),
             listItemTextColor = prefs.getInt("listItemTextColor", Color.parseColor("#4D4D4D")),

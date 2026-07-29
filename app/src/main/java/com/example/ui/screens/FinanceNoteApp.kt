@@ -609,23 +609,23 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = customGradient ?: when (categoryType) {
-        "INCOME" -> listOf(Color(0xFF10B981), Color(0xFF10B981))  // Green
-        "EXPENSE" -> listOf(Color(0xFFE65100), Color(0xFFE65100)) // Dark Orange
-        "SAVINGS" -> listOf(Color(0xFF38BDF8), Color(0xFF38BDF8)) // Light Blue
+        "INCOME" -> listOf(Color(0xFF00BCD4), Color(0xFF2196F3), Color(0xFF6366F1))
+        "EXPENSE" -> listOf(Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFE91E63))
+        "SAVINGS" -> listOf(Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF10B981))
         else -> listOf(Color(0xFF38BDF8), Color(0xFF38BDF8))
     }
 
     val trackColor = when (categoryType) {
-        "INCOME" -> Color(0xFF10B981).copy(alpha = 0.20f)             // 20% green
-        "EXPENSE" -> Color(0xFFE65100).copy(alpha = 0.20f)            // 20% dark orange
-        "SAVINGS" -> Color(0xFF38BDF8).copy(alpha = 0.20f)            // 20% light blue
+        "INCOME" -> Color(0xFF2196F3).copy(alpha = 0.20f)
+        "EXPENSE" -> Color(0xFFFF9800).copy(alpha = 0.20f)
+        "SAVINGS" -> Color(0xFF8BC34A).copy(alpha = 0.20f)
         else -> Color.LightGray.copy(alpha = 0.20f)
     }
 
     val percentageColor = when (categoryType) {
-        "INCOME" -> Color(0xFF10B981)
-        "EXPENSE" -> Color(0xFFE65100)
-        "SAVINGS" -> Color(0xFF38BDF8)
+        "INCOME" -> Color(0xFF2196F3)
+        "EXPENSE" -> Color(0xFFFF9800)
+        "SAVINGS" -> Color(0xFF8BC34A)
         else -> FintechBlue
     }
 
@@ -3737,9 +3737,9 @@ fun FinanceNoteApp(
                 if (editingBudgetGradientType != null) {
                     val type = editingBudgetGradientType!!
                     val defaultColors = when (type) {
-                        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))
-                        "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336))
-                        "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A))
+                        "INCOME" -> listOf(Color(0xFF00BCD4), Color(0xFF2196F3), Color(0xFF6366F1))
+                        "EXPENSE" -> listOf(Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFE91E63))
+                        "SAVINGS" -> listOf(Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF10B981))
                         "BUDGET_DETAILS_INCOME" -> listOf(Color(0xFF4285F4), Color(0xFF00BCD4), Color(0xFF34A853), Color(0xFFEA4335), Color(0xFF3F51B5))
                         "BUDGET_DETAILS_EXPENSE" -> listOf(Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFFFF5722), Color(0xFFFF9800), Color(0xFF3F51B5))
                         "BUDGET_DETAILS_SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFFFC107))
@@ -19006,7 +19006,8 @@ fun ModernSplashProgressIndicator(
 
 @Composable
 fun AnimatedAppLogo(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isInfinite: Boolean = true
 ) {
     // 1. Entrance animation values
     val logoScale = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -19016,7 +19017,7 @@ fun AnimatedAppLogo(
     val bar2ScaleAnim = remember { androidx.compose.animation.core.Animatable(1.0f) }
     val bar3ScaleAnim = remember { androidx.compose.animation.core.Animatable(1.0f) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isInfinite) {
         // Cycle 1: scale up the whole logo with a bouncy settle (Logo pulses exactly once!)
         logoScale.animateTo(
             targetValue = 1.15f,
@@ -19036,39 +19037,56 @@ fun AnimatedAppLogo(
         // Wait a little bit after logo settles before starting the equalizer bars
         kotlinx.coroutines.delay(200)
 
-        // Equalizer bars rise and fall/move up and down EXACTLY TWICE!
-        // We run them in parallel with small staggered start delays.
-        
-        // Bar 1
-        this.launch {
-            // Cycle 1
-            bar1ScaleAnim.animateTo(1.35f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            bar1ScaleAnim.animateTo(0.55f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            // Cycle 2
-            bar1ScaleAnim.animateTo(1.35f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-        }
-
-        // Bar 2 (staggered slightly by 150ms)
-        this.launch {
-            kotlinx.coroutines.delay(150)
-            // Cycle 1
-            bar2ScaleAnim.animateTo(1.25f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            bar2ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            // Cycle 2
-            bar2ScaleAnim.animateTo(1.25f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-        }
-
-        // Bar 3 (staggered slightly by 300ms)
-        this.launch {
-            kotlinx.coroutines.delay(300)
-            // Cycle 1
-            bar3ScaleAnim.animateTo(1.45f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            bar3ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            // Cycle 2
-            bar3ScaleAnim.animateTo(1.45f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-            bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        if (isInfinite) {
+            // Infinite loop for dashboard
+            launch {
+                while (true) {
+                    bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                }
+            }
+            launch {
+                kotlinx.coroutines.delay(150)
+                while (true) {
+                    bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                }
+            }
+            launch {
+                kotlinx.coroutines.delay(300)
+                while (true) {
+                    bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                }
+            }
+        } else {
+            // Limited cycles for Splash screen (plays twice and ends at 1.0f)
+            launch {
+                // Cycle 1
+                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                // Cycle 2
+                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            }
+            launch {
+                kotlinx.coroutines.delay(150)
+                // Cycle 1
+                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                // Cycle 2
+                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            }
+            launch {
+                kotlinx.coroutines.delay(300)
+                // Cycle 1
+                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                // Cycle 2
+                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            }
         }
     }
 
@@ -19190,7 +19208,8 @@ fun SplashScreen(isDark: Boolean) {
         ) {
             AnimatedAppLogo(
                 modifier = Modifier
-                    .size(screenWidth * 0.48f)
+                    .size(screenWidth * 0.48f),
+                isInfinite = false
             )
         }
     }

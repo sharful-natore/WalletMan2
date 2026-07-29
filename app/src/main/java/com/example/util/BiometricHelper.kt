@@ -149,6 +149,8 @@ object BiometricHelper {
 
         private var animProgress = 0f
         private var waveAnimator: android.animation.ValueAnimator? = null
+        private var successScale = 0f
+        private var successAnimator: android.animation.ValueAnimator? = null
         private var currentState: Int = 0 // 0 = scanning, 1 = success, 2 = failure
 
         init {
@@ -195,8 +197,19 @@ object BiometricHelper {
 
         fun animateSuccess() {
             waveAnimator?.cancel()
+            successAnimator?.cancel()
             currentState = 1
-            invalidate()
+            successScale = 0f
+            
+            successAnimator = android.animation.ValueAnimator.ofFloat(0f, 1.2f, 1.0f).apply {
+                duration = 500
+                interpolator = android.view.animation.OvershootInterpolator(1.5f)
+                addUpdateListener { animation ->
+                    successScale = animation.animatedValue as Float
+                    invalidate()
+                }
+            }
+            successAnimator?.start()
         }
 
         fun animateFailure() {
@@ -236,6 +249,30 @@ object BiometricHelper {
             bgPaint.color = android.graphics.Color.WHITE
             canvas.drawCircle(cx, cy, radius, bgPaint)
 
+            if (currentState == 1) {
+                // Success state: draw pulsing tickmark check
+                canvas.save()
+                canvas.scale(successScale, successScale, cx, cy)
+                
+                val checkPath = android.graphics.Path().apply {
+                    moveTo(cx - 12f * density, cy + 2f * density)
+                    lineTo(cx - 3f * density, cy + 11f * density)
+                    lineTo(cx + 13f * density, cy - 7f * density)
+                }
+                
+                val checkPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = 6f * density
+                    strokeCap = android.graphics.Paint.Cap.ROUND
+                    strokeJoin = android.graphics.Paint.Join.ROUND
+                    color = android.graphics.Color.parseColor("#10B981") // Success Green
+                }
+                
+                canvas.drawPath(checkPath, checkPaint)
+                canvas.restore()
+                return
+            }
+
             canvas.save()
             val targetSize = 56f * density
             val scale = targetSize / 960f
@@ -245,12 +282,6 @@ object BiometricHelper {
             canvas.translate(0f, 960f)
 
             when (currentState) {
-                1 -> {
-                    // Success state: all ridges green
-                    for (path in ridgePaths) {
-                        canvas.drawPath(path, successPaint)
-                    }
-                }
                 2 -> {
                     // Failure state: all ridges red
                     for (path in ridgePaths) {
