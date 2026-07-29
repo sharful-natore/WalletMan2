@@ -124,12 +124,12 @@ object BiometricHelper {
 
         private val basePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             style = android.graphics.Paint.Style.FILL
-            color = android.graphics.Color.parseColor("#1E293B") // Crisp dark slate on white background
+            color = android.graphics.Color.parseColor("#40000000") // 25% Black
         }
 
         private val activePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             style = android.graphics.Paint.Style.FILL
-            color = android.graphics.Color.parseColor("#0284C7") // Vivid cyan-blue
+            color = android.graphics.Color.parseColor("#7C3AED") // Vivid Purple
         }
 
         private val successPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -258,52 +258,44 @@ object BiometricHelper {
                     }
                 }
                 else -> {
-                    // Scanning state: Custom Wave Animation
-                    // 1) Bottom to Top turns purple (0.0 -> 0.5)
-                    // 2) Top to Bottom turns grey (0.5 -> 1.0)
+                    // Scanning state: Line by line fill animation
+                    // 1) Bottom to Top: line by line turns purple (0.0 -> 0.5)
+                    // 2) Top to Bottom: line by line turns back to 25% black (0.5 -> 1.0)
                     for (i in ridgePaths.indices) {
                         val path = ridgePaths[i]
                         
-                        // First draw the base light grey line
+                        // Always draw base 25% black line first
                         canvas.drawPath(path, basePaint)
 
-                        // Calculate purple fraction (0.0 = all grey, 1.0 = all purple)
+                        // Calculate purple fraction (0.0 = 25% black, 1.0 = full purple)
                         var purpleFraction = 0f
 
                         if (animProgress < 0.5f) {
                             // Phase 1: Bottom (i=0) to Top (i=4) turning purple
-                            val startT = i * 0.10f
+                            val startT = i * 0.09f
                             val endT = startT + 0.08f
                             if (animProgress >= startT) {
-                                purpleFraction = if (animProgress >= endT) {
-                                    1f
-                                } else {
-                                    (animProgress - startT) / 0.08f
-                                }
+                                purpleFraction = if (animProgress >= endT) 1f else (animProgress - startT) / 0.08f
                             }
                         } else {
-                            // Phase 2: Top (i=4) to Bottom (i=0) turning grey
-                            val j = (ridgePaths.size - 1) - i // 0 for top, 4 for bottom
-                            val startT = 0.50f + j * 0.10f
+                            // Phase 2: Top (i=4) to Bottom (i=0) turning back to 25% black
+                            val j = (ridgePaths.size - 1) - i // 0 for top (i=4), 4 for bottom (i=0)
+                            val startT = 0.50f + j * 0.09f
                             val endT = startT + 0.08f
                             if (animProgress < startT) {
                                 purpleFraction = 1f // still purple
                             } else if (animProgress >= endT) {
-                                purpleFraction = 0f // turned grey
+                                purpleFraction = 0f // turned black
                             } else {
                                 purpleFraction = 1f - ((animProgress - startT) / 0.08f)
                             }
                         }
 
-                        // Draw purple segment expanding/collapsing from center outward
                         if (purpleFraction > 0f) {
-                            val center = 480f
-                            val halfW = 480f * purpleFraction
-                            
-                            canvas.save()
-                            canvas.clipRect(center - halfW, -960f, center + halfW, 0f)
+                            val prevAlpha = activePaint.alpha
+                            activePaint.alpha = (255 * purpleFraction).toInt().coerceIn(0, 255)
                             canvas.drawPath(path, activePaint)
-                            canvas.restore()
+                            activePaint.alpha = prevAlpha
                         }
                     }
                 }
@@ -446,6 +438,42 @@ object BiometricHelper {
                 window.decorView.setViewTreeSavedStateRegistryOwner(activity)
             }
 
+            // Dismiss dialog and cancel fingerprint scanning when screen turns off or app is stopped
+            val screenOffReceiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: android.content.Intent?) {
+                    if (intent?.action == android.content.Intent.ACTION_SCREEN_OFF) {
+                        try { cancellationSignal.cancel() } catch (_: Throwable) {}
+                        try {
+                            if (alertDialog.isShowing) {
+                                alertDialog.dismiss()
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                }
+            }
+
+            val lifecycleObserver = object : androidx.lifecycle.DefaultLifecycleObserver {
+                override fun onStop(owner: androidx.lifecycle.LifecycleOwner) {
+                    try { cancellationSignal.cancel() } catch (_: Throwable) {}
+                    try {
+                        if (alertDialog.isShowing) {
+                            alertDialog.dismiss()
+                        }
+                    } catch (_: Throwable) {}
+                }
+            }
+
+            try {
+                activity.registerReceiver(
+                    screenOffReceiver,
+                    android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_OFF)
+                )
+            } catch (_: Throwable) {}
+
+            try {
+                activity.lifecycle.addObserver(lifecycleObserver)
+            } catch (_: Throwable) {}
+
             negativeButton.setOnClickListener {
                 try {
                     cancellationSignal.cancel()
@@ -462,6 +490,12 @@ object BiometricHelper {
                 } catch (t: Throwable) {
                     t.printStackTrace()
                 }
+                try {
+                    activity.unregisterReceiver(screenOffReceiver)
+                } catch (_: Throwable) {}
+                try {
+                    activity.lifecycle.removeObserver(lifecycleObserver)
+                } catch (_: Throwable) {}
             }
 
             val callback = object : androidx.core.hardware.fingerprint.FingerprintManagerCompat.AuthenticationCallback() {

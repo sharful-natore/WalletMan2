@@ -30,7 +30,7 @@ fun GlowingPortalBackground(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3600, easing = LinearEasing),
+            animation = tween(durationMillis = 12000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "border_rotation"
@@ -43,24 +43,28 @@ fun GlowingPortalBackground(
         Canvas(modifier = Modifier.matchParentSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val minDim = minOf(size.width, size.height)
-            val borderRadius = (minDim / 2f) - 6.dp.toPx()
+            val borderRadius = (minDim / 2f) - 18.dp.toPx()
+
+            val dashLen = 14.dp.toPx()
+            val gapLen = 6.dp.toPx()
+            val dotLen = 3.dp.toPx()
 
             // Subtle static guide ring behind dashes
             drawCircle(
-                color = Color(0xFF0284C7).copy(alpha = 0.15f),
+                color = Color(0xFF0284C7).copy(alpha = 0.12f),
                 radius = borderRadius,
                 center = center,
-                style = Stroke(width = 2.dp.toPx())
+                style = Stroke(width = 1.5.dp.toPx())
             )
 
-            // Rotating Long-Dashed / Long-Dotted Round Border
+            // Rotating Custom Border Pattern: Two Dashes, One Dot
             rotate(degrees = rotationAngle, pivot = center) {
                 drawCircle(
                     brush = Brush.sweepGradient(
                         colors = listOf(
                             Color(0xFF0284C7), // Vivid Cyan-Blue
                             Color(0xFF38BDF8), // Sky Blue
-                            Color(0xFF8B5CF6), // Violet
+                            Color(0xFF8B5CF6), // Purple accent
                             Color(0xFF0284C7)  // Back to Cyan-Blue
                         ),
                         center = center
@@ -68,10 +72,14 @@ fun GlowingPortalBackground(
                     radius = borderRadius,
                     center = center,
                     style = Stroke(
-                        width = 3.dp.toPx(),
+                        width = 2.5.dp.toPx(),
                         cap = StrokeCap.Round,
                         pathEffect = PathEffect.dashPathEffect(
-                            intervals = floatArrayOf(22.dp.toPx(), 11.dp.toPx()),
+                            intervals = floatArrayOf(
+                                dashLen, gapLen,
+                                dashLen, gapLen,
+                                dotLen, gapLen
+                            ),
                             phase = 0f
                         )
                     )
@@ -81,7 +89,7 @@ fun GlowingPortalBackground(
 
         // Center Fingerprint Content Slot
         Box(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(6.dp),
             contentAlignment = Alignment.Center
         ) {
             content()

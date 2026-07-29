@@ -6430,7 +6430,7 @@ fun AnimatedFingerprintKey(
             Icon(
                 imageVector = Icons.Rounded.Fingerprint,
                 contentDescription = "Biometrics",
-                tint = if (isSuccess) Color(0xFF059669) else Color(0xFF1E293B),
+                tint = if (isSuccess) Color(0xFF059669) else Color.Black.copy(alpha = 0.30f),
                 modifier = Modifier
                     .size(28.dp)
                     .then(
@@ -6441,10 +6441,9 @@ fun AnimatedFingerprintKey(
                                     drawContent()
                                     val glowGradient = Brush.linearGradient(
                                         colors = listOf(
+                                            Color.Black.copy(alpha = 0.30f),
                                             Color(0xFF0284C7),
-                                            Color(0xFF7C3AED),
-                                            Color(0xFFEC4899),
-                                            Color(0xFF0284C7)
+                                            Color.Black.copy(alpha = 0.30f)
                                         ),
                                         start = Offset(
                                             x = -size.width + (gradientPhase * size.width * 2f),
@@ -6466,7 +6465,7 @@ fun AnimatedFingerprintKey(
                                 .drawWithContent {
                                     drawContent()
                                     drawRect(
-                                        color = if (isSuccess) Color(0xFF059669) else Color(0xFF1E293B),
+                                        color = if (isSuccess) Color(0xFF059669) else Color.Black.copy(alpha = 0.30f),
                                         blendMode = BlendMode.SrcIn
                                     )
                                 }
@@ -8568,6 +8567,7 @@ fun CategoryBadge(
             fontWeight = FontWeight.SemiBold,
             color = finalTextColor,
             maxLines = 1,
+            softWrap = false,
             style = androidx.compose.ui.text.TextStyle(
                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(
                     includeFontPadding = false
@@ -8739,29 +8739,33 @@ fun TransactionRowItem(
 
                 Column {
                     val formattedCategory = if (language == AppLanguage.BN) {
-                        when (tx.category) {
-                            "Salary" -> "বেতন"
-                            "Business" -> "ব্যবসা"
-                            "Agriculture" -> "কৃষি"
-                            "Gift" -> "উপহার"
-                            "Sales" -> "বিক্রয়"
-                            "Honorarium" -> "সম্মানী"
-                            "Food" -> "খাবার"
-                            "Housing" -> "বাসস্থান"
-                            "Transport" -> "যাতায়াত"
-                            "Shopping" -> "কেনাকাটা"
-                            "Medical" -> "চিকিৎসা"
-                            "Education" -> "শিক্ষা"
-                            "Clothing" -> "পোশাক"
-                            "Others" -> "অন্যান্য"
-                            "Lending" -> "ধার দেওয়া"
-                            "Borrowing" -> "ধার নেওয়া"
-                            "Repay Paid" -> Translation.get("debt_repaid", language)
-                            "Repay Received" -> Translation.get("pawn_repaid", language)
+                        when {
+                            tx.category.equals("Salary", ignoreCase = true) -> "বেতন"
+                            tx.category.equals("Business", ignoreCase = true) -> "ব্যবসা"
+                            tx.category.equals("Agriculture", ignoreCase = true) -> "কৃষি"
+                            tx.category.equals("Gift", ignoreCase = true) -> "উপহার"
+                            tx.category.equals("Sales", ignoreCase = true) -> "বিক্রয়"
+                            tx.category.equals("Honorarium", ignoreCase = true) -> "সম্মানী"
+                            tx.category.equals("Food", ignoreCase = true) -> "খাবার"
+                            tx.category.equals("Housing", ignoreCase = true) -> "বাসস্থান"
+                            tx.category.equals("Transport", ignoreCase = true) -> "যাতায়াত"
+                            tx.category.equals("Shopping", ignoreCase = true) -> "কেনাকাটা"
+                            tx.category.equals("Medical", ignoreCase = true) -> "চিকিৎসা"
+                            tx.category.equals("Education", ignoreCase = true) -> "শিক্ষা"
+                            tx.category.equals("Clothing", ignoreCase = true) -> "পোশাক"
+                            tx.category.equals("Others", ignoreCase = true) -> "অন্যান্য"
+                            tx.category.equals("Lending", ignoreCase = true) || tx.category.equals("Lend", ignoreCase = true) -> "ধার দেওয়া"
+                            tx.category.equals("Borrowing", ignoreCase = true) || tx.category.equals("Borrow", ignoreCase = true) -> "ধার নেওয়া"
+                            tx.category.equals("Repay Paid", ignoreCase = true) || tx.category.equals("Debt Repaid", ignoreCase = true) || tx.category.contains("দেনা পরিশোধ") -> "দেনা পরিশোধ"
+                            tx.category.equals("Repay Received", ignoreCase = true) || tx.category.equals("Loan Repaid", ignoreCase = true) || tx.category.contains("পাওনা পরিশোধ") -> "পাওনা পরিশোধ"
                             else -> tx.category
                         }
                     } else {
-                        tx.category
+                        when {
+                            tx.category.equals("Repay Paid", ignoreCase = true) -> "Debt Repaid"
+                            tx.category.equals("Repay Received", ignoreCase = true) -> "Loan Repaid"
+                            else -> tx.category
+                        }
                     }
 
                     val mainTitle = if (tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
@@ -8774,13 +8778,17 @@ fun TransactionRowItem(
                         linkedPerson.name
                     } else null
 
-                    val typeBadgeText = when (tx.type) {
-                        "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
-                        "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
-                        "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
-                        "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
-                        "REPAY_PAID" -> if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
-                        "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
+                    val typeBadgeText = when {
+                        tx.type == "REPAY_PAID" || tx.category.equals("Repay Paid", ignoreCase = true) || tx.category.equals("Debt Repaid", ignoreCase = true) || tx.category.contains("দেনা পরিশোধ") -> {
+                            if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
+                        }
+                        tx.type == "REPAY_RECEIVED" || tx.category.equals("Repay Received", ignoreCase = true) || tx.category.equals("Loan Repaid", ignoreCase = true) || tx.category.contains("পাওনা পরিশোধ") -> {
+                            if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
+                        }
+                        tx.type == "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
+                        tx.type == "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
+                        tx.type == "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
+                        tx.type == "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
                         else -> null
                     }
 
@@ -8792,7 +8800,8 @@ fun TransactionRowItem(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         HighlightedText(
                             text = mainTitle,
@@ -8802,7 +8811,8 @@ fun TransactionRowItem(
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color(0xFF1E222F)
-                            )
+                            ),
+                            modifier = Modifier.weight(1f, fill = false)
                         )
 
                         if (personBadgeName != null) {
@@ -8815,13 +8825,13 @@ fun TransactionRowItem(
 
                         if (typeBadgeText != null) {
                             Spacer(modifier = Modifier.width(6.dp))
-                            val badgeBg = when (tx.type) {
-                                "EXPENSE" -> Color(0xFFFF5252)
-                                "INCOME" -> Color(0xFF10B981)
-                                "LEND" -> Color(0xFF3B82F6)
-                                "BORROW" -> Color(0xFFF97316)
-                                "REPAY_PAID" -> Color(0xFF8B5CF6)
-                                "REPAY_RECEIVED" -> Color(0xFF0D9488)
+                            val badgeBg = when {
+                                tx.type == "REPAY_PAID" || typeBadgeText == "দেনা পরিশোধ" || typeBadgeText == "Debt Repaid" -> Color(0xFF8B5CF6)
+                                tx.type == "REPAY_RECEIVED" || typeBadgeText == "পাওনা পরিশোধ" || typeBadgeText == "Loan Repaid" -> Color(0xFF0D9488)
+                                tx.type == "EXPENSE" -> Color(0xFFFF5252)
+                                tx.type == "INCOME" -> Color(0xFF10B981)
+                                tx.type == "LEND" -> Color(0xFF3B82F6)
+                                tx.type == "BORROW" -> Color(0xFFF97316)
                                 else -> Color.Gray
                             }
                             CategoryBadge(
