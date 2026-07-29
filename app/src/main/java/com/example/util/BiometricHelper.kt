@@ -382,7 +382,7 @@ object BiometricHelper {
                 setViewCompositionStrategy(
                     androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool
                 )
-                val portalSize = (150 * density).toInt()
+                val portalSize = (120 * density).toInt()
                 layoutParams = android.widget.LinearLayout.LayoutParams(portalSize, portalSize).apply {
                     gravity = android.view.Gravity.CENTER_HORIZONTAL
                     bottomMargin = (20 * density).toInt()
@@ -393,7 +393,7 @@ object BiometricHelper {
                     ) {
                         androidx.compose.ui.viewinterop.AndroidView(
                             factory = { fingerprintView },
-                            modifier = Modifier.size((85 * density).dp)
+                            modifier = Modifier.size((80 * density).dp)
                         )
                     }
                 }

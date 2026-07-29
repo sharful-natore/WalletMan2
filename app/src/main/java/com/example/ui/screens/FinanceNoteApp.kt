@@ -8556,18 +8556,23 @@ fun CategoryBadge(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(softBg)
-            .border(0.8.dp, borderCol, RoundedCornerShape(8.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .border(0.7.dp, borderCol, RoundedCornerShape(6.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            fontSize = 10.sp,
+            fontSize = 9.5.sp,
             fontWeight = FontWeight.SemiBold,
             color = finalTextColor,
-            maxLines = 1
+            maxLines = 1,
+            style = androidx.compose.ui.text.TextStyle(
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
+                    includeFontPadding = false
+                )
+            )
         )
     }
 }
