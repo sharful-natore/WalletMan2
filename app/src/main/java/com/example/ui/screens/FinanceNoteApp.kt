@@ -6399,79 +6399,28 @@ fun AnimatedFingerprintKey(
     isSuccess: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "fingerprint_glow")
-
-    val haloScale by if (isScanning && !isSuccess) {
-        infiniteTransition.animateFloat(
-            initialValue = 1.0f,
-            targetValue = 1.35f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1200, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "halo_scale"
-        )
-    } else {
-        remember { mutableStateOf(1.0f) }
-    }
-
-    val haloAlpha by if (isScanning && !isSuccess) {
-        infiniteTransition.animateFloat(
-            initialValue = 0.4f,
-            targetValue = 0.0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1200, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "halo_alpha"
-        )
-    } else {
-        remember { mutableStateOf(0.0f) }
-    }
-
-    val gradientPhase by if (isScanning && !isSuccess) {
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "gradient_phase"
-        )
-    } else {
-        remember { mutableStateOf(0f) }
-    }
-
-    Box(
-        modifier = modifier.size(56.dp),
-        contentAlignment = Alignment.Center
+    com.example.ui.components.GlowingPortalBackground(
+        modifier = modifier
     ) {
-        if (isScanning && !isSuccess) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = haloScale
-                        scaleY = haloScale
-                        alpha = haloAlpha
-                    }
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF10B981).copy(alpha = 0.4f),
-                                Color(0xFF3B82F6).copy(alpha = 0.1f),
-                                Color.Transparent
-                            )
-                        ),
-                        shape = CircleShape
-                    )
+        val infiniteTransition = rememberInfiniteTransition(label = "fingerprint_glow")
+
+        val gradientPhase by if (isScanning && !isSuccess) {
+            infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "gradient_phase"
             )
+        } else {
+            remember { mutableStateOf(0f) }
         }
 
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(44.dp)
                 .background(
                     if (isSuccess) Color(0xFF10B981).copy(alpha = 0.25f)
                     else Color(0xFF10B981).copy(alpha = 0.12f),
@@ -6484,7 +6433,7 @@ fun AnimatedFingerprintKey(
                 contentDescription = "Biometrics",
                 tint = Color.White,
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(28.dp)
                     .then(
                         if (isScanning && !isSuccess) {
                             Modifier

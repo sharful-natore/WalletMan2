@@ -3,6 +3,10 @@ package com.example.util
 import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 
@@ -368,15 +372,30 @@ object BiometricHelper {
             }
             rootLayout.addView(subtitleTextView)
 
-            // Custom Fingerprint View
+            // Custom Fingerprint View with Animated Glowing Portal Background
             val fingerprintView = FingerprintView(activity).apply {
-                val viewSize = (110 * density).toInt()
-                layoutParams = android.widget.LinearLayout.LayoutParams(viewSize, viewSize).apply {
+                val viewSize = (85 * density).toInt()
+                layoutParams = android.view.ViewGroup.LayoutParams(viewSize, viewSize)
+            }
+
+            val composeView = androidx.compose.ui.platform.ComposeView(activity).apply {
+                val portalSize = (150 * density).toInt()
+                layoutParams = android.widget.LinearLayout.LayoutParams(portalSize, portalSize).apply {
                     gravity = android.view.Gravity.CENTER_HORIZONTAL
-                    bottomMargin = (24 * density).toInt()
+                    bottomMargin = (20 * density).toInt()
+                }
+                setContent {
+                    com.example.ui.components.GlowingPortalBackground(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        androidx.compose.ui.viewinterop.AndroidView(
+                            factory = { fingerprintView },
+                            modifier = Modifier.size((85 * density).dp)
+                        )
+                    }
                 }
             }
-            rootLayout.addView(fingerprintView)
+            rootLayout.addView(composeView)
 
             // Dynamic Status/Instruction TextView
             val statusTextView = android.widget.TextView(activity).apply {
