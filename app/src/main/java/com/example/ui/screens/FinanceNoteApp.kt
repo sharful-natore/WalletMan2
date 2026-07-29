@@ -1970,11 +1970,21 @@ fun FinanceNoteApp(
 ) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var showSplash by remember { mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.loadProfile(context)
+        viewModel.checkAndProcessAutoEntries(context)
+        kotlinx.coroutines.delay(2800)
+        showSplash = false
+    }
 
     BiometricLockWrapper(
         viewModel = viewModel,
         language = language,
-        isDarkTheme = isDarkTheme
+        isDarkTheme = isDarkTheme,
+        isSplashActive = showSplash
     ) {
     val selectedThemeIndex by viewModel.selectedThemeGradientIndex.collectAsState()
     val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
@@ -2165,14 +2175,6 @@ fun FinanceNoteApp(
                 }
             }
         }
-    }
-
-    var showSplash by remember { mutableStateOf(true) }
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        viewModel.loadProfile(context)
-        viewModel.checkAndProcessAutoEntries(context)
-        kotlinx.coroutines.delay(2800)
-        showSplash = false
     }
 
     if (showSplash) {
@@ -5964,27 +5966,27 @@ fun BiometricLockWrapper(
     viewModel: FinanceViewModel,
     language: AppLanguage,
     isDarkTheme: Boolean,
+    isSplashActive: Boolean,
     content: @Composable () -> Unit
 ) {
     val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
     val autoLockTimeoutSeconds by viewModel.autoLockTimeoutSeconds.collectAsState()
     val reauthRequest by viewModel.reauthRequest.collectAsState()
-    var isAppUnlocked by remember { mutableStateOf(!isBiometricEnabled) }
-    var lastBackgroundTime by remember { mutableStateOf(0L) }
+    val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, isBiometricEnabled, autoLockTimeoutSeconds) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && isBiometricEnabled) {
-                lastBackgroundTime = System.currentTimeMillis()
+                viewModel.lastBackgroundTime = System.currentTimeMillis()
                 if (autoLockTimeoutSeconds == 0L) {
-                    isAppUnlocked = false
+                    viewModel.setAppUnlocked(false)
                 }
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_START && isBiometricEnabled) {
-                if (lastBackgroundTime != 0L) {
-                    val elapsedSeconds = (System.currentTimeMillis() - lastBackgroundTime) / 1000L
+                if (viewModel.lastBackgroundTime != 0L) {
+                    val elapsedSeconds = (System.currentTimeMillis() - viewModel.lastBackgroundTime) / 1000L
                     if (elapsedSeconds >= autoLockTimeoutSeconds) {
-                        isAppUnlocked = false
+                        viewModel.setAppUnlocked(false)
                     }
                 }
             }
@@ -5998,12 +6000,12 @@ fun BiometricLockWrapper(
     Box(modifier = Modifier.fillMaxSize()) {
         content()
 
-        if (isBiometricEnabled && !isAppUnlocked) {
+        if (!isSplashActive && isBiometricEnabled && !isAppUnlocked) {
             AppLockOverlay(
                 viewModel = viewModel,
                 language = language,
                 isDark = isDarkTheme,
-                onUnlock = { isAppUnlocked = true }
+                onUnlock = { viewModel.setAppUnlocked(true) }
             )
         }
 
@@ -6047,21 +6049,33 @@ fun AppLockOverlay(
     var showPinFallback by remember { mutableStateOf(!com.example.util.BiometricHelper.isBiometricAvailable(context)) }
     var enteredPin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isBioScanning by remember { mutableStateOf(false) }
+    var isBioSuccess by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     fun triggerPrompt() {
         if (activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+            isBioScanning = true
+            isBioSuccess = false
             com.example.util.BiometricHelper.showBiometricPrompt(
                 activity = activity,
                 title = titleOverride ?: (if (language == AppLanguage.BN) "ফাইন্যান্স নোট আনলক করুন" else "Unlock Finance Note"),
-                subtitle = subtitleOverride ?: (if (language == AppLanguage.BN) "আপনার ফিঙ্গারপ্রিন্ট বা ফেস লক ব্যবহার করুন" else "Use your fingerprint or face to access your account"),
+                subtitle = subtitleOverride ?: (if (language == AppLanguage.BN) "আপনার ফিঙ্গারপ্রিন্ট ব্যবহার করুন" else "Use your fingerprint or face to access your account"),
                 negativeButtonText = if (language == AppLanguage.BN) "পিন ব্যবহার করুন" else "Use PIN",
                 onSuccess = {
-                    onUnlock()
+                    isBioScanning = false
+                    isBioSuccess = true
+                    scope.launch {
+                        delay(1200)
+                        onUnlock()
+                    }
                 },
                 onUsePinFallback = {
+                    isBioScanning = false
                     showPinFallback = true
                 },
                 onError = { err ->
+                    isBioScanning = false
                     showPinFallback = true
                 }
             )
@@ -6258,48 +6272,51 @@ fun AppLockOverlay(
 
                     for (row in keys) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             for (key in row) {
+                                val isBioKey = key == "BIO"
+                                val isBioAvailable = com.example.util.BiometricHelper.isBiometricAvailable(context)
+                                val isVisible = !isBioKey || isBioAvailable
+
                                 Spacer(modifier = Modifier.weight(1f))
-                                if (key.isNotEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(72.dp)
-                                            .clip(CircleShape)
-                                            .background(if (key == "BIO" || key == "DEL") Color.Transparent else buttonBg)
-                                            .clickable {
-                                                errorMessage = null
-                                                when (key) {
-                                                    "DEL" -> {
-                                                        if (enteredPin.isNotEmpty()) {
-                                                            enteredPin = enteredPin.dropLast(1)
-                                                        }
+                                Box(
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(CircleShape)
+                                        .background(if (key == "BIO" || key == "DEL" || !isVisible) Color.Transparent else buttonBg)
+                                        .clickable(enabled = isVisible) {
+                                            errorMessage = null
+                                            when (key) {
+                                                "DEL" -> {
+                                                    if (enteredPin.isNotEmpty()) {
+                                                        enteredPin = enteredPin.dropLast(1)
                                                     }
-                                                    "BIO" -> {
-                                                        if (com.example.util.BiometricHelper.isBiometricAvailable(context)) {
-                                                            triggerPrompt()
-                                                        }
+                                                }
+                                                "BIO" -> {
+                                                    if (isBioAvailable) {
+                                                        triggerPrompt()
                                                     }
-                                                    else -> {
-                                                        if (enteredPin.length < 4) {
-                                                            enteredPin += key
-                                                            if (enteredPin.length == 4) {
-                                                                if (viewModel.verifyPin(enteredPin)) {
-                                                                    onUnlock()
-                                                                } else {
-                                                                    errorMessage = if (language == AppLanguage.BN) "ভুল পিন। আবার চেষ্টা করুন।" else "Incorrect PIN. Please try again."
-                                                                    enteredPin = ""
-                                                                }
+                                                }
+                                                else -> {
+                                                    if (enteredPin.length < 4) {
+                                                        enteredPin += key
+                                                        if (enteredPin.length == 4) {
+                                                            if (viewModel.verifyPin(enteredPin)) {
+                                                                onUnlock()
+                                                            } else {
+                                                                errorMessage = if (language == AppLanguage.BN) "ভুল পিন। আবার চেষ্টা করুন।" else "Incorrect PIN. Please try again."
+                                                                enteredPin = ""
                                                             }
                                                         }
                                                     }
                                                 }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isVisible) {
                                         when (key) {
                                             "DEL" -> {
                                                 Icon(
@@ -6310,14 +6327,14 @@ fun AppLockOverlay(
                                                 )
                                             }
                                             "BIO" -> {
-                                                if (com.example.util.BiometricHelper.isBiometricAvailable(context)) {
-                                                    Icon(
-                                                        imageVector = Icons.Rounded.Fingerprint,
-                                                        contentDescription = "Biometrics",
-                                                        tint = Color(0xFF6366F1),
-                                                        modifier = Modifier.size(28.dp)
-                                                    )
-                                                }
+                                                FingerprintKeyIcon(
+                                                    isScanning = isBioScanning,
+                                                    isSuccess = isBioSuccess,
+                                                    modifier = Modifier.size(36.dp),
+                                                    activeColor = Color(0xFF6366F1),
+                                                    successColor = Color(0xFF22C55E),
+                                                    inactiveColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                                                )
                                             }
                                             else -> {
                                                 Text(
@@ -6336,6 +6353,171 @@ fun AppLockOverlay(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun FingerprintKeyIcon(
+    isScanning: Boolean,
+    isSuccess: Boolean,
+    modifier: Modifier = Modifier,
+    activeColor: Color = Color(0xFF6366F1),
+    successColor: Color = Color(0xFF22C55E),
+    inactiveColor: Color = Color(0xFFE2E8F0)
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "scanning")
+    val scanningProgress by if (isScanning && !isSuccess) {
+        infiniteTransition.animateFloat(
+            initialValue = 0.15f,
+            targetValue = 0.65f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "progress"
+        )
+    } else {
+        remember { mutableStateOf(0.15f) }
+    }
+
+    val successProgress by animateFloatAsState(
+        targetValue = if (isSuccess) 1.0f else 0.0f,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "successProgress"
+    )
+
+    val progress = if (isSuccess) {
+        val lastScanningVal = remember { mutableStateOf(0.4f) }
+        SideEffect {
+            if (!isSuccess) {
+                lastScanningVal.value = scanningProgress
+            }
+        }
+        lastScanningVal.value + (1.0f - lastScanningVal.value) * successProgress
+    } else {
+        scanningProgress
+    }
+
+    val currentColor by animateColorAsState(
+        targetValue = if (isSuccess) successColor else activeColor,
+        animationSpec = tween(350),
+        label = "color"
+    )
+
+    Canvas(modifier = modifier.size(36.dp)) {
+        val width = size.width
+        val height = size.height
+        val cx = width / 2
+        val cy = height / 2
+        val density = size.width / 80f
+        
+        val strokeWidth = 3f * density
+        
+        fun drawFingerprintLines(color: Color) {
+            drawArc(
+                color = color,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = Offset(cx - 6 * density, cy - 6 * density),
+                size = Size(12 * density, 12 * density),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = color,
+                startAngle = 190f,
+                sweepAngle = 160f,
+                useCenter = false,
+                topLeft = Offset(cx - 12 * density, cy - 12 * density),
+                size = Size(24 * density, 24 * density),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = color,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = Offset(cx - 18 * density, cy - 18 * density),
+                size = Size(36 * density, 36 * density),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = color,
+                startAngle = 200f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = Offset(cx - 24 * density, cy - 24 * density),
+                size = Size(48 * density, 48 * density),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = color,
+                startAngle = 180f,
+                sweepAngle = 180f,
+                useCenter = false,
+                topLeft = Offset(cx - 30 * density, cy - 30 * density),
+                size = Size(60 * density, 60 * density),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            drawArc(
+                color = color,
+                startAngle = 195f,
+                sweepAngle = 150f,
+                useCenter = false,
+                topLeft = Offset(cx - 36 * density, cy - 36 * density),
+                size = Size(72 * density, 72 * density),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            drawLine(
+                color = color,
+                start = Offset(cx - 6 * density, cy),
+                end = Offset(cx - 6 * density, cy + 6 * density),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = color,
+                start = Offset(cx - 18 * density, cy),
+                end = Offset(cx - 18 * density, cy + 12 * density),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = color,
+                start = Offset(cx - 30 * density, cy),
+                end = Offset(cx - 30 * density, cy + 18 * density),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+
+            drawLine(
+                color = color,
+                start = Offset(cx + 6 * density, cy),
+                end = Offset(cx + 6 * density, cy + 10 * density),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = color,
+                start = Offset(cx + 18 * density, cy),
+                end = Offset(cx + 18 * density, cy + 15 * density),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+        }
+
+        drawFingerprintLines(inactiveColor)
+
+        val totalHeight = 54f * density
+        val clipTop = (cy + 18f * density) - (progress * totalHeight)
+        
+        clipRect(
+            top = clipTop,
+            bottom = height + 50f
+        ) {
+            drawFingerprintLines(currentColor)
         }
     }
 }

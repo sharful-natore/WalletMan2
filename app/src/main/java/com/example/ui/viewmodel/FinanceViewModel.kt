@@ -243,6 +243,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isBiometricEnabled = MutableStateFlow(false)
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
 
+    private val _isAppUnlocked = MutableStateFlow(true)
+    val isAppUnlocked: StateFlow<Boolean> = _isAppUnlocked.asStateFlow()
+
+    var lastBackgroundTime: Long = 0L
+
+    fun setAppUnlocked(unlocked: Boolean) {
+        _isAppUnlocked.value = unlocked
+    }
+
     private val _appLockPin = MutableStateFlow("1234")
     val appLockPin: StateFlow<String> = _appLockPin.asStateFlow()
 
@@ -2124,6 +2133,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         
         _isNotificationEnabled.value = notifEnabled
         _isBiometricEnabled.value = prefs.getBoolean("biometric_lock_enabled", false)
+        _isAppUnlocked.value = !_isBiometricEnabled.value
         _appLockPin.value = prefs.getString("app_lock_pin", "1234") ?: "1234"
         _autoLockTimeoutSeconds.value = prefs.getLong("auto_lock_timeout_seconds", 0L)
         _isScreenSecurityEnabled.value = prefs.getBoolean("screen_security_flag_secure", false)
@@ -2150,6 +2160,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun setBiometricEnabled(context: Context, enabled: Boolean) {
         _isBiometricEnabled.value = enabled
+        _isAppUnlocked.value = !enabled
         context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("biometric_lock_enabled", enabled)
