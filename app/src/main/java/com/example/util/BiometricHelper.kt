@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 object BiometricHelper {
 
@@ -379,6 +381,11 @@ object BiometricHelper {
             }
 
             val composeView = androidx.compose.ui.platform.ComposeView(activity).apply {
+                setViewTreeLifecycleOwner(activity)
+                setViewTreeSavedStateRegistryOwner(activity)
+                setViewCompositionStrategy(
+                    androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnDetachedFromWindowOrReleasedFromPool
+                )
                 val portalSize = (150 * density).toInt()
                 layoutParams = android.widget.LinearLayout.LayoutParams(portalSize, portalSize).apply {
                     gravity = android.view.Gravity.CENTER_HORIZONTAL
@@ -437,8 +444,11 @@ object BiometricHelper {
 
             val alertDialog = dialogBuilder.create()
 
-            // Remove native dialog background/borders to show the beautiful card round corners
-            alertDialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            alertDialog.window?.let { window ->
+                window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+                window.decorView.setViewTreeLifecycleOwner(activity)
+                window.decorView.setViewTreeSavedStateRegistryOwner(activity)
+            }
 
             negativeButton.setOnClickListener {
                 try {
@@ -462,6 +472,7 @@ object BiometricHelper {
                 override fun onAuthenticationSucceeded(result: androidx.core.hardware.fingerprint.FingerprintManagerCompat.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
                     try {
+                        BiometricFeedback.triggerScanSuccess(activity)
                         statusTextView.text = if (subtitle.contains("আপনার")) "সফল হয়েছে!" else "Success!"
                         statusTextView.setTextColor(android.graphics.Color.parseColor("#22C55E")) // Green
                         fingerprintView.animateSuccess()
@@ -484,6 +495,7 @@ object BiometricHelper {
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
                     try {
+                        BiometricFeedback.triggerScanFailure(activity)
                         statusTextView.text = if (subtitle.contains("আপনার")) "ফিঙ্গারপ্রিন্ট মেলেনি, আবার চেষ্টা করুন।" else "Fingerprint not recognized. Try again."
                         statusTextView.setTextColor(android.graphics.Color.parseColor("#EF4444")) // Red
                         fingerprintView.animateFailure()
@@ -549,6 +561,7 @@ object BiometricHelper {
             }
 
             alertDialog.show()
+            BiometricFeedback.triggerScanInitiated(activity)
 
             try {
                 fm.authenticate(null, 0, cancellationSignal, callback, null)
@@ -583,5 +596,77 @@ object BiometricHelper {
             onUsePinFallback = onUsePinFallback,
             onError = onError
         )
+    }
+}
+
+object BiometricFeedback {
+    fun triggerScanInitiated(context: Context) {
+        try {
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            vibrator?.let {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    it.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
+                } else if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    it.vibrate(android.os.VibrationEffect.createOneShot(25, 60))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(25)
+                }
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 20)
+            toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 35)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try { toneGen.release() } catch (_: Throwable) {}
+            }, 100)
+        } catch (_: Throwable) {}
+    }
+
+    fun triggerScanSuccess(context: Context) {
+        try {
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            vibrator?.let {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    it.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_DOUBLE_CLICK))
+                } else if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    it.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 35, 45, 40), -1))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(longArrayOf(0, 35, 45, 40), -1)
+                }
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 30)
+            toneGen.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 75)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try { toneGen.release() } catch (_: Throwable) {}
+            }, 150)
+        } catch (_: Throwable) {}
+    }
+
+    fun triggerScanFailure(context: Context) {
+        try {
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            vibrator?.let {
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    it.vibrate(android.os.VibrationEffect.createOneShot(180, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.vibrate(180)
+                }
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 25)
+            toneGen.startTone(android.media.ToneGenerator.TONE_PROP_NACK, 90)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try { toneGen.release() } catch (_: Throwable) {}
+            }, 180)
+        } catch (_: Throwable) {}
     }
 }
