@@ -6053,6 +6053,17 @@ fun AppLockOverlay(
     var isBioSuccess by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val deviceLockLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            onUnlock()
+        }
+    }
+
+    val keyguardManager = remember { context.getSystemService(android.content.Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager }
+    val isDeviceSecure = remember { keyguardManager?.isDeviceSecure == true }
+
     fun triggerPrompt() {
         if (activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
             isBioScanning = true
@@ -6065,10 +6076,7 @@ fun AppLockOverlay(
                 onSuccess = {
                     isBioScanning = false
                     isBioSuccess = true
-                    scope.launch {
-                        delay(1200)
-                        onUnlock()
-                    }
+                    onUnlock()
                 },
                 onUsePinFallback = {
                     isBioScanning = false
@@ -6327,13 +6335,10 @@ fun AppLockOverlay(
                                                 )
                                             }
                                             "BIO" -> {
-                                                FingerprintKeyIcon(
+                                                AnimatedFingerprintKey(
                                                     isScanning = isBioScanning,
                                                     isSuccess = isBioSuccess,
-                                                    modifier = Modifier.size(36.dp),
-                                                    activeColor = Color(0xFF6366F1),
-                                                    successColor = Color(0xFF22C55E),
-                                                    inactiveColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                                                    modifier = Modifier.size(56.dp)
                                                 )
                                             }
                                             else -> {
@@ -6352,175 +6357,179 @@ fun AppLockOverlay(
                         }
                     }
                 }
+
+                if (isDeviceSecure) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TextButton(
+                        onClick = {
+                            val intent = keyguardManager?.createConfirmDeviceCredentialIntent(
+                                if (language == AppLanguage.BN) "ফাইন্যান্স নোট আনলক করুন" else "Unlock Finance Note",
+                                if (language == AppLanguage.BN) "আপনার ফোনের পিন, প্যাটার্ন বা পাসওয়ার্ড দিন" else "Enter your phone PIN, pattern, or password"
+                            )
+                            if (intent != null) {
+                                deviceLockLauncher.launch(intent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            tint = Color(0xFF6366F1),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "ফোনের স্ক্রিন লক ব্যবহার করুন" else "Use Phone Screen Lock",
+                            color = Color(0xFF6366F1),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
             }
         }
     }
 }
+
 
 @Composable
-fun FingerprintKeyIcon(
+fun AnimatedFingerprintKey(
     isScanning: Boolean,
     isSuccess: Boolean,
-    modifier: Modifier = Modifier,
-    activeColor: Color = Color(0xFF6366F1),
-    successColor: Color = Color(0xFF22C55E),
-    inactiveColor: Color = Color(0xFFE2E8F0)
+    modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "scanning")
-    val scanningProgress by if (isScanning && !isSuccess) {
+    val infiniteTransition = rememberInfiniteTransition(label = "fingerprint_glow")
+
+    val haloScale by if (isScanning && !isSuccess) {
         infiniteTransition.animateFloat(
-            initialValue = 0.15f,
-            targetValue = 0.65f,
+            initialValue = 1.0f,
+            targetValue = 1.35f,
             animationSpec = infiniteRepeatable(
-                animation = tween(1500, easing = LinearEasing),
+                animation = tween(1200, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
-            label = "progress"
+            label = "halo_scale"
         )
     } else {
-        remember { mutableStateOf(0.15f) }
+        remember { mutableStateOf(1.0f) }
     }
 
-    val successProgress by animateFloatAsState(
-        targetValue = if (isSuccess) 1.0f else 0.0f,
-        animationSpec = tween(400, easing = FastOutSlowInEasing),
-        label = "successProgress"
-    )
-
-    val progress = if (isSuccess) {
-        val lastScanningVal = remember { mutableStateOf(0.4f) }
-        SideEffect {
-            if (!isSuccess) {
-                lastScanningVal.value = scanningProgress
-            }
-        }
-        lastScanningVal.value + (1.0f - lastScanningVal.value) * successProgress
+    val haloAlpha by if (isScanning && !isSuccess) {
+        infiniteTransition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 0.0f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "halo_alpha"
+        )
     } else {
-        scanningProgress
+        remember { mutableStateOf(0.0f) }
     }
 
-    val currentColor by animateColorAsState(
-        targetValue = if (isSuccess) successColor else activeColor,
-        animationSpec = tween(350),
-        label = "color"
-    )
+    val gradientPhase by if (isScanning && !isSuccess) {
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "gradient_phase"
+        )
+    } else {
+        remember { mutableStateOf(0f) }
+    }
 
-    Canvas(modifier = modifier.size(36.dp)) {
-        val width = size.width
-        val height = size.height
-        val cx = width / 2
-        val cy = height / 2
-        val density = size.width / 80f
-        
-        val strokeWidth = 3f * density
-        
-        fun drawFingerprintLines(color: Color) {
-            drawArc(
-                color = color,
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = Offset(cx - 6 * density, cy - 6 * density),
-                size = Size(12 * density, 12 * density),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = color,
-                startAngle = 190f,
-                sweepAngle = 160f,
-                useCenter = false,
-                topLeft = Offset(cx - 12 * density, cy - 12 * density),
-                size = Size(24 * density, 24 * density),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = color,
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = Offset(cx - 18 * density, cy - 18 * density),
-                size = Size(36 * density, 36 * density),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = color,
-                startAngle = 200f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(cx - 24 * density, cy - 24 * density),
-                size = Size(48 * density, 48 * density),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = color,
-                startAngle = 180f,
-                sweepAngle = 180f,
-                useCenter = false,
-                topLeft = Offset(cx - 30 * density, cy - 30 * density),
-                size = Size(60 * density, 60 * density),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = color,
-                startAngle = 195f,
-                sweepAngle = 150f,
-                useCenter = false,
-                topLeft = Offset(cx - 36 * density, cy - 36 * density),
-                size = Size(72 * density, 72 * density),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-
-            drawLine(
-                color = color,
-                start = Offset(cx - 6 * density, cy),
-                end = Offset(cx - 6 * density, cy + 6 * density),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = color,
-                start = Offset(cx - 18 * density, cy),
-                end = Offset(cx - 18 * density, cy + 12 * density),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = color,
-                start = Offset(cx - 30 * density, cy),
-                end = Offset(cx - 30 * density, cy + 18 * density),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
-            )
-
-            drawLine(
-                color = color,
-                start = Offset(cx + 6 * density, cy),
-                end = Offset(cx + 6 * density, cy + 10 * density),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = color,
-                start = Offset(cx + 18 * density, cy),
-                end = Offset(cx + 18 * density, cy + 15 * density),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
+    Box(
+        modifier = modifier.size(56.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isScanning && !isSuccess) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = haloScale
+                        scaleY = haloScale
+                        alpha = haloAlpha
+                    }
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF10B981).copy(alpha = 0.4f),
+                                Color(0xFF3B82F6).copy(alpha = 0.1f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
             )
         }
 
-        drawFingerprintLines(inactiveColor)
-
-        val totalHeight = 54f * density
-        val clipTop = (cy + 18f * density) - (progress * totalHeight)
-        
-        clipRect(
-            top = clipTop,
-            bottom = height + 50f
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .background(
+                    if (isSuccess) Color(0xFF10B981).copy(alpha = 0.25f)
+                    else Color(0xFF10B981).copy(alpha = 0.12f),
+                    CircleShape
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            drawFingerprintLines(currentColor)
+            Icon(
+                imageVector = Icons.Rounded.Fingerprint,
+                contentDescription = "Biometrics",
+                tint = Color.White,
+                modifier = Modifier
+                    .size(32.dp)
+                    .then(
+                        if (isScanning && !isSuccess) {
+                            Modifier
+                                .graphicsLayer(alpha = 0.99f)
+                                .drawWithContent {
+                                    drawContent()
+                                    val glowGradient = Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF10B981),
+                                            Color(0xFF3B82F6),
+                                            Color(0xFF8B5CF6),
+                                            Color(0xFF10B981)
+                                        ),
+                                        start = Offset(
+                                            x = -size.width + (gradientPhase * size.width * 2f),
+                                            y = 0f
+                                        ),
+                                        end = Offset(
+                                            x = (gradientPhase * size.width * 2f),
+                                            y = size.height
+                                        )
+                                    )
+                                    drawRect(
+                                        brush = glowGradient,
+                                        blendMode = BlendMode.SrcIn
+                                    )
+                                }
+                        } else {
+                            Modifier
+                                .graphicsLayer(alpha = 0.99f)
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        color = Color(0xFF10B981),
+                                        blendMode = BlendMode.SrcIn
+                                    )
+                                }
+                        }
+                    )
+            )
         }
     }
 }
+
+
 
 
 @Composable
