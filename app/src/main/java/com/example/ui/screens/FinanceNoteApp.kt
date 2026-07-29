@@ -1976,7 +1976,7 @@ fun FinanceNoteApp(
     androidx.compose.runtime.LaunchedEffect(Unit) {
         viewModel.loadProfile(context)
         viewModel.checkAndProcessAutoEntries(context)
-        kotlinx.coroutines.delay(4000)
+        kotlinx.coroutines.delay(4200)
         showSplash = false
     }
 
@@ -2025,6 +2025,7 @@ fun FinanceNoteApp(
     
     val updateInfo by viewModel.updateManager.updateInfo.collectAsState()
     val isCheckingForUpdate by viewModel.updateManager.isChecking.collectAsState()
+    val devPhotoPath by viewModel.devPhotoPath.collectAsState()
     var showUpdatePopup by remember(initialAction) { mutableStateOf(initialAction == "ACTION_SHOW_UPDATE") }
 
     LaunchedEffect(targetWorkspaceId) {
@@ -2037,9 +2038,12 @@ fun FinanceNoteApp(
 
     LaunchedEffect(Unit) {
         viewModel.updateManager.checkForUpdates(context) { isAvailable ->
+            val info = viewModel.updateManager.updateInfo.value
+            if (info.devPhotoUrl.isNotBlank()) {
+                viewModel.checkAndDownloadDevPhoto(context, info.devPhotoUrl)
+            }
             if (isAvailable) {
                 showUpdatePopup = true
-                val info = viewModel.updateManager.updateInfo.value
                 if (!info.isForceUpdate) {
                     UpdateNotificationHelper.showUpdateNotification(
                         context, 
@@ -14196,6 +14200,7 @@ fun SettingsScreen(
     val rawProfileName by viewModel.profileName.collectAsState()
     val rawProfileEmail by viewModel.profileEmail.collectAsState()
     val rawProfilePhotoUri by viewModel.profilePhotoUri.collectAsState()
+    val devPhotoPath by viewModel.devPhotoPath.collectAsState()
     val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
     val profilePhone by viewModel.profilePhone.collectAsState()
     val profileSocial by viewModel.profileSocial.collectAsState()
@@ -16070,19 +16075,32 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Person,
+                        if (devPhotoPath != null) {
+                            coil.compose.AsyncImage(
+                                model = java.io.File(devPhotoPath!!),
                                 contentDescription = null,
-                                tint = FintechBlue,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, FintechBlue, CircleShape),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                                    .border(1.5.dp, FintechBlue.copy(alpha = 0.5f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    tint = FintechBlue,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                         Column {
                             Text(
@@ -18992,14 +19010,18 @@ fun AnimatedAppLogo(
 ) {
     // 1. Entrance animation values
     val logoScale = remember { androidx.compose.animation.core.Animatable(0f) }
-    val equalizerAlpha = remember { androidx.compose.animation.core.Animatable(0f) }
+    
+    // Explicit animatables for the three equalizer bars
+    val bar1ScaleAnim = remember { androidx.compose.animation.core.Animatable(1.0f) }
+    val bar2ScaleAnim = remember { androidx.compose.animation.core.Animatable(1.0f) }
+    val bar3ScaleAnim = remember { androidx.compose.animation.core.Animatable(1.0f) }
 
     LaunchedEffect(Unit) {
-        // Cycle 1: scale up the whole logo with a bouncy settle
+        // Cycle 1: scale up the whole logo with a bouncy settle (Logo pulses exactly once!)
         logoScale.animateTo(
             targetValue = 1.15f,
             animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 700,
+                durationMillis = 600,
                 easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
@@ -19011,90 +19033,48 @@ fun AnimatedAppLogo(
             )
         )
 
-        kotlinx.coroutines.delay(300)
+        // Wait a little bit after logo settles before starting the equalizer bars
+        kotlinx.coroutines.delay(200)
 
-        // Cycle 2: second pulse animation (scale down slightly, then bounce up and settle)
-        logoScale.animateTo(
-            targetValue = 0.85f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 450,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
-        logoScale.animateTo(
-            targetValue = 1.15f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 450,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
-        logoScale.animateTo(
-            targetValue = 1.0f,
-            animationSpec = androidx.compose.animation.core.spring(
-                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-            )
-        )
+        // Equalizer bars rise and fall/move up and down EXACTLY TWICE!
+        // We run them in parallel with small staggered start delays.
+        
+        // Bar 1
+        this.launch {
+            // Cycle 1
+            bar1ScaleAnim.animateTo(1.35f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            bar1ScaleAnim.animateTo(0.55f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            // Cycle 2
+            bar1ScaleAnim.animateTo(1.35f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
 
-        // Step 2: Smoothly start the live equalizer bar animation
-        equalizerAlpha.animateTo(
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.tween(
-                durationMillis = 500,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            )
-        )
+        // Bar 2 (staggered slightly by 150ms)
+        this.launch {
+            kotlinx.coroutines.delay(150)
+            // Cycle 1
+            bar2ScaleAnim.animateTo(1.25f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            bar2ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            // Cycle 2
+            bar2ScaleAnim.animateTo(1.25f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
+
+        // Bar 3 (staggered slightly by 300ms)
+        this.launch {
+            kotlinx.coroutines.delay(300)
+            // Cycle 1
+            bar3ScaleAnim.animateTo(1.45f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            bar3ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            // Cycle 2
+            bar3ScaleAnim.animateTo(1.45f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+        }
     }
 
-    // 2. Unconditional live equalizer animations using infinite transition with varying properties
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "LiveEqualizer")
-
-    // Bar 1 (Green) live scale between 0.45f and 1.25f (smooth, slower speed)
-    val bar1LiveValue by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1.25f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(
-                durationMillis = 1400,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            ),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "Bar1"
-    )
-
-    // Bar 2 (Orange) live scale between 0.35f and 0.95f (smooth, slower speed)
-    val bar2LiveValue by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.95f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(
-                durationMillis = 1100,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            ),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "Bar2"
-    )
-
-    // Bar 3 (Blue) live scale between 0.5f and 1.15f (smooth, slower speed)
-    val bar3LiveValue by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1.15f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(
-                durationMillis = 1700,
-                easing = androidx.compose.animation.core.FastOutSlowInEasing
-            ),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-        ),
-        label = "Bar3"
-    )
-
-    // Interpolate the bar scales smoothly from 1f (initial static state) to their live values
-    val bar1Scale = 1.0f + (bar1LiveValue - 1.0f) * equalizerAlpha.value
-    val bar2Scale = 1.0f + (bar2LiveValue - 1.0f) * equalizerAlpha.value
-    val bar3Scale = 1.0f + (bar3LiveValue - 1.0f) * equalizerAlpha.value
+    val bar1Scale = bar1ScaleAnim.value
+    val bar2Scale = bar2ScaleAnim.value
+    val bar3Scale = bar3ScaleAnim.value
 
     val painterArrow = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_logo_circle_arrow)
 

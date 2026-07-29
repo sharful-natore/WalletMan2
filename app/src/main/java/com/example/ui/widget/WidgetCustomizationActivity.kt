@@ -1,6 +1,7 @@
 package com.example.ui.widget
 
 import android.os.Bundle
+import android.appwidget.AppWidgetManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -66,7 +67,22 @@ fun WidgetCustomizationScreen(onBackPressed: () -> Unit) {
                     Button(
                         onClick = {
                             WidgetConfigManager.saveConfig(context, config)
-                            // Notify widget to update
+                            
+                            // Direct synchronous widget update for maximum reliability and immediate effect
+                            try {
+                                val appWidgetManager = AppWidgetManager.getInstance(context)
+                                val appWidgetIds = appWidgetManager.getAppWidgetIds(
+                                    android.content.ComponentName(context, DraftWidgetProvider::class.java)
+                                )
+                                for (appWidgetId in appWidgetIds) {
+                                    DraftWidgetProvider.updateAppWidget(context, appWidgetManager, appWidgetId)
+                                }
+                                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, com.example.R.id.widget_list_view)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+
+                            // Notify widget to update (broadcast fallback)
                             val intent = android.content.Intent(context, DraftWidgetProvider::class.java).apply {
                                 action = "com.example.UPDATE_DRAFT_WIDGET"
                             }

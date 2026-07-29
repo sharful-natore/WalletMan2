@@ -292,6 +292,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _profileAddress = MutableStateFlow("")
     val profileAddress: StateFlow<String> = _profileAddress.asStateFlow()
 
+    private val _devPhotoPath = MutableStateFlow<String?>(null)
+    val devPhotoPath: StateFlow<String?> = _devPhotoPath.asStateFlow()
+
     // Moshi JSON adapter configuration
     private val moshi = Moshi.Builder()
         .addLast(KotlinJsonAdapterFactory())
@@ -2118,7 +2121,59 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     // Profile Settings Helpers
+    fun loadDevPhoto(context: Context) {
+        val file = java.io.File(context.filesDir, "dev_photo.jpg")
+        if (file.exists()) {
+            _devPhotoPath.value = file.absolutePath
+        } else {
+            _devPhotoPath.value = null
+        }
+    }
+
+    fun checkAndDownloadDevPhoto(context: Context, url: String) {
+        if (url.isBlank()) return
+        
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val lastUrl = prefs.getString("last_dev_photo_url", "")
+        val file = java.io.File(context.filesDir, "dev_photo.jpg")
+        
+        if (!file.exists() || lastUrl != url) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+                    connection.useCaches = false
+                    connection.doInput = true
+                    connection.connect()
+                    
+                    if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                        val input = connection.inputStream
+                        val tempFile = java.io.File(context.filesDir, "dev_photo_temp.jpg")
+                        tempFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                        
+                        if (tempFile.exists()) {
+                            if (file.exists()) {
+                                file.delete()
+                            }
+                            tempFile.renameTo(file)
+                            prefs.edit().putString("last_dev_photo_url", url).apply()
+                            
+                            _devPhotoPath.value = file.absolutePath
+                        }
+                    }
+                    connection.disconnect()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
     fun loadProfile(context: Context) {
+        loadDevPhoto(context)
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         val wsId = _currentWorkspaceId.value
         _profileName.value = prefs.getString(getProfileKey("user_name", wsId), "") ?: ""

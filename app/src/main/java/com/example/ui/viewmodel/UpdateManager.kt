@@ -16,7 +16,8 @@ data class UpdateInfo(
     val isForceUpdate: Boolean = false,
     val updateUrl: String = "",
     val latestVersion: String = "",
-    val updateDetails: String = ""
+    val updateDetails: String = "",
+    val devPhotoUrl: String = ""
 )
 
 class UpdateManager {
@@ -39,7 +40,8 @@ class UpdateManager {
             remoteConfig.setDefaultsAsync(mapOf(
                 "is_force_update" to false,
                 "latest_version_code" to 1.0,
-                "update_url" to ""
+                "update_url" to "",
+                "Dev_photo" to ""
             ))
             
             remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
@@ -49,6 +51,7 @@ class UpdateManager {
                     val latestVersionCode = remoteConfig.getDouble("latest_version_code")
                     val updateUrl = remoteConfig.getString("update_url")
                     val updateDetails = remoteConfig.getString("Update_Details")
+                    val devPhotoUrl = remoteConfig.getString("Dev_photo")
                     
                     val currentVersionCode = getAppVersionCode(context)
                     val currentVersionName = getAppVersionName(context)
@@ -60,7 +63,8 @@ class UpdateManager {
                         isForceUpdate = isForceUpdate,
                         updateUrl = updateUrl,
                         updateDetails = updateDetails,
-                        latestVersion = latestVersionCode.toString()
+                        latestVersion = latestVersionCode.toString(),
+                        devPhotoUrl = devPhotoUrl
                     )
                     onComplete?.invoke(isAvailable)
                 } else {
