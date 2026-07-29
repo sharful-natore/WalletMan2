@@ -10,9 +10,9 @@ data class WidgetDraftConfig(
     val titleTextColor: Int = Color.parseColor("#333333"),
     val subtitleTextColor: Int = Color.parseColor("#666666"),
     val listItemTextColor: Int = Color.parseColor("#4D4D4D"),
-    val buttonTintColor: Int = Color.parseColor("#0284C7"),
+    val buttonTintColor: Int = Color.parseColor("#38BDF8"),
     val buttonBgColor: Int = Color.parseColor("#E0F2FE"),
-    val infoIconColor: Int = Color.parseColor("#03A9F4"), // Default Light Blue
+    val infoIconColor: Int = Color.parseColor("#38BDF8"), // Default Light Blue
     val isTitleVisible: Boolean = true,
     val isSubtitleVisible: Boolean = true,
     val isListVisible: Boolean = true
@@ -49,9 +49,9 @@ object WidgetConfigManager {
             titleTextColor = prefs.getInt("titleTextColor", Color.parseColor("#333333")),
             subtitleTextColor = prefs.getInt("subtitleTextColor", Color.parseColor("#666666")),
             listItemTextColor = prefs.getInt("listItemTextColor", Color.parseColor("#4D4D4D")),
-            buttonTintColor = prefs.getInt("buttonTintColor", Color.parseColor("#0284C7")),
+            buttonTintColor = prefs.getInt("buttonTintColor", Color.parseColor("#38BDF8")),
             buttonBgColor = prefs.getInt("buttonBgColor", Color.parseColor("#E0F2FE")),
-            infoIconColor = prefs.getInt("infoIconColor", Color.parseColor("#03A9F4")),
+            infoIconColor = prefs.getInt("infoIconColor", Color.parseColor("#38BDF8")),
             isTitleVisible = prefs.getBoolean("isTitleVisible", true),
             isSubtitleVisible = prefs.getBoolean("isSubtitleVisible", true),
             isListVisible = prefs.getBoolean("isListVisible", true)

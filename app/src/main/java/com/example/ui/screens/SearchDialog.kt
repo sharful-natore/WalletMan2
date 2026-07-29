@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -521,12 +522,49 @@ fun TransactionSearchItem(
                         else -> tx.category
                     }
                     val highlightColor = if (isDark) Color(0xFFFFB300) else Color(0xFFF57C00)
-                    Text(
-                        text = highlightMatch(if (language == AppLanguage.BN) banglaCat else tx.category, searchQuery, highlightColor),
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color.White else Color(0xFF1E293B),
-                        fontSize = 14.sp
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = highlightMatch(if (language == AppLanguage.BN) banglaCat else tx.category, searchQuery, highlightColor),
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B),
+                            fontSize = 14.sp
+                        )
+                        val typeBadgeText = when (tx.type) {
+                            "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
+                            "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
+                            "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
+                            "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
+                            "REPAY_PAID" -> if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
+                            "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
+                            else -> null
+                        }
+                        if (typeBadgeText != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            val badgeBg = when (tx.type) {
+                                "EXPENSE" -> Color(0xFFFF5252)
+                                "INCOME" -> Color(0xFF10B981)
+                                "LEND" -> Color(0xFF3B82F6)
+                                "BORROW" -> Color(0xFFF97316)
+                                "REPAY_PAID" -> Color(0xFF8B5CF6)
+                                "REPAY_RECEIVED" -> Color(0xFF0D9488)
+                                else -> Color.Gray
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(badgeBg.copy(alpha = 0.12f))
+                                    .border(0.8.dp, badgeBg.copy(alpha = 0.7f), RoundedCornerShape(50))
+                                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    text = typeBadgeText,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = badgeBg
+                                )
+                            }
+                        }
+                    }
                     if (tx.note.isNotBlank()) {
                         Text(
                             text = highlightMatch(tx.note, searchQuery, highlightColor),

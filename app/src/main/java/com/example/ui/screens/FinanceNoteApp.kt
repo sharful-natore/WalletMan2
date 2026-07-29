@@ -609,23 +609,23 @@ fun BudgetControlDonutChart(
 
     // Colors & Gradients selection
     val gradientColors = customGradient ?: when (categoryType) {
-        "INCOME" -> listOf(Color(0xFFFFC107), Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF34A853))  // amber -> lime -> light green -> green
-        "EXPENSE" -> listOf(Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFF44336)) // Green -> Lime -> Amber -> Orange -> Deep Orange -> Red
-        "SAVINGS" -> listOf(Color(0xFF2196F3), Color(0xFF03A9F4), Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFF8BC34A)) // blue -> light blue -> cyan -> green -> light green
-        else -> listOf(Color(0xFF4285F4), Color(0xFF34A853))
+        "INCOME" -> listOf(Color(0xFF10B981), Color(0xFF10B981))  // Green
+        "EXPENSE" -> listOf(Color(0xFFE65100), Color(0xFFE65100)) // Dark Orange
+        "SAVINGS" -> listOf(Color(0xFF38BDF8), Color(0xFF38BDF8)) // Light Blue
+        else -> listOf(Color(0xFF38BDF8), Color(0xFF38BDF8))
     }
 
     val trackColor = when (categoryType) {
-        "INCOME" -> Color(0xFF34A853).copy(alpha = 0.20f)             // 20% green
-        "EXPENSE" -> Color(0xFFFF5722).copy(alpha = 0.20f)            // 20% deep orange
-        "SAVINGS" -> Color(0xFF4285F4).copy(alpha = 0.20f)            // 20% tech blue
+        "INCOME" -> Color(0xFF10B981).copy(alpha = 0.20f)             // 20% green
+        "EXPENSE" -> Color(0xFFE65100).copy(alpha = 0.20f)            // 20% dark orange
+        "SAVINGS" -> Color(0xFF38BDF8).copy(alpha = 0.20f)            // 20% light blue
         else -> Color.LightGray.copy(alpha = 0.20f)
     }
 
     val percentageColor = when (categoryType) {
         "INCOME" -> Color(0xFF10B981)
-        "EXPENSE" -> Color(0xFFFF5722)
-        "SAVINGS" -> Color(0xFF4285F4)
+        "EXPENSE" -> Color(0xFFE65100)
+        "SAVINGS" -> Color(0xFF38BDF8)
         else -> FintechBlue
     }
 
@@ -7676,7 +7676,7 @@ fun DashboardScreen(
                                 text = if (language == AppLanguage.BN) "সঞ্চয়" else "Savings",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color(0xFF64B5F6) else Color(0xFF0D47A1), // Deep Blue
+                                color = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7), // Light Blue
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             BudgetControlDonutChart(
@@ -8595,6 +8595,35 @@ fun DashboardScreen(
     }
 }
 
+@Composable
+fun CategoryBadge(
+    text: String,
+    backgroundColor: Color,
+    textColor: Color = Color.Unspecified,
+    modifier: Modifier = Modifier
+) {
+    val softBg = backgroundColor.copy(alpha = 0.12f)
+    val borderCol = backgroundColor.copy(alpha = 0.7f)
+    val finalTextColor = if (textColor == Color.White || textColor == Color.Unspecified) backgroundColor else textColor
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(softBg)
+            .border(0.8.dp, borderCol, RoundedCornerShape(50))
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = finalTextColor,
+            maxLines = 1
+        )
+    }
+}
+
 // ---------------- TRANSACTION ROW COMPONENT ----------------
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -8782,47 +8811,82 @@ fun TransactionRowItem(
                         tx.category
                     }
 
-                    val titleText = run {
-                        val typeSuffix = when (tx.type) {
-                            "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
-                            "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
-                            "REPAY_PAID" -> if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
-                            "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
-                            "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
-                            "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
-                            else -> ""
+                    val mainTitle = if (tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
+                        linkedPerson.name
+                    } else {
+                        formattedCategory
+                    }
+
+                    val personBadgeName = if (tx.type !in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
+                        linkedPerson.name
+                    } else null
+
+                    val typeBadgeText = when (tx.type) {
+                        "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
+                        "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
+                        "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
+                        "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
+                        "REPAY_PAID" -> if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
+                        "REPAY_RECEIVED" -> if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
+                        else -> null
+                    }
+
+                    val creditBadgeText = if (tx.subType == "CREDIT") {
+                        if (tx.type == "LEND") (if (language == AppLanguage.BN) "বাকি বিক্রয়" else "Credit Sale")
+                        else if (tx.type == "BORROW") (if (language == AppLanguage.BN) "বাকি ক্রয়" else "Credit Purchase")
+                        else null
+                    } else null
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        HighlightedText(
+                            text = mainTitle,
+                            query = searchQuery,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = TextStyle(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color(0xFF1E222F)
+                            )
+                        )
+
+                        if (personBadgeName != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            CategoryBadge(
+                                text = personBadgeName,
+                                backgroundColor = Color(0xFF6366F1)
+                            )
                         }
-                        val baseName = if (tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
-                            linkedPerson.name
-                        } else {
-                            if (linkedPerson != null) "$formattedCategory (${linkedPerson.name})" else formattedCategory
+
+                        if (typeBadgeText != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            val badgeBg = when (tx.type) {
+                                "EXPENSE" -> Color(0xFFFF5252)
+                                "INCOME" -> Color(0xFF10B981)
+                                "LEND" -> Color(0xFF3B82F6)
+                                "BORROW" -> Color(0xFFF97316)
+                                "REPAY_PAID" -> Color(0xFF8B5CF6)
+                                "REPAY_RECEIVED" -> Color(0xFF0D9488)
+                                else -> Color.Gray
+                            }
+                            CategoryBadge(
+                                text = typeBadgeText,
+                                backgroundColor = badgeBg
+                            )
                         }
-                        if (typeSuffix.isNotEmpty()) {
-                            "$baseName ($typeSuffix)"
-                        } else {
-                            baseName
+
+                        if (creditBadgeText != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            CategoryBadge(
+                                text = creditBadgeText,
+                                backgroundColor = Color(0xFFE11D48)
+                            )
                         }
                     }
 
-                    HighlightedText(
-                        text = titleText,
-                        query = searchQuery,
-                        color = MaterialTheme.colorScheme.primary,
-                        style = TextStyle(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color.White else Color(0xFF1E222F)
-                        )
-                    )
-                    val creditLabel = if (tx.subType == "CREDIT") {
-                        if (tx.type == "LEND") (if (language == AppLanguage.BN) "(বাকি বিক্রয়)" else "(Credit Sale)")
-                        else if (tx.type == "BORROW") (if (language == AppLanguage.BN) "(বাকি ক্রয়)" else "(Credit Purchase)")
-                        else ""
-                    } else ""
-                    
-                    val descriptionText = if (tx.note.isNotEmpty()) {
-                        if (creditLabel.isNotEmpty()) "${tx.note} $creditLabel" else tx.note
-                    } else creditLabel
+                    val descriptionText = tx.note.trim()
 
                     if (descriptionText.isNotEmpty()) {
                         HighlightedText(
@@ -15808,6 +15872,63 @@ fun SettingsScreen(
         }
 
 
+        // --- 9. PRIVACY & TERMS CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "প্রাইভেসি ও শর্তাবলী" else "Privacy & Terms",
+            isDark = isDark,
+            icon = Icons.Rounded.Security,
+            initiallyExpanded = false
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Item 1: Privacy Policy
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showPrivacyDialog = true
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Info, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "প্রাইভেসি পলিসি" else "Privacy Policy",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
+
+                // Item 2: Terms of Use
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            showTermsDialog = true
+                        }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Rounded.Security, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "ব্যবহারের শর্তাবলী" else "Terms of Use",
+                        fontSize = 14.sp,
+                        color = if (isDark) Color.White else Color(0xFF1E293B),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
         // --- 8. APP INFO CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "অ্যাপ ইনফো" else "App Info",
@@ -15990,63 +16111,6 @@ fun SettingsScreen(
                         fontSize = 15.sp,
                         color = Color.White
                     )
-                }
-            }
-        }
-
-        // --- 9. PRIVACY & TERMS CARD ---
-        SettingCategory(
-            title = if (language == AppLanguage.BN) "প্রাইভেসি ও শর্তাবলী" else "Privacy & Terms",
-            isDark = isDark,
-            icon = Icons.Rounded.Security,
-            initiallyExpanded = false
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Item 1: Privacy Policy
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            showPrivacyDialog = true
-                        }
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Rounded.Info, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
-                    Text(
-                        text = if (language == AppLanguage.BN) "প্রাইভেসি পলিসি" else "Privacy Policy",
-                        fontSize = 14.sp,
-                        color = if (isDark) Color.White else Color(0xFF1E293B),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
-                }
-
-                HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
-
-                // Item 2: Terms of Use
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            showTermsDialog = true
-                        }
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Rounded.Security, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
-                    Text(
-                        text = if (language == AppLanguage.BN) "ব্যবহারের শর্তাবলী" else "Terms of Use",
-                        fontSize = 14.sp,
-                        color = if (isDark) Color.White else Color(0xFF1E293B),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = if (isDark) Color.Gray else Color.DarkGray, modifier = Modifier.size(16.dp))
                 }
             }
         }
