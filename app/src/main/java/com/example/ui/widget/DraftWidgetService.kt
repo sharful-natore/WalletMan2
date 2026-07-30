@@ -130,9 +130,13 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         val draft = draftsList[position]
         val rv = RemoteViews(context.packageName, R.layout.widget_draft_item)
 
-        val (inferredAmt, inferredType) = parseDetails(draft.note)
+        val parsedDetails = com.example.data.DraftParser.parse(draft.note)
+        val inferredAmt = parsedDetails.amount
+        val inferredType = parsedDetails.type
+        val inferredCat = parsedDetails.category
         val finalAmt = draft.amount ?: inferredAmt
         val finalType = draft.type ?: inferredType ?: "EXPENSE"
+        val finalCat = draft.category ?: inferredCat
 
         val amountStr = if (finalAmt != null) {
             " " + toBanglaDigits(finalAmt.toInt().toString()) + "৳"
@@ -150,16 +154,19 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         rv.setTextViewText(R.id.widget_item_serial, "$serial.")
 
         // Tag text and color
-        val (tagText, tagColor) = when (finalType) {
-            "INCOME" -> "আয়" to android.graphics.Color.parseColor("#059669")
-            "EXPENSE" -> "ব্যয়" to android.graphics.Color.parseColor("#DC2626")
-            "LEND" -> "পাওনা" to android.graphics.Color.parseColor("#7C3AED")
-            "BORROW" -> "দেনা" to android.graphics.Color.parseColor("#D97706")
-            "SAVINGS" -> "সঞ্চয়" to android.graphics.Color.parseColor("#2563EB")
-            "WITHDRAWAL" -> "উত্তোলন" to android.graphics.Color.parseColor("#0D9488")
-            else -> "ব্যয়" to android.graphics.Color.parseColor("#DC2626")
+        val tagColor = when (finalType) {
+            "INCOME" -> android.graphics.Color.parseColor("#059669")
+            "EXPENSE" -> android.graphics.Color.parseColor("#DC2626")
+            "LEND" -> android.graphics.Color.parseColor("#7C3AED")
+            "BORROW" -> android.graphics.Color.parseColor("#D97706")
+            "SAVINGS" -> android.graphics.Color.parseColor("#2563EB")
+            "WITHDRAWAL" -> android.graphics.Color.parseColor("#0D9488")
+            else -> android.graphics.Color.parseColor("#DC2626")
         }
-        rv.setTextViewText(R.id.widget_item_tag, tagText)
+
+        val categoryLabel = com.example.data.DraftParser.getCategoryBanglaLabel(finalCat, finalType)
+
+        rv.setTextViewText(R.id.widget_item_tag, categoryLabel)
         rv.setTextColor(R.id.widget_item_tag, tagColor)
 
         // Intent for item click (Open Edit Dialog Activity)

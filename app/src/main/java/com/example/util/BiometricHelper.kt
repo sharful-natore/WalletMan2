@@ -129,7 +129,17 @@ object BiometricHelper {
 
         private val activePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             style = android.graphics.Paint.Style.FILL
-            color = android.graphics.Color.parseColor("#7C3AED") // Vivid Purple
+            shader = android.graphics.LinearGradient(
+                200f, -879f, 760f, -191f,
+                intArrayOf(
+                    android.graphics.Color.parseColor("#2563EB"), // Royal Blue
+                    android.graphics.Color.parseColor("#0284C7"), // Cyan Blue
+                    android.graphics.Color.parseColor("#8B5CF6"), // Purple
+                    android.graphics.Color.parseColor("#7C3AED")  // Deep Purple
+                ),
+                floatArrayOf(0.0f, 0.35f, 0.70f, 1.0f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
         }
 
         private val successPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -573,7 +583,7 @@ object BiometricHelper {
 
                         statusTextView.postDelayed({
                             try {
-                                statusTextView.text = if (subtitle.contains("আপনার")) "ফিンダーপ্রিন্ট সেন্সর স্পর্শ করুন" else "Touch Fingerprint Sensor"
+                                statusTextView.text = if (subtitle.contains("আপনার")) "ফিঙ্গারপ্রিন্ট সেন্সর স্পর্শ করুন" else "Touch Fingerprint Sensor"
                                 statusTextView.setTextColor(android.graphics.Color.parseColor("#38BDF8"))
                             } catch (t: Throwable) {
                                 t.printStackTrace()

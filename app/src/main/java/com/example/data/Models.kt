@@ -299,12 +299,13 @@ object DraftParser {
         val hasGift = noteLower.contains("উপহার") || noteLower.contains("gift")
         val hasHonorarium = noteLower.contains("সম্মানী") || noteLower.contains("honorarium")
 
-        val hasFood = noteLower.contains("খাবার") || noteLower.contains("চা") || noteLower.contains("ভাত") || noteLower.contains("নাস্তা") || noteLower.contains("কফি") || noteLower.contains("breakfast") || noteLower.contains("lunch") || noteLower.contains("dinner") || noteLower.contains("food")
-        val hasGrocery = noteLower.contains("বাজার") || noteLower.contains("গ্রোসারী") || noteLower.contains("grocery")
-        val hasTransport = noteLower.contains("গাড়ি") || noteLower.contains("রিকশা") || noteLower.contains("বাস") || noteLower.contains("ভাড়া") || noteLower.contains("ট্যাক্সি") || noteLower.contains("সিএনজি") || noteLower.contains("rent") || noteLower.contains("travel") || noteLower.contains("fare") || noteLower.contains("transport")
-        val hasShopping = noteLower.contains("জামা") || noteLower.contains("কাপড়") || noteLower.contains("shopping") || noteLower.contains("কেনাকাটা")
-        val hasMedical = noteLower.contains("চিকিৎসা") || noteLower.contains("ঔষধ") || noteLower.contains("ডাক্তার") || noteLower.contains("মেডিকেল") || noteLower.contains("medicine") || noteLower.contains("medical")
-        val hasEducation = noteLower.contains("বই") || noteLower.contains("স্কুল") || noteLower.contains("কলেজ") || noteLower.contains("টিউশন") || noteLower.contains("শিক্ষা") || noteLower.contains("education")
+        val hasFood = noteLower.contains("খাবার") || noteLower.contains("চা") || noteLower.contains("ভাত") || noteLower.contains("নাস্তা") || noteLower.contains("কফি") || noteLower.contains("breakfast") || noteLower.contains("lunch") || noteLower.contains("dinner") || noteLower.contains("food") || noteLower.contains("restaurant") || noteLower.contains("রেস্টুরেন্ট") || noteLower.contains("হোটেল") || noteLower.contains("বার্গার") || noteLower.contains("পিৎজা") || noteLower.contains("বিরিয়ানি")
+        val hasGrocery = noteLower.contains("বাজার") || noteLower.contains("গ্রোসারী") || noteLower.contains("grocery") || noteLower.contains("মাছ") || noteLower.contains("মাংস") || noteLower.contains("সবজি") || noteLower.contains("ফল") || noteLower.contains("চাল") || noteLower.contains("ডাল") || noteLower.contains("আটা") || noteLower.contains("ময়দা") || noteLower.contains("ডিম") || noteLower.contains("দুধ") || noteLower.contains("egg") || noteLower.contains("milk")
+        val hasTransport = noteLower.contains("গাড়ি") || noteLower.contains("রিকশা") || noteLower.contains("বাস") || noteLower.contains("ভাড়া") || noteLower.contains("ট্যাক্সি") || noteLower.contains("সিএনজি") || noteLower.contains("rent") || noteLower.contains("travel") || noteLower.contains("fare") || noteLower.contains("transport") || noteLower.contains("fuel") || noteLower.contains("petrol") || noteLower.contains("octane") || noteLower.contains("cng") || noteLower.contains("diesel") || noteLower.contains("জ্বালানি") || noteLower.contains("জ্বালানী") || noteLower.contains("পাম্প") || noteLower.contains("uber") || noteLower.contains("pathao") || noteLower.contains("ride") || noteLower.contains("drive") || noteLower.contains("তেল")
+        val hasShopping = noteLower.contains("জামা") || noteLower.contains("কাপড়") || noteLower.contains("shopping") || noteLower.contains("কেনাকাটা") || noteLower.contains("জুতা") || noteLower.contains("প্যান্ট") || noteLower.contains("শার্ট") || noteLower.contains("dress") || noteLower.contains("clothes") || noteLower.contains("shoes")
+        val hasMedical = noteLower.contains("চিকিৎসা") || noteLower.contains("ঔষধ") || noteLower.contains("ডাক্তার") || noteLower.contains("মেডিকেল") || noteLower.contains("medicine") || noteLower.contains("medical") || noteLower.contains("ফার্মেসি") || noteLower.contains("হাসপাতাল") || noteLower.contains("hospital") || noteLower.contains("pharma") || noteLower.contains("ঔষধপত্র")
+        val hasEducation = noteLower.contains("বই") || noteLower.contains("স্কুল") || noteLower.contains("কলেজ") || noteLower.contains("টিউশন") || noteLower.contains("শিক্ষা") || noteLower.contains("education") || noteLower.contains("school") || noteLower.contains("college") || noteLower.contains("fee") || noteLower.contains("ফি")
+        val hasBill = noteLower.contains("বিল") || noteLower.contains("বিদ্যুৎ") || noteLower.contains("পানি") || noteLower.contains("গ্যাস") || noteLower.contains("ইন্টারনেট") || noteLower.contains("ওয়াইফাই") || noteLower.contains("wifi") || noteLower.contains("bill") || noteLower.contains("electricity") || noteLower.contains("water") || noteLower.contains("recharge") || noteLower.contains("রিচার্জ") || noteLower.contains("মোবাইল") || noteLower.contains("mobile") || noteLower.contains("net")
 
         if (isSavingsExplicit) {
             type = "SAVINGS"
@@ -327,7 +328,7 @@ object DraftParser {
         } else if (isBorrowExplicit) {
             type = "BORROW"
             category = "Borrowing"
-        } else if (isExpenseExplicit || hasFood || hasGrocery || hasTransport || hasShopping || hasMedical || hasEducation) {
+        } else if (isExpenseExplicit || hasFood || hasGrocery || hasTransport || hasShopping || hasMedical || hasEducation || hasBill) {
             type = "EXPENSE"
             category = when {
                 hasFood -> "Food"
@@ -336,6 +337,7 @@ object DraftParser {
                 hasShopping -> "Shopping"
                 hasMedical -> "Medical"
                 hasEducation -> "Education"
+                hasBill -> "Utility"
                 else -> "Expense"
             }
         } else {
@@ -378,6 +380,46 @@ object DraftParser {
             "SAVINGS" -> "Savings"
             "WITHDRAWAL" -> "Withdrawal"
             else -> "Other"
+        }
+    }
+
+    fun getCategoryBanglaLabel(cat: String?, type: String?): String {
+        if (cat.isNullOrBlank()) {
+            return when (type) {
+                "INCOME" -> "আয়"
+                "EXPENSE" -> "ব্যয়"
+                "LEND" -> "পাওনা"
+                "BORROW" -> "দেনা"
+                "SAVINGS" -> "সঞ্চয়"
+                "WITHDRAWAL" -> "উত্তোলন"
+                else -> "ব্যয়"
+            }
+        }
+        val c = cat.trim()
+        return when {
+            c.equals("Salary", ignoreCase = true) || c.contains("বেতন", ignoreCase = true) -> "বেতন"
+            c.equals("Business", ignoreCase = true) || c.contains("ব্যবসা", ignoreCase = true) -> "ব্যবসা"
+            c.equals("Agriculture", ignoreCase = true) || c.contains("কৃষি", ignoreCase = true) -> "কৃষি"
+            c.equals("Gift", ignoreCase = true) || c.contains("উপহার", ignoreCase = true) -> "উপহার"
+            c.equals("Sales", ignoreCase = true) || c.contains("বিক্রয়", ignoreCase = true) || c.contains("বিক্রি", ignoreCase = true) -> "বিক্রয়"
+            c.equals("Honorarium", ignoreCase = true) || c.contains("সম্মানী", ignoreCase = true) -> "সম্মানী"
+            c.equals("Food", ignoreCase = true) || c.contains("খাবার", ignoreCase = true) -> "খাবার"
+            c.equals("Grocery", ignoreCase = true) || c.contains("বাজার", ignoreCase = true) -> "বাজার"
+            c.equals("Transportation", ignoreCase = true) || c.equals("Transport", ignoreCase = true) || c.contains("যাতায়াত", ignoreCase = true) || c.contains("জ্বালানি", ignoreCase = true) || c.contains("জ্বালানী", ignoreCase = true) -> "যাতায়াত"
+            c.equals("Shopping", ignoreCase = true) || c.contains("কেনাকাটা", ignoreCase = true) -> "কেনাকাটা"
+            c.equals("Medical", ignoreCase = true) || c.contains("চিকিৎসা", ignoreCase = true) -> "চিকিৎসা"
+            c.equals("Education", ignoreCase = true) || c.contains("শিক্ষা", ignoreCase = true) -> "শিক্ষা"
+            c.equals("Utility", ignoreCase = true) || c.equals("Bill", ignoreCase = true) || c.contains("বিল", ignoreCase = true) -> "ইউটিলিটি"
+            c.equals("Clothing", ignoreCase = true) || c.contains("পোশাক", ignoreCase = true) -> "পোশাক"
+            c.equals("Housing", ignoreCase = true) || c.contains("বাসস্থান", ignoreCase = true) -> "বাসস্থান"
+            c.equals("Lending", ignoreCase = true) || c.equals("Lend", ignoreCase = true) || c.contains("ধার দেওয়া", ignoreCase = true) -> "ধার দেওয়া"
+            c.equals("Borrowing", ignoreCase = true) || c.equals("Borrow", ignoreCase = true) || c.contains("ধার নেওয়া", ignoreCase = true) -> "ধার নেওয়া"
+            c.equals("Savings", ignoreCase = true) || c.contains("সঞ্চয়", ignoreCase = true) -> "সঞ্চয়"
+            c.equals("Withdrawal", ignoreCase = true) || c.contains("উত্তোলন", ignoreCase = true) -> "উত্তোলন"
+            c.equals("Expense", ignoreCase = true) -> "ব্যয়"
+            c.equals("Income", ignoreCase = true) -> "আয়"
+            c.equals("Other", ignoreCase = true) || c.equals("Others", ignoreCase = true) || c.contains("অন্যান্য", ignoreCase = true) -> "অন্যান্য"
+            else -> c
         }
     }
 }

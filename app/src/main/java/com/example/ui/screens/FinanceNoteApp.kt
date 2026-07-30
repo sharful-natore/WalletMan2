@@ -630,25 +630,27 @@ fun BudgetControlDonutChart(
         if (language == AppLanguage.BN) "সেট করুন" else "Set"
     }
 
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+
     // Colors & Gradients selection
     val gradientColors = customGradient ?: when (categoryType) {
-        "INCOME" -> listOf(Color(0xFF00BCD4), Color(0xFF2196F3), Color(0xFF6366F1))
-        "EXPENSE" -> listOf(Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFFE91E63))
-        "SAVINGS" -> listOf(Color(0xFFCDDC39), Color(0xFF8BC34A), Color(0xFF10B981))
+        "INCOME" -> listOf(Color(0xFF34D399), Color(0xFF10B981), Color(0xFF059669))
+        "EXPENSE" -> listOf(Color(0xFFFDBA74), Color(0xFFF97316), Color(0xFFEA580C))
+        "SAVINGS" -> listOf(Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFF2563EB))
         else -> listOf(Color(0xFF38BDF8), Color(0xFF38BDF8))
     }
 
     val trackColor = when (categoryType) {
-        "INCOME" -> Color(0xFF2196F3).copy(alpha = 0.20f)
-        "EXPENSE" -> Color(0xFFFF9800).copy(alpha = 0.20f)
-        "SAVINGS" -> Color(0xFF8BC34A).copy(alpha = 0.20f)
+        "INCOME" -> Color(0xFF10B981).copy(alpha = 0.20f)
+        "EXPENSE" -> Color(0xFFEA580C).copy(alpha = 0.20f)
+        "SAVINGS" -> FintechBlue.copy(alpha = 0.20f)
         else -> Color.LightGray.copy(alpha = 0.20f)
     }
 
     val percentageColor = when (categoryType) {
-        "INCOME" -> Color(0xFF2196F3)
-        "EXPENSE" -> Color(0xFFFF9800)
-        "SAVINGS" -> Color(0xFF8BC34A)
+        "INCOME" -> if (isDark) Color(0xFF4CAF50) else Color(0xFF2E7D32)
+        "EXPENSE" -> if (isDark) Color(0xFFFF9800) else Color(0xFFE65100)
+        "SAVINGS" -> if (isDark) Color(0xFF38BDF8) else FintechBlue
         else -> FintechBlue
     }
 
@@ -3544,23 +3546,6 @@ fun FinanceNoteApp(
                     )
                 }
 
-                activeUndoState?.let { undoState ->
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.TopCenter
-                    ) {
-                        UndoFloatingBanner(
-                            undoState = undoState,
-                            language = language,
-                            onDismiss = { viewModel.clearUndoAction() },
-                            onUndoClick = {
-                                undoState.onUndo()
-                                viewModel.clearUndoAction()
-                            }
-                        )
-                    }
-                }
-
                 // Main screen switches
                 Column(
                     modifier = Modifier
@@ -3801,6 +3786,26 @@ fun FinanceNoteApp(
                 }
 
                 // Dynamic Overlays & Dialogs
+                activeUndoState?.let { undoState ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(999f)
+                            .padding(top = 12.dp),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        UndoFloatingBanner(
+                            undoState = undoState,
+                            language = language,
+                            onDismiss = { viewModel.clearUndoAction() },
+                            onUndoClick = {
+                                undoState.onUndo()
+                                viewModel.clearUndoAction()
+                            }
+                        )
+                    }
+                }
+
                 if (editingBudgetGradientType != null) {
                     val type = editingBudgetGradientType!!
                     val defaultColors = when (type) {
@@ -7590,14 +7595,13 @@ fun DashboardScreen(
                                 ).forEach { (label, color, z) ->
                                     Box(
                                         modifier = Modifier
-                                            .size(22.dp)
+                                            .size(23.dp)
                                             .zIndex(z)
-                                            .background(color, CircleShape)
-                                            .border(
-                                                1.5.dp, 
-                                                if (isDark) Color(0xFF1E293B) else Color.White, 
-                                                CircleShape
-                                            ),
+                                            .clip(CircleShape)
+                                            .background(if (isDark) Color(0xFF0F172A) else Color.White)
+                                            .padding(1.5.dp)
+                                            .clip(CircleShape)
+                                            .background(color),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
@@ -13534,8 +13538,11 @@ fun PersonDetailOverlay(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = personDebt.person.name,
+                            modifier = Modifier.fillMaxWidth(),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             color = if (isDark) Color.White else Color(0xFF1E222F)
                         )
                         if (personDebt.person.phone.isNotEmpty()) {

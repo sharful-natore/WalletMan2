@@ -615,7 +615,7 @@ fun DraftItemCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         draft.type?.let { t ->
                             val label = when (t) {
                                 "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
@@ -632,6 +632,25 @@ fun DraftItemCard(
                             ) {
                                 Text(
                                     text = label,
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                        val catDisplay = draft.category ?: com.example.data.DraftParser.parse(draft.note).category
+                        catDisplay?.let { cat ->
+                            val catLabel = if (language == AppLanguage.BN) {
+                                com.example.data.DraftParser.getCategoryBanglaLabel(cat, draft.type)
+                            } else cat
+
+                            Surface(
+                                color = Color.White.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = catLabel,
                                     color = Color.White,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
