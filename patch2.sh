@@ -1,0 +1,1 @@
+sed -i '245i\    private val _isBiometricActionEnabled = MutableStateFlow(false)\n    val isBiometricActionEnabled: StateFlow<Boolean> = _isBiometricActionEnabled.asStateFlow()' app/src/main/java/com/example/ui/viewmodel/FinanceViewModel.kt

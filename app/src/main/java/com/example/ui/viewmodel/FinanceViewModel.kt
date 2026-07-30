@@ -242,7 +242,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private val _isBiometricEnabled = MutableStateFlow(false)
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
+    private val _isBiometricActionEnabled = MutableStateFlow(false)
+    val isBiometricActionEnabled: StateFlow<Boolean> = _isBiometricActionEnabled.asStateFlow()
 
+    private var _hasLoadedSettingsInitially = false
     private val _isAppUnlocked = MutableStateFlow(true)
     val isAppUnlocked: StateFlow<Boolean> = _isAppUnlocked.asStateFlow()
 
@@ -2313,7 +2316,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         
         _isNotificationEnabled.value = notifEnabled
         _isBiometricEnabled.value = prefs.getBoolean("biometric_lock_enabled", false)
-        _isAppUnlocked.value = !_isBiometricEnabled.value
+        _isBiometricActionEnabled.value = prefs.getBoolean("biometric_action_confirmation_enabled", true)
+        if (!_hasLoadedSettingsInitially) {
+            _isAppUnlocked.value = !_isBiometricEnabled.value
+            _hasLoadedSettingsInitially = true
+        }
         _appLockPin.value = prefs.getString("app_lock_pin", "1234") ?: "1234"
         _autoLockTimeoutSeconds.value = prefs.getLong("auto_lock_timeout_seconds", 0L)
         _isScreenSecurityEnabled.value = prefs.getBoolean("screen_security_flag_secure", false)
@@ -2348,6 +2355,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("biometric_lock_enabled", enabled)
+            .apply()
+    }
+    fun setBiometricActionEnabled(context: Context, enabled: Boolean) {
+        _isBiometricActionEnabled.value = enabled
+        context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("biometric_action_confirmation_enabled", enabled)
             .apply()
     }
 

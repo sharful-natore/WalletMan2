@@ -115,6 +115,29 @@ class UCropContract : ActivityResultContract<Pair<Uri, Uri>, Uri?>() {
 }
 
 
+fun performActionWithSecurity(
+    context: android.content.Context,
+    viewModel: com.example.ui.viewmodel.FinanceViewModel,
+    actionTitle: String = "Action Confirmation",
+    actionSubtitle: String = "Verify your identity to proceed",
+    onSuccess: () -> Unit,
+    onFallback: () -> Unit
+) {
+    if (viewModel.isBiometricEnabled.value && viewModel.isBiometricActionEnabled.value && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+        com.example.util.BiometricHelper.showBiometricPrompt(
+            activity = context as androidx.fragment.app.FragmentActivity,
+            title = actionTitle,
+            subtitle = actionSubtitle,
+            negativeButtonText = if (viewModel.language.value == com.example.ui.AppLanguage.BN) "ক্যাপচা ব্যবহার করুন" else "Use CAPTCHA",
+            onSuccess = onSuccess,
+            onUsePinFallback = onFallback,
+            onError = { onFallback() }
+        )
+    } else {
+        onFallback()
+    }
+}
+
 
 fun formatNumber(number: Int, lang: AppLanguage): String {
     val str = number.toString()
@@ -855,10 +878,12 @@ fun HighlightedText(
     query: String,
     color: Color = MaterialTheme.colorScheme.primary,
     style: TextStyle = TextStyle.Default,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: androidx.compose.ui.text.style.TextOverflow = androidx.compose.ui.text.style.TextOverflow.Clip,
     modifier: Modifier = Modifier
 ) {
     if (query.isEmpty() || !text.contains(query, ignoreCase = true)) {
-        Text(text = text, style = style, modifier = modifier)
+        Text(text = text, style = style, maxLines = maxLines, overflow = overflow, modifier = modifier)
         return
     }
 
@@ -887,7 +912,7 @@ fun HighlightedText(
         }
     }
 
-    Text(text = annotatedString, style = style, modifier = modifier)
+    Text(text = annotatedString, style = style, maxLines = maxLines, overflow = overflow, modifier = modifier)
 }
 
 fun formatNumberString(str: String, lang: AppLanguage): String {
@@ -1750,17 +1775,40 @@ fun DeleteVerificationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val verificationCode = remember { (1000..9999).random().toString() }
-    var userInput by remember { mutableStateOf("") }
-    val isMatched = userInput.trim() == verificationCode
-    
-    val title = if (language == AppLanguage.BN) "মুছে ফেলার নিশ্চিতকরণ" else "Confirm Deletion"
-    val msg = if (language == AppLanguage.BN) {
-        "এটি মুছে ফেলতে নিচে দেখানো কোডটি টাইপ করুন:"
-    } else {
-        "To delete, please type the verification code below:"
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showCaptchaDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+        val bioEnabled = prefs.getBoolean("biometric_lock_enabled", false)
+        val actionEnabled = prefs.getBoolean("biometric_action_confirmation_enabled", true)
+        
+        if (bioEnabled && actionEnabled && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+            com.example.util.BiometricHelper.showBiometricPrompt(
+                activity = context as androidx.fragment.app.FragmentActivity,
+                title = if (language == AppLanguage.BN) "মুছে ফেলার নিশ্চিতকরণ" else "Confirm Deletion",
+                subtitle = if (language == AppLanguage.BN) "মুছে ফেলার আগে আপনার পরিচয় নিশ্চিত করুন" else "Verify your identity before deleting",
+                negativeButtonText = if (language == AppLanguage.BN) "ক্যাপচা ব্যবহার করুন" else "Use CAPTCHA",
+                onSuccess = { onConfirm() },
+                onUsePinFallback = { showCaptchaDialog = true },
+                onError = { showCaptchaDialog = true }
+            )
+        } else {
+            showCaptchaDialog = true
+        }
     }
-    
+
+    if (showCaptchaDialog) {
+        val verificationCode = remember { (1000..9999).random().toString() }
+        var userInput by remember { mutableStateOf("") }
+        val isMatched = userInput.trim() == verificationCode
+        val title = if (language == AppLanguage.BN) "মুছে ফেলার নিশ্চিতকরণ" else "Confirm Deletion"
+        val msg = if (language == AppLanguage.BN) {
+            "এটি মুছে ফেলতে নিচে দেখানো কোডটি টাইপ করুন:"
+        } else {
+            "To delete, please type the verification code below:"
+        }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1832,6 +1880,7 @@ fun DeleteVerificationDialog(
             }
         }
     )
+    }
 }
 
 // Helper to format currency
@@ -3498,7 +3547,7 @@ fun FinanceNoteApp(
                 activeUndoState?.let { undoState ->
                     Box(
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.BottomCenter
+                        contentAlignment = Alignment.TopCenter
                     ) {
                         UndoFloatingBanner(
                             undoState = undoState,
@@ -7494,8 +7543,80 @@ fun DashboardScreen(
 
 
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onExportRequest?.invoke("ALL_DATA") }
+                        .testTag("dashboard_export_menu_button")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Rounded.Download,
+                                contentDescription = null,
+                                tint = FintechBlue,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = if (language == AppLanguage.BN) "রিপোর্ট এক্সপোর্ট করুন" else "Export Report",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                        }
 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Stacked Overlapping Icons (PDF, XLS, CSV)
+                            Row(
+                                modifier = Modifier.padding(end = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy((-7).dp)
+                            ) {
+                                listOf(
+                                    Triple("PDF", Color(0xFFEF4444), 1f),
+                                    Triple("XLS", Color(0xFF10B981), 2f),
+                                    Triple("CSV", Color(0xFF3B82F6), 3f)
+                                ).forEach { (label, color, z) ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .zIndex(z)
+                                            .background(color, CircleShape)
+                                            .border(1.2.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 5.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = null,
+                                tint = FintechBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
                 // Monthly Budget Control Card (সাদা রং এর)
             Card(
                 shape = RoundedCornerShape(24.dp),
@@ -7674,111 +7795,6 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Export Menu Option (প্রফেশনাল এক্সপোর্ট মেনু)
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
-                border = BorderStroke(
-                    1.5.dp,
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        colors = listOf(
-                            FintechBlue.copy(alpha = 0.8f),
-                            Color(0xFF10B981).copy(alpha = 0.8f)
-                        )
-                    )
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onExportRequest?.invoke("ALL_DATA") }
-                    .testTag("dashboard_export_menu_button")
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            if (isDark) {
-                                androidx.compose.ui.graphics.Brush.linearGradient(
-                                    colors = listOf(
-                                        FintechBlue.copy(alpha = 0.08f),
-                                        Color(0xFF10B981).copy(alpha = 0.05f)
-                                    )
-                                )
-                            } else {
-                                androidx.compose.ui.graphics.SolidColor(Color.White)
-                            }
-                        )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(
-                                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                                            colors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient
-                                        ),
-                                        shape = RoundedCornerShape(14.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = androidx.compose.material.icons.Icons.Rounded.Download,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                            Column {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = if (language == AppLanguage.BN) "এক্সপোর্ট মেনু (রিপোর্ট)" else "Export Menu (Reports)",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = if (isDark) Color.White else Color(0xFF0F172A)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (language == AppLanguage.BN) "পিডিএফ, এক্সেল ও সিএসভি আকারে রিপোর্ট শেয়ার ও ডাউনলোড করুন" else "Share & download reports in PDF, Excel & CSV formats",
-                                    fontSize = 11.sp,
-                                    color = if (isDark) Color.White.copy(alpha = 0.7f) else Color(0xFF475569)
-                                )
-                            }
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .background(
-                                    color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
-                                    shape = CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowForward,
-                                contentDescription = null,
-                                tint = if (isDark) Color.White else Color(0xFF1E293B),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -8838,6 +8854,8 @@ fun TransactionRowItem(
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color(0xFF1E222F)
                             ),
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
 
@@ -14639,6 +14657,7 @@ fun SettingsScreen(
         }
 
         // --- 4. SECURITY & BIOMETRIC LOCK CARD ---
+        val isBiometricActionEnabled by viewModel.isBiometricActionEnabled.collectAsState()
         val isBiometricEnabled by viewModel.isBiometricEnabled.collectAsState()
         var showVerifyCurrentPinDialog by remember { mutableStateOf(false) }
         var showSecurityQuestionDialog by remember { mutableStateOf(false) }
@@ -15098,6 +15117,59 @@ fun SettingsScreen(
                     modifier = Modifier.padding(vertical = 4.dp),
                     color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
                 )
+                // Action Confirmation with Fingerprint Toggle
+                androidx.compose.animation.AnimatedVisibility(visible = isBiometricEnabled) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color(0xFF3B82F6).copy(alpha = 0.12f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.VerifiedUser,
+                                contentDescription = null,
+                                tint = Color(0xFF3B82F6),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "একশন কনফার্মেশন" else "Action Confirmation",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                            Text(
+                                text = if (language == AppLanguage.BN) "ডিলিট এর মতো স্পর্শকাতর কাজে ফিঙ্গারপ্রিন্ট ব্যবহার করুন" else "Use fingerprint for sensitive actions like deleting",
+                                fontSize = 12.sp,
+                                color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                            )
+                        }
+                        Switch(
+                            checked = isBiometricActionEnabled,
+                            onCheckedChange = { enable ->
+                                viewModel.setBiometricActionEnabled(context, enable)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF10B981),
+                                uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                                uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                            )
+                        )
+                    }
+                }
+                androidx.compose.animation.AnimatedVisibility(visible = isBiometricEnabled) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+                    )
+                }
 
                 // Row 2: Change PIN
                 val appLockPin by viewModel.appLockPin.collectAsState()
@@ -20791,8 +20863,8 @@ fun UndoFloatingBanner(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        contentAlignment = Alignment.BottomCenter
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        contentAlignment = Alignment.TopCenter
     ) {
         androidx.compose.material3.Card(
             modifier = Modifier

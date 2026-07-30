@@ -161,8 +161,9 @@ fun QuickAddDialogScreen(
     }
 
     // Default categories based on type
-    val expenseCategories = listOf("খাবার", "কেনাকাটা", "বিল", "পরিবহন", "চিকিৎসা", "বিনোদন", "অন্যান্য")
-    val incomeCategories = listOf("বেতন", "ব্যবসা", "ফ্রিল্যান্সিং", "উপহার", "বিনিয়োগ", "অন্যান্য")
+    val expenseCategories = listOf("নগদ", "বাকি", "ধার", "খাবার", "কেনাকাটা", "বিল", "পরিবহন", "চিকিৎসা", "বিনোদন", "অন্যান্য")
+    val incomeCategories = listOf("নগদ", "বিক্রয়", "বেতন", "ব্যবসা", "ফ্রিল্যান্সিং", "উপহার", "বিনিয়োগ", "অন্যান্য")
+
 
     Box(
         modifier = Modifier
@@ -217,7 +218,6 @@ fun QuickAddDialogScreen(
                                 modifier = Modifier.size(22.dp)
                             )
                         }
-
                         Column {
                             Text(
                                 text = if (isBn) "তাৎক্ষণিক এন্ট্রি" else "Quick Entry",
@@ -225,13 +225,37 @@ fun QuickAddDialogScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            var workspaceDropdownExpanded by remember { mutableStateOf(false) }
                             val currentWsName = workspaces.find { it.id == selectedWorkspaceId }?.name ?: (if (isBn) "ব্যক্তিগত" else "Personal")
-                            Text(
-                                text = "${if (isBn) "ওয়ার্কস্পেস" else "Workspace"}: $currentWsName",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Box {
+                                Row(
+                                    modifier = Modifier.clickable { workspaceDropdownExpanded = true }.padding(vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${if (isBn) "ওয়ার্কস্পেস" else "Workspace"}: $currentWsName",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                }
+                                DropdownMenu(
+                                    expanded = workspaceDropdownExpanded,
+                                    onDismissRequest = { workspaceDropdownExpanded = false }
+                                ) {
+                                    workspaces.forEach { ws ->
+                                        DropdownMenuItem(
+                                            text = { Text(ws.name) },
+                                            onClick = {
+                                                selectedWorkspaceId = ws.id
+                                                workspaceDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
+
                     }
 
                     Row(

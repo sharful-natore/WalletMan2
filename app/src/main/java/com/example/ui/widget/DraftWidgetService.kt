@@ -118,7 +118,10 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
             rv.setTextViewText(R.id.widget_summary_text, summaryText)
             rv.setTextColor(R.id.widget_summary_title, config.listItemTextColor)
             rv.setTextColor(R.id.widget_summary_text, config.listItemTextColor)
-            rv.setInt(R.id.widget_summary_bg, "setColorFilter", config.listItemBg)
+            val summaryAlpha = android.graphics.Color.alpha(config.listItemBg)
+            val summaryOpaque = (config.listItemBg and 0x00FFFFFF) or -0x1000000
+            rv.setInt(R.id.widget_summary_bg, "setColorFilter", summaryOpaque)
+            rv.setInt(R.id.widget_summary_bg, "setImageAlpha", summaryAlpha)
 
             return rv
         }
@@ -138,7 +141,10 @@ class DraftWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         rv.setTextViewText(R.id.widget_item_text, "${draft.note}$amountStr")
         rv.setTextColor(R.id.widget_item_text, config.listItemTextColor)
         rv.setTextColor(R.id.widget_item_serial, config.listItemTextColor)
-        rv.setInt(R.id.widget_item_bg, "setColorFilter", config.listItemBg)
+        val itemAlpha = android.graphics.Color.alpha(config.listItemBg)
+        val itemOpaque = (config.listItemBg and 0x00FFFFFF) or -0x1000000
+        rv.setInt(R.id.widget_item_bg, "setColorFilter", itemOpaque)
+        rv.setInt(R.id.widget_item_bg, "setImageAlpha", itemAlpha)
         
         val serial = toBanglaDigits((position + 1).toString())
         rv.setTextViewText(R.id.widget_item_serial, "$serial.")
