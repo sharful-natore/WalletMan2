@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
     <ImageView
         android:id="@+id/widget_summary_bg"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@id/widget_summary_container"
+        android:layout_alignBottom="@id/widget_summary_container"
         android:src="@drawable/widget_rounded_rect_bg"
         android:scaleType="fitXY" />
 
@@ -43,4 +45,4 @@
             android:maxLines="1"
             android:ellipsize="end" />
     </LinearLayout>
-</FrameLayout>
+</RelativeLayout>

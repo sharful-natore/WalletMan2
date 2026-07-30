@@ -42,6 +42,18 @@ object WidgetConfigManager {
     
     fun loadConfig(context: Context): WidgetDraftConfig {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        
+        // One-time migration to new default colors for existing users
+        val hasMigratedToNewDefaults = prefs.getBoolean("has_migrated_to_new_defaults_v2", false)
+        if (!hasMigratedToNewDefaults) {
+            val editor = prefs.edit()
+            editor.putInt("titleSectionBg", Color.parseColor("#E6FFFFFF"))
+            editor.putInt("listSectionBg", Color.parseColor("#BFFFFFFF"))
+            editor.putInt("listItemBg", Color.parseColor("#D9FFFFFF"))
+            editor.putBoolean("has_migrated_to_new_defaults_v2", true)
+            editor.apply()
+        }
+
         return WidgetDraftConfig(
             titleSectionBg = prefs.getInt("titleSectionBg", Color.parseColor("#E6FFFFFF")),
             listSectionBg = prefs.getInt("listSectionBg", Color.parseColor("#BFFFFFFF")),

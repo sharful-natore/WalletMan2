@@ -7,7 +7,7 @@
     android:orientation="vertical">
 
     <!-- Header Container -->
-    <FrameLayout
+    <RelativeLayout
         android:id="@+id/widget_header_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -15,11 +15,14 @@
         <ImageView
             android:id="@+id/widget_header_bg"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignTop="@id/widget_header_content"
+            android:layout_alignBottom="@id/widget_header_content"
             android:src="@drawable/widget_draft_header_bg"
             android:scaleType="fitXY" />
 
         <LinearLayout
+            android:id="@+id/widget_header_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
@@ -139,7 +142,7 @@
                     android:scaleType="fitCenter" />
             </FrameLayout>
         </LinearLayout>
-    </FrameLayout>
+    </RelativeLayout>
 
     <!-- List Section -->
     <FrameLayout

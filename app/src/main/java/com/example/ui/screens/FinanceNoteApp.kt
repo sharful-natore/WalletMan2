@@ -1970,6 +1970,7 @@ fun FinanceNoteApp(
 ) {
     val language by viewModel.language.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
+    val activeUndoState by viewModel.activeUndoState.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var showSplash by remember { mutableStateOf(true) }
@@ -3492,6 +3493,23 @@ fun FinanceNoteApp(
                             )
                             .align(Alignment.BottomEnd)
                     )
+                }
+
+                activeUndoState?.let { undoState ->
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        UndoFloatingBanner(
+                            undoState = undoState,
+                            language = language,
+                            onDismiss = { viewModel.clearUndoAction() },
+                            onUndoClick = {
+                                undoState.onUndo()
+                                viewModel.clearUndoAction()
+                            }
+                        )
+                    }
                 }
 
                 // Main screen switches
@@ -19038,54 +19056,54 @@ fun AnimatedAppLogo(
         kotlinx.coroutines.delay(200)
 
         if (isInfinite) {
-            // Infinite loop for dashboard
+            // Infinite loop for dashboard (slowed down for a smoother, gentler motion)
             launch {
                 while (true) {
-                    bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                    bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
             launch {
-                kotlinx.coroutines.delay(150)
+                kotlinx.coroutines.delay(200)
                 while (true) {
-                    bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                    bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
             launch {
-                kotlinx.coroutines.delay(300)
+                kotlinx.coroutines.delay(400)
                 while (true) {
-                    bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                    bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
         } else {
             // Limited cycles for Splash screen (plays twice and ends at 1.0f)
             launch {
                 // Cycle 1
-                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
             launch {
                 kotlinx.coroutines.delay(150)
                 // Cycle 1
-                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
             launch {
                 kotlinx.coroutines.delay(300)
                 // Cycle 1
-                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
         }
     }
@@ -20745,3 +20763,138 @@ fun ProfileMenuItem(
         }
     }
 }
+
+@Composable
+fun UndoFloatingBanner(
+    undoState: com.example.ui.viewmodel.FinanceViewModel.UndoState,
+    language: com.example.ui.AppLanguage,
+    onDismiss: () -> Unit,
+    onUndoClick: () -> Unit
+) {
+    var timeLeft by remember { mutableStateOf(3) }
+    var progress by remember { mutableStateOf(1f) }
+    
+    LaunchedEffect(undoState.id) {
+        timeLeft = 3
+        progress = 1f
+        val startTime = System.currentTimeMillis()
+        val duration = 3000L
+        while (System.currentTimeMillis() - startTime < duration) {
+            val elapsed = System.currentTimeMillis() - startTime
+            progress = (duration - elapsed).toFloat() / duration
+            timeLeft = (3 - (elapsed / 1000)).toInt().coerceAtLeast(0)
+            kotlinx.coroutines.delay(16) // ~60fps
+        }
+        onDismiss()
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        androidx.compose.material3.Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 500.dp)
+                .shadow(12.dp, shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                .testTag("undo_floating_banner"),
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = androidx.compose.ui.graphics.Color(0xFF1E293B) // Rich Slate-800
+            ),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        // Countdown Circle
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxSize(),
+                                color = androidx.compose.ui.graphics.Color(0xFF38BDF8), // Light Blue-400
+                                strokeWidth = 2.5.dp,
+                                trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.15f)
+                            )
+                            Text(
+                                text = "$timeLeft",
+                                color = androidx.compose.ui.graphics.Color.White,
+                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                        
+                        Text(
+                            text = if (language == com.example.ui.AppLanguage.BN) undoState.messageBn else undoState.messageEn,
+                            color = androidx.compose.ui.graphics.Color.White,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Undo Button
+                        androidx.compose.material3.Button(
+                            onClick = onUndoClick,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = androidx.compose.ui.graphics.Color(0xFF10B981) // Emerald-500
+                            ),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            modifier = Modifier.testTag("undo_banner_button")
+                        ) {
+                            Text(
+                                text = if (language == com.example.ui.AppLanguage.BN) "আনডু" else "Undo",
+                                color = androidx.compose.ui.graphics.Color.White,
+                                style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            )
+                        }
+                        
+                        // Dismiss Button
+                        androidx.compose.material3.IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("dismiss_banner_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = if (language == com.example.ui.AppLanguage.BN) "বাতিল" else "Dismiss",
+                                tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                
+                // Subtle thin progress bar at bottom of card
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(3.dp),
+                    color = androidx.compose.ui.graphics.Color(0xFF38BDF8),
+                    trackColor = androidx.compose.ui.graphics.Color.Transparent
+                )
+            }
+        }
+    }
+}
+

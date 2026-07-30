@@ -891,7 +891,6 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     workspaces = listOf(workspace)
                 )
 
-                
                 val json = backupAdapter.toJson(backupData)
                 repository.insertTrashItem(com.example.data.TrashItem(
                     originalId = workspaceId.hashCode(),
@@ -899,13 +898,32 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     itemJson = json,
                     deletedAt = System.currentTimeMillis()
                 ))
+                
+                val prevWorkspaceId = _currentWorkspaceId.value
+                repository.deleteWorkspace(workspaceId)
+                if (_currentWorkspaceId.value == workspaceId) {
+                    selectWorkspace("default")
+                }
+                onLocalDatabaseChanged()
+                
+                triggerUndoAction(
+                    messageBn = "ওয়ার্কস্পেস মুছে ফেলা হয়েছে",
+                    messageEn = "Workspace deleted",
+                    onUndo = {
+                        viewModelScope.launch {
+                            repository.insertWorkspace(workspace)
+                            backupData.persons.forEach { repository.insertPerson(it) }
+                            backupData.transactions.forEach { repository.insertTransaction(it) }
+                            backupData.savingsGoals.forEach { repository.insertSavingsGoal(it) }
+                            backupData.savingsTransactions.forEach { repository.insertSavingsTransaction(it) }
+                            if (prevWorkspaceId == workspaceId) {
+                                selectWorkspace(workspaceId)
+                            }
+                            onLocalDatabaseChanged()
+                        }
+                    }
+                )
             }
-            
-            repository.deleteWorkspace(workspaceId)
-            if (_currentWorkspaceId.value == workspaceId) {
-                selectWorkspace("default")
-            }
-            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ওয়ার্কস্পেস মুছে ফেলা হয়েছে" else "Workspace deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -1141,11 +1159,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun deletePersons(ids: List<Int>) {
         viewModelScope.launch {
             var lastDeletedName = ""
+            val deletedPersons = mutableListOf<Person>()
+            val deletedTxMap = mutableMapOf<Int, List<Transaction>>()
             ids.forEach { id ->
                 val p = repository.getPersonById(id)
                 if (p != null) {
+                    deletedPersons.add(p)
                     lastDeletedName = p.name
                     val txs = repository.getTransactionsByPersonList(id)
+                    deletedTxMap[id] = txs
                     val pWithTx = com.example.data.PersonWithTransactions(p, txs)
                     repository.insertTrashItem(com.example.data.TrashItem(
                         originalId = id, 
@@ -1161,7 +1183,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
-            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "নির্বাচিত ব্যক্তিদের মুছে ফেলা হয়েছে" else "Selected persons deleted", isSuccess = true, type = "SUCCESS")
+            
+            triggerUndoAction(
+                messageBn = "নির্বাচিত ব্যক্তিদের মুছে ফেলা হয়েছে",
+                messageEn = "Selected persons deleted",
+                onUndo = {
+                    viewModelScope.launch {
+                        deletedPersons.forEach { p ->
+                            repository.insertPerson(p)
+                            deletedTxMap[p.id]?.forEach { tx ->
+                                repository.insertTransaction(tx)
+                            }
+                        }
+                        com.example.widget.updateAllWidgets(getApplication())
+                        onLocalDatabaseChanged()
+                    }
+                }
+            )
         }
     }
 
@@ -1195,11 +1233,24 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     itemJson = personWithTxAdapter.toJson(pWithTx)
                 ))
                 recordDatabaseMutation("DELETE", p.name, "PERSON", 0.0)
+                
+                repository.deletePerson(id)
+                com.example.widget.updateAllWidgets(getApplication())
+                onLocalDatabaseChanged()
+                
+                triggerUndoAction(
+                    messageBn = "ব্যক্তি মুছে ফেলা হয়েছে",
+                    messageEn = "Person deleted",
+                    onUndo = {
+                        viewModelScope.launch {
+                            repository.insertPerson(p)
+                            txs.forEach { repository.insertTransaction(it) }
+                            com.example.widget.updateAllWidgets(getApplication())
+                            onLocalDatabaseChanged()
+                        }
+                    }
+                )
             }
-            repository.deletePerson(id)
-            com.example.widget.updateAllWidgets(getApplication())
-            onLocalDatabaseChanged()
-            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "ব্যক্তি মুছে ফেলা হয়েছে" else "Person deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -1250,10 +1301,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         itemJson = draftAdapter.toJson(target)
                     )
                 )
+                repository.deleteDraftTransaction(id)
+                com.example.widget.updateAllWidgets(getApplication())
+                onLocalDatabaseChanged()
+                
+                triggerUndoAction(
+                    messageBn = "খসড়া লেনদেন মুছে ফেলা হয়েছে",
+                    messageEn = "Draft transaction deleted",
+                    onUndo = {
+                        viewModelScope.launch {
+                            repository.insertDraftTransaction(target)
+                            com.example.widget.updateAllWidgets(getApplication())
+                            onLocalDatabaseChanged()
+                        }
+                    }
+                )
             }
-            repository.deleteDraftTransaction(id)
-            com.example.widget.updateAllWidgets(getApplication())
-            onLocalDatabaseChanged()
         }
     }
 
@@ -1342,11 +1405,23 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 else if (t.note.isBlank()) t.category else t.note
                 val finalCategory = "${t.type.uppercase()} - ${t.category}"
                 recordDatabaseMutation("DELETE", finalName, finalCategory, t.amount)
+                
+                repository.deleteTransaction(id)
+                com.example.widget.updateAllWidgets(getApplication())
+                onLocalDatabaseChanged()
+                
+                triggerUndoAction(
+                    messageBn = "লেনদেন মুছে ফেলা হয়েছে",
+                    messageEn = "Transaction deleted",
+                    onUndo = {
+                        viewModelScope.launch {
+                            repository.insertTransaction(t)
+                            com.example.widget.updateAllWidgets(getApplication())
+                            onLocalDatabaseChanged()
+                        }
+                    }
+                )
             }
-            repository.deleteTransaction(id)
-            com.example.widget.updateAllWidgets(getApplication())
-            onLocalDatabaseChanged()
-            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "লেনদেন মুছে ফেলা হয়েছে" else "Transaction deleted", isSuccess = true, type = "SUCCESS")
         }
     }
 
@@ -1493,9 +1568,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             var lastDeletedNote = ""
             var lastDeletedAmount = 0.0
             var lastDeletedCategory = "TRANSACTIONS"
+            val deletedList = mutableListOf<Transaction>()
             ids.forEach { id ->
                 val t = repository.getTransactionById(id)
                 if (t != null) {
+                    deletedList.add(t)
                     lastDeletedNote = if (t.note.isBlank()) t.category else t.note
                     lastDeletedAmount = t.amount
                     lastDeletedCategory = "${t.type.uppercase()} - ${t.category}"
@@ -1509,7 +1586,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             }
             com.example.widget.updateAllWidgets(getApplication())
             onLocalDatabaseChanged()
-            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "${ids.size}টি লেনদেন মুছে ফেলা হয়েছে" else "${ids.size} transactions deleted", isSuccess = true, type = "SUCCESS")
+            
+            triggerUndoAction(
+                messageBn = "${ids.size}টি লেনদেন মুছে ফেলা হয়েছে",
+                messageEn = "${ids.size} transactions deleted",
+                onUndo = {
+                    viewModelScope.launch {
+                        deletedList.forEach { repository.insertTransaction(it) }
+                        com.example.widget.updateAllWidgets(getApplication())
+                        onLocalDatabaseChanged()
+                    }
+                }
+            )
         }
     }
 
@@ -1517,12 +1605,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             var lastDeletedTitle = ""
             var lastDeletedTargetAmount = 0.0
+            val deletedGoals = mutableListOf<SavingsGoal>()
+            val deletedTxMap = mutableMapOf<Int, List<SavingsTransaction>>()
             ids.forEach { id ->
                 val g = repository.getSavingsGoalById(id)
                 if (g != null) {
+                    deletedGoals.add(g)
                     lastDeletedTitle = g.title
                     lastDeletedTargetAmount = g.targetAmount
                     val txs = repository.getSavingsTransactionsByGoalList(id)
+                    deletedTxMap[id] = txs
                     val gWithTx = com.example.data.GoalWithTransactions(g, txs)
                     repository.insertTrashItem(com.example.data.TrashItem(
                         originalId = id, 
@@ -1537,7 +1629,22 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 recordDatabaseMutation("DELETE", msg, "SAVINGS_GOAL", lastDeletedTargetAmount)
             }
             onLocalDatabaseChanged()
-            triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "${ids.size}টি সঞ্চয় কার্ড মুছে ফেলা হয়েছে" else "${ids.size} savings cards deleted", isSuccess = true, type = "SUCCESS")
+            
+            triggerUndoAction(
+                messageBn = "${ids.size}টি সঞ্চয় কার্ড মুছে ফেলা হয়েছে",
+                messageEn = "${ids.size} savings cards deleted",
+                onUndo = {
+                    viewModelScope.launch {
+                        deletedGoals.forEach { g ->
+                            repository.insertSavingsGoal(g)
+                            deletedTxMap[g.id]?.forEach { tx ->
+                                repository.insertSavingsTransaction(tx)
+                            }
+                        }
+                        onLocalDatabaseChanged()
+                    }
+                }
+            )
         }
     }
 
@@ -3287,6 +3394,24 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     private val _autoBackupIntervalDays = MutableStateFlow(-1)
     val autoBackupIntervalDays: StateFlow<Int> = _autoBackupIntervalDays.asStateFlow()
+
+    data class UndoState(
+        val id: Long = System.currentTimeMillis(),
+        val messageBn: String,
+        val messageEn: String,
+        val onUndo: () -> Unit
+    )
+
+    private val _activeUndoState = MutableStateFlow<UndoState?>(null)
+    val activeUndoState: StateFlow<UndoState?> = _activeUndoState.asStateFlow()
+
+    fun triggerUndoAction(messageBn: String, messageEn: String, onUndo: () -> Unit) {
+        _activeUndoState.value = UndoState(messageBn = messageBn, messageEn = messageEn, onUndo = onUndo)
+    }
+
+    fun clearUndoAction() {
+        _activeUndoState.value = null
+    }
 
     private val _customNotifications = MutableStateFlow<List<CustomNotification>>(emptyList())
     val customNotifications: StateFlow<List<CustomNotification>> = _customNotifications.asStateFlow()
