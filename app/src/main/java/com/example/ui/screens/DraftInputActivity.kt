@@ -177,6 +177,8 @@ class DraftInputActivity : ComponentActivity() {
                 )
             }
 
+            val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -188,7 +190,7 @@ class DraftInputActivity : ComponentActivity() {
                 } else {
                     Card(
                         shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                         modifier = Modifier
                             .fillMaxWidth(0.9f)
                             .padding(16.dp)
@@ -216,11 +218,10 @@ class DraftInputActivity : ComponentActivity() {
                                     text = if (isEdit) {
                                         if (isBn) "ড্রাফট এডিট করুন" else "Edit Draft Note"
                                     } else {
-                                        if (isBn) "নতুন ড্রাফট যোগ করুন" else "Add Draft Transaction"
+                                        if (isBn) "নতুন ড্রাফট লিখুন" else "Add New Draft Note"
                                     },
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1E293B)
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isDark) Color.White else Color(0xFF1E293B)
                                 )
                                 IconButton(onClick = { showInfoDialogState = true }) {
                                     Icon(
@@ -247,8 +248,10 @@ class DraftInputActivity : ComponentActivity() {
                                 },
                                 maxLines = 3,
                                 colors = TextFieldDefaults.colors(
-                                    focusedContainerColor = Color.White,
-                                    unfocusedContainerColor = Color.White,
+                                    focusedContainerColor = if (isDark) Color(0xFF0F172A) else Color.White,
+                                    unfocusedContainerColor = if (isDark) Color(0xFF0F172A) else Color.White,
+                                    focusedTextColor = if (isDark) Color.White else Color.Black,
+                                    unfocusedTextColor = if (isDark) Color.White else Color.Black,
                                     focusedIndicatorColor = Color(0xFFD97706),
                                     unfocusedIndicatorColor = Color.Gray.copy(alpha = 0.5f)
                                 )

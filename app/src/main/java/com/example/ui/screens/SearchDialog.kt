@@ -149,7 +149,7 @@ fun SearchDialog(
                     .fillMaxHeight(0.9f)
                     .widthIn(max = 600.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF131724) else Color.White
+                    containerColor = if (isDark) Color(0xFF1E293B) else Color.White
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
                 border = BorderStroke(
@@ -187,7 +187,7 @@ fun SearchDialog(
                         IconButton(
                             onClick = onDismissRequest,
                             colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isDark) Color(0xFF1E2235) else Color(0xFFF1F5F9)
+                                containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                             )
                         ) {
                             Icon(
@@ -231,8 +231,8 @@ fun SearchDialog(
                             .padding(bottom = 12.dp),
                         shape = RoundedCornerShape(18.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = if (isDark) Color(0xFF181C2A) else Color(0xFFF8FAFC),
-                            unfocusedContainerColor = if (isDark) Color(0xFF181C2A) else Color(0xFFF8FAFC),
+                            focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC),
+                            unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC),
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = if (isDark) Color(0xFF2E354F) else Color(0xFFE2E8F0)
                         ),
@@ -467,7 +467,7 @@ fun TransactionSearchItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
@@ -598,7 +598,7 @@ fun PersonSearchItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
@@ -685,7 +685,7 @@ fun GoalSearchItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
@@ -755,7 +755,7 @@ fun SavingsTransactionSearchItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
@@ -834,7 +834,7 @@ fun SettingSearchItem(
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),

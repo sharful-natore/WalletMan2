@@ -1320,7 +1320,7 @@ fun WorkspaceManagementDialog(
                             modifier = Modifier.animateItem()
                         ) {
                         val isSelected = ws.workspace.id == currentWorkspace.id
-                        val itemBg = if (isSelected) FintechBlue.copy(alpha = 0.08f) else (if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC))
+                        val itemBg = if (isSelected) FintechBlue.copy(alpha = 0.08f) else (if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC))
                         val cardBorderCol = if (isSelected) FintechBlue else borderCol
                         
                         Card(
@@ -1383,7 +1383,7 @@ fun WorkspaceManagementDialog(
                                                 .size(14.dp)
                                                 .clip(CircleShape)
                                                 .background(FintechBlue)
-                                                .border(1.dp, if (isDark) Color(0xFF1E1E1E) else Color.White, CircleShape),
+                                                .border(1.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
@@ -2302,7 +2302,7 @@ fun FinanceNoteApp(
                                         },
                                     shape = RoundedCornerShape(10.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isDarkTheme) Color(0xFF2C2C2E) else Color(0xFFF1F5F9)
+                                        containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                                     ),
                                     border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f))
                                 ) {
@@ -3044,7 +3044,7 @@ fun FinanceNoteApp(
                 containerColor = Color.Transparent,
             topBar = {
                 val topBarGradient = if (isDarkTheme) {
-                    Brush.linearGradient(listOf(Color(0xFF121212), Color(0xFF121212)))
+                    Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF1E293B)))
                 } else {
                     activeThemeGradientBrush
                 }
@@ -3330,7 +3330,7 @@ fun FinanceNoteApp(
             },
             bottomBar = {
                 val bottomBarGradient = if (isDarkTheme) {
-                    Brush.linearGradient(listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)))
+                    Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF1E293B)))
                 } else {
                     activeThemeGradientBrush
                 }
@@ -3852,7 +3852,7 @@ fun FinanceNoteApp(
                     ) {
                         AlertDialog(
                             onDismissRequest = { editingBudgetGradientType = null },
-                            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+                            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
                             title = {
                                 Text(
                                     text = if (language == AppLanguage.BN) {
@@ -4481,7 +4481,7 @@ fun FinanceNoteApp(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier
-                        .background(if (isDarkTheme) Color(0xFF121212) else Color.White, RoundedCornerShape(16.dp))
+                        .background(if (isDarkTheme) Color(0xFF1E293B) else Color.White, RoundedCornerShape(16.dp))
                         .padding(32.dp)
                 ) {
                     CircularProgressIndicator(color = FintechBlue)
@@ -4501,7 +4501,7 @@ fun FinanceNoteApp(
 
         AlertDialog(
             onDismissRequest = { showThemeCustomizeDialog = false },
-            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
             shape = RoundedCornerShape(24.dp),
             tonalElevation = 8.dp,
             title = {
@@ -4575,7 +4575,7 @@ fun FinanceNoteApp(
                                 checkedThumbColor = Color.White,
                                 checkedTrackColor = MaterialTheme.colorScheme.primary,
                                 uncheckedThumbColor = Color.Gray,
-                                uncheckedTrackColor = if (isDarkTheme) Color(0xFF1E2235) else Color(0xFFE2E8F0)
+                                uncheckedTrackColor = if (isDarkTheme) Color(0xFF1E293B) else Color(0xFFE2E8F0)
                             )
                         )
                     }
@@ -4732,7 +4732,7 @@ fun FinanceNoteApp(
 
         AlertDialog(
             onDismissRequest = { showCustomGradientDialog = false },
-            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
             shape = RoundedCornerShape(24.dp),
             tonalElevation = 8.dp,
             title = {
@@ -5186,7 +5186,7 @@ fun FinanceNoteApp(
         val allGradientsList by viewModel.allGradientsConfig.collectAsState()
         AlertDialog(
             onDismissRequest = { showLongPressOptions = false },
-            containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White,
+            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
             shape = RoundedCornerShape(20.dp),
             title = {
                 Text(
@@ -5255,7 +5255,7 @@ fun FinanceNoteApp(
 
         AlertDialog(
             onDismissRequest = { showRealtimeSyncDialog = false },
-            containerColor = if (isDarkTheme) Color(0xFF121212) else Color.White,
+            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -5617,7 +5617,7 @@ fun FinanceNoteApp(
     if (showNoInternetDialog) {
         AlertDialog(
             onDismissRequest = { showNoInternetDialog = false },
-            containerColor = if (isDarkTheme) Color(0xFF121212) else Color.White,
+            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -5720,7 +5720,7 @@ fun FinanceNoteApp(
                 viewModel.dismissCloudDataFoundDialog() 
                 cloudRestoreUserInput = ""
             },
-            containerColor = if (isDarkTheme) Color(0xFF121212) else Color.White,
+            containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(28.dp))
@@ -7274,7 +7274,7 @@ fun DashboardScreen(
         // Balance Card (Fintech Gradient Card with sleek styling and beautifully integrated debts/loans cards)
         item {
             FintechGradientCard(
-                gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient, // Sleek Indigo-Violet-Fuchsia Gradient
+                gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient, // Sleek Indigo-Violet-Fuchsia Gradient
                 cornerRadius = 32.dp,
                 padding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
                 onLongClick = {
@@ -7449,7 +7449,7 @@ fun DashboardScreen(
             ) {
                 // I Owe Card (দেনা)
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     onClick = { onNavigate("debts", "DENA") },
@@ -7497,7 +7497,7 @@ fun DashboardScreen(
 
                 // Owed to Me Card (পাওনা)
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     onClick = { onNavigate("debts", "PAWN") },
@@ -7629,7 +7629,7 @@ fun DashboardScreen(
                 // Monthly Budget Control Card (সাদা রং এর)
             Card(
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                 border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -7718,7 +7718,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA),
                                 customGradient = budgetGradients["INCOME"],
                                 onCenterClick = { showBudgetDetailsType = "INCOME" },
                                 onLongPress = { onEditGradient?.invoke("INCOME") }
@@ -7752,7 +7752,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA),
                                 customGradient = budgetGradients["EXPENSE"],
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" },
                                 onLongPress = { onEditGradient?.invoke("EXPENSE") }
@@ -7786,7 +7786,7 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
                                 strokeWidthDp = 14.dp,
                                 centerTextSize = 14.sp,
-                                centerColorOverride = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8F9FA),
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA),
                                 customGradient = budgetGradients["SAVINGS"],
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" },
                                 onLongPress = { onEditGradient?.invoke("SAVINGS") }
@@ -7847,7 +7847,7 @@ fun DashboardScreen(
 
         if (recentTransactions.isEmpty()) {
             item {
-                val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF121212) else Color.White)
+                val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF1E293B) else Color.White)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -7930,7 +7930,7 @@ fun DashboardScreen(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(24.dp))
-                        .background(if (isDark) Color(0xFF2C2C2E) else Color.White)
+                        .background(if (isDark) Color(0xFF1E293B) else Color.White)
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f), RoundedCornerShape(24.dp)),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -8034,7 +8034,7 @@ fun DashboardScreen(
                     // Large Segmented Donut Chart in a card with matching styling
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White),
+                        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -8056,7 +8056,7 @@ fun DashboardScreen(
                                 strokeWidthDp = 22.dp, // Match budget section with increased thickness
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
-                                centerColorOverride = if (isDark) Color(0xFF2C2C2E) else Color(0xFFF8F9FA), // Match budget section
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA), // Match budget section
                                 customPalette = budgetGradients["BUDGET_DETAILS_$categoryType"],
                                 onCenterClick = {
                                     if (targetAmount == 0.0) {
@@ -8709,7 +8709,7 @@ fun TransactionRowItem(
         )
     }
 
-    val bgColor by androidx.compose.animation.animateColorAsState(if (isHighlighted) (if (isDark) Color(0xFF453A1E) else Color(0xFFFEF3C7)) else (if (isDark) Color(0xFF121212) else Color.White))
+    val bgColor by androidx.compose.animation.animateColorAsState(if (isHighlighted) (if (isDark) Color(0xFF453A1E) else Color(0xFFFEF3C7)) else (if (isDark) Color(0xFF1E293B) else Color.White))
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
@@ -8979,7 +8979,7 @@ fun TransactionDetailsDialog(
     onNavigateToTab: ((String, String) -> Unit)? = null,
     onPersonClick: ((Person) -> Unit)? = null
 ) {
-    val bgColor = if (isDark) Color(0xFF121212) else Color.White
+    val bgColor = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val subtitleColor = if (isDark) Color.LightGray else Color(0xFF64748B)
 
@@ -9028,7 +9028,7 @@ fun TransactionDetailsDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .captureToPicture(screenshotState)
-                    .background(if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -9042,7 +9042,7 @@ fun TransactionDetailsDialog(
                                 if (onClick != null) {
                                     Modifier
                                         .clickable { onClick() }
-                                        .background(if (isDark) Color(0xFF1C1C1E) else Color(0xFFEDF2F7))
+                                        .background(if (isDark) Color(0xFF1E293B) else Color(0xFFEDF2F7))
                                         .padding(horizontal = 8.dp, vertical = 6.dp)
                                 } else {
                                     Modifier.padding(vertical = 4.dp)
@@ -9374,8 +9374,8 @@ fun TransactionsScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
-                    focusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9),
-                    unfocusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9)
+                    focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                    unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                 )
             )
 
@@ -9387,7 +9387,7 @@ fun TransactionsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     onLongClick = { onExportRequest?.invoke("ONLY_INCOME") },
@@ -9412,7 +9412,7 @@ fun TransactionsScreen(
                     }
                 }
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     onLongClick = { onExportRequest?.invoke("ONLY_EXPENSE") },
@@ -9474,7 +9474,7 @@ fun TransactionsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     if (isSelected) MaterialTheme.colorScheme.primary
-                                    else if (isDark) Color(0xFF1C1C1E) else Color.White
+                                    else if (isDark) Color(0xFF1E293B) else Color.White
                                 )
                                 .clickable { onFilterChange(type) }
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -9498,7 +9498,7 @@ fun TransactionsScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .background(
-                                if (isDark) Color(0xFF1C1C1E) else Color.White,
+                                if (isDark) Color(0xFF1E293B) else Color.White,
                                 RoundedCornerShape(12.dp)
                             )
                             .border(
@@ -9517,7 +9517,7 @@ fun TransactionsScreen(
                     DropdownMenu(
                         expanded = showSortMenu,
                         onDismissRequest = { showSortMenu = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF1C1C1E) else Color.White)
+                        modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
                     ) {
                         val sortOptions = listOf(
                             Triple("DATE_DESC", if (language == AppLanguage.BN) "নতুন সময় আগে" else "Newest First", Icons.Rounded.ArrowDownward),
@@ -9667,7 +9667,7 @@ fun TransactionsScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 110.dp)
-                    .background(if (isDark) Color(0xFF121212) else Color.White, RoundedCornerShape(28.dp))
+                    .background(if (isDark) Color(0xFF1E293B) else Color.White, RoundedCornerShape(28.dp))
                     .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(28.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -9917,8 +9917,8 @@ fun DebtsScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
-                    focusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9),
-                    unfocusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9)
+                    focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                    unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                 )
             )
 
@@ -9930,7 +9930,7 @@ fun DebtsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     onLongClick = { onExportRequest?.invoke("ONLY_DEBT") },
@@ -9955,7 +9955,7 @@ fun DebtsScreen(
                     }
                 }
                 FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
                     cornerRadius = 24.dp,
                     padding = PaddingValues(10.dp),
                     onLongClick = { onExportRequest?.invoke("ONLY_PAONA") },
@@ -10006,7 +10006,7 @@ fun DebtsScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     if (isSelected) MaterialTheme.colorScheme.primary
-                                    else if (isDark) Color(0xFF1C1C1E) else Color.White
+                                    else if (isDark) Color(0xFF1E293B) else Color.White
                                 )
                                 .clickable { onFilterChange(type) }
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -10030,7 +10030,7 @@ fun DebtsScreen(
                         modifier = Modifier
                             .size(40.dp)
                             .background(
-                                if (isDark) Color(0xFF1C1C1E) else Color.White,
+                                if (isDark) Color(0xFF1E293B) else Color.White,
                                 RoundedCornerShape(12.dp)
                             )
                             .border(
@@ -10049,7 +10049,7 @@ fun DebtsScreen(
                     DropdownMenu(
                         expanded = showSortMenu,
                         onDismissRequest = { showSortMenu = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF1C1C1E) else Color.White)
+                        modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
                     ) {
                         val sortOptions = listOf(
                             Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
@@ -10163,7 +10163,7 @@ fun DebtsScreen(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
-                    .background(if (isDark) Color(0xFF121212) else Color.White)
+                    .background(if (isDark) Color(0xFF1E293B) else Color.White)
                     .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f), RoundedCornerShape(24.dp))
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -10552,7 +10552,7 @@ fun PersonDebtRowItem(
         } else if (isHighlighted) {
             if (isDark) Color(0xFF453A1E) else Color(0xFFFEF3C7)
         } else {
-            if (isDark) Color(0xFF121212) else Color.White
+            if (isDark) Color(0xFF1E293B) else Color.White
         }
     )
     
@@ -10895,8 +10895,8 @@ fun SavingsScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
-                        focusedContainerColor = if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9),
-                        unfocusedContainerColor = if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9)
+                        focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                        unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                     )
                 )
 
@@ -10908,7 +10908,7 @@ fun SavingsScreen(
                         modifier = Modifier
                             .size(48.dp)
                             .background(
-                                if (isDark) Color(0xFF121212) else Color.White,
+                                if (isDark) Color(0xFF1E293B) else Color.White,
                                 RoundedCornerShape(16.dp)
                             )
                             .border(
@@ -10927,7 +10927,7 @@ fun SavingsScreen(
                     DropdownMenu(
                         expanded = showSortMenu,
                         onDismissRequest = { showSortMenu = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF121212) else Color.White)
+                        modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
                     ) {
                         val sortOptions = listOf(
                             Triple("TITLE_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Title (A-Z)", Icons.Rounded.SortByAlpha),
@@ -11038,7 +11038,7 @@ fun SavingsScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 110.dp)
-                    .background(if (isDark) Color(0xFF121212) else Color.White, RoundedCornerShape(28.dp))
+                    .background(if (isDark) Color(0xFF1E293B) else Color.White, RoundedCornerShape(28.dp))
                     .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(28.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -11152,7 +11152,7 @@ fun SavingsGoalCardItem(
         com.example.ui.theme.GradientsList[0]
     }
     val gradient = if (isDark) {
-        listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E))
+        listOf(Color(0xFF1E293B), Color(0xFF1E293B))
     } else {
         rawGradient
     }
@@ -11352,10 +11352,10 @@ fun PersonSelectorDialog(
         }
     }
 
-    val dialogBg = if (isDark) Color(0xFF121212) else Color.White
+    val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF0F1724)
     val secondaryTextColor = if (isDark) Color.LightGray else Color(0xFF475569)
-    val cardBg = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC)
+    val cardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
     val dividerColor = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0)
 
     Dialog(onDismissRequest = onDismiss) {
@@ -11637,10 +11637,10 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var showPersonSelector by remember { mutableStateOf(false) }
     val isPersonRequired = type != "INCOME" && type != "EXPENSE"
 
-    val dialogBg = if (isDark) Color(0xFF121212) else Color.White
+    val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF0F1724)
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
-    val chipBg = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9)
+    val chipBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
 
     var amountInputState by remember { 
         mutableStateOf(
@@ -12224,7 +12224,7 @@ fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var photoUri by remember { mutableStateOf(initialPerson?.photoUri ?: "") }
     val context = LocalContext.current
 
-    val dialogBg = if (isDark) Color(0xFF121212) else Color.White
+    val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color.Black
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
 
@@ -12411,7 +12411,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var customSectorName by remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    val dialogBg = if (isDark) Color(0xFF121212) else Color.White
+    val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF0F1724)
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
 
@@ -12691,7 +12691,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
     var customTimestamp by remember { mutableStateOf<Long?>(txToEdit?.timestamp) }
     val context = LocalContext.current
 
-    val dialogBg = if (isDark) Color(0xFF121212) else Color.White
+    val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF0F1724)
     val labelColor = if (isDark) Color.Gray else Color(0xFF64748B)
 
@@ -13168,7 +13168,7 @@ fun SavingsGoalDetailOverlay(
                         val txLabel = if (isDeposit) Translation.get("deposit", language) else Translation.get("withdraw", language)
 
                         val isSelected = selectedSavingsTxIds.contains(tx.id)
-                        val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF121212) else Color.White)
+                        val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF1E293B) else Color.White)
                         Card(
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = bgColor),
@@ -13351,7 +13351,7 @@ fun SavingsTransactionDetailsDialog(
     onShareText: () -> Unit,
     onShareImage: (android.graphics.Bitmap) -> Unit
 ) {
-    val bgColor = if (isDark) Color(0xFF121212) else Color.White
+    val bgColor = if (isDark) Color(0xFF1E293B) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val subtitleColor = if (isDark) Color.LightGray else Color(0xFF64748B)
 
@@ -13400,7 +13400,7 @@ fun SavingsTransactionDetailsDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .captureToPicture(screenshotState)
-                    .background(if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                    .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -13610,7 +13610,7 @@ fun PersonDetailOverlay(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(if (isDark) Color(0xFF121212) else Color(0xFFF3F4F6))
+                        .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF3F4F6))
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -13670,7 +13670,7 @@ fun PersonDetailOverlay(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { showActionSheet = "REPAY_RECEIVED" },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -13682,7 +13682,7 @@ fun PersonDetailOverlay(
 
                     Button(
                         onClick = { showActionSheet = "REPAY_PAID" },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -14068,7 +14068,7 @@ fun QuickActionCard(
     modifier: Modifier = Modifier
 ) {
     FintechGradientCard(
-        gradientColors = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else activeThemeGradient,
+        gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
         cornerRadius = 24.dp,
         onClick = onClick,
         modifier = modifier
@@ -14216,7 +14216,7 @@ fun SettingCategory(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (isDark) Color(0xFF121212) else Color.White)
+                    .background(if (isDark) Color(0xFF1E293B) else Color.White)
                     .border(
                         width = 1.dp,
                         color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0),
@@ -14419,7 +14419,7 @@ fun SettingsScreen(
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF121212) else Color.White
+                containerColor = if (isDark) Color(0xFF1E293B) else Color.White
             ),
             border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
             modifier = Modifier
@@ -14624,7 +14624,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .background(
-                            if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9),
+                            if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
                             RoundedCornerShape(12.dp)
                         )
                         .padding(4.dp),
@@ -15556,7 +15556,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFE2E8F0)),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)),
                             border = BorderStroke(1.dp, if (isDark) Color(0xFF262626) else Color(0xFFCBD5E1))
                         ) {
                             Icon(Icons.Rounded.Restore, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
@@ -15663,7 +15663,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(14.dp))
-                            .background(if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9))
+                            .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -15841,8 +15841,8 @@ fun SettingsScreen(
                                             focusedBorderColor = FintechBlue,
                                             unfocusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
                                             focusedTextColor = if (isDark) Color.White else Color(0xFF1E293B),
-                                            unfocusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC),
-                                            focusedContainerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFF8FAFC)
+                                            unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC),
+                                            focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
                                         ),
                                         shape = RoundedCornerShape(10.dp),
                                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
@@ -15908,7 +15908,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1C1C1E) else Color(0xFFE2E8F0)),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)),
                             border = BorderStroke(1.dp, if (isDark) Color(0xFF262626) else Color(0xFFCBD5E1))
                         ) {
                             Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
@@ -16875,7 +16875,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
-                            .background(if (isDark) Color(0xFF1C1C1E) else Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+                            .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
                             .border(1.5.dp, if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
                             .padding(8.dp)
                     ) {
@@ -17079,7 +17079,7 @@ fun TimelineSplineChart(
     targetIndex: Int = -1,
     onLongPress: () -> Unit = {}
 ) {
-    val bgColor = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
+    val bgColor = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     val gridColor = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f)
 
@@ -17321,7 +17321,7 @@ fun TimelineSplineChart(
                                             center = pt
                                         )
                                         drawCircle(
-                                            color = if (isDark) Color(0xFF121212) else Color.White,
+                                            color = if (isDark) Color(0xFF1E293B) else Color.White,
                                             radius = 1.5.dp.toPx(),
                                             center = pt
                                         )
@@ -17707,7 +17707,7 @@ fun CustomChartFilterChip(
     val containerColor = if (selected) {
         if (isDark) Color(0xFF3B82F6) else Color(0xFF2563EB)
     } else {
-        if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9)
+        if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
     }
     
     val contentColor = if (selected) {
@@ -17743,8 +17743,8 @@ fun SegmentedFilterPicker(
     onClickCenter: (() -> Unit)? = null
 ) {
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
-    val buttonBg = if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9)
-    val containerBg = if (isDark) Color(0xFF1E1E1E) else Color(0xFFE2E8F0)
+    val buttonBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+    val containerBg = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
     
     Row(
         modifier = Modifier
@@ -17975,7 +17975,7 @@ fun ChartsScreen(
         androidx.activity.compose.BackHandler(onBack = onBack)
 
         // --- CONTROL CARD ---
-        val cardBg = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
+        val cardBg = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC))
         val textColor = if (isDark) Color.White else Color(0xFF1E293B)
         
         FintechGradientCard(
@@ -18682,7 +18682,7 @@ fun ChartsScreen(
                     }
                 }
             },
-            containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         )
     }
 
@@ -18757,7 +18757,7 @@ fun ChartsScreen(
                     }
                 }
             },
-            containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         )
     }
 
@@ -18875,7 +18875,7 @@ fun ChartsScreen(
                     }
                 }
             },
-            containerColor = if (isDark) Color(0xFF1C1C1E) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         )
     }
 }
@@ -18890,7 +18890,7 @@ fun ChartSection(
     isDark: Boolean = true,
     onLongPress: () -> Unit = {}
 ) {
-    val bgColor = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
+    val bgColor = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     
     var animationPlayed by remember { mutableStateOf(false) }
@@ -19375,7 +19375,7 @@ fun GoogleDriveRestoreListDialog(
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.85f)
                 .clip(RoundedCornerShape(16.dp)),
-            color = if (isDark) Color(0xFF121212) else Color.White
+            color = if (isDark) Color(0xFF1E293B) else Color.White
         ) {
             Column(
                 modifier = Modifier
@@ -19467,7 +19467,7 @@ fun GoogleDriveRestoreListDialog(
                                     },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9)
+                                    containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                                 ),
                                 border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
                             ) {
@@ -19831,7 +19831,7 @@ fun BudgetHistoryDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC)
+                                    containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
                                 ),
                                 border = BorderStroke(
                                     width = 1.dp,
@@ -19957,7 +19957,7 @@ fun BudgetHistoryDialog(
             }
         },
         shape = RoundedCornerShape(16.dp),
-        containerColor = if (isDark) Color(0xFF121212) else Color.White,
+        containerColor = if (isDark) Color(0xFF1E293B) else Color.White,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = true)
     )
 }
@@ -20085,7 +20085,7 @@ fun LoginScreen(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC)
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
         ) {
             Column(
                 modifier = Modifier
@@ -20128,7 +20128,7 @@ fun LoginScreen(
                     },
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF2C2C2E) else Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                     border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
@@ -20476,7 +20476,7 @@ fun ProfileSetupScreen(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC)
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
         ) {
             Column(
                 modifier = Modifier
@@ -20674,7 +20674,7 @@ fun EnhancedProfileMenu(
                 .fillMaxWidth(0.95f)
                 .wrapContentHeight(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White)
+            colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White)
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -20865,18 +20865,18 @@ fun UndoFloatingBanner(
     onDismiss: () -> Unit,
     onUndoClick: () -> Unit
 ) {
-    var timeLeft by remember { mutableStateOf(3) }
+    var timeLeft by remember { mutableStateOf(5) }
     var progress by remember { mutableStateOf(1f) }
     
     LaunchedEffect(undoState.id) {
-        timeLeft = 3
+        timeLeft = 5
         progress = 1f
         val startTime = System.currentTimeMillis()
-        val duration = 3000L
+        val duration = 5000L
         while (System.currentTimeMillis() - startTime < duration) {
             val elapsed = System.currentTimeMillis() - startTime
             progress = (duration - elapsed).toFloat() / duration
-            timeLeft = (3 - (elapsed / 1000)).toInt().coerceAtLeast(0)
+            timeLeft = (5 - (elapsed / 1000)).toInt().coerceAtLeast(0)
             kotlinx.coroutines.delay(16) // ~60fps
         }
         onDismiss()

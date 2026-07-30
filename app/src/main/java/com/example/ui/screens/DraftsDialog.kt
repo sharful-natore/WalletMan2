@@ -117,15 +117,15 @@ fun DraftsScratchpadDialog(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9)),
-            color = if (isDark) Color(0xFF121212) else Color(0xFFF1F5F9)
+                .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)),
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                val headerGradient = if (isDark) listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)) else com.example.ui.screens.activeThemeGradient
+                val headerGradient = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else com.example.ui.screens.activeThemeGradient
                 
                 com.example.ui.components.FintechGradientCard(
                     gradientColors = headerGradient,
@@ -616,8 +616,8 @@ fun DraftItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        draft.type?.let { t ->
-                            val label = when (t) {
+                        val typeLabel = draft.type?.let { t ->
+                            when (t) {
                                 "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
                                 "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
                                 "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Lend"
@@ -626,6 +626,8 @@ fun DraftItemCard(
                                 "WITHDRAWAL" -> if (language == AppLanguage.BN) "উত্তোলন" else "Withdrawal"
                                 else -> t
                             }
+                        }
+                        typeLabel?.let { label ->
                             Surface(
                                 color = Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(8.dp)
@@ -639,12 +641,15 @@ fun DraftItemCard(
                                 )
                             }
                         }
+
                         val catDisplay = draft.category ?: com.example.data.DraftParser.parse(draft.note).category
-                        catDisplay?.let { cat ->
-                            val catLabel = if (language == AppLanguage.BN) {
+                        val catLabel = catDisplay?.let { cat ->
+                            if (language == AppLanguage.BN) {
                                 com.example.data.DraftParser.getCategoryBanglaLabel(cat, draft.type)
                             } else cat
+                        }
 
+                        if (catLabel != null && catLabel != typeLabel && catLabel != "Other" && catLabel != "Others" && catLabel != "অন্যান্য") {
                             Surface(
                                 color = Color.White.copy(alpha = 0.25f),
                                 shape = RoundedCornerShape(8.dp)

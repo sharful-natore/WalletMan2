@@ -895,8 +895,8 @@ fun ExportDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        val dialogBg = if (isDark) Color(0xFF121212) else Color.White
-        val cardBg = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF3F4F6)
+        val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
+        val cardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF3F4F6)
         val textPrimary = if (isDark) Color.White else Color(0xFF1F2937)
         val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF4B5563)
 

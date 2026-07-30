@@ -89,7 +89,7 @@ fun BackupStatsDialog(
                 .padding(vertical = 16.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+                containerColor = if (isDark) Color(0xFF1E293B) else Color.White
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -592,7 +592,7 @@ fun CaptchaDeleteDialog(
                 .padding(vertical = 16.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+                containerColor = if (isDark) Color(0xFF1E293B) else Color.White
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -734,7 +734,7 @@ fun TrashDialog(
         Card(
             modifier = Modifier.fillMaxWidth(0.95f).fillMaxHeight(0.9f).padding(16.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = if (isDarkTheme) Color(0xFF1E2235) else Color.White)
+            colors = CardDefaults.cardColors(containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
@@ -954,7 +954,7 @@ fun MoveToWorkspaceDialog(
                 .padding(vertical = 16.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+                containerColor = if (isDark) Color(0xFF1E293B) else Color.White
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -1121,7 +1121,7 @@ fun ItemActionChoiceDialog(
                 .padding(16.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+                containerColor = if (isDark) Color(0xFF1E293B) else Color.White
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {

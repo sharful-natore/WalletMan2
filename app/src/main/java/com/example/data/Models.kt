@@ -299,7 +299,7 @@ object DraftParser {
         val hasGift = noteLower.contains("উপহার") || noteLower.contains("gift")
         val hasHonorarium = noteLower.contains("সম্মানী") || noteLower.contains("honorarium")
 
-        val hasFood = noteLower.contains("খাবার") || noteLower.contains("চা") || noteLower.contains("ভাত") || noteLower.contains("নাস্তা") || noteLower.contains("কফি") || noteLower.contains("breakfast") || noteLower.contains("lunch") || noteLower.contains("dinner") || noteLower.contains("food") || noteLower.contains("restaurant") || noteLower.contains("রেস্টুরেন্ট") || noteLower.contains("হোটেল") || noteLower.contains("বার্গার") || noteLower.contains("পিৎজা") || noteLower.contains("বিরিয়ানি")
+        val hasFood = noteLower.contains("খাবার") || noteLower.contains("চা") || noteLower.contains("ভাত") || noteLower.contains("নাস্তা") || noteLower.contains("কফি") || noteLower.contains("breakfast") || noteLower.contains("lunch") || noteLower.contains("dinner") || noteLower.contains("food") || noteLower.contains("restaurant") || noteLower.contains("রেস্টুরেন্ট") || noteLower.contains("হোটেল") || noteLower.contains("বার্গার") || noteLower.contains("পিৎজা") || noteLower.contains("বিরিয়ানি") || noteLower.contains("আপেল") || noteLower.contains("ফল") || noteLower.contains("কলা") || noteLower.contains("আম") || noteLower.contains("কমলা") || noteLower.contains("আঙ্গুর") || noteLower.contains("apple") || noteLower.contains("fruit")
         val hasGrocery = noteLower.contains("বাজার") || noteLower.contains("গ্রোসারী") || noteLower.contains("grocery") || noteLower.contains("মাছ") || noteLower.contains("মাংস") || noteLower.contains("সবজি") || noteLower.contains("ফল") || noteLower.contains("চাল") || noteLower.contains("ডাল") || noteLower.contains("আটা") || noteLower.contains("ময়দা") || noteLower.contains("ডিম") || noteLower.contains("দুধ") || noteLower.contains("egg") || noteLower.contains("milk")
         val hasTransport = noteLower.contains("গাড়ি") || noteLower.contains("রিকশা") || noteLower.contains("বাস") || noteLower.contains("ভাড়া") || noteLower.contains("ট্যাক্সি") || noteLower.contains("সিএনজি") || noteLower.contains("rent") || noteLower.contains("travel") || noteLower.contains("fare") || noteLower.contains("transport") || noteLower.contains("fuel") || noteLower.contains("petrol") || noteLower.contains("octane") || noteLower.contains("cng") || noteLower.contains("diesel") || noteLower.contains("জ্বালানি") || noteLower.contains("জ্বালানী") || noteLower.contains("পাম্প") || noteLower.contains("uber") || noteLower.contains("pathao") || noteLower.contains("ride") || noteLower.contains("drive") || noteLower.contains("তেল")
         val hasShopping = noteLower.contains("জামা") || noteLower.contains("কাপড়") || noteLower.contains("shopping") || noteLower.contains("কেনাকাটা") || noteLower.contains("জুতা") || noteLower.contains("প্যান্ট") || noteLower.contains("শার্ট") || noteLower.contains("dress") || noteLower.contains("clothes") || noteLower.contains("shoes")
@@ -384,18 +384,34 @@ object DraftParser {
     }
 
     fun getCategoryBanglaLabel(cat: String?, type: String?): String {
+        val typeLabel = when (type) {
+            "INCOME" -> "আয়"
+            "EXPENSE" -> "ব্যয়"
+            "LEND" -> "পাওনা"
+            "BORROW" -> "দেনা"
+            "SAVINGS" -> "সঞ্চয়"
+            "WITHDRAWAL" -> "উত্তোলন"
+            else -> "ব্যয়"
+        }
+
         if (cat.isNullOrBlank()) {
-            return when (type) {
-                "INCOME" -> "আয়"
-                "EXPENSE" -> "ব্যয়"
-                "LEND" -> "পাওনা"
-                "BORROW" -> "দেনা"
-                "SAVINGS" -> "সঞ্চয়"
-                "WITHDRAWAL" -> "উত্তোলন"
-                else -> "ব্যয়"
-            }
+            return typeLabel
         }
         val c = cat.trim()
+
+        if (c.equals("Other", ignoreCase = true) ||
+            c.equals("Others", ignoreCase = true) ||
+            c.equals("Expense", ignoreCase = true) ||
+            c.equals("Income", ignoreCase = true) ||
+            c.equals("Lending", ignoreCase = true) ||
+            c.equals("Borrowing", ignoreCase = true) ||
+            c.equals("Savings", ignoreCase = true) ||
+            c.equals("Withdrawal", ignoreCase = true) ||
+            c.contains("অন্যান্য", ignoreCase = true)
+        ) {
+            return typeLabel
+        }
+
         return when {
             c.equals("Salary", ignoreCase = true) || c.contains("বেতন", ignoreCase = true) -> "বেতন"
             c.equals("Business", ignoreCase = true) || c.contains("ব্যবসা", ignoreCase = true) -> "ব্যবসা"
@@ -416,10 +432,7 @@ object DraftParser {
             c.equals("Borrowing", ignoreCase = true) || c.equals("Borrow", ignoreCase = true) || c.contains("ধার নেওয়া", ignoreCase = true) -> "ধার নেওয়া"
             c.equals("Savings", ignoreCase = true) || c.contains("সঞ্চয়", ignoreCase = true) -> "সঞ্চয়"
             c.equals("Withdrawal", ignoreCase = true) || c.contains("উত্তোলন", ignoreCase = true) -> "উত্তোলন"
-            c.equals("Expense", ignoreCase = true) -> "ব্যয়"
-            c.equals("Income", ignoreCase = true) -> "আয়"
-            c.equals("Other", ignoreCase = true) || c.equals("Others", ignoreCase = true) || c.contains("অন্যান্য", ignoreCase = true) -> "অন্যান্য"
-            else -> c
+            else -> typeLabel
         }
     }
 }

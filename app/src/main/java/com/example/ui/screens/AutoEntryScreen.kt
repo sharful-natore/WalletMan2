@@ -62,7 +62,7 @@ fun AutoEntryScreen(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = if (isDark) Color(0xFF121212) else Color(0xFFF8FAFC)
+            color = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
         ) {
             Scaffold(
                 containerColor = Color.Transparent,
@@ -86,7 +86,7 @@ fun AutoEntryScreen(
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White
+                            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
                         )
                     )
                 },
@@ -323,7 +323,7 @@ fun AutoEntryCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDark) Color(0xFF1E1E1E) else Color.White
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
         ),
         border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.4f))
     ) {
@@ -507,7 +507,7 @@ fun AutoEntryFormDialog(
                 .fillMaxWidth(0.92f)
                 .fillMaxHeight(0.85f),
             shape = RoundedCornerShape(24.dp),
-            color = if (isDark) Color(0xFF1E1E1E) else Color.White
+            color = if (isDark) Color(0xFF1E293B) else Color.White
         ) {
             Column(
                 modifier = Modifier

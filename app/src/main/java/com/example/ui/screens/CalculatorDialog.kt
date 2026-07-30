@@ -188,7 +188,7 @@ fun CalculatorDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(100.dp)
-                        .background(if (isDark) Color(0xFF2D3249) else Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9), RoundedCornerShape(12.dp))
                         .padding(16.dp)
                 ) {
                     Column(
@@ -257,7 +257,7 @@ fun CalculatorDialog(
                                             isEq -> MaterialTheme.colorScheme.primary
                                             isClear -> Color(0xFFEF4444).copy(alpha = 0.2f)
                                             isFunc -> Color(0xFF10B981).copy(alpha = 0.2f)
-                                            else -> if (isDark) Color(0xFF2D3249) else Color(0xFFF8FAFC)
+                                            else -> if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
                                         }
                                     )
                                     .clickable { onButtonClick(btn) },
@@ -351,6 +351,6 @@ fun CalculatorDialog(
         },
         confirmButton = {},
         shape = RoundedCornerShape(16.dp),
-        containerColor = if (isDark) Color(0xFF1E2235) else Color.White
+        containerColor = if (isDark) Color(0xFF1E293B) else Color.White
     )
 }

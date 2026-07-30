@@ -12,7 +12,7 @@ val Pink40 = Color(0xFF7D5260)
 
 // Fintech Obsidian Palette
 val DeepObsidian = Color(0xFF000000) // True AMOLED Black
-val SurfaceDark = Color(0xFF121212) // Modern Native M3 Dark Surface (high visibility, low glare)
+val SurfaceDark = Color(0xFF1E293B) // Modern Dark Slate Blue Surface matching export card
 val SurfaceLight = Color(0xFFFFFFFF)
 val TextLight = Color(0xFF1E222F)
 val TextDark = Color(0xFFF0F2F5)
