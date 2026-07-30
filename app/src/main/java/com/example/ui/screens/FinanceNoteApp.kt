@@ -7569,7 +7569,7 @@ fun DashboardScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
-                                text = if (language == AppLanguage.BN) "রিপোর্ট এক্সপোর্ট করুন" else "Export Report",
+                                text = if (language == AppLanguage.BN) "তথ্য/রিপোর্ট এক্সপোর্ট করুন" else "Export Data/Report",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDark) Color.White else Color(0xFF1E293B)
@@ -7577,29 +7577,52 @@ fun DashboardScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Stacked Overlapping Icons (PDF, XLS, CSV)
+                            // Stacked Overlapping Icons (CSV, XLS, PDF) - PDF fully visible on right
                             Row(
-                                modifier = Modifier.padding(end = 10.dp),
-                                horizontalArrangement = Arrangement.spacedBy((-7).dp)
+                                modifier = Modifier.padding(end = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy((-10).dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 listOf(
-                                    Triple("PDF", Color(0xFFEF4444), 1f),
-                                    Triple("XLS", Color(0xFF10B981), 2f),
-                                    Triple("CSV", Color(0xFF3B82F6), 3f)
+                                    Triple("CSV", Color(0xFF1D7044), 1f),
+                                    Triple("XLS", Color(0xFF2E7D32), 2f),
+                                    Triple("PDF", Color(0xFFD32F2F), 3f)
                                 ).forEach { (label, color, z) ->
                                     Box(
                                         modifier = Modifier
-                                            .size(20.dp)
+                                            .size(width = 22.dp, height = 28.dp)
                                             .zIndex(z)
-                                            .background(color, CircleShape)
-                                            .border(1.2.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape),
+                                            .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 7.dp, bottomEnd = 2.dp, bottomStart = 2.dp))
+                                            .background(color)
+                                            .border(
+                                                1.5.dp, 
+                                                if (isDark) Color(0xFF1E293B) else Color.White, 
+                                                RoundedCornerShape(topStart = 2.dp, topEnd = 7.dp, bottomEnd = 2.dp, bottomStart = 2.dp)
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            text = label,
-                                            fontSize = 5.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color.White
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                fontSize = 7.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = Color.White
+                                            )
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            // Decorative lines for a document look
+                                            Box(modifier = Modifier.size(width = 12.dp, height = 1.dp).background(Color.White.copy(alpha = 0.4f)))
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Box(modifier = Modifier.size(width = 12.dp, height = 1.dp).background(Color.White.copy(alpha = 0.4f)))
+                                        }
+                                        // Top fold highlight
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .size(6.dp)
+                                                .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(bottomStart = 2.dp))
                                         )
                                     }
                                 }
@@ -8740,161 +8763,164 @@ fun TransactionRowItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                if (isSelectionMode) {
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 12.dp)
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.2f))
-                            .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.6f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isSelected) {
-                            Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                        }
-                    }
-                }
-
+            if (isSelectionMode) {
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .padding(end = 12.dp)
+                        .size(22.dp)
                         .clip(CircleShape)
-                        .background(iconColor.copy(alpha = 0.15f)),
+                        .background(if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.2f))
+                        .border(2.dp, if (isSelected) FintechBlue else Color.Gray.copy(alpha = 0.6f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    when (tx.type) {
-                        "INCOME" -> Icon(Icons.AutoMirrored.Rounded.TrendingUp, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
-                        "EXPENSE" -> Icon(Icons.AutoMirrored.Rounded.TrendingDown, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
-                        "LEND", "BORROW" -> Icon(painterResource(id = R.drawable.ic_lend_borrow_new), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
-                        "REPAY_RECEIVED" -> Icon(painterResource(id = R.drawable.ic_repay_received), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
-                        "REPAY_PAID" -> Icon(painterResource(id = R.drawable.ic_repay_paid), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
-                        else -> Icon(Icons.AutoMirrored.Rounded.CompareArrows, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    if (isSelected) {
+                        Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(iconColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                when (tx.type) {
+                    "INCOME" -> Icon(Icons.AutoMirrored.Rounded.TrendingUp, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    "EXPENSE" -> Icon(Icons.AutoMirrored.Rounded.TrendingDown, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    "LEND", "BORROW" -> Icon(painterResource(id = R.drawable.ic_lend_borrow_new), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    "REPAY_RECEIVED" -> Icon(painterResource(id = R.drawable.ic_repay_received), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    "REPAY_PAID" -> Icon(painterResource(id = R.drawable.ic_repay_paid), contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                    else -> Icon(Icons.AutoMirrored.Rounded.CompareArrows, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                val formattedCategory = if (language == AppLanguage.BN) {
+                    when {
+                        tx.category.equals("Salary", ignoreCase = true) -> "বেতন"
+                        tx.category.equals("Business", ignoreCase = true) -> "ব্যবসা"
+                        tx.category.equals("Agriculture", ignoreCase = true) -> "কৃষি"
+                        tx.category.equals("Gift", ignoreCase = true) -> "উপহার"
+                        tx.category.equals("Sales", ignoreCase = true) -> "বিক্রয়"
+                        tx.category.equals("Honorarium", ignoreCase = true) -> "সম্মানী"
+                        tx.category.equals("Food", ignoreCase = true) -> "খাবার"
+                        tx.category.equals("Housing", ignoreCase = true) -> "বাসস্থান"
+                        tx.category.equals("Transport", ignoreCase = true) -> "যাতায়াত"
+                        tx.category.equals("Shopping", ignoreCase = true) -> "কেনাকাটা"
+                        tx.category.equals("Medical", ignoreCase = true) -> "চিকিৎসা"
+                        tx.category.equals("Education", ignoreCase = true) -> "শিক্ষা"
+                        tx.category.equals("Clothing", ignoreCase = true) -> "পোশাক"
+                        tx.category.equals("Others", ignoreCase = true) -> "অন্যান্য"
+                        tx.category.equals("Lending", ignoreCase = true) || tx.category.equals("Lend", ignoreCase = true) -> "ধার দেওয়া"
+                        tx.category.equals("Borrowing", ignoreCase = true) || tx.category.equals("Borrow", ignoreCase = true) -> "ধার নেওয়া"
+                        tx.category.equals("Repay Paid", ignoreCase = true) || tx.category.equals("Debt Repaid", ignoreCase = true) || tx.category.contains("দেনা পরিশোধ") -> "দেনা পরিশোধ"
+                        tx.category.equals("Repay Received", ignoreCase = true) || tx.category.equals("Loan Repaid", ignoreCase = true) || tx.category.contains("পাওনা পরিশোধ") -> "পাওনা পরিশোধ"
+                        else -> tx.category
+                    }
+                } else {
+                    when {
+                        tx.category.equals("Repay Paid", ignoreCase = true) -> "Debt Repaid"
+                        tx.category.equals("Repay Received", ignoreCase = true) -> "Loan Repaid"
+                        else -> tx.category
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                val mainTitle = if (tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
+                    linkedPerson.name
+                } else {
+                    formattedCategory
+                }
 
-                Column {
-                    val formattedCategory = if (language == AppLanguage.BN) {
-                        when {
-                            tx.category.equals("Salary", ignoreCase = true) -> "বেতন"
-                            tx.category.equals("Business", ignoreCase = true) -> "ব্যবসা"
-                            tx.category.equals("Agriculture", ignoreCase = true) -> "কৃষি"
-                            tx.category.equals("Gift", ignoreCase = true) -> "উপহার"
-                            tx.category.equals("Sales", ignoreCase = true) -> "বিক্রয়"
-                            tx.category.equals("Honorarium", ignoreCase = true) -> "সম্মানী"
-                            tx.category.equals("Food", ignoreCase = true) -> "খাবার"
-                            tx.category.equals("Housing", ignoreCase = true) -> "বাসস্থান"
-                            tx.category.equals("Transport", ignoreCase = true) -> "যাতায়াত"
-                            tx.category.equals("Shopping", ignoreCase = true) -> "কেনাকাটা"
-                            tx.category.equals("Medical", ignoreCase = true) -> "চিকিৎসা"
-                            tx.category.equals("Education", ignoreCase = true) -> "শিক্ষা"
-                            tx.category.equals("Clothing", ignoreCase = true) -> "পোশাক"
-                            tx.category.equals("Others", ignoreCase = true) -> "অন্যান্য"
-                            tx.category.equals("Lending", ignoreCase = true) || tx.category.equals("Lend", ignoreCase = true) -> "ধার দেওয়া"
-                            tx.category.equals("Borrowing", ignoreCase = true) || tx.category.equals("Borrow", ignoreCase = true) -> "ধার নেওয়া"
-                            tx.category.equals("Repay Paid", ignoreCase = true) || tx.category.equals("Debt Repaid", ignoreCase = true) || tx.category.contains("দেনা পরিশোধ") -> "দেনা পরিশোধ"
-                            tx.category.equals("Repay Received", ignoreCase = true) || tx.category.equals("Loan Repaid", ignoreCase = true) || tx.category.contains("পাওনা পরিশোধ") -> "পাওনা পরিশোধ"
-                            else -> tx.category
-                        }
-                    } else {
-                        when {
-                            tx.category.equals("Repay Paid", ignoreCase = true) -> "Debt Repaid"
-                            tx.category.equals("Repay Received", ignoreCase = true) -> "Loan Repaid"
-                            else -> tx.category
-                        }
+                val personBadgeName = if (tx.type !in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
+                    linkedPerson.name
+                } else null
+
+                val typeBadgeText = when {
+                    tx.type == "REPAY_PAID" || tx.category.equals("Repay Paid", ignoreCase = true) || tx.category.equals("Debt Repaid", ignoreCase = true) || tx.category.contains("দেনা পরিশোধ") -> {
+                        if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
                     }
-
-                    val mainTitle = if (tx.type in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
-                        linkedPerson.name
-                    } else {
-                        formattedCategory
+                    tx.type == "REPAY_RECEIVED" || tx.category.equals("Repay Received", ignoreCase = true) || tx.category.equals("Loan Repaid", ignoreCase = true) || tx.category.contains("পাওনা পরিশোধ") -> {
+                        if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
                     }
+                    tx.type == "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
+                    tx.type == "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
+                    tx.type == "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
+                    tx.type == "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
+                    else -> null
+                }
 
-                    val personBadgeName = if (tx.type !in listOf("LEND", "BORROW", "REPAY_PAID", "REPAY_RECEIVED") && linkedPerson != null) {
-                        linkedPerson.name
-                    } else null
+                val creditBadgeText = if (tx.subType == "CREDIT") {
+                    if (tx.type == "LEND") (if (language == AppLanguage.BN) "বাকি বিক্রয়" else "Credit Sale")
+                    else if (tx.type == "BORROW") (if (language == AppLanguage.BN) "বাকি ক্রয়" else "Credit Purchase")
+                    else null
+                } else null
 
-                    val typeBadgeText = when {
-                        tx.type == "REPAY_PAID" || tx.category.equals("Repay Paid", ignoreCase = true) || tx.category.equals("Debt Repaid", ignoreCase = true) || tx.category.contains("দেনা পরিশোধ") -> {
-                            if (language == AppLanguage.BN) "দেনা পরিশোধ" else "Debt Repaid"
-                        }
-                        tx.type == "REPAY_RECEIVED" || tx.category.equals("Repay Received", ignoreCase = true) || tx.category.equals("Loan Repaid", ignoreCase = true) || tx.category.contains("পাওনা পরিশোধ") -> {
-                            if (language == AppLanguage.BN) "পাওনা পরিশোধ" else "Loan Repaid"
-                        }
-                        tx.type == "EXPENSE" -> if (language == AppLanguage.BN) "ব্যয়" else "Expense"
-                        tx.type == "INCOME" -> if (language == AppLanguage.BN) "আয়" else "Income"
-                        tx.type == "LEND" -> if (language == AppLanguage.BN) "পাওনা" else "Receivable"
-                        tx.type == "BORROW" -> if (language == AppLanguage.BN) "দেনা" else "Payable"
-                        else -> null
-                    }
+                // Line 1: Title + Badges (Badges can extend to the right edge)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HighlightedText(
+                        text = mainTitle,
+                        query = searchQuery,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = TextStyle(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF1E222F)
+                        ),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
 
-                    val creditBadgeText = if (tx.subType == "CREDIT") {
-                        if (tx.type == "LEND") (if (language == AppLanguage.BN) "বাকি বিক্রয়" else "Credit Sale")
-                        else if (tx.type == "BORROW") (if (language == AppLanguage.BN) "বাকি ক্রয়" else "Credit Purchase")
-                        else null
-                    } else null
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        HighlightedText(
-                            text = mainTitle,
-                            query = searchQuery,
-                            color = MaterialTheme.colorScheme.primary,
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color(0xFF1E222F)
-                            ),
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
+                    if (personBadgeName != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CategoryBadge(
+                            text = personBadgeName,
+                            backgroundColor = Color(0xFF6366F1)
                         )
-
-                        if (personBadgeName != null) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            CategoryBadge(
-                                text = personBadgeName,
-                                backgroundColor = Color(0xFF6366F1)
-                            )
-                        }
-
-                        if (typeBadgeText != null) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            val badgeBg = when {
-                                tx.type == "REPAY_PAID" || typeBadgeText == "দেনা পরিশোধ" || typeBadgeText == "Debt Repaid" -> Color(0xFF8B5CF6)
-                                tx.type == "REPAY_RECEIVED" || typeBadgeText == "পাওনা পরিশোধ" || typeBadgeText == "Loan Repaid" -> Color(0xFF0D9488)
-                                tx.type == "EXPENSE" -> Color(0xFFFF5252)
-                                tx.type == "INCOME" -> Color(0xFF10B981)
-                                tx.type == "LEND" -> Color(0xFF3B82F6)
-                                tx.type == "BORROW" -> Color(0xFFF97316)
-                                else -> Color.Gray
-                            }
-                            CategoryBadge(
-                                text = typeBadgeText,
-                                backgroundColor = badgeBg
-                            )
-                        }
-
-                        if (creditBadgeText != null) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            CategoryBadge(
-                                text = creditBadgeText,
-                                backgroundColor = Color(0xFFE11D48)
-                            )
-                        }
                     }
 
-                    val descriptionText = tx.note.trim()
+                    if (typeBadgeText != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        val badgeBg = when {
+                            tx.type == "REPAY_PAID" || typeBadgeText == "দেনা পরিশোধ" || typeBadgeText == "Debt Repaid" -> Color(0xFF8B5CF6)
+                            tx.type == "REPAY_RECEIVED" || typeBadgeText == "পাওনা পরিশোধ" || typeBadgeText == "Loan Repaid" -> Color(0xFF0D9488)
+                            tx.type == "EXPENSE" -> Color(0xFFFF5252)
+                            tx.type == "INCOME" -> Color(0xFF10B981)
+                            tx.type == "LEND" -> Color(0xFF3B82F6)
+                            tx.type == "BORROW" -> Color(0xFFF97316)
+                            else -> Color.Gray
+                        }
+                        CategoryBadge(
+                            text = typeBadgeText,
+                            backgroundColor = badgeBg
+                        )
+                    }
 
+                    if (creditBadgeText != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CategoryBadge(
+                            text = creditBadgeText,
+                            backgroundColor = Color(0xFFE11D48)
+                        )
+                    }
+                }
+
+                // Line 2: Note (left) + Amount/Delete (right)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val descriptionText = tx.note.trim()
                     if (descriptionText.isNotEmpty()) {
                         HighlightedText(
                             text = descriptionText,
@@ -8903,43 +8929,50 @@ fun TransactionRowItem(
                             style = TextStyle(
                                 fontSize = 11.sp,
                                 color = Color.Gray
-                            )
+                            ),
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
-                    Text(
-                        text = formatDate(tx.timestamp, language),
-                        fontSize = 10.sp,
-                        color = Color.Gray.copy(alpha = 0.8f)
-                    )
+
+                    // Amount + Delete
+                    val amountPrefix = when (tx.type) {
+                        "INCOME", "BORROW", "REPAY_RECEIVED" -> "+"
+                        else -> "-"
+                    }
+                    val amountColor = iconColor
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "$amountPrefix${formatCurrency(tx.amount, language)}",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = amountColor
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { showDeleteConfirm = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.Gray.copy(alpha = 0.6f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
-            }
 
-            // Amount
-            val amountPrefix = when (tx.type) {
-                "INCOME", "BORROW", "REPAY_RECEIVED" -> "+"
-                else -> "-"
-            }
-            val amountColor = iconColor
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Line 3: Date
                 Text(
-                    text = "$amountPrefix${formatCurrency(tx.amount, language)}",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = amountColor
+                    text = formatDate(tx.timestamp, language),
+                    fontSize = 10.sp,
+                    color = Color.Gray.copy(alpha = 0.8f)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
-                    onClick = { showDeleteConfirm = true },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Delete,
-                        contentDescription = "Delete",
-                        tint = Color.Gray.copy(alpha = 0.6f),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
             }
         }
             }
