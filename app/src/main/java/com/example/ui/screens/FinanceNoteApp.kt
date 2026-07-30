@@ -7577,52 +7577,34 @@ fun DashboardScreen(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Stacked Overlapping Icons (CSV, XLS, PDF) - PDF fully visible on right
+                            // Stacked Overlapping Circular Icons (CSV, XLS, PDF)
                             Row(
                                 modifier = Modifier.padding(end = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy((-10).dp),
+                                horizontalArrangement = Arrangement.spacedBy((-8).dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 listOf(
-                                    Triple("CSV", Color(0xFF1D7044), 1f),
-                                    Triple("XLS", Color(0xFF2E7D32), 2f),
-                                    Triple("PDF", Color(0xFFD32F2F), 3f)
+                                    Triple("CSV", Color(0xFF3B82F6), 1f),
+                                    Triple("XLS", Color(0xFF10B981), 2f),
+                                    Triple("PDF", Color(0xFFEF4444), 3f)
                                 ).forEach { (label, color, z) ->
                                     Box(
                                         modifier = Modifier
-                                            .size(width = 22.dp, height = 28.dp)
+                                            .size(22.dp)
                                             .zIndex(z)
-                                            .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 7.dp, bottomEnd = 2.dp, bottomStart = 2.dp))
-                                            .background(color)
+                                            .background(color, CircleShape)
                                             .border(
                                                 1.5.dp, 
                                                 if (isDark) Color(0xFF1E293B) else Color.White, 
-                                                RoundedCornerShape(topStart = 2.dp, topEnd = 7.dp, bottomEnd = 2.dp, bottomStart = 2.dp)
+                                                CircleShape
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = 7.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = Color.White
-                                            )
-                                            Spacer(modifier = Modifier.height(3.dp))
-                                            // Decorative lines for a document look
-                                            Box(modifier = Modifier.size(width = 12.dp, height = 1.dp).background(Color.White.copy(alpha = 0.4f)))
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Box(modifier = Modifier.size(width = 12.dp, height = 1.dp).background(Color.White.copy(alpha = 0.4f)))
-                                        }
-                                        // Top fold highlight
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .size(6.dp)
-                                                .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(bottomStart = 2.dp))
+                                        Text(
+                                            text = label,
+                                            fontSize = 6.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color.White
                                         )
                                     }
                                 }
