@@ -9253,8 +9253,24 @@ fun TransactionsScreen(
         filterTransactionsByTime(transactions, timeFilter)
     }
 
+    val previousMonthTransactionsList = remember(transactions, timeFilter) {
+        getPreviousMonthTransactions(transactions, timeFilter)
+    }
+
     val filteredTransactions = remember(timeFilteredTransactions, filter) {
         val list = timeFilteredTransactions
+        // Type filter
+        when (filter) {
+            "INCOME" -> list.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
+            "EXPENSE" -> list.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }
+            "DENA" -> list.filter { it.type == "BORROW" || it.type == "REPAY_PAID" }
+            "PAWN" -> list.filter { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
+            else -> list
+        }
+    }
+
+    val filteredPrevMonthTransactions = remember(previousMonthTransactionsList, filter) {
+        val list = previousMonthTransactionsList
         // Type filter
         when (filter) {
             "INCOME" -> list.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }
@@ -9271,6 +9287,56 @@ fun TransactionsScreen(
             filteredTransactions
         } else {
             filteredTransactions.filter { tx ->
+                val personName = persons.find { it.id == tx.personId }?.name?.lowercase() ?: ""
+                val banglaCat = when (tx.category) {
+                    "Salary" -> "বেতন"
+                    "Business" -> "ব্যবসা"
+                    "Agriculture" -> "কৃষি"
+                    "Gift" -> "উপহার"
+                    "Sales" -> "বিক্রয়"
+                    "Honorarium" -> "সম্মানী"
+                    "Freelance" -> "ফ্রিল্যান্সিং"
+                    "Rental" -> "ভাড়া"
+                    "Investment" -> "বিনিয়োগ"
+                    "Food" -> "খাবার"
+                    "Housing" -> "বাসস্থান"
+                    "Bills" -> "বিল"
+                    "Transport" -> "যাতায়াত"
+                    "Shopping" -> "কেনাকাটা"
+                    "Medical" -> "চিকিৎসা"
+                    "Education" -> "শিক্ষা"
+                    "Clothing" -> "পোশাক"
+                    "Entertainment" -> "বিনোদন"
+                    "Others" -> "অন্যান্য"
+                    else -> tx.category
+                }.lowercase()
+                val subTypeStr = (tx.subType ?: "").lowercase()
+                val typeStrBn = when (tx.type) {
+                    "INCOME" -> "আয় income"
+                    "EXPENSE" -> "ব্যয় expense"
+                    "LEND" -> "পাওনা লেন্ড lend"
+                    "BORROW" -> "দেনা ধার borrow"
+                    "REPAY_PAID" -> "দেনা পরিশোধ repay"
+                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay"
+                    else -> ""
+                }
+
+                tx.note.lowercase().contains(searchQueryLower) || 
+                tx.category.lowercase().contains(searchQueryLower) ||
+                banglaCat.contains(searchQueryLower) ||
+                tx.amount.toString().contains(searchQueryLower) ||
+                personName.contains(searchQueryLower) ||
+                subTypeStr.contains(searchQueryLower) ||
+                typeStrBn.contains(searchQueryLower)
+            }
+        }
+    }
+
+    val searchedPrevMonthTransactions = remember(filteredPrevMonthTransactions, searchQuery, persons) {
+        if (searchQueryLower.isEmpty()) {
+            filteredPrevMonthTransactions
+        } else {
+            filteredPrevMonthTransactions.filter { tx ->
                 val personName = persons.find { it.id == tx.personId }?.name?.lowercase() ?: ""
                 val banglaCat = when (tx.category) {
                     "Salary" -> "বেতন"
@@ -9333,6 +9399,23 @@ fun TransactionsScreen(
         list
     }
 
+    val sortedPrevMonthTransactions = remember(searchedPrevMonthTransactions, currentSortBy, persons) {
+        val list = searchedPrevMonthTransactions.toMutableList()
+        when (currentSortBy) {
+            "DATE_DESC" -> list.sortByDescending { it.timestamp }
+            "DATE_ASC" -> list.sortBy { it.timestamp }
+            "AMOUNT_DESC" -> list.sortByDescending { it.amount }
+            "AMOUNT_ASC" -> list.sortBy { it.amount }
+            "NAME_ASC" -> list.sortBy { tx ->
+                persons.find { it.id == tx.personId }?.name?.lowercase() ?: tx.note.lowercase()
+            }
+            "NAME_DESC" -> list.sortByDescending { tx ->
+                persons.find { it.id == tx.personId }?.name?.lowercase() ?: tx.note.lowercase()
+            }
+        }
+        list
+    }
+
     val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
@@ -9344,7 +9427,7 @@ fun TransactionsScreen(
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            if (currentIndex == 0 && currentOffset < 15) {
+            if (currentIndex < 5) {
                 isHeaderVisible = true
             } else {
                 if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -9364,18 +9447,43 @@ fun TransactionsScreen(
             if (currentSortBy.startsWith("DATE")) {
                 val grouped = sortedTransactions.groupBy { formatDateToDay(it.timestamp) }
                 var currentIndex = 0
+                var found = false
                 outer@ for ((_, txs) in grouped) {
                     currentIndex++ // for the date header item
                     for (tx in txs) {
                         if (tx.id == highlightedTxId) {
                             targetIndex = currentIndex
+                            found = true
                             break@outer
                         }
                         currentIndex++
                     }
                 }
+                if (!found && sortedPrevMonthTransactions.isNotEmpty()) {
+                    currentIndex++ // for the section header item
+                    val prevGrouped = sortedPrevMonthTransactions.groupBy { formatDateToDay(it.timestamp) }
+                    outerPrev@ for ((_, txs) in prevGrouped) {
+                        currentIndex++ // for the date header item
+                        for (tx in txs) {
+                            if (tx.id == highlightedTxId) {
+                                targetIndex = currentIndex
+                                found = true
+                                break@outerPrev
+                            }
+                            currentIndex++
+                        }
+                    }
+                }
             } else {
-                targetIndex = sortedTransactions.indexOfFirst { it.id == highlightedTxId }
+                val mainIndex = sortedTransactions.indexOfFirst { it.id == highlightedTxId }
+                if (mainIndex != -1) {
+                    targetIndex = mainIndex
+                } else if (sortedPrevMonthTransactions.isNotEmpty()) {
+                    val prevIndex = sortedPrevMonthTransactions.indexOfFirst { it.id == highlightedTxId }
+                    if (prevIndex != -1) {
+                        targetIndex = sortedTransactions.size + 1 + prevIndex
+                    }
+                }
             }
             
             if (targetIndex != -1) {
@@ -9420,15 +9528,17 @@ fun TransactionsScreen(
                     
                     TextButton(
                         onClick = {
-                            if (selectedTxIds.size == sortedTransactions.size) {
+                            val allVisible = sortedTransactions + sortedPrevMonthTransactions
+                            if (selectedTxIds.size == allVisible.size) {
                                 selectedTxIds = emptySet()
                             } else {
-                                selectedTxIds = sortedTransactions.map { it.id }.toSet()
+                                selectedTxIds = allVisible.map { it.id }.toSet()
                             }
                         }
                     ) {
+                        val allVisible = sortedTransactions + sortedPrevMonthTransactions
                         Text(
-                            text = if (selectedTxIds.size == sortedTransactions.size) 
+                            text = if (selectedTxIds.size == allVisible.size) 
                                 (if (language == AppLanguage.BN) "সব আনমার্ক" else "Deselect All")
                             else (if (language == AppLanguage.BN) "সব মার্ক" else "Select All"),
                             color = Color.White,
@@ -9669,7 +9779,7 @@ fun TransactionsScreen(
                     }
 
             // Transactions List
-            if (sortedTransactions.isEmpty()) {
+            if (sortedTransactions.isEmpty() && sortedPrevMonthTransactions.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -9730,6 +9840,82 @@ fun TransactionsScreen(
                                 }
                             }
                         }
+
+                        if (sortedPrevMonthTransactions.isNotEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .background(
+                                                color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Rounded.History,
+                                            contentDescription = null,
+                                            tint = if (isDark) Color.LightGray else Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
+                                            color = if (isDark) Color.LightGray else Color.Gray,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            val prevGrouped = sortedPrevMonthTransactions.groupBy { formatDateToDay(it.timestamp) }
+                            prevGrouped.forEach { (date, txs) ->
+                                item {
+                                    Text(
+                                        text = formatDateHeader(date, language),
+                                        color = Color.Gray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
+                                    )
+                                }
+                                items(txs, key = { it.id }) { tx ->
+                                    val isSelected = selectedTxIds.contains(tx.id)
+                                    Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
+                                        TransactionRowItem(
+                                            tx = tx,
+                                            language = language,
+                                            isDark = isDark,
+                                            persons = persons,
+                                            onDelete = onDeleteTransaction,
+                                            onEdit = onEditTransaction,
+                                            isHighlighted = (tx.id == highlightedTxId),
+                                            onNavigateToTab = onNavigateToTab,
+                                            onPersonClick = onPersonClick,
+                                            searchQuery = searchQuery,
+                                            isSelected = isSelected,
+                                            isSelectionMode = isSelectionMode,
+                                            onLongClick = {
+                                                selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         item {
                             Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                         }
@@ -9763,6 +9949,70 @@ fun TransactionsScreen(
                                 )
                             }
                         }
+
+                        if (sortedPrevMonthTransactions.isNotEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier
+                                            .background(
+                                                color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f),
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = androidx.compose.material.icons.Icons.Rounded.History,
+                                            contentDescription = null,
+                                            tint = if (isDark) Color.LightGray else Color.Gray,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
+                                            color = if (isDark) Color.LightGray else Color.Gray,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+
+                            items(sortedPrevMonthTransactions, key = { it.id }) { tx ->
+                                val isSelected = selectedTxIds.contains(tx.id)
+                                Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
+                                    TransactionRowItem(
+                                        tx = tx,
+                                        language = language,
+                                        isDark = isDark,
+                                        persons = persons,
+                                        onDelete = onDeleteTransaction,
+                                        onEdit = onEditTransaction,
+                                        isHighlighted = (tx.id == highlightedTxId),
+                                        onNavigateToTab = onNavigateToTab,
+                                        onPersonClick = onPersonClick,
+                                        searchQuery = searchQuery,
+                                        isSelected = isSelected,
+                                        isSelectionMode = isSelectionMode,
+                                        onLongClick = {
+                                            selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
                         item {
                             Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                         }
@@ -9936,7 +10186,7 @@ fun DebtsScreen(
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            if (currentIndex == 0 && currentOffset < 15) {
+            if (currentIndex < 5) {
                 isHeaderVisible = true
             } else {
                 if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -10556,6 +10806,46 @@ fun filterTransactionsByTime(transactions: List<Transaction>, timeFilter: String
             } else transactions
         }
         else -> transactions
+    }
+}
+
+fun getPreviousMonthTransactions(transactions: List<Transaction>, timeFilter: String): List<Transaction> {
+    if (timeFilter != "MONTH" && !timeFilter.startsWith("CUSTOM_MONTH:")) return emptyList()
+    val now = System.currentTimeMillis()
+    val calendar = java.util.Calendar.getInstance()
+    return when {
+        timeFilter == "MONTH" -> {
+            calendar.timeInMillis = now
+            calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            calendar.set(java.util.Calendar.MINUTE, 0)
+            calendar.set(java.util.Calendar.SECOND, 0)
+            calendar.set(java.util.Calendar.MILLISECOND, 0)
+            val startOfSelectedMonth = calendar.timeInMillis
+            calendar.add(java.util.Calendar.MONTH, -1)
+            val startOfPreviousMonth = calendar.timeInMillis
+            transactions.filter { it.timestamp in startOfPreviousMonth until startOfSelectedMonth }
+        }
+        timeFilter.startsWith("CUSTOM_MONTH:") -> {
+            val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+            if (parts.size == 2) {
+                val year = parts[0].toIntOrNull() ?: 2026
+                val month = parts[1].toIntOrNull() ?: 1
+                calendar.clear()
+                calendar.set(java.util.Calendar.YEAR, year)
+                calendar.set(java.util.Calendar.MONTH, month - 1)
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                calendar.set(java.util.Calendar.MINUTE, 0)
+                calendar.set(java.util.Calendar.SECOND, 0)
+                calendar.set(java.util.Calendar.MILLISECOND, 0)
+                val startOfSelectedMonth = calendar.timeInMillis
+                calendar.add(java.util.Calendar.MONTH, -1)
+                val startOfPreviousMonth = calendar.timeInMillis
+                transactions.filter { it.timestamp in startOfPreviousMonth until startOfSelectedMonth }
+            } else emptyList()
+        }
+        else -> emptyList()
     }
 }
 
@@ -13184,7 +13474,7 @@ fun SavingsGoalDetailOverlay(
     LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        if (currentIndex == 0 && currentOffset < 15) {
+        if (currentIndex < 5) {
             isHeaderVisible = true
         } else {
             if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -13769,7 +14059,7 @@ fun PersonDetailOverlay(
     LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        if (currentIndex == 0 && currentOffset < 15) {
+        if (currentIndex < 5) {
             isHeaderVisible = true
         } else {
             if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -19823,21 +20113,21 @@ fun AnimatedAppLogo(
             // Infinite loop for dashboard (slowed down for a smoother, gentler motion)
             launch {
                 while (true) {
-                    bar1ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar1ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                     bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
             launch {
                 kotlinx.coroutines.delay(200)
                 while (true) {
-                    bar2ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar2ScaleAnim.animateTo(0.60f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                     bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
             launch {
                 kotlinx.coroutines.delay(400)
                 while (true) {
-                    bar3ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar3ScaleAnim.animateTo(0.40f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                     bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
@@ -19845,28 +20135,28 @@ fun AnimatedAppLogo(
             // Limited cycles for Splash screen (plays twice and ends at 1.0f)
             launch {
                 // Cycle 1
-                bar1ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar1ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
             launch {
                 kotlinx.coroutines.delay(150)
                 // Cycle 1
-                bar2ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(0.60f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar2ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(0.60f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
             launch {
                 kotlinx.coroutines.delay(300)
                 // Cycle 1
-                bar3ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(0.40f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar3ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(0.40f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
         }

@@ -127,20 +127,28 @@ object BiometricHelper {
             color = android.graphics.Color.parseColor("#40000000") // 25% Black
         }
 
-        private val activePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            style = android.graphics.Paint.Style.FILL
-            shader = android.graphics.LinearGradient(
-                200f, -879f, 760f, -191f,
-                intArrayOf(
-                    android.graphics.Color.parseColor("#2563EB"), // Royal Blue
-                    android.graphics.Color.parseColor("#0284C7"), // Cyan Blue
-                    android.graphics.Color.parseColor("#8B5CF6"), // Purple
-                    android.graphics.Color.parseColor("#7C3AED")  // Deep Purple
-                ),
-                floatArrayOf(0.0f, 0.35f, 0.70f, 1.0f),
-                android.graphics.Shader.TileMode.CLAMP
-            )
-        }
+        private val ridgePaints = arrayOf(
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = android.graphics.Color.parseColor("#38BDF8") // Light Blue
+            },
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = android.graphics.Color.parseColor("#84CC16") // Lime
+            },
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = android.graphics.Color.parseColor("#A855F7") // Purple
+            },
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = android.graphics.Color.parseColor("#06B6D4") // Cyan
+            },
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = android.graphics.Color.parseColor("#EA580C") // Dark Orange
+            }
+        )
 
         private val successPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             style = android.graphics.Paint.Style.FILL
@@ -333,6 +341,7 @@ object BiometricHelper {
                         }
 
                         if (purpleFraction > 0f) {
+                            val activePaint = ridgePaints[i]
                             val prevAlpha = activePaint.alpha
                             activePaint.alpha = (255 * purpleFraction).toInt().coerceIn(0, 255)
                             canvas.drawPath(path, activePaint)
