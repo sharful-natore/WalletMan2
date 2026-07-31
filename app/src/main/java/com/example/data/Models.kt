@@ -44,7 +44,8 @@ data class Transaction(
     val note: String = "",
     val personId: Int? = null, // Linked person if it's a debt/credit related transaction
     val workspaceId: String = "default",
-    val subType: String? = "CASH" // "CASH" or "CREDIT"
+    val subType: String? = "CASH", // "CASH" or "CREDIT"
+    val isManualTimestamp: Boolean = false
 )
 
 @Entity(tableName = "savings_goals")
@@ -70,7 +71,8 @@ data class SavingsTransaction(
     val isDeposit: Boolean,
     val timestamp: Long = System.currentTimeMillis(),
     val note: String = "",
-    val workspaceId: String = "default"
+    val workspaceId: String = "default",
+    val isManualTimestamp: Boolean = false
 )
 
 @JsonClass(generateAdapter = true)

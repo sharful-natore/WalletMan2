@@ -4175,7 +4175,7 @@ fun FinanceNoteApp(
                             transactionToEdit = null
                             draftToPost = null
                         },
-                        onConfirm = { amount, type, category, note, personId, timestamp, subType ->
+                        onConfirm = { amount, type, category, note, personId, timestamp, subType, isManual ->
                             if (transactionToEdit != null) {
                                 viewModel.updateTransaction(transactionToEdit!!.copy(
                                     amount = amount,
@@ -4184,12 +4184,13 @@ fun FinanceNoteApp(
                                     note = note,
                                     personId = personId,
                                     timestamp = timestamp,
-                                    subType = subType
+                                    subType = subType,
+                                    isManualTimestamp = isManual
                                 ))
                             } else if (draftToPost != null) {
                                 viewModel.postDraftToActual(draftToPost!!.id, amount, type, category, note, personId, subType)
                             } else {
-                                viewModel.addTransaction(amount, type, category, note, personId, timestamp, subType)
+                                viewModel.addTransaction(amount, type, category, note, personId, timestamp, subType, isManual)
                             }
                             showAddTransactionDialog = false
                             transactionToEdit = null
@@ -7343,7 +7344,7 @@ fun DashboardScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = formatCurrency(balance, language),
-                            color = if (balance < 0) Color(0xFFFB923C) else Color(0xFFFFD700),
+                            color = if (balance < 0) Color(0xFFFFF700) else Color.White,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
@@ -8981,11 +8982,24 @@ fun TransactionRowItem(
                 }
 
                 // Line 3: Date
-                Text(
-                    text = formatDate(tx.timestamp, language),
-                    fontSize = 10.sp,
-                    color = Color.Gray.copy(alpha = 0.8f)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = formatDate(tx.timestamp, language),
+                        fontSize = 10.sp,
+                        color = Color.Gray.copy(alpha = 0.8f)
+                    )
+                    if (tx.isManualTimestamp) {
+                        Icon(
+                            imageVector = Icons.Rounded.Edit,
+                            contentDescription = if (language == AppLanguage.BN) "ম্যানুয়ালি এডিট করা হয়েছে" else "Manually edited",
+                            tint = FintechBlue,
+                            modifier = Modifier.size(11.dp)
+                        )
+                    }
+                }
             }
         }
             }
@@ -9163,7 +9177,7 @@ fun TransactionDetailsDialog(
 
                 DetailRow(
                     if (language == AppLanguage.BN) "তারিখ:" else "Date:",
-                    formatDate(tx.timestamp, language),
+                    formatDate(tx.timestamp, language) + (if (tx.isManualTimestamp) " ✏️" else ""),
                     null
                 )
                 
@@ -9258,9 +9272,46 @@ fun TransactionsScreen(
         } else {
             filteredTransactions.filter { tx ->
                 val personName = persons.find { it.id == tx.personId }?.name?.lowercase() ?: ""
+                val banglaCat = when (tx.category) {
+                    "Salary" -> "বেতন"
+                    "Business" -> "ব্যবসা"
+                    "Agriculture" -> "কৃষি"
+                    "Gift" -> "উপহার"
+                    "Sales" -> "বিক্রয়"
+                    "Honorarium" -> "সম্মানী"
+                    "Freelance" -> "ফ্রিল্যান্সিং"
+                    "Rental" -> "ভাড়া"
+                    "Investment" -> "বিনিয়োগ"
+                    "Food" -> "খাবার"
+                    "Housing" -> "বাসস্থান"
+                    "Bills" -> "বিল"
+                    "Transport" -> "যাতায়াত"
+                    "Shopping" -> "কেনাকাটা"
+                    "Medical" -> "চিকিৎসা"
+                    "Education" -> "শিক্ষা"
+                    "Clothing" -> "পোশাক"
+                    "Entertainment" -> "বিনোদন"
+                    "Others" -> "অন্যান্য"
+                    else -> tx.category
+                }.lowercase()
+                val subTypeStr = (tx.subType ?: "").lowercase()
+                val typeStrBn = when (tx.type) {
+                    "INCOME" -> "আয় income"
+                    "EXPENSE" -> "ব্যয় expense"
+                    "LEND" -> "পাওনা লেন্ড lend"
+                    "BORROW" -> "দেনা ধার borrow"
+                    "REPAY_PAID" -> "দেনা পরিশোধ repay"
+                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay"
+                    else -> ""
+                }
+
                 tx.note.lowercase().contains(searchQueryLower) || 
+                tx.category.lowercase().contains(searchQueryLower) ||
+                banglaCat.contains(searchQueryLower) ||
                 tx.amount.toString().contains(searchQueryLower) ||
-                personName.contains(searchQueryLower)
+                personName.contains(searchQueryLower) ||
+                subTypeStr.contains(searchQueryLower) ||
+                typeStrBn.contains(searchQueryLower)
             }
         }
     }
@@ -9283,6 +9334,29 @@ fun TransactionsScreen(
     }
 
     val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var isHeaderVisible by remember { mutableStateOf(true) }
+    var prevIndex by remember { mutableIntStateOf(0) }
+    var prevScrollOffset by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode) {
+        if (isSelectionMode) {
+            isHeaderVisible = true
+        } else {
+            val currentIndex = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+            if (currentIndex == 0 && currentOffset < 15) {
+                isHeaderVisible = true
+            } else {
+                if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
+                    isHeaderVisible = false
+                } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+                    isHeaderVisible = true
+                }
+            }
+            prevIndex = currentIndex
+            prevScrollOffset = currentOffset
+        }
+    }
     
     LaunchedEffect(highlightedTxId) {
         if (highlightedTxId != null) {
@@ -9364,114 +9438,122 @@ fun TransactionsScreen(
                 }
             }
 
-            // Modern Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = {
-                    Text(
-                        text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isHeaderVisible,
+                enter = androidx.compose.animation.expandVertically(expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically(shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut()
+            ) {
+                Column {
+                    // Modern Search Bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = {
+                            Text(
+                                text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
+                                fontSize = 14.sp,
+                                color = Color.Gray
+                            )
+                        },
+                        leadingIcon = {
                             Icon(
-                                imageVector = Icons.Rounded.Close,
+                                imageVector = Icons.Rounded.Search,
                                 contentDescription = null,
                                 tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
                             )
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(16.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
-                    focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
-                    unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
-                )
-            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = null,
+                                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                                    )
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
+                            focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                            unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+                        )
+                    )
 
-            // Summary Cards (arranged horizontally in a Row)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
-                    cornerRadius = 24.dp,
-                    padding = PaddingValues(10.dp),
-                    onLongClick = { onExportRequest?.invoke("ONLY_INCOME") },
-                    modifier = Modifier.weight(1f).height(80.dp)
-                ) {
+                    // Summary Cards (arranged horizontally in a Row)
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column {
-                            Text(Translation.get("total_income", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(formatCurrency(totalIncome, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                        FintechGradientCard(
+                            gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
+                            cornerRadius = 24.dp,
+                            padding = PaddingValues(10.dp),
+                            onLongClick = { onExportRequest?.invoke("ONLY_INCOME") },
+                            modifier = Modifier.weight(1f).height(80.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(Translation.get("total_income", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(formatCurrency(totalIncome, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
-                    cornerRadius = 24.dp,
-                    padding = PaddingValues(10.dp),
-                    onLongClick = { onExportRequest?.invoke("ONLY_EXPENSE") },
-                    modifier = Modifier.weight(1f).height(80.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(Translation.get("total_expense", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(formatCurrency(totalExpense, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                        FintechGradientCard(
+                            gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
+                            cornerRadius = 24.dp,
+                            padding = PaddingValues(10.dp),
+                            onLongClick = { onExportRequest?.invoke("ONLY_EXPENSE") },
+                            modifier = Modifier.weight(1f).height(80.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(Translation.get("total_expense", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(formatCurrency(totalExpense, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
                     }
+
+                    // Time Filter Row
+                    TimeFilterRow(
+                        timeFilter = timeFilter,
+                        language = language,
+                        onTimeFilterChange = onTimeFilterChange,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
                 }
             }
-
-            // Time Filter Row
-            TimeFilterRow(
-                timeFilter = timeFilter,
-                language = language,
-                onTimeFilterChange = onTimeFilterChange,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-            )
 
             // Type Filters chip row & Sort button
             Row(
@@ -9480,111 +9562,111 @@ fun TransactionsScreen(
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val filters = listOf(
-                        Pair("ALL", "all"),
-                        Pair("INCOME", "income"),
-                        Pair("EXPENSE", "expense"),
-                        Pair("DENA", "dena"),
-                        Pair("PAWN", "pawn")
-                    )
-
-                    filters.forEach { (type, labelKey) ->
-                        val isSelected = filter == type
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else if (isDark) Color(0xFF1E293B) else Color.White
-                                )
-                                .clickable { onFilterChange(type) }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = Translation.get(labelKey, language),
-                                color = if (isSelected) Color.White else Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                            val filters = listOf(
+                                Pair("ALL", "all"),
+                                Pair("INCOME", "income"),
+                                Pair("EXPENSE", "expense"),
+                                Pair("DENA", "dena"),
+                                Pair("PAWN", "pawn")
                             )
-                        }
-                    }
-                }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Box {
-                    IconButton(
-                        onClick = { showSortMenu = true },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                if (isDark) Color(0xFF1E293B) else Color.White,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
-                                RoundedCornerShape(12.dp)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Sort,
-                            contentDescription = "Sort",
-                            tint = FintechBlue
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
-                    ) {
-                        val sortOptions = listOf(
-                            Triple("DATE_DESC", if (language == AppLanguage.BN) "নতুন সময় আগে" else "Newest First", Icons.Rounded.ArrowDownward),
-                            Triple("DATE_ASC", if (language == AppLanguage.BN) "পুরানো সময় আগে" else "Oldest First", Icons.Rounded.ArrowUpward),
-                            Triple("AMOUNT_DESC", if (language == AppLanguage.BN) "বেশি পরিমাণ আগে" else "Highest Amount First", Icons.Rounded.TrendingUp),
-                            Triple("AMOUNT_ASC", if (language == AppLanguage.BN) "কম পরিমাণ আগে" else "Lowest Amount First", Icons.Rounded.TrendingDown),
-                            Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
-                            Triple("NAME_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Name (Z-A)", Icons.Rounded.SortByAlpha)
-                        )
-
-                        sortOptions.forEach { (option, label, icon) ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
-                                            modifier = Modifier.size(16.dp)
+                            filters.forEach { (type, labelKey) ->
+                                val isSelected = filter == type
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else if (isDark) Color(0xFF1E293B) else Color.White
                                         )
-                                        Text(
-                                            text = label,
-                                            color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
-                                            fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    currentSortBy = option
-                                    showSortMenu = false
+                                        .clickable { onFilterChange(type) }
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = Translation.get(labelKey, language),
+                                        color = if (isSelected) Color.White else Color.Gray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                            )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Box {
+                            IconButton(
+                                onClick = { showSortMenu = true },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        if (isDark) Color(0xFF1E293B) else Color.White,
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Sort,
+                                    contentDescription = "Sort",
+                                    tint = FintechBlue
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false },
+                                modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
+                            ) {
+                                val sortOptions = listOf(
+                                    Triple("DATE_DESC", if (language == AppLanguage.BN) "নতুন সময় আগে" else "Newest First", Icons.Rounded.ArrowDownward),
+                                    Triple("DATE_ASC", if (language == AppLanguage.BN) "পুরানো সময় আগে" else "Oldest First", Icons.Rounded.ArrowUpward),
+                                    Triple("AMOUNT_DESC", if (language == AppLanguage.BN) "বেশি পরিমাণ আগে" else "Highest Amount First", Icons.Rounded.TrendingUp),
+                                    Triple("AMOUNT_ASC", if (language == AppLanguage.BN) "কম পরিমাণ আগে" else "Lowest Amount First", Icons.Rounded.TrendingDown),
+                                    Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
+                                    Triple("NAME_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Name (Z-A)", Icons.Rounded.SortByAlpha)
+                                )
+
+                                sortOptions.forEach { (option, label, icon) ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = icon,
+                                                    contentDescription = null,
+                                                    tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Text(
+                                                    text = label,
+                                                    color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
+                                                    fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            currentSortBy = option
+                                            showSortMenu = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-            }
 
             // Transactions List
             if (sortedTransactions.isEmpty()) {
@@ -9833,6 +9915,8 @@ fun DebtsScreen(
     val sortedDebts = remember(searchedDebts, currentSortBy) {
         val list = searchedDebts.toMutableList()
         when (currentSortBy) {
+            "DATE_DESC" -> list.sortByDescending { it.person.createdAt }
+            "DATE_ASC" -> list.sortBy { it.person.createdAt }
             "NAME_ASC" -> list.sortBy { it.person.name.lowercase() }
             "NAME_DESC" -> list.sortByDescending { it.person.name.lowercase() }
             "AMOUNT_DESC" -> list.sortByDescending { kotlin.math.abs(it.netBalance) }
@@ -9842,6 +9926,29 @@ fun DebtsScreen(
     }
 
     val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var isHeaderVisible by remember { mutableStateOf(true) }
+    var prevIndex by remember { mutableIntStateOf(0) }
+    var prevScrollOffset by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode) {
+        if (isSelectionMode) {
+            isHeaderVisible = true
+        } else {
+            val currentIndex = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+            if (currentIndex == 0 && currentOffset < 15) {
+                isHeaderVisible = true
+            } else {
+                if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
+                    isHeaderVisible = false
+                } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+                    isHeaderVisible = true
+                }
+            }
+            prevIndex = currentIndex
+            prevScrollOffset = currentOffset
+        }
+    }
     
     LaunchedEffect(highlightedPersonId) {
         if (highlightedPersonId != null) {
@@ -9907,103 +10014,111 @@ fun DebtsScreen(
                 }
             }
 
-            // Modern Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                placeholder = {
-                    Text(
-                        text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isHeaderVisible,
+                enter = androidx.compose.animation.expandVertically(expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically(shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut()
+            ) {
+                Column {
+                    // Modern Search Bar
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = {
+                            Text(
+                                text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
+                                fontSize = 14.sp,
+                                color = Color.Gray
+                            )
+                        },
+                        leadingIcon = {
                             Icon(
-                                imageVector = Icons.Rounded.Close,
+                                imageVector = Icons.Rounded.Search,
                                 contentDescription = null,
                                 tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
                             )
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(16.dp),
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
-                    focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
-                    unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
-                )
-            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = null,
+                                        tint = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                                    )
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f),
+                            focusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                            unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+                        )
+                    )
 
-            // Summary Cards (arranged horizontally in a Row)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
-                    cornerRadius = 24.dp,
-                    padding = PaddingValues(10.dp),
-                    onLongClick = { onExportRequest?.invoke("ONLY_DEBT") },
-                    modifier = Modifier.weight(1f).height(80.dp)
-                ) {
+                    // Summary Cards (arranged horizontally in a Row)
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Column {
-                            Text(Translation.get("total_dena", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(formatCurrency(totalDena, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                        FintechGradientCard(
+                            gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
+                            cornerRadius = 24.dp,
+                            padding = PaddingValues(10.dp),
+                            onLongClick = { onExportRequest?.invoke("ONLY_DEBT") },
+                            modifier = Modifier.weight(1f).height(80.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(Translation.get("total_dena", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(formatCurrency(totalDena, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                                }
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowDownward,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowDownward,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                FintechGradientCard(
-                    gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
-                    cornerRadius = 24.dp,
-                    padding = PaddingValues(10.dp),
-                    onLongClick = { onExportRequest?.invoke("ONLY_PAONA") },
-                    modifier = Modifier.weight(1f).height(80.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(Translation.get("total_pawn", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(formatCurrency(totalPawn, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                        FintechGradientCard(
+                            gradientColors = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else activeThemeGradient,
+                            cornerRadius = 24.dp,
+                            padding = PaddingValues(10.dp),
+                            onLongClick = { onExportRequest?.invoke("ONLY_PAONA") },
+                            modifier = Modifier.weight(1f).height(80.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(Translation.get("total_pawn", language), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(formatCurrency(totalPawn, language), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, maxLines = 1)
+                                }
+                                Icon(
+                                    imageVector = Icons.Rounded.ArrowUpward,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                        Icon(
-                            imageVector = Icons.Rounded.ArrowUpward,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
                     }
                 }
             }
@@ -10015,106 +10130,108 @@ fun DebtsScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val filters = listOf(
-                        Pair("ALL", "all"),
-                        Pair("DENA", "dena"),
-                        Pair("PAWN", "pawn")
-                    )
-
-                    filters.forEach { (type, labelKey) ->
-                        val isSelected = filter == type
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else if (isDark) Color(0xFF1E293B) else Color.White
-                                )
-                                .clickable { onFilterChange(type) }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                                .weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = Translation.get(labelKey, language),
-                                color = if (isSelected) Color.White else Color.Gray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                            val filters = listOf(
+                                Pair("ALL", "all"),
+                                Pair("DENA", "dena"),
+                                Pair("PAWN", "pawn")
                             )
-                        }
-                    }
-                }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Box {
-                    IconButton(
-                        onClick = { showSortMenu = true },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                if (isDark) Color(0xFF1E293B) else Color.White,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
-                                RoundedCornerShape(12.dp)
-                            )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Sort,
-                            contentDescription = "Sort",
-                            tint = FintechBlue
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
-                        modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
-                    ) {
-                        val sortOptions = listOf(
-                            Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
-                            Triple("NAME_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Name (Z-A)", Icons.Rounded.SortByAlpha),
-                            Triple("AMOUNT_DESC", if (language == AppLanguage.BN) "বেশি পরিমাণ আগে" else "Highest Amount First", Icons.Rounded.TrendingUp),
-                            Triple("AMOUNT_ASC", if (language == AppLanguage.BN) "কম পরিমাণ আগে" else "Lowest Amount First", Icons.Rounded.TrendingDown)
-                        )
-
-                        sortOptions.forEach { (option, label, icon) ->
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
-                                            modifier = Modifier.size(16.dp)
+                            filters.forEach { (type, labelKey) ->
+                                val isSelected = filter == type
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else if (isDark) Color(0xFF1E293B) else Color.White
                                         )
-                                        Text(
-                                            text = label,
-                                            color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
-                                            fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    currentSortBy = option
-                                    showSortMenu = false
+                                        .clickable { onFilterChange(type) }
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = Translation.get(labelKey, language),
+                                        color = if (isSelected) Color.White else Color.Gray,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                            )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Box {
+                            IconButton(
+                                onClick = { showSortMenu = true },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        if (isDark) Color(0xFF1E293B) else Color.White,
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Sort,
+                                    contentDescription = "Sort",
+                                    tint = FintechBlue
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showSortMenu,
+                                onDismissRequest = { showSortMenu = false },
+                                modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
+                            ) {
+                                val sortOptions = listOf(
+                                    Triple("DATE_DESC", if (language == AppLanguage.BN) "নতুন সময় আগে" else "Newest First", Icons.Rounded.ArrowDownward),
+                                    Triple("DATE_ASC", if (language == AppLanguage.BN) "পুরানো সময় আগে" else "Oldest First", Icons.Rounded.ArrowUpward),
+                                    Triple("NAME_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Name (A-Z)", Icons.Rounded.SortByAlpha),
+                                    Triple("NAME_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Name (Z-A)", Icons.Rounded.SortByAlpha),
+                                    Triple("AMOUNT_DESC", if (language == AppLanguage.BN) "বেশি পরিমাণ আগে" else "Highest Amount First", Icons.Rounded.TrendingUp),
+                                    Triple("AMOUNT_ASC", if (language == AppLanguage.BN) "কম পরিমাণ আগে" else "Lowest Amount First", Icons.Rounded.TrendingDown)
+                                )
+
+                                sortOptions.forEach { (option, label, icon) ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = icon,
+                                                    contentDescription = null,
+                                                    tint = if (currentSortBy == option) MaterialTheme.colorScheme.primary else Color.Gray,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Text(
+                                                    text = label,
+                                                    color = if (currentSortBy == option) MaterialTheme.colorScheme.primary else (if (isDark) Color.White else Color.Black),
+                                                    fontWeight = if (currentSortBy == option) FontWeight.Bold else FontWeight.Normal,
+                                                    fontSize = 13.sp
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            currentSortBy = option
+                                            showSortMenu = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-            }
 
             if (sortedDebts.isEmpty()) {
                 Box(
@@ -11615,7 +11732,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     editTransaction: Transaction? = null,
     initialDraft: com.example.data.DraftTransaction? = null,
     onDismiss: () -> Unit,
-    onConfirm: (Double, String, String, String, Int?, Long, String?) -> Unit,
+    onConfirm: (Double, String, String, String, Int?, Long, String?, Boolean) -> Unit,
     onAddPersonClick: () -> Unit = {}
 ) {
     val personDebts by viewModel.personDebts.collectAsState()
@@ -11626,6 +11743,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     
     var note by remember { mutableStateOf(editTransaction?.note ?: initialDraft?.note ?: defaultParsed?.cleanedNote ?: "") }
     var customTimestamp by remember { mutableStateOf<Long?>(editTransaction?.timestamp) }
+    var isManualTime by remember { mutableStateOf(editTransaction?.isManualTimestamp ?: false) }
 
     // Dropdowns / Option selectors
     var type by remember { mutableStateOf(editTransaction?.type ?: initialDraft?.type ?: defaultParsed?.type ?: "EXPENSE") } // INCOME, EXPENSE, LEND, BORROW, REPAY_PAID, REPAY_RECEIVED
@@ -12246,7 +12364,10 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             Text(dateLabel, color = textColor, fontSize = 14.sp)
                         }
                         if (customTimestamp != null) {
-                            IconButton(onClick = { customTimestamp = null }, modifier = Modifier.size(24.dp)) {
+                            IconButton(onClick = { 
+                                customTimestamp = null 
+                                isManualTime = false
+                            }, modifier = Modifier.size(24.dp)) {
                                 Icon(Icons.Rounded.Close, contentDescription = "Clear", tint = FintechRed, modifier = Modifier.size(16.dp))
                             }
                         }
@@ -12274,6 +12395,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                 calendar.clear()
                                 calendar.set(year, month - 1, day, hour, minute)
                                 customTimestamp = calendar.timeInMillis
+                                isManualTime = true
                                 showManualDatePicker = false
                             }
                         )
@@ -12303,7 +12425,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                 } else if (isPersonRequired && selectedPersonId == null) {
                                     viewModel.triggerCustomNotification(Translation.get("error_empty_person", language), isSuccess = false, type = "ERROR")
                                 } else {
-                                    onConfirm(amount, type, category, note, selectedPersonId, customTimestamp ?: System.currentTimeMillis(), subType)
+                                    onConfirm(amount, type, category, note, selectedPersonId, customTimestamp ?: System.currentTimeMillis(), subType, isManualTime)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -13054,6 +13176,27 @@ fun SavingsGoalDetailOverlay(
     var selectedSavingsTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedSavingsTxIds.isNotEmpty()
 
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var isHeaderVisible by remember { mutableStateOf(true) }
+    var prevIndex by remember { mutableIntStateOf(0) }
+    var prevScrollOffset by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+        val currentIndex = lazyListState.firstVisibleItemIndex
+        val currentOffset = lazyListState.firstVisibleItemScrollOffset
+        if (currentIndex == 0 && currentOffset < 15) {
+            isHeaderVisible = true
+        } else {
+            if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
+                isHeaderVisible = false
+            } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+                isHeaderVisible = true
+            }
+        }
+        prevIndex = currentIndex
+        prevScrollOffset = currentOffset
+    }
+
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
         selectedSavingsTxIds = emptySet()
     }
@@ -13162,52 +13305,58 @@ fun SavingsGoalDetailOverlay(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Show Card at top
-            SavingsGoalCardItem(
-                goal = goal,
-                language = language,
-                isDark = isDark,
-                profileName = profileName,
-                allGradientsList = allGradientsList,
-                onGoalClick = {}, // No click action here
-                onContributeClick = { _, _ -> },
-                onEditGoal = {},
-                maskBalance = false
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Deposit/Withdraw Buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isHeaderVisible,
+                enter = androidx.compose.animation.expandVertically(expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically(shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut()
             ) {
-                Button(
-                    onClick = { onContributeClick(goal, false) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechGreen)
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (language == AppLanguage.BN) "জমা করুন" else "Deposit", color = Color.White, fontWeight = FontWeight.Bold)
-                }
+                Column {
+                    // Show Card at top
+                    SavingsGoalCardItem(
+                        goal = goal,
+                        language = language,
+                        isDark = isDark,
+                        profileName = profileName,
+                        allGradientsList = allGradientsList,
+                        onGoalClick = {}, // No click action here
+                        onContributeClick = { _, _ -> },
+                        onEditGoal = {},
+                        maskBalance = false
+                    )
 
-                Button(
-                    onClick = { onContributeClick(goal, true) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
-                ) {
-                    Icon(Icons.Rounded.Remove, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (language == AppLanguage.BN) "উত্তোলন" else "Withdraw", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Deposit/Withdraw Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Button(
+                            onClick = { onContributeClick(goal, false) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechGreen)
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (language == AppLanguage.BN) "জমা করুন" else "Deposit", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { onContributeClick(goal, true) },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
+                        ) {
+                            Icon(Icons.Rounded.Remove, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (language == AppLanguage.BN) "উত্তোলন" else "Withdraw", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // History Label
             Row(
@@ -13272,6 +13421,7 @@ fun SavingsGoalDetailOverlay(
                 }
             } else {
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
@@ -13611,6 +13761,27 @@ fun PersonDetailOverlay(
     var actionSubType by remember(showActionSheet) { mutableStateOf("CASH") }
     var customActionTimestamp by remember(showActionSheet) { mutableStateOf<Long?>(null) }
 
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var isHeaderVisible by remember { mutableStateOf(true) }
+    var prevIndex by remember { mutableIntStateOf(0) }
+    var prevScrollOffset by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+        val currentIndex = lazyListState.firstVisibleItemIndex
+        val currentOffset = lazyListState.firstVisibleItemScrollOffset
+        if (currentIndex == 0 && currentOffset < 15) {
+            isHeaderVisible = true
+        } else {
+            if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
+                isHeaderVisible = false
+            } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+                isHeaderVisible = true
+            }
+        }
+        prevIndex = currentIndex
+        prevScrollOffset = currentOffset
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -13625,15 +13796,25 @@ fun PersonDetailOverlay(
             // Header - Simplified (removed Close button to reduce empty space as requested by user)
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Person Bio Card (Frosted Card)
-            FrostedGlassCard(
-                isDark = isDark,
-                padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isHeaderVisible,
+                enter = androidx.compose.animation.expandVertically(expandFrom = Alignment.Top) + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically(shrinkTowards = Alignment.Top) + androidx.compose.animation.fadeOut()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    // Person Bio Card (Frosted Card)
+                    FrostedGlassCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        isDark = isDark,
+                        padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(52.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                             .border(2.dp, FintechBlue, CircleShape),
@@ -13656,7 +13837,7 @@ fun PersonDetailOverlay(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -13683,7 +13864,7 @@ fun PersonDetailOverlay(
                                             e.printStackTrace()
                                         }
                                     }
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    .padding(horizontal = 2.dp, vertical = 2.dp)
                             ) {
                                 Icon(Icons.Rounded.Phone, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -13692,7 +13873,9 @@ fun PersonDetailOverlay(
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
-                                    style = TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
+                                    style = TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -13703,18 +13886,20 @@ fun PersonDetailOverlay(
                                 Text(
                                     text = personDebt.person.address,
                                     fontSize = 13.sp,
-                                    color = Color.Gray
+                                    color = Color.Gray,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
                     }
                     
-                    Row {
-                        IconButton(onClick = { onEditPerson(personDebt.person) }) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { onEditPerson(personDebt.person) }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(18.dp))
                         }
-                        IconButton(onClick = { onDeletePerson() }) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
+                        IconButton(onClick = { onDeletePerson() }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -13816,8 +14001,10 @@ fun PersonDetailOverlay(
                     }
                 }
             }
+        }
+    }
 
-            Spacer(modifier = Modifier.height(20.dp))
+    Spacer(modifier = Modifier.height(20.dp))
 
             // History Label
             Row(
@@ -14146,6 +14333,7 @@ fun PersonDetailOverlay(
             } else {
                 val grouped = txList.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
                 LazyColumn(
+                    state = lazyListState,
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
@@ -19635,21 +19823,21 @@ fun AnimatedAppLogo(
             // Infinite loop for dashboard (slowed down for a smoother, gentler motion)
             launch {
                 while (true) {
-                    bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar1ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                     bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1200, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
             launch {
                 kotlinx.coroutines.delay(200)
                 while (true) {
-                    bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar2ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                     bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
             launch {
                 kotlinx.coroutines.delay(400)
                 while (true) {
-                    bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    bar3ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                     bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(1000, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 }
             }
@@ -19657,29 +19845,29 @@ fun AnimatedAppLogo(
             // Limited cycles for Splash screen (plays twice and ends at 1.0f)
             launch {
                 // Cycle 1
-                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar1ScaleAnim.animateTo(0.4f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(750, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(0.45f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar1ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(600, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
             launch {
                 kotlinx.coroutines.delay(150)
                 // Cycle 1
-                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar2ScaleAnim.animateTo(0.3f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(0.65f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar2ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(550, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
             launch {
                 kotlinx.coroutines.delay(300)
                 // Cycle 1
-                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                 // Cycle 2
-                bar3ScaleAnim.animateTo(0.5f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(650, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(0.35f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                bar3ScaleAnim.animateTo(1.0f, androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
             }
         }
     }
@@ -19711,7 +19899,7 @@ fun AnimatedAppLogo(
             draw(size, alpha = 1f)
         }
 
-        // 2. Bar 1 (Green) with 100% fixed bottom edge
+        // 2. Bar 1 (Green) with 100% fixed bottom edge and undistorted top cap
         val path1 = androidx.compose.ui.graphics.Path().apply {
             val xBL = 101.5f * scaleX
             val yBL = 318.6f * scaleY
@@ -19719,11 +19907,13 @@ fun AnimatedAppLogo(
             val xBR = 156.63f * scaleX
             val yBR = 275.92f * scaleY
             
+            val dy = 159.41f * (1.0f - bar1Scale)
+            
             val xTR = 156.9f * scaleX
-            val yTR = (275.92f - 117.02f * bar1Scale) * scaleY
+            val yTR = (158.9f + dy) * scaleY
             
             val xTL = 101.42f * scaleX
-            val yTL = (318.6f - 159.41f * bar1Scale) * scaleY
+            val yTL = (159.19f + dy) * scaleY
             
             moveTo(xBL, yBL)
             lineTo(xBR, yBR)
@@ -19733,7 +19923,7 @@ fun AnimatedAppLogo(
         }
         drawPath(path1, color = Color(0xFF00C800))
 
-        // 3. Bar 2 (Orange) with 100% fixed pointed bottom
+        // 3. Bar 2 (Orange) with 100% fixed pointed bottom and undistorted top cap
         val path2 = androidx.compose.ui.graphics.Path().apply {
             val xBL = 173.07f * scaleX
             val yBL = 263.79f * scaleY
@@ -19744,11 +19934,13 @@ fun AnimatedAppLogo(
             val xBR = 228.59f * scaleX
             val yBR = 259.43f * scaleY
             
+            val dy = 194.48f * (1.0f - bar2Scale)
+            
             val xTR = 228.12f * scaleX
-            val yTR = (259.43f - 190.11f * bar2Scale) * scaleY
+            val yTR = (69.32f + dy) * scaleY
             
             val xTL = 173.12f * scaleX
-            val yTL = (263.79f - 194.48f * bar2Scale) * scaleY
+            val yTL = (69.31f + dy) * scaleY
             
             moveTo(xBL, yBL)
             lineTo(xBM, yBM)
@@ -19759,7 +19951,7 @@ fun AnimatedAppLogo(
         }
         drawPath(path2, color = Color(0xFFFF8A00))
 
-        // 4. Bar 3 (Blue) with 100% fixed pointed bottom
+        // 4. Bar 3 (Blue) with 100% fixed pointed bottom and undistorted top cap
         val path3 = androidx.compose.ui.graphics.Path().apply {
             val xBL = 245.02f * scaleX
             val yBL = 266.3f * scaleY
@@ -19770,11 +19962,13 @@ fun AnimatedAppLogo(
             val xBR = 299.27f * scaleX
             val yBR = 243.05f * scaleY
             
+            val dy = 164.72f * (1.0f - bar3Scale)
+            
             val xTR = 300.21f * scaleX
-            val yTR = (243.05f - 141.46f * bar3Scale) * scaleY
+            val yTR = (101.59f + dy) * scaleY
             
             val xTL = 244.71f * scaleX
-            val yTL = (266.3f - 164.72f * bar3Scale) * scaleY
+            val yTL = (101.58f + dy) * scaleY
             
             moveTo(xBL, yBL)
             lineTo(xBM, yBM)
@@ -20951,6 +21145,7 @@ fun ProfileSetupScreen(
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
+    var isEditMode by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -20960,163 +21155,348 @@ fun ProfileSetupScreen(
             modifier = Modifier.fillMaxSize(),
             color = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Text(
-                    text = if (language == AppLanguage.BN) "প্রোফাইল সেটআপ" else "Profile Setup",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color.Black
-                )
-
-                Box(
+            if (!isEditMode) {
+                Column(
                     modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
-                        .clickable { photoLauncher.launch("image/*") },
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    if (isPhotoLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(36.dp),
-                            strokeWidth = 3.dp,
-                            color = FintechBlue
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "প্রোফাইল তথ্য" else "Profile Info",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color.Black
                         )
-                    } else if (photoUri.isNotEmpty()) {
-                        SubcomposeAsyncImage(
-                            model = photoUri,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                            loading = {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp).padding(6.dp),
-                                    strokeWidth = 3.dp,
-                                    color = FintechBlue
-                                )
-                            },
-                            error = {
-                                Icon(
-                                    imageVector = Icons.Rounded.AddAPhoto,
-                                    contentDescription = null,
-                                    tint = if (isDark) Color.LightGray else Color.Gray,
-                                    modifier = Modifier.size(40.dp)
-                                )
-                            }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close", tint = if (isDark) Color.White else Color.Black)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(130.dp)
+                            .clip(CircleShape)
+                            .border(3.dp, FintechBlue, CircleShape)
+                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (photoUri.isNotEmpty()) {
+                            SubcomposeAsyncImage(
+                                model = photoUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                loading = {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(36.dp).padding(6.dp),
+                                        strokeWidth = 3.dp,
+                                        color = FintechBlue
+                                    )
+                                }
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Person,
+                                contentDescription = null,
+                                tint = if (isDark) Color.LightGray else Color.Gray,
+                                modifier = Modifier.size(64.dp)
+                            )
+                        }
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = name.ifBlank { if (language == AppLanguage.BN) "নাম দেওয়া হয়নি" else "No Name Set" },
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = if (isDark) Color.White else Color.Black,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.AddAPhoto,
-                            contentDescription = null,
-                            tint = if (isDark) Color.LightGray else Color.Gray,
-                            modifier = Modifier.size(40.dp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "ফিন্যান্স ডায়েরি সদস্য" else "Finance Note Member",
+                            fontSize = 12.sp,
+                            color = FintechBlue,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .background(FintechBlue.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color(0xFF2E3A4E) else Color.White
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            ProfileInfoRow(
+                                icon = Icons.Rounded.Phone,
+                                label = if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number",
+                                value = phone.ifBlank { "-" },
+                                isDark = isDark
+                            )
+                            HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                            ProfileInfoRow(
+                                icon = Icons.Rounded.CalendarToday,
+                                label = if (language == AppLanguage.BN) "জন্ম তারিখ" else "Date of Birth",
+                                value = dob.ifBlank { "-" },
+                                isDark = isDark
+                            )
+                            HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                            ProfileInfoRow(
+                                icon = Icons.Rounded.LocationOn,
+                                label = if (language == AppLanguage.BN) "ঠিকানা" else "Address",
+                                value = address.ifBlank { "-" },
+                                isDark = isDark
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Button(
+                        onClick = { isEditMode = true },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                    ) {
+                        Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (language == AppLanguage.BN) "প্রোফাইল সংশোধন করুন" else "Edit Profile",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
                     }
                 }
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(if (language == AppLanguage.BN) "আপনার নাম" else "Your Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = if (isDark) Color.White else Color.Black,
-                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
-                        focusedLabelColor = FintechBlue,
-                        unfocusedLabelColor = Color.Gray
-                    )
-                )
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text(if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number") },
-                    leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = if (isDark) Color.White else Color.Black,
-                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
-                        focusedLabelColor = FintechBlue,
-                        unfocusedLabelColor = Color.Gray
-                    )
-                )
-
-                OutlinedTextField(
-                    value = dob,
-                    onValueChange = { dob = it },
-                    label = { Text(if (language == AppLanguage.BN) "জন্ম তারিখ" else "Date of Birth") },
-                    leadingIcon = { Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = FintechBlue) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    placeholder = { Text("DD/MM/YYYY", color = Color.Gray.copy(alpha = 0.5f)) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = if (isDark) Color.White else Color.Black,
-                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
-                        focusedLabelColor = FintechBlue,
-                        unfocusedLabelColor = Color.Gray
-                    )
-                )
-
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    label = { Text(if (language == AppLanguage.BN) "ঠিকানা" else "Address") },
-                    leadingIcon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = FintechBlue) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = if (isDark) Color.White else Color.Black,
-                        unfocusedTextColor = if (isDark) Color.White else Color.Black,
-                        focusedLabelColor = FintechBlue,
-                        unfocusedLabelColor = Color.Gray
-                    )
-                )
-
-                if (error != null) {
-                    Text(text = error!!, color = Color.Red, fontSize = 12.sp)
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Button(
-                    onClick = {
-                        isLoading = true
-                        viewModel.updateUserProfile(name, address, phone, dob, photoUri,
-                            onSuccess = {
-                                isLoading = false
-                                onDismiss()
-                            },
-                            onError = { err ->
-                                isLoading = false
-                                error = err
-                            }
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text(if (language == AppLanguage.BN) "সংরক্ষণ করুন" else "Save Profile", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(
+                        text = if (language == AppLanguage.BN) "প্রোফাইল সম্পাদন" else "Edit Profile",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color.Black
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape)
+                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                            .clickable { photoLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isPhotoLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp),
+                                strokeWidth = 3.dp,
+                                color = FintechBlue
+                            )
+                        } else if (photoUri.isNotEmpty()) {
+                            SubcomposeAsyncImage(
+                                model = photoUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                                loading = {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(36.dp).padding(6.dp),
+                                        strokeWidth = 3.dp,
+                                        color = FintechBlue
+                                    )
+                                },
+                                error = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.AddAPhoto,
+                                        contentDescription = null,
+                                        tint = if (isDark) Color.LightGray else Color.Gray,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.AddAPhoto,
+                                contentDescription = null,
+                                tint = if (isDark) Color.LightGray else Color.Gray,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
                     }
-                }
-                
-                TextButton(onClick = onDismiss) {
-                    Text(if (language == AppLanguage.BN) "পরে করব" else "Setup Later")
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text(if (language == AppLanguage.BN) "আপনার নাম" else "Your Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                            focusedLabelColor = FintechBlue,
+                            unfocusedLabelColor = Color.Gray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text(if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number") },
+                        leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                            focusedLabelColor = FintechBlue,
+                            unfocusedLabelColor = Color.Gray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = dob,
+                        onValueChange = { dob = it },
+                        label = { Text(if (language == AppLanguage.BN) "জন্ম তারিখ" else "Date of Birth") },
+                        leadingIcon = { Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        placeholder = { Text("DD/MM/YYYY", color = Color.Gray.copy(alpha = 0.5f)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                            focusedLabelColor = FintechBlue,
+                            unfocusedLabelColor = Color.Gray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = address,
+                        onValueChange = { address = it },
+                        label = { Text(if (language == AppLanguage.BN) "ঠিকানা" else "Address") },
+                        leadingIcon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                            focusedLabelColor = FintechBlue,
+                            unfocusedLabelColor = Color.Gray
+                        )
+                    )
+
+                    if (error != null) {
+                        Text(text = error!!, color = Color.Red, fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { isEditMode = false },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.outlinedButtonColors()
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "বাতিল করুন" else "Cancel",
+                                color = if (isDark) Color.White else Color.Black
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                isLoading = true
+                                viewModel.updateUserProfile(name, address, phone, dob, photoUri,
+                                    onSuccess = {
+                                        isLoading = false
+                                        isEditMode = false
+                                    },
+                                    onError = { err ->
+                                        isLoading = false
+                                        error = err
+                                    }
+                                )
+                            },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                            } else {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "সংরক্ষণ করুন" else "Save",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun ProfileInfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    isDark: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(FintechBlue.copy(alpha = 0.12f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(20.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, fontSize = 12.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isDark) Color.White else Color.Black
+            )
         }
     }
 }

@@ -81,11 +81,50 @@ fun SearchDialog(
     }
 
     // 2. Transactions (লেনদেনসমূহ)
-    val filteredTransactions = remember(searchQuery, transactions) {
+    val filteredTransactions = remember(searchQuery, transactions, persons) {
         if (searchQuery.isBlank()) emptyList()
-        else transactions.filter { 
-            it.category.contains(searchQuery, true) || 
-            it.note.contains(searchQuery, true) 
+        else transactions.filter { tx ->
+            val personName = persons.find { it.id == tx.personId }?.name ?: ""
+            val banglaCat = when (tx.category) {
+                "Salary" -> "বেতন"
+                "Business" -> "ব্যবসা"
+                "Agriculture" -> "কৃষি"
+                "Gift" -> "উপহার"
+                "Sales" -> "বিক্রয়"
+                "Honorarium" -> "সম্মানী"
+                "Freelance" -> "ফ্রিল্যান্সিং"
+                "Rental" -> "ভাড়া"
+                "Investment" -> "বিনিয়োগ"
+                "Food" -> "খাবার"
+                "Housing" -> "বাসস্থান"
+                "Bills" -> "বিল"
+                "Transport" -> "যাতায়াত"
+                "Shopping" -> "কেনাকাটা"
+                "Medical" -> "চিকিৎসা"
+                "Education" -> "শিক্ষা"
+                "Clothing" -> "পোশাক"
+                "Entertainment" -> "বিনোদন"
+                "Others" -> "অন্যান্য"
+                else -> tx.category
+            }
+            val subTypeStr = tx.subType ?: ""
+            val typeStrBn = when (tx.type) {
+                "INCOME" -> "আয় Income"
+                "EXPENSE" -> "ব্যয় Expense"
+                "LEND" -> "পাওনা Lend"
+                "BORROW" -> "দেনা ধার Borrow"
+                "REPAY_PAID" -> "দেনা পরিশোধ Repay"
+                "REPAY_RECEIVED" -> "পাওনা পরিশোধ Repay"
+                else -> ""
+            }
+
+            tx.category.contains(searchQuery, true) || 
+            banglaCat.contains(searchQuery, true) ||
+            tx.note.contains(searchQuery, true) ||
+            personName.contains(searchQuery, true) ||
+            tx.amount.toString().contains(searchQuery) ||
+            subTypeStr.contains(searchQuery, true) ||
+            typeStrBn.contains(searchQuery, true)
         }
     }
 

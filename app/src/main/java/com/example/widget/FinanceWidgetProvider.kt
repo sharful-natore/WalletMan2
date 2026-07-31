@@ -155,18 +155,18 @@ fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWid
             calendar.set(java.util.Calendar.MILLISECOND, 0)
             val startOfMonth = calendar.timeInMillis
 
-            val allTxs = dao.getAllTransactionsList()
-                .filter { it.workspaceId == widgetWorkspaceId && it.timestamp >= startOfMonth }
+            val allTxsForWorkspace = dao.getAllTransactionsList().filter { it.workspaceId == widgetWorkspaceId }
+            val currentMonthTxs = allTxsForWorkspace.filter { it.timestamp >= startOfMonth }
             
-            val income = allTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
-            val expense = allTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val income = currentMonthTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val expense = currentMonthTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
             val balance = income - expense
 
             val persons = dao.getAllPersonsList().filter { it.workspaceId == widgetWorkspaceId }
             var totalDena = 0.0
             var totalPaona = 0.0
             for (p in persons) {
-                val pTxs = allTxs.filter { it.personId == p.id }
+                val pTxs = allTxsForWorkspace.filter { it.personId == p.id }
                 val lent = pTxs.filter { it.type == "LEND" }.sumOf { it.amount }
                 val borrowed = pTxs.filter { it.type == "BORROW" }.sumOf { it.amount }
                 val repaidPaid = pTxs.filter { it.type == "REPAY_PAID" }.sumOf { it.amount }

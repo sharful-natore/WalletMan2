@@ -115,51 +115,23 @@ fun DraftsScratchpadDialog(
         }
 
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)),
+            modifier = Modifier.fillMaxSize(),
             color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            ) {
-                val headerGradient = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else com.example.ui.screens.activeThemeGradient
-                
-                com.example.ui.components.FintechGradientCard(
-                    gradientColors = headerGradient,
-                    cornerRadius = 24.dp,
-                    padding = PaddingValues(16.dp),
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back",
-                                tint = Color.White
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = {
+                    TopAppBar(
+                        title = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
                                     text = if (language == AppLanguage.BN) "লেনদেন খসড়া খাতা" else "Transaction Drafts",
-                                    fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    fontSize = 18.sp,
+                                    color = if (isDark) Color.White else Color.Black
                                 )
                                 IconButton(
                                     onClick = { showInfoDialog = true },
@@ -168,19 +140,33 @@ fun DraftsScratchpadDialog(
                                     Icon(
                                         imageVector = Icons.Rounded.Info,
                                         contentDescription = "Info",
-                                        tint = Color.White,
+                                        tint = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f),
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
-                            Text(
-                                text = if (language == AppLanguage.BN) "লেনদেনের ড্রাফটসমূহঃ" else "Transaction drafts:",
-                                fontSize = 12.sp,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
-                        }
-                    }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = if (isDark) Color.White else Color.Black
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
+                        )
+                    )
                 }
+            ) { paddingValues ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
 
                 // Add Draft Input Card (Yellow Notepad Styling)
                 Card(
@@ -455,6 +441,7 @@ fun DraftsScratchpadDialog(
             }
         }
     }
+}
 
     // Modal Edit draft
     if (editDraftMode != null) {

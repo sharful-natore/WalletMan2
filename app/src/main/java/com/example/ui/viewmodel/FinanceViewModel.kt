@@ -1360,7 +1360,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         note: String,
         personId: Int?,
         timestamp: Long = System.currentTimeMillis(),
-        subType: String? = "CASH"
+        subType: String? = "CASH",
+        isManualTimestamp: Boolean = false
     ) {
         viewModelScope.launch {
             repository.insertTransaction(
@@ -1372,7 +1373,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     personId = personId,
                     timestamp = timestamp,
                     workspaceId = _currentWorkspaceId.value,
-                    subType = subType
+                    subType = subType,
+                    isManualTimestamp = isManualTimestamp
                 )
 
             )
@@ -2802,6 +2804,27 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         // Internet is back! If there are unsaved changes, trigger sync
                         if (_hasUnsavedChanges.value && _isGoogleSignedIn.value) {
                             uploadToFirestore()
+                        }
+                        // Automatically background sync any offline profile/person photos if signed in
+                        if (_isGoogleSignedIn.value) {
+                            viewModelScope.launch(Dispatchers.IO) {
+                                try {
+                                    val workspacesList = repository.allWorkspaces.first()
+                                    for (ws in workspacesList) {
+                                        if (!ws.profilePhotoUri.isNullOrBlank()) {
+                                            syncProfilePhotoToCloud(getApplication(), ws.id, ws.profilePhotoUri)
+                                        }
+                                    }
+                                    val personsList = repository.allPersons.first()
+                                    for (person in personsList) {
+                                        if (person.photoUri.isNotEmpty()) {
+                                            syncPersonPhotoToCloud(getApplication(), person.id, person.photoUri)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
                         }
                     }
                     override fun onLost(network: android.net.Network) {

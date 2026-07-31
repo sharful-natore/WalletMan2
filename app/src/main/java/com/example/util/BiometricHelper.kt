@@ -368,19 +368,57 @@ object BiometricHelper {
             val cancellationSignal = androidx.core.os.CancellationSignal()
             val density = activity.resources.displayMetrics.density
             
-            // Create root linear layout
-            val rootLayout = android.widget.LinearLayout(activity).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                setPadding((24 * density).toInt(), (28 * density).toInt(), (24 * density).toInt(), (24 * density).toInt())
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
-                
-                // Solid white card with beautifully rounded corners
+            var alertDialog: android.app.AlertDialog? = null
+
+            // Parent FrameLayout to hold the card and overlay the close button
+            val parentLayout = android.widget.FrameLayout(activity).apply {
                 val backgroundDrawable = android.graphics.drawable.GradientDrawable().apply {
                     setColor(android.graphics.Color.WHITE)
                     cornerRadius = 24 * density
                 }
                 background = backgroundDrawable
             }
+
+            // Create root linear layout (no background anymore, background is on parent)
+            val rootLayout = android.widget.LinearLayout(activity).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding((24 * density).toInt(), (28 * density).toInt(), (24 * density).toInt(), (24 * density).toInt())
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            }
+            parentLayout.addView(rootLayout)
+
+            // Top-right Close/Cross Button
+            val closeButton = android.widget.TextView(activity).apply {
+                text = "✕"
+                textSize = 18f
+                setTextColor(android.graphics.Color.parseColor("#94A3B8")) // Slate 400
+                setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+                
+                setOnClickListener {
+                    try {
+                        cancellationSignal.cancel()
+                    } catch (t: Throwable) {
+                        t.printStackTrace()
+                    }
+                    onUsePinFallback()
+                    alertDialog?.dismiss()
+                }
+
+                val outValue = android.util.TypedValue()
+                activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
+                setBackgroundResource(outValue.resourceId)
+                isClickable = true
+                isFocusable = true
+            }
+            val closeParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.TOP or android.view.Gravity.END
+                topMargin = (4 * density).toInt()
+                rightMargin = (4 * density).toInt()
+            }
+            parentLayout.addView(closeButton, closeParams)
 
             // Title TextView
             val titleTextView = android.widget.TextView(activity).apply {
@@ -468,10 +506,10 @@ object BiometricHelper {
 
             // Dialog configuration
             val dialogBuilder = android.app.AlertDialog.Builder(activity)
-                .setView(rootLayout)
+                .setView(parentLayout)
                 .setCancelable(false)
 
-            val alertDialog = dialogBuilder.create()
+            alertDialog = dialogBuilder.create()
 
             alertDialog.window?.let { window ->
                 window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
