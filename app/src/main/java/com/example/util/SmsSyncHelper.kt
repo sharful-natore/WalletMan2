@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.net.Uri
+import com.example.data.DraftTransaction
 import com.example.data.FinanceRepository
 import com.example.data.Transaction
 import kotlinx.coroutines.flow.firstOrNull
@@ -56,6 +57,9 @@ object SmsSyncHelper {
         workspaceId: String,
         daysBack: Int = 30
     ): Int {
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        val isDirectEntry = prefs.getBoolean("is_sms_auto_direct_entry", false)
+
         val parsedSmsList = scanSmsInbox(context, daysBack)
         if (parsedSmsList.isEmpty()) return 0
 
@@ -66,22 +70,40 @@ object SmsSyncHelper {
             regex.find(tx.note)?.groupValues?.get(1)
         }.toSet()
 
+        val existingDrafts = repository.allDraftTransactions.firstOrNull() ?: emptyList()
+        val existingDraftNotes = existingDrafts.map { it.note }.toSet()
+        val existingDraftTrxIds = existingDrafts.mapNotNull { d ->
+            val regex = Regex("TrxID:\\s*([A-Za-z0-9]+)")
+            regex.find(d.note)?.groupValues?.get(1)
+        }.toSet()
+
         var insertedCount = 0
         for (parsed in parsedSmsList) {
-            if (existingNotes.contains(parsed.summaryNote)) continue
-            if (parsed.trxId != null && existingTrxIds.contains(parsed.trxId)) continue
+            if (existingNotes.contains(parsed.summaryNote) || existingDraftNotes.contains(parsed.summaryNote)) continue
+            if (parsed.trxId != null && (existingTrxIds.contains(parsed.trxId) || existingDraftTrxIds.contains(parsed.trxId))) continue
 
-            val transaction = Transaction(
-                amount = parsed.amount,
-                type = if (parsed.isIncome) "INCOME" else "EXPENSE",
-                category = parsed.category,
-                timestamp = parsed.timestamp,
-                note = parsed.summaryNote,
-                workspaceId = workspaceId,
-                subType = if (parsed.provider.contains("Bank", ignoreCase = true)) "BANK" else "MOBILE_MONEY"
-            )
-
-            repository.insertTransaction(transaction)
+            if (isDirectEntry) {
+                val transaction = Transaction(
+                    amount = parsed.amount,
+                    type = if (parsed.isIncome) "INCOME" else "EXPENSE",
+                    category = parsed.category,
+                    timestamp = parsed.timestamp,
+                    note = parsed.summaryNote,
+                    workspaceId = workspaceId,
+                    subType = if (parsed.provider.contains("Bank", ignoreCase = true)) "BANK" else "MOBILE_MONEY"
+                )
+                repository.insertTransaction(transaction)
+            } else {
+                val draft = DraftTransaction(
+                    amount = parsed.amount,
+                    type = if (parsed.isIncome) "INCOME" else "EXPENSE",
+                    category = parsed.category,
+                    note = parsed.summaryNote,
+                    timestamp = parsed.timestamp,
+                    workspaceId = workspaceId
+                )
+                repository.insertDraftTransaction(draft)
+            }
             insertedCount++
         }
 

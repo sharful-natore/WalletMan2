@@ -3358,37 +3358,25 @@ fun FinanceNoteApp(
                     ) {
                         val isSelected = activeTab == tab
 
-                        val scale by androidx.compose.animation.core.animateFloatAsState(
+                        val iconScale by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = if (isSelected) 1.15f else 1.0f,
                             animationSpec = androidx.compose.animation.core.spring(
                                 dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
                                 stiffness = androidx.compose.animation.core.Spring.StiffnessLow
                             ),
-                            label = "tabScale"
+                            label = "iconScale"
                         )
 
                         val bgAlpha by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (isSelected) 0.28f else 0f,
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
-                            ),
+                            targetValue = if (isSelected) 0.20f else 0f,
+                            animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
                             label = "tabBgAlpha"
                         )
 
                         val iconAlpha by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (isSelected) 1.0f else 0.65f,
+                            targetValue = if (isSelected) 1.0f else 0.70f,
                             animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
                             label = "tabIconAlpha"
-                        )
-
-                        val pillWidth by androidx.compose.animation.core.animateDpAsState(
-                            targetValue = if (isSelected) 56.dp else 40.dp,
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
-                            ),
-                            label = "tabPillWidth"
                         )
 
                         Box(
@@ -3405,11 +3393,9 @@ fun FinanceNoteApp(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .width(pillWidth)
-                                    .height(36.dp)
-                                    .scale(scale)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = bgAlpha)),
+                                    .background(Color.White.copy(alpha = bgAlpha))
+                                    .padding(horizontal = 18.dp, vertical = 8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (icon is ImageVector) {
@@ -3417,14 +3403,18 @@ fun FinanceNoteApp(
                                         imageVector = icon,
                                         contentDescription = null,
                                         tint = Color.White.copy(alpha = iconAlpha),
-                                        modifier = Modifier.size(iconSize)
+                                        modifier = Modifier
+                                            .size(iconSize)
+                                            .scale(iconScale)
                                     )
                                 } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
                                     Icon(
                                         painter = icon,
                                         contentDescription = null,
                                         tint = Color.White.copy(alpha = iconAlpha),
-                                        modifier = Modifier.size(iconSize)
+                                        modifier = Modifier
+                                            .size(iconSize)
+                                            .scale(iconScale)
                                     )
                                 }
                             }
@@ -7353,7 +7343,7 @@ fun DashboardScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = formatCurrency(balance, language),
-                            color = if (balance < 0) Color(0xFFFB923C) else Color.White,
+                            color = if (balance < 0) Color(0xFFFB923C) else Color(0xFFFFD700),
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
@@ -11657,8 +11647,8 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
         previousPersonIds = currentIds
     }
 
-    val categoriesIncome = listOf("Salary", "Business", "Agriculture", "Gift", "Sales", "Honorarium", "Others")
-    val categoriesExpense = listOf("Food", "Housing", "Transport", "Shopping", "Medical", "Education", "Clothing", "Others")
+    val categoriesIncome = listOf("Salary", "Business", "Freelance", "Rental", "Investment", "Gift", "Honorarium", "Others")
+    val categoriesExpense = listOf("Food", "Housing", "Bills", "Transport", "Shopping", "Medical", "Education", "Clothing", "Entertainment", "LoanRepay", "Others")
 
     val types = listOf(
         Pair("INCOME", "tx_type_income"),
@@ -12034,24 +12024,50 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             ) {
                                 val formattedCategory = if (language == AppLanguage.BN) {
                                     when (category) {
-                                        "Salary" -> "বেতন"
-                                        "Business" -> "ব্যবসা"
-                                        "Agriculture" -> "কৃষি"
-                                        "Gift" -> "উপহার"
-                                        "Sales" -> "বিক্রয়"
+                                        "Salary" -> "বেতন ও ভাতা"
+                                        "Business" -> "ব্যবসা ও বিক্রয়"
+                                        "Freelance" -> "ফ্রিল্যান্সিং ও সেবা"
+                                        "Rental" -> "বাড়ি/দোকান ভাড়া আয়"
+                                        "Investment" -> "বিনিয়োগ ও লভ্যাংশ"
+                                        "Gift" -> "উপহার ও সাহায্য"
                                         "Honorarium" -> "সম্মানী"
-                                        "Food" -> "খাবার"
-                                        "Housing" -> "বাসস্থান"
-                                        "Transport" -> "যাতায়াত"
-                                        "Shopping" -> "কেনাকাটা"
-                                        "Medical" -> "চিকিৎসা"
-                                        "Education" -> "শিক্ষা"
-                                        "Clothing" -> "পোশাক"
+                                        "Food" -> "খাবার ও মুদি"
+                                        "Housing" -> "বাসস্থান ও ঘর ভাড়া"
+                                        "Bills" -> "বিদ্যুৎ, গ্যাস ও ওয়াইফাই বিল"
+                                        "Transport" -> "পরিবহন ও জ্বালানি"
+                                        "Shopping" -> "কেনাকাটা ও গৃহস্থালি"
+                                        "Medical" -> "স্বাস্থ্য ও চিকিৎসা"
+                                        "Education" -> "শিক্ষা ও পড়াশোনা"
+                                        "Clothing" -> "পোশাক ও ফ্যাশন"
+                                        "Entertainment" -> "বিনোদন ও ভ্রমণ"
+                                        "LoanRepay" -> "ঋণ/ধার পরিশোধ"
+                                        "Agriculture" -> "কৃষি"
+                                        "Sales" -> "বিক্রয়"
                                         "Others" -> "অন্যান্য"
                                         else -> category
                                     }
                                 } else {
-                                    category
+                                    when (category) {
+                                        "Salary" -> "Salary & Allowance"
+                                        "Business" -> "Business & Sales"
+                                        "Freelance" -> "Freelancing & Services"
+                                        "Rental" -> "Rental Income"
+                                        "Investment" -> "Investment & Dividend"
+                                        "Gift" -> "Gifts & Remittance"
+                                        "Honorarium" -> "Honorarium"
+                                        "Food" -> "Food & Grocery"
+                                        "Housing" -> "Housing & Rent"
+                                        "Bills" -> "Utility Bills"
+                                        "Transport" -> "Transport & Fuel"
+                                        "Shopping" -> "Shopping & Home"
+                                        "Medical" -> "Health & Medical"
+                                        "Education" -> "Education"
+                                        "Clothing" -> "Clothing & Fashion"
+                                        "Entertainment" -> "Entertainment & Travel"
+                                        "LoanRepay" -> "Debt Repayment"
+                                        "Others" -> "Others"
+                                        else -> category
+                                    }
                                 }
 
                                 OutlinedTextField(
@@ -12075,23 +12091,51 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                     cats.forEach { cat ->
                                         val catLabel = if (language == AppLanguage.BN) {
                                             when (cat) {
-                                                "Salary" -> "বেতন"
-                                                "Business" -> "ব্যবসা"
-                                                "Agriculture" -> "কৃষি"
-                                                "Gift" -> "উপহার"
-                                                "Sales" -> "বিক্রয়"
+                                                "Salary" -> "বেতন ও ভাতা"
+                                                "Business" -> "ব্যবসা ও বিক্রয়"
+                                                "Freelance" -> "ফ্রিল্যান্সিং ও সেবা"
+                                                "Rental" -> "বাড়ি/দোকান ভাড়া আয়"
+                                                "Investment" -> "বিনিয়োগ ও লভ্যাংশ"
+                                                "Gift" -> "উপহার ও সাহায্য"
                                                 "Honorarium" -> "সম্মানী"
+                                                "Food" -> "খাবার ও মুদি"
+                                                "Housing" -> "বাসস্থান ও ঘর ভাড়া"
+                                                "Bills" -> "বিদ্যুৎ, গ্যাস ও ওয়াইফাই বিল"
+                                                "Transport" -> "পরিবহন ও জ্বালানি"
+                                                "Shopping" -> "কেনাকাটা ও গৃহস্থালি"
+                                                "Medical" -> "স্বাস্থ্য ও চিকিৎসা"
+                                                "Education" -> "শিক্ষা ও পড়াশোনা"
+                                                "Clothing" -> "পোশাক ও ফ্যাশন"
+                                                "Entertainment" -> "বিনোদন ও ভ্রমণ"
+                                                "LoanRepay" -> "ঋণ/ধার পরিশোধ"
+                                                "Agriculture" -> "কৃষি"
+                                                "Sales" -> "বিক্রয়"
                                                 "Others" -> "অন্যান্য"
-                                                "Food" -> "খাবার"
-                                                "Housing" -> "বাসস্থান"
-                                                "Transport" -> "যাতায়াত"
-                                                "Shopping" -> "কেনাকাটা"
-                                                "Education" -> "শিক্ষা"
-                                                "Medical" -> "চিকিৎসা"
-                                                "Clothing" -> "পোশাক"
                                                 else -> cat
                                             }
-                                        } else cat
+                                        } else {
+                                            when (cat) {
+                                                "Salary" -> "Salary & Allowance"
+                                                "Business" -> "Business & Sales"
+                                                "Freelance" -> "Freelancing & Services"
+                                                "Rental" -> "Rental Income"
+                                                "Investment" -> "Investment & Dividend"
+                                                "Gift" -> "Gifts & Remittance"
+                                                "Honorarium" -> "Honorarium"
+                                                "Food" -> "Food & Grocery"
+                                                "Housing" -> "Housing & Rent"
+                                                "Bills" -> "Utility Bills"
+                                                "Transport" -> "Transport & Fuel"
+                                                "Shopping" -> "Shopping & Home"
+                                                "Medical" -> "Health & Medical"
+                                                "Education" -> "Education"
+                                                "Clothing" -> "Clothing & Fashion"
+                                                "Entertainment" -> "Entertainment & Travel"
+                                                "LoanRepay" -> "Debt Repayment"
+                                                "Others" -> "Others"
+                                                else -> cat
+                                            }
+                                        }
 
                                         DropdownMenuItem(
                                             text = { Text(catLabel) },
@@ -12101,6 +12145,48 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                             }
                                         )
                                     }
+                                }
+                            }
+                        }
+
+                        // Subcategory suggestion chips
+                        val subCats = when (category) {
+                            "Salary" -> if (language == AppLanguage.BN) listOf("মূল বেতন", "বোনাস", "ওভারটাইম", "হাতখরচ") else listOf("Basic", "Bonus", "Overtime", "Allowance")
+                            "Business" -> if (language == AppLanguage.BN) listOf("পণ্য বিক্রি", "কাস্টমার পেমেন্ট", "লাভের অংশ") else listOf("Sales", "Customer Payment", "Profit Share")
+                            "Freelance" -> if (language == AppLanguage.BN) listOf("প্রজেক্ট ফি", "মার্কেটপ্লেস", "কনসালটেন্সি") else listOf("Project Fee", "Marketplace", "Consultancy")
+                            "Rental" -> if (language == AppLanguage.BN) listOf("বাসা ভাড়া", "দোকান ভাড়া", "গ্যারেজ ভাড়া") else listOf("House Rent", "Shop Rent", "Garage Rent")
+                            "Investment" -> if (language == AppLanguage.BN) listOf("সঞ্চয়পত্র লাভ", "শেয়ারবাজার", "ডিপোজিট লাভ") else listOf("Savings Profit", "Stocks", "Deposit Profit")
+                            "Gift" -> if (language == AppLanguage.BN) listOf("ঈদ উপহার", "রেমিটেন্স", "সাহায্য") else listOf("Eid Gift", "Remittance", "Family Help")
+                            "Food" -> if (language == AppLanguage.BN) listOf("কাঁচা বাজার", "রেস্টুরেন্ট", "স্ন্যাকস/চা", "অনলাইন ফুড") else listOf("Grocery", "Restaurant", "Snacks & Tea", "Online Food")
+                            "Housing" -> if (language == AppLanguage.BN) listOf("বাসা ভাড়া", "সার্ভিস চার্জ", "মেরামত") else listOf("House Rent", "Service Charge", "Repairs")
+                            "Bills" -> if (language == AppLanguage.BN) listOf("বিদ্যুৎ বিল", "ওয়াইফাই বিল", "গ্যাস বিল", "পানির বিল", "মোবাইল রিচার্জ") else listOf("Electricity", "WiFi Bill", "Gas Bill", "Water Bill", "Mobile Recharge")
+                            "Transport" -> if (language == AppLanguage.BN) listOf("বাস/রিকশা ভাড়া", "রাইড শেয়ার (Uber/Pathao)", "জ্বালানি তেল", "গাড়ি মেরামত") else listOf("Bus/Rickshaw", "Ride Sharing", "Fuel", "Vehicle Repair")
+                            "Shopping" -> if (language == AppLanguage.BN) listOf("কসমেটিকস", "ইলেক্ট্রনিক্স", "গৃহস্থালি") else listOf("Cosmetics", "Electronics", "Household")
+                            "Medical" -> if (language == AppLanguage.BN) listOf("ডাক্তারের ফি", "ওষুধপত্র", "ল্যাব টেস্ট/ডায়াগনস্টিক") else listOf("Doctor Fee", "Medicine", "Diagnostic Test")
+                            "Education" -> if (language == AppLanguage.BN) listOf("টিউটর ফি", "স্কুল/কলেজ ফি", "বই ও খাতা", "কোর্স ফি") else listOf("Tutor Fee", "Tuition Fee", "Books", "Course Fee")
+                            "Clothing" -> if (language == AppLanguage.BN) listOf("জামাকাপড়", "জুতো", "এক্সেসরিজ") else listOf("Clothes", "Shoes", "Accessories")
+                            "Entertainment" -> if (language == AppLanguage.BN) listOf("সিনেমা/ওটিটি", "ভ্রমণ/ট্যুর", "পার্ক/আউটিং", "শখ") else listOf("Movies/OTT", "Travel/Tour", "Park/Outing", "Hobby")
+                            else -> emptyList()
+                        }
+
+                        if (subCats.isNotEmpty()) {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(top = 8.dp)
+                            ) {
+                                items(subCats) { subCat ->
+                                    val isSelected = note.contains(subCat)
+                                    androidx.compose.material3.FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            note = if (note.isBlank()) subCat else if (!note.contains(subCat)) "$note ($subCat)" else note
+                                        },
+                                        label = { Text(subCat, fontSize = 11.sp) },
+                                        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                            selectedLabelColor = Color.White
+                                        )
+                                    )
                                 }
                             }
                         }
@@ -16235,6 +16321,7 @@ fun SettingsScreen(
 
         // --- SMS AUTO PARSER CATEGORY ---
         val isSmsAutoParseEnabled by viewModel.isSmsAutoParseEnabled.collectAsState()
+        val isSmsAutoDirectEntry by viewModel.isSmsAutoDirectEntry.collectAsState()
         var isScanningSms by remember { mutableStateOf(false) }
 
         val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -16332,6 +16419,113 @@ fun SettingsScreen(
                             uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
                         )
                     )
+                }
+
+                if (isSmsAutoParseEnabled) {
+                    HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "এসএমএস এন্ট্রি মেথড (Entry Mode):" else "SMS Entry Mode:",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Option 1: Review/Draft Entry (Default)
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.setSmsAutoDirectEntry(context, false) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (!isSmsAutoDirectEntry) Color(0xFF10B981).copy(alpha = 0.15f) else (if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                                ),
+                                border = BorderStroke(
+                                    width = if (!isSmsAutoDirectEntry) 1.5.dp else 1.dp,
+                                    color = if (!isSmsAutoDirectEntry) Color(0xFF10B981) else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        RadioButton(
+                                            selected = !isSmsAutoDirectEntry,
+                                            onClick = { viewModel.setSmsAutoDirectEntry(context, false) },
+                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF10B981))
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "খসড়া রিভিউ (ডিফল্ট)" else "Draft Review (Default)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                                        )
+                                    }
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "এসএমএস পাওয়ার পর খসড়ায় জমা হবে, ম্যানুয়ালি রিভিউ করে কনফার্ম করবেন।" else "Saved to drafts first for manual review & confirmation.",
+                                        fontSize = 11.sp,
+                                        color = if (isDark) Color.LightGray else Color(0xFF475569),
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+
+                            // Option 2: Direct Auto Entry
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { viewModel.setSmsAutoDirectEntry(context, true) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSmsAutoDirectEntry) Color(0xFF2563EB).copy(alpha = 0.15f) else (if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                                ),
+                                border = BorderStroke(
+                                    width = if (isSmsAutoDirectEntry) 1.5.dp else 1.dp,
+                                    color = if (isSmsAutoDirectEntry) Color(0xFF2563EB) else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        RadioButton(
+                                            selected = isSmsAutoDirectEntry,
+                                            onClick = { viewModel.setSmsAutoDirectEntry(context, true) },
+                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF2563EB))
+                                        )
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "সরাসরি অটো এন্ট্রি" else "Direct Auto Entry",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                                        )
+                                    }
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "এসএমএস পাওয়ার সাথে সাথে সরাসরি মূল লেনদেনে যোগ হবে।" else "Directly added to main transaction history immediately.",
+                                        fontSize = 11.sp,
+                                        color = if (isDark) Color.LightGray else Color(0xFF475569),
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))

@@ -243,6 +243,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isSmsAutoParseEnabled = MutableStateFlow(true)
     val isSmsAutoParseEnabled: StateFlow<Boolean> = _isSmsAutoParseEnabled.asStateFlow()
 
+    private val _isSmsAutoDirectEntry = MutableStateFlow(false)
+    val isSmsAutoDirectEntry: StateFlow<Boolean> = _isSmsAutoDirectEntry.asStateFlow()
+
     private val _isBiometricEnabled = MutableStateFlow(false)
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
     private val _isBiometricActionEnabled = MutableStateFlow(false)
@@ -2236,12 +2239,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     fun verifySmsAutoParseState(context: Context) {
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         _isSmsAutoParseEnabled.value = prefs.getBoolean("is_sms_auto_parse_enabled", true)
+        _isSmsAutoDirectEntry.value = prefs.getBoolean("is_sms_auto_direct_entry", false)
     }
 
     fun setSmsAutoParseEnabled(context: Context, enabled: Boolean) {
         _isSmsAutoParseEnabled.value = enabled
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         prefs.edit().putBoolean("is_sms_auto_parse_enabled", enabled).apply()
+    }
+
+    fun setSmsAutoDirectEntry(context: Context, direct: Boolean) {
+        _isSmsAutoDirectEntry.value = direct
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("is_sms_auto_direct_entry", direct).apply()
     }
 
     fun syncSmsInbox(context: Context, daysBack: Int = 30, onResult: (newCount: Int) -> Unit) {

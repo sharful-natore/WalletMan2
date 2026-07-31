@@ -495,8 +495,8 @@ fun AutoEntryFormDialog(
     var timeOfDay by remember { mutableStateOf(entry?.timeOfDay ?: "09:00") }
     var askBeforeAdding by remember { mutableStateOf(entry?.askBeforeAdding ?: true) }
 
-    val expenseCategories = listOf("বাসা ভাড়া", "বিদ্যুৎ বিল", "ওয়াইফাই বিল", "মুদি খরচ", "মোবাইল রিচার্জ", "পড়াশোনা", "চিকিৎসা", "পরিবহন", "অন্যান্য")
-    val incomeCategories = listOf("বেতন", "ব্যবসা", "ফ্রিল্যান্সিং", "বাড়ি ভাড়া আয়", "বিনিয়োগ আয়", "অন্যান্য")
+    val expenseCategories = listOf("খাবার ও মুদি", "বাসা ভাড়া ও সার্ভিস", "বিদ্যুৎ/গ্যাস/ওয়াইফাই বিল", "পরিবহন ও জ্বালানি", "মোবাইল রিচার্জ", "শিক্ষা ও পড়াশোনা", "স্বাস্থ্য ও চিকিৎসা", "কেনাকাটা", "বিনোদন ও ভ্রমণ", "অন্যান্য")
+    val incomeCategories = listOf("বেতন ও ভাতা", "ব্যবসা ও বিক্রয়", "ফ্রিল্যান্সিং ও সেবা", "বাড়ি/দোকান ভাড়া আয়", "বিনিয়োগ ও লভ্যাংশ", "উপহার ও সাহায্য", "অন্যান্য")
 
     Dialog(
         onDismissRequest = onDismiss,
