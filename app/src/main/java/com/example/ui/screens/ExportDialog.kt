@@ -18,7 +18,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -895,9 +898,10 @@ fun ExportDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        val dialogBg = if (isDark) Color(0xFF1E293B) else Color.White
-        val cardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF3F4F6)
-        val textPrimary = if (isDark) Color.White else Color(0xFF1F2937)
+        val dialogBg = if (isDark) Color(0xFF0F172A) else Color.White
+        val cardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
+        val primaryAccent = Color(0xFF2563EB) // Fintech Blue matching main app theme
+        val textPrimary = if (isDark) Color.White else Color.Black.copy(alpha = 0.95f)
         val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF4B5563)
 
         Card(
@@ -928,13 +932,13 @@ fun ExportDialog(
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
-                                .background(Color(0xFF10B981).copy(alpha = 0.15f), CircleShape),
+                                .background(primaryAccent.copy(alpha = 0.12f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Download,
                                 contentDescription = null,
-                                tint = Color(0xFF10B981),
+                                tint = primaryAccent,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -964,7 +968,7 @@ fun ExportDialog(
                             text = if (isBn) "ফাইল ফরম্যাট বেছে নিন" else "Choose File Format",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF10B981)
+                            color = primaryAccent
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
@@ -981,7 +985,7 @@ fun ExportDialog(
                                         .clickable { selectedFormat = format },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (selected) Color(0xFF10B981) else cardBg
+                                        containerColor = if (selected) primaryAccent else cardBg
                                     ),
                                     border = if (selected) null else BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
                                 ) {
@@ -1007,7 +1011,7 @@ fun ExportDialog(
                             text = if (isBn) "এক্সপোর্ট বিবরণ বা টাইপ" else "Select Data to Export",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF10B981)
+                            color = primaryAccent
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
@@ -1024,14 +1028,24 @@ fun ExportDialog(
                             Triple("ONLY_BUDGET", "বাজেট", "Budget")
                         )
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
+                        val categoryLazyState = rememberLazyListState()
+                        val categoryIndex = categories.indexOfFirst { it.first == selectedCategory }
+                        LaunchedEffect(selectedCategory) {
+                            if (categoryIndex >= 0) {
+                                val isVisible = categoryLazyState.layoutInfo.visibleItemsInfo.any { it.index == categoryIndex }
+                                if (!isVisible) {
+                                    categoryLazyState.animateScrollToItem(categoryIndex)
+                                }
+                            }
+                        }
+
+                        LazyRow(
+                            state = categoryLazyState,
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            for (cat in categories) {
+                            itemsIndexed(categories) { _, cat ->
                                 val catId = cat.first
                                 val catBn = cat.second
                                 val catEn = cat.third
@@ -1041,7 +1055,7 @@ fun ExportDialog(
                                         .clickable { selectedCategory = catId },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (selected) Color(0xFF10B981) else cardBg
+                                        containerColor = if (selected) primaryAccent else cardBg
                                     ),
                                     border = if (selected) null else BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
                                 ) {
@@ -1063,27 +1077,37 @@ fun ExportDialog(
                             text = if (isBn) "সময়কাল নির্বাচন করুন" else "Select Time Period",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF10B981)
+                            color = primaryAccent
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val timeFilters = listOf(
+                            Pair("ALL_TIME", if (isBn) "সব সময়" else "All Time"),
                             Pair("MONTH", if (isBn) "নির্দিষ্ট মাস" else "Month"),
                             Pair("YEAR", if (isBn) "নির্দিষ্ট বছর" else "Year"),
                             Pair("DATE_RANGE", if (isBn) "তারিখ টু তারিখ" else "Custom Range"),
                             Pair("MONTH_RANGE", if (isBn) "মাস টু মাস" else "Month Range"),
-                            Pair("YEAR_RANGE", if (isBn) "বছর টু বছর" else "Year Range"),
-                            Pair("ALL_TIME", if (isBn) "সব সময়" else "All Time")
+                            Pair("YEAR_RANGE", if (isBn) "বছর টু বছর" else "Year Range")
                         )
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
+                        val timeFilterLazyState = rememberLazyListState()
+                        val timeFilterIndex = timeFilters.indexOfFirst { it.first == selectedTimeFilter }
+                        LaunchedEffect(selectedTimeFilter) {
+                            if (timeFilterIndex >= 0) {
+                                val isVisible = timeFilterLazyState.layoutInfo.visibleItemsInfo.any { it.index == timeFilterIndex }
+                                if (!isVisible) {
+                                    timeFilterLazyState.animateScrollToItem(timeFilterIndex)
+                                }
+                            }
+                        }
+
+                        LazyRow(
+                            state = timeFilterLazyState,
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            for (tf in timeFilters) {
+                            itemsIndexed(timeFilters) { _, tf ->
                                 val filterId = tf.first
                                 val label = tf.second
                                 val selected = selectedTimeFilter == filterId
@@ -1092,7 +1116,7 @@ fun ExportDialog(
                                         .clickable { selectedTimeFilter = filterId },
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (selected) Color(0xFF10B981) else cardBg
+                                        containerColor = if (selected) primaryAccent else cardBg
                                     ),
                                     border = if (selected) null else BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
                                 ) {
@@ -1916,11 +1940,11 @@ fun ExportDialog(
                             .height(48.dp)
                             .testTag("export_share_button"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981), contentColor = Color.White)
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryAccent, contentColor = Color.White)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(imageVector = Icons.Rounded.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
-                            Text(text = if (isBn) "শেয়ার করুন" else "Share Report", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = if (isBn) "শেয়ার" else "Share", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1944,7 +1968,7 @@ fun ExportDialog(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            CircularProgressIndicator(color = Color(0xFF10B981))
+                            CircularProgressIndicator(color = primaryAccent)
                             Text(
                                 text = if (isBn) "ফাইল তৈরি হচ্ছে..." else "Generating file...",
                                 fontWeight = FontWeight.Bold,

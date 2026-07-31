@@ -3357,6 +3357,40 @@ fun FinanceNoteApp(
                         iconSize: androidx.compose.ui.unit.Dp = 24.dp
                     ) {
                         val isSelected = activeTab == tab
+
+                        val scale by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (isSelected) 1.15f else 1.0f,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                            ),
+                            label = "tabScale"
+                        )
+
+                        val bgAlpha by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (isSelected) 0.28f else 0f,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+                            ),
+                            label = "tabBgAlpha"
+                        )
+
+                        val iconAlpha by androidx.compose.animation.core.animateFloatAsState(
+                            targetValue = if (isSelected) 1.0f else 0.65f,
+                            animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+                            label = "tabIconAlpha"
+                        )
+
+                        val pillWidth by androidx.compose.animation.core.animateDpAsState(
+                            targetValue = if (isSelected) 56.dp else 40.dp,
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+                            ),
+                            label = "tabPillWidth"
+                        )
+
                         Box(
                             modifier = Modifier
                                 .clip(CircleShape)
@@ -3371,22 +3405,25 @@ fun FinanceNoteApp(
                         ) {
                             Box(
                                 modifier = Modifier
+                                    .width(pillWidth)
+                                    .height(36.dp)
+                                    .scale(scale)
                                     .clip(CircleShape)
-                                    .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                                    .padding(horizontal = 18.dp, vertical = 8.dp)
-                             ) {
+                                    .background(Color.White.copy(alpha = bgAlpha)),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 if (icon is ImageVector) {
                                     Icon(
                                         imageVector = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.70f),
+                                        tint = Color.White.copy(alpha = iconAlpha),
                                         modifier = Modifier.size(iconSize)
                                     )
                                 } else if (icon is androidx.compose.ui.graphics.painter.Painter) {
                                     Icon(
                                         painter = icon,
                                         contentDescription = null,
-                                        tint = if (isSelected) Color.White else Color.White.copy(alpha = 0.70f),
+                                        tint = Color.White.copy(alpha = iconAlpha),
                                         modifier = Modifier.size(iconSize)
                                     )
                                 }
@@ -7316,7 +7353,7 @@ fun DashboardScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = formatCurrency(balance, language),
-                            color = Color.White,
+                            color = if (balance < 0) Color(0xFFFB923C) else Color.White,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
@@ -7577,7 +7614,7 @@ fun DashboardScreen(
                                 text = if (language == AppLanguage.BN) "তথ্য/রিপোর্ট এক্সপোর্ট করুন" else "Export Data/Report",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                                color = if (isDark) Color.White else Color.Black.copy(alpha = 0.95f)
                             )
                         }
 
@@ -14253,6 +14290,7 @@ fun SettingsScreen(
     
     LaunchedEffect(Unit) {
         viewModel.verifyNotificationState(context)
+        viewModel.verifySmsAutoParseState(context)
     }
 
     val rawProfileName by viewModel.profileName.collectAsState()
@@ -14330,9 +14368,80 @@ fun SettingsScreen(
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showTermsDialog by remember { mutableStateOf(false) }
     var showErrorLogDialog by remember { mutableStateOf(false) }
+    var showOppoGuideDialog by remember { mutableStateOf(false) }
     var currentLogsText by remember { mutableStateOf("") }
     var autoBackupDropdownExpanded by remember { mutableStateOf(false) }
     var showTrashDialog by remember { mutableStateOf(false) }
+
+    if (showOppoGuideDialog) {
+        AlertDialog(
+            onDismissRequest = { showOppoGuideDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Smartphone, contentDescription = null, tint = Color(0xFFD97706))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "Oppo A5s ও সকল ফোন গাইড" else "Oppo A5s & Phone Guide",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "Oppo A5s, Realme, Xiaomi, Vivo বা Huawei ফোনে ব্যাকগ্রাউন্ড অ্যাপ কিলিং পলিসির কারণে ব্যাকগ্রাউন্ডে রিয়েলটাইম এসএমএস মিস হতে পারে। ১০০% নির্ভুল এসএমএস পার্সিং নিশ্চিত করতে নিচের ধাপগুলো অনুসরণ করুন:"
+                            else "Due to aggressive background app management in Oppo A5s, Xiaomi, Vivo, or Realme, background SMS alerts might be delayed when closed. Follow these steps for 100% background reliability:",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.LightGray else Color(0xFF334155),
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "১. ফোনের Settings > App Management এ যান।\n" +
+                            "২. 'Finance Note' চিহ্নিত করে 'Auto-start' বা 'Allow Background Launch' অন করুন।\n" +
+                            "৩. Battery Optimization থেকে 'No Restrictions' দিন।\n" +
+                            "৪. অথবা অ্যাপে ঢুকে 'ইনবক্সের এসএমএস স্ক্যান ও সিঙ্ক করুন' বাটনে চাপলেই আপনার অদেখা সব বিকাশ, নগদ ও ব্যাংকের এসএমএস স্বয়ংক্রিয়ভাবে নোটে যোগ হয়ে যাবে।"
+                            else "1. Go to Settings > App Management.\n" +
+                            "2. Select 'Finance Note' and enable 'Auto-start'.\n" +
+                            "3. Set Battery Optimization to 'No Restrictions'.\n" +
+                            "4. Or simply tap 'Scan & Sync SMS Inbox' inside Finance Note anytime to import all unread financial SMS!",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.White else Color.Black,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        try {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", context.packageName, null)
+                            )
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        showOppoGuideDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                ) {
+                    Text(text = if (language == AppLanguage.BN) "অ্যাপ সেটিংস খুলুন" else "Open App Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOppoGuideDialog = false }) {
+                    Text(text = if (language == AppLanguage.BN) "বন্ধ করুন" else "Close")
+                }
+            }
+        )
+    }
 
     if (showTrashDialog) {
         TrashDialog(
@@ -16124,6 +16233,171 @@ fun SettingsScreen(
 
 
 
+        // --- SMS AUTO PARSER CATEGORY ---
+        val isSmsAutoParseEnabled by viewModel.isSmsAutoParseEnabled.collectAsState()
+        var isScanningSms by remember { mutableStateOf(false) }
+
+        val smsPermissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            val receiveGranted = permissions[android.Manifest.permission.RECEIVE_SMS] ?: false
+            val readGranted = permissions[android.Manifest.permission.READ_SMS] ?: false
+            if (receiveGranted || readGranted) {
+                viewModel.setSmsAutoParseEnabled(context, true)
+                viewModel.triggerCustomNotification(
+                    if (language == AppLanguage.BN) "এসএমএস অটো পার্সার চালু করা হয়েছে!" else "SMS Auto Parser enabled!",
+                    isSuccess = true,
+                    type = "SUCCESS"
+                )
+            } else {
+                viewModel.setSmsAutoParseEnabled(context, false)
+                viewModel.triggerCustomNotification(
+                    if (language == AppLanguage.BN) "এসএমএস পারমিশন প্রয়োজন" else "SMS permission required",
+                    isSuccess = false,
+                    type = "INFO"
+                )
+            }
+        }
+
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "এসএমএস অটো পার্সার (SMS Auto-Parser)" else "SMS Auto-Parser Settings",
+            isDark = isDark,
+            icon = Icons.Rounded.Sms,
+            initiallyExpanded = false
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFF10B981).copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Sms,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "এসএমএস পার্সিং অন/অফ" else "SMS Auto Parse Toggle",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "বিকাশ, নগদ, রকেট, ব্যাংক লেনদেনের এসএমএস অটো সনাক্ত করুন" else "Auto detect bKash, Nagad, Rocket, Bank SMS transactions",
+                            fontSize = 12.sp,
+                            color = if (isDark) Color.Gray else Color(0xFF64748B)
+                        )
+                    }
+                    Switch(
+                        checked = isSmsAutoParseEnabled,
+                        onCheckedChange = { checkState ->
+                            if (checkState) {
+                                val hasReceive = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.RECEIVE_SMS
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                val hasRead = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context, android.Manifest.permission.READ_SMS
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                                if (!hasReceive || !hasRead) {
+                                    smsPermissionLauncher.launch(
+                                        arrayOf(
+                                            android.Manifest.permission.RECEIVE_SMS,
+                                            android.Manifest.permission.READ_SMS
+                                        )
+                                    )
+                                } else {
+                                    viewModel.setSmsAutoParseEnabled(context, true)
+                                }
+                            } else {
+                                viewModel.setSmsAutoParseEnabled(context, false)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color(0xFF10B981),
+                            uncheckedThumbColor = if (isDark) Color.Gray else Color.White,
+                            uncheckedTrackColor = if (isDark) Color(0xFF2A2E42) else Color(0xFFE2E8F0)
+                        )
+                    )
+                }
+
+                HorizontalDivider(color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+
+                Button(
+                    onClick = {
+                        val hasRead = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.READ_SMS
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                        if (!hasRead) {
+                            smsPermissionLauncher.launch(arrayOf(android.Manifest.permission.READ_SMS, android.Manifest.permission.RECEIVE_SMS))
+                        } else {
+                            isScanningSms = true
+                            viewModel.syncSmsInbox(context, daysBack = 30) { count ->
+                                isScanningSms = false
+                                if (count > 0) {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "$count টি নতুন লেনদেন ইনবক্স থেকে সেভ করা হয়েছে!" else "$count new transactions synced from SMS inbox!",
+                                        isSuccess = true,
+                                        type = "SUCCESS"
+                                    )
+                                } else {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "কোনো নতুন বা অদেখা আর্থিক এসএমএস পাওয়া যায়নি" else "No new financial SMS found in inbox",
+                                        isSuccess = true,
+                                        type = "INFO"
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                    enabled = !isScanningSms
+                ) {
+                    if (isScanningSms) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (language == AppLanguage.BN) "ইনবক্স স্ক্যান হচ্ছে..." else "Scanning Inbox...", fontSize = 12.sp, color = Color.White)
+                    } else {
+                        Icon(Icons.Rounded.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (language == AppLanguage.BN) "ইনবক্সের এসএমএস স্ক্যান ও সিঙ্ক করুন" else "Scan & Sync SMS Inbox", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { showOppoGuideDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFD97706))
+                ) {
+                    Icon(Icons.Rounded.Smartphone, contentDescription = null, tint = Color(0xFFD97706), modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (language == AppLanguage.BN) "Oppo/Xiaomi/Vivo ব্যাকগ্রাউন্ড সেটআপ গাইড" else "Oppo/Xiaomi Background Setup Guide",
+                        fontSize = 12.sp,
+                        color = Color(0xFFD97706),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
         // --- 6. APP ERROR LOG (SUPPORT) CARD ---
         SettingCategory(
             title = if (language == AppLanguage.BN) "অ্যাপ এর লগ (সাপোর্ট)" else "App Error Log (Support)",
@@ -16775,6 +17049,13 @@ fun SettingsScreen(
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "৫. এসএমএস পার্সার ও ডাটা প্রাইভেসি (SMS Auto Parser Privacy):\nFinance Note আপনার বিকাশ, নগদ, রকেট ও ব্যাংক লেনদেনের এসএমএস অটো সনাক্ত করার জন্য READ_SMS ও RECEIVE_SMS অনুমতি ব্যবহার করে। আপনার কোনো এসএমএস বা ব্যক্তিগত তথ্য কখনোই আমাদের কোনো সার্ভারে বা থার্ড-পার্টির কাছে পাঠানো হয় না। সকল পার্সিং ১০০% অন-ডিভাইস প্রসেসিং এর মাধ্যমে সম্পন্ন হয়। সেটিংস থেকে যেকোনো সময় এসএমএস পার্সার অন বা অফ করা যায়।"
+                            else "5. SMS Parser & Data Privacy:\nFinance Note uses SMS permissions (READ_SMS, RECEIVE_SMS) strictly to auto-detect financial transactions (bKash, Nagad, Rocket, Bank SMS). All SMS parsing occurs 100% locally on your device. No SMS content is ever uploaded to any server or third party. You can enable or disable SMS parsing in Settings anytime.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.LightGray else Color(0xFF334155)
+                    )
                 }
             },
             confirmButton = {
@@ -16827,6 +17108,13 @@ fun SettingsScreen(
                         text = if (language == AppLanguage.BN)
                             "৪. পলিসি ও ফিচার পরিবর্তন:\nউত্তম সেবা এবং সর্বোচ্চ সিকিউরিটি বজায় রাখতে Finance Note যেকোনো সময় অ্যাপের শর্তাবলী, ইন্টারফেস এবং ফিচার পরিবর্তন করার পূর্ণ অধিকার সংরক্ষণ করে।"
                             else "4. Policy & Feature Updates:\nTo ensure the best user experience and highest standards of security, Finance Note reserves the right to update these terms, interfaces, and features at any time.",
+                        fontSize = 12.sp,
+                        color = if (isDark) Color.LightGray else Color(0xFF334155)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "৫. এসএমএস পার্সিং ও ফোন সামঞ্জস্যতা (Oppo A5s ও সকল ডিভাইস):\nবিকাশ, নগদ বা ব্যাংক এসএমএস অটো-এন্ট্রি ফোনের সিস্টেম ব্রডকাস্ট রিসিভারের উপর নির্ভরশীল। Oppo, Xiaomi, Vivo ইত্যাদি ব্র্যান্ডের আগ্রাসী ব্যাকগ্রাউন্ড অ্যাপ কিলিং এর ক্ষেত্রে ইউজার সেটিংসে 'Auto-start' অন করতে পারেন অথবা অ্যাপ থেকে সরাসরি 'ইনবক্সের এসএমএস স্ক্যান ও সিঙ্ক করুন' বাটনে চাপ দিয়ে যেকোনো সময় মিস হওয়া এসএমএস লেনদেন আপডেট করে নিতে পারবেন।"
+                            else "5. SMS Parsing & Device Compatibility:\nSMS auto-entry relies on Android broadcast receivers. For budget devices with aggressive background app policies (e.g., Oppo A5s, Xiaomi, Vivo), users are advised to enable 'Auto-start' in system settings or use the manual 'Scan & Sync SMS Inbox' button inside Finance Note anytime.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.LightGray else Color(0xFF334155)
                     )

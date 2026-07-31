@@ -240,6 +240,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
 
+    private val _isSmsAutoParseEnabled = MutableStateFlow(true)
+    val isSmsAutoParseEnabled: StateFlow<Boolean> = _isSmsAutoParseEnabled.asStateFlow()
+
     private val _isBiometricEnabled = MutableStateFlow(false)
     val isBiometricEnabled: StateFlow<Boolean> = _isBiometricEnabled.asStateFlow()
     private val _isBiometricActionEnabled = MutableStateFlow(false)
@@ -2228,6 +2231,32 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
 
         _isNotificationEnabled.value = isActuallyEnabled
+    }
+
+    fun verifySmsAutoParseState(context: Context) {
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        _isSmsAutoParseEnabled.value = prefs.getBoolean("is_sms_auto_parse_enabled", true)
+    }
+
+    fun setSmsAutoParseEnabled(context: Context, enabled: Boolean) {
+        _isSmsAutoParseEnabled.value = enabled
+        val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("is_sms_auto_parse_enabled", enabled).apply()
+    }
+
+    fun syncSmsInbox(context: Context, daysBack: Int = 30, onResult: (newCount: Int) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeWsId = currentWorkspace.value.id
+            val insertedCount = com.example.util.SmsSyncHelper.syncSmsInboxToDatabase(
+                context = context,
+                repository = repository,
+                workspaceId = activeWsId,
+                daysBack = daysBack
+            )
+            withContext(Dispatchers.Main) {
+                onResult(insertedCount)
+            }
+        }
     }
 
     // Profile Settings Helpers
