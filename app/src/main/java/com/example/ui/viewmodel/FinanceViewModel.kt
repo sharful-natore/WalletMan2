@@ -671,16 +671,28 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             val workspaceId = _currentWorkspaceId.value
             val existing = repository.getMonthlyBudget(year, month, workspaceId)
-            val newBudget = existing?.copy(
-                income = income ?: existing.income,
-                expense = expense ?: existing.expense,
-                savings = savings ?: existing.savings
-            ) ?: com.example.data.MonthlyBudget(
+            
+            val targetVal = year * 12 + (month - 1)
+            val allBudgets = repository.getAllMonthlyBudgetsList(workspaceId)
+            val previous = if (existing == null) {
+                allBudgets
+                    .filter { (it.year * 12 + (it.month - 1)) < targetVal }
+                    .maxByOrNull { it.year * 12 + (it.month - 1) }
+            } else null
+            
+            val ws = if (existing == null && previous == null) repository.getWorkspaceById(workspaceId) else null
+
+            val baseIncome = existing?.income ?: previous?.income ?: ws?.budgetIncome ?: 0.0
+            val baseExpense = existing?.expense ?: previous?.expense ?: ws?.budgetExpense ?: 0.0
+            val baseSavings = existing?.savings ?: previous?.savings ?: ws?.budgetSavings ?: 0.0
+
+            val newBudget = com.example.data.MonthlyBudget(
+                id = existing?.id ?: 0,
                 year = year,
                 month = month,
-                income = income ?: 0.0,
-                expense = expense ?: 0.0,
-                savings = savings ?: 0.0,
+                income = income ?: baseIncome,
+                expense = expense ?: baseExpense,
+                savings = savings ?: baseSavings,
                 workspaceId = workspaceId
             )
             repository.insertMonthlyBudget(newBudget)

@@ -3672,6 +3672,10 @@ fun FinanceNoteApp(
                                 HorizontalPager(
                                     state = pagerState,
                                     beyondViewportPageCount = 1,
+                                    flingBehavior = PagerDefaults.flingBehavior(
+                                        state = pagerState,
+                                        snapPositionalThreshold = 0.5f
+                                    ),
                                     modifier = Modifier.fillMaxSize()
                                 ) { page ->
                                     when (page) {
@@ -6688,6 +6692,7 @@ fun DashboardScreen(
     var showBudgetDetailsType by remember { mutableStateOf<String?>(null) }
     var activeAlertPopup by remember { mutableStateOf<BudgetAlertData?>(null) }
     val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    val dashboardPrevMonthTransactions = remember(transactions, timeFilter) { getPreviousMonthTransactions(transactions, timeFilter) }
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
 
@@ -6713,30 +6718,33 @@ fun DashboardScreen(
     val monthlyBudgets by viewModel?.monthlyBudgets?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
     val budgetGradients by viewModel?.budgetGradients?.collectAsState() ?: remember { mutableStateOf(emptyMap()) }
 
-    val budgetIncomeAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
-        val ym = getYearMonthFromFilter(timeFilter)
-        if (ym != null) {
-            monthlyBudgets.find { it.year == ym.first && (it.month == ym.second || it.month == ym.second - 1) }?.income ?: 0.0
-        } else if (timeFilter == "ALL") {
-            currentWorkspace.budgetIncome
-        } else 0.0
+    val effectiveMonthlyBudget = remember(timeFilter, monthlyBudgets, currentWorkspace) {
+        val ym = getYearMonthFromFilter(timeFilter) ?: run {
+            val cal = java.util.Calendar.getInstance()
+            Pair(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+        }
+        val targetVal = ym.first * 12 + (ym.second - 1)
+        val exact = monthlyBudgets.find { it.year == ym.first && it.month == ym.second }
+        if (exact != null) {
+            exact
+        } else {
+            val prev = monthlyBudgets
+                .filter { (it.year * 12 + (it.month - 1)) < targetVal }
+                .maxByOrNull { it.year * 12 + (it.month - 1) }
+            com.example.data.MonthlyBudget(
+                year = ym.first,
+                month = ym.second,
+                income = prev?.income ?: currentWorkspace.budgetIncome,
+                expense = prev?.expense ?: currentWorkspace.budgetExpense,
+                savings = prev?.savings ?: currentWorkspace.budgetSavings,
+                workspaceId = currentWorkspace.id
+            )
+        }
     }
-    val budgetExpenseAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
-        val ym = getYearMonthFromFilter(timeFilter)
-        if (ym != null) {
-            monthlyBudgets.find { it.year == ym.first && (it.month == ym.second || it.month == ym.second - 1) }?.expense ?: 0.0
-        } else if (timeFilter == "ALL") {
-            currentWorkspace.budgetExpense
-        } else 0.0
-    }
-    val budgetSavingsAmount = remember(timeFilter, monthlyBudgets, currentWorkspace) {
-        val ym = getYearMonthFromFilter(timeFilter)
-        if (ym != null) {
-            monthlyBudgets.find { it.year == ym.first && (it.month == ym.second || it.month == ym.second - 1) }?.savings ?: 0.0
-        } else if (timeFilter == "ALL") {
-            currentWorkspace.budgetSavings
-        } else 0.0
-    }
+
+    val budgetIncomeAmount = if (timeFilter == "ALL") currentWorkspace.budgetIncome else effectiveMonthlyBudget.income
+    val budgetExpenseAmount = if (timeFilter == "ALL") currentWorkspace.budgetExpense else effectiveMonthlyBudget.expense
+    val budgetSavingsAmount = if (timeFilter == "ALL") currentWorkspace.budgetSavings else effectiveMonthlyBudget.savings
     val savingsTransactions by viewModel?.savingsTransactions?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
     var showBudgetHistoryDialog by remember { mutableStateOf(false) }
     val totalSavingsAmount = savingsGoals.sumOf { it.savedAmount }
@@ -7874,7 +7882,7 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(0.dp))
         }
 
-        if (recentTransactions.isEmpty()) {
+        if (recentTransactions.isEmpty() && dashboardPrevMonthTransactions.isEmpty()) {
             item {
                 val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF1E293B) else Color.White)
                 Card(
@@ -7907,35 +7915,80 @@ fun DashboardScreen(
                 }
             }
         } else {
-            val grouped = recentTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
-            grouped.forEach { (date, txs) ->
-                item {
-                    Text(
-                        text = formatDateHeader(date, language),
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 0.dp, bottom = 4.dp)
-                    )
+            if (recentTransactions.isNotEmpty()) {
+                val grouped = recentTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
+                grouped.forEach { (date, txs) ->
+                    item {
+                        Text(
+                            text = formatDateHeader(date, language),
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 0.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(txs, key = { it.id }) { tx ->
+                        val isSelected = selectedTxIds.contains(tx.id)
+                        TransactionRowItem(
+                            tx = tx,
+                            language = language,
+                            isDark = isDark,
+                            persons = persons,
+                            onDelete = onDeleteTransaction,
+                            onEdit = onEditTransaction,
+                            onNavigateToTab = onNavigate,
+                            onPersonClick = onPersonClick,
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onLongClick = {
+                                selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                            },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
-                items(txs, key = { it.id }) { tx ->
-                    val isSelected = selectedTxIds.contains(tx.id)
-                    TransactionRowItem(
-                        tx = tx,
+            }
+
+            if (dashboardPrevMonthTransactions.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    PreviousMonthSectionHeader(
                         language = language,
                         isDark = isDark,
-                        persons = persons,
-                        onDelete = onDeleteTransaction,
-                        onEdit = onEditTransaction,
-                        onNavigateToTab = onNavigate,
-                        onPersonClick = onPersonClick,
-                        isSelected = isSelected,
-                        isSelectionMode = isSelectionMode,
-                        onLongClick = {
-                            selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
-                        },
-                        modifier = Modifier.animateItem()
+                        count = dashboardPrevMonthTransactions.size
                     )
+                }
+
+                val prevGrouped = dashboardPrevMonthTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
+                prevGrouped.forEach { (date, txs) ->
+                    item {
+                        Text(
+                            text = formatDateHeader(date, language),
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(txs, key = { it.id }) { tx ->
+                        val isSelected = selectedTxIds.contains(tx.id)
+                        TransactionRowItem(
+                            tx = tx,
+                            language = language,
+                            isDark = isDark,
+                            persons = persons,
+                            onDelete = onDeleteTransaction,
+                            onEdit = onEditTransaction,
+                            onNavigateToTab = onNavigate,
+                            onPersonClick = onPersonClick,
+                            isSelected = isSelected,
+                            isSelectionMode = isSelectionMode,
+                            onLongClick = {
+                                selectedTxIds = if (isSelected) selectedTxIds - tx.id else selectedTxIds + tx.id
+                            },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
         }
@@ -8525,10 +8578,21 @@ fun DashboardScreen(
                     if (currentLimit > 0) {
                         TextButton(
                             onClick = {
+                                val ym = getYearMonthFromFilter(timeFilter) ?: run {
+                                    val cal = java.util.Calendar.getInstance()
+                                    Pair(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+                                }
                                 when (category) {
-                                    "INCOME" -> viewModel?.setBudgetIncome(0.0)
-                                    "EXPENSE" -> viewModel?.setBudgetExpense(0.0)
-                                    "SAVINGS" -> viewModel?.setBudgetSavings(0.0)
+                                    "INCOME" -> viewModel?.setMonthlyBudget(ym.first, ym.second, 0.0, null, null)
+                                    "EXPENSE" -> viewModel?.setMonthlyBudget(ym.first, ym.second, null, 0.0, null)
+                                    "SAVINGS" -> viewModel?.setMonthlyBudget(ym.first, ym.second, null, null, 0.0)
+                                }
+                                if (timeFilter == "ALL") {
+                                    when (category) {
+                                        "INCOME" -> viewModel?.setBudgetIncome(0.0)
+                                        "EXPENSE" -> viewModel?.setBudgetExpense(0.0)
+                                        "SAVINGS" -> viewModel?.setBudgetSavings(0.0)
+                                    }
                                 }
                                 showBudgetDialogType = null
                             }
@@ -8544,10 +8608,21 @@ fun DashboardScreen(
                     Button(
                         onClick = {
                             val finalVal = parseAmountOrExpression(tempAmount) ?: 0.0
+                            val ym = getYearMonthFromFilter(timeFilter) ?: run {
+                                val cal = java.util.Calendar.getInstance()
+                                Pair(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+                            }
                             when (category) {
-                                "INCOME" -> viewModel?.setBudgetIncome(finalVal)
-                                "EXPENSE" -> viewModel?.setBudgetExpense(finalVal)
-                                "SAVINGS" -> viewModel?.setBudgetSavings(finalVal)
+                                "INCOME" -> viewModel?.setMonthlyBudget(ym.first, ym.second, finalVal, null, null)
+                                "EXPENSE" -> viewModel?.setMonthlyBudget(ym.first, ym.second, null, finalVal, null)
+                                "SAVINGS" -> viewModel?.setMonthlyBudget(ym.first, ym.second, null, null, finalVal)
+                            }
+                            if (timeFilter == "ALL") {
+                                when (category) {
+                                    "INCOME" -> viewModel?.setBudgetIncome(finalVal)
+                                    "EXPENSE" -> viewModel?.setBudgetExpense(finalVal)
+                                    "SAVINGS" -> viewModel?.setBudgetSavings(finalVal)
+                                }
                             }
                             showBudgetDialogType = null
                         },
@@ -9599,6 +9674,28 @@ fun TransactionsScreen(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            val baseSearchedMain = remember(timeFilteredTransactions, searchQuery, persons) {
+                                if (searchQuery.isBlank()) timeFilteredTransactions
+                                else timeFilteredTransactions.filter { matchTransactionSearch(it, searchQuery, persons) }
+                            }
+                            val baseSearchedPrev = remember(previousMonthTransactionsList, searchQuery, persons) {
+                                if (searchQuery.isBlank()) previousMonthTransactionsList
+                                else previousMonthTransactionsList.filter { matchTransactionSearch(it, searchQuery, persons) }
+                            }
+                            val baseSearchedAll = remember(baseSearchedMain, baseSearchedPrev) {
+                                baseSearchedMain + baseSearchedPrev
+                            }
+
+                            val filterCounts = remember(baseSearchedAll) {
+                                mapOf(
+                                    "ALL" to baseSearchedAll.size,
+                                    "INCOME" to baseSearchedAll.count { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") },
+                                    "EXPENSE" to baseSearchedAll.count { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") },
+                                    "DENA" to baseSearchedAll.count { it.type == "BORROW" || it.type == "REPAY_PAID" },
+                                    "PAWN" to baseSearchedAll.count { it.type == "LEND" || it.type == "REPAY_RECEIVED" }
+                                )
+                            }
+
                             val filters = listOf(
                                 Pair("ALL", "all"),
                                 Pair("INCOME", "income"),
@@ -9609,23 +9706,41 @@ fun TransactionsScreen(
 
                             filters.forEach { (type, labelKey) ->
                                 val isSelected = filter == type
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else if (isDark) Color(0xFF1E293B) else Color.White
-                                        )
-                                        .clickable { onFilterChange(type) }
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    contentAlignment = Alignment.Center
+                                val count = filterCounts[type] ?: 0
+                                androidx.compose.material3.BadgedBox(
+                                    badge = {
+                                        androidx.compose.material3.Badge(
+                                            containerColor = if (isSelected) Color(0xFFEF4444) else (if (isDark) Color(0xFF3575E2) else Color(0xFF2563EB)),
+                                            contentColor = Color.White,
+                                            modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
+                                        ) {
+                                            Text(
+                                                text = formatNumberByLanguage(count, language),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.padding(top = 4.dp, end = 6.dp)
                                 ) {
-                                    Text(
-                                        text = Translation.get(labelKey, language),
-                                        color = if (isSelected) Color.White else Color.Gray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.primary
+                                                else if (isDark) Color(0xFF1E293B) else Color.White
+                                            )
+                                            .clickable { onFilterChange(type) }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = Translation.get(labelKey, language),
+                                            color = if (isSelected) Color.White else (if (isDark) Color.White.copy(alpha = 0.9f) else Color(0xFF1E293B)),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -10244,6 +10359,19 @@ fun DebtsScreen(
                                 .weight(1f),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            val allSearchedDebts = remember(personDebts, searchQuery, transactions) {
+                                if (searchQuery.isBlank()) personDebts
+                                else personDebts.filter { item -> matchPersonSearch(item.person, searchQuery, item.netBalance, transactions) }
+                            }
+
+                            val debtCounts = remember(allSearchedDebts) {
+                                mapOf(
+                                    "ALL" to allSearchedDebts.size,
+                                    "DENA" to allSearchedDebts.count { it.netBalance < 0 },
+                                    "PAWN" to allSearchedDebts.count { it.netBalance > 0 }
+                                )
+                            }
+
                             val filters = listOf(
                                 Pair("ALL", "all"),
                                 Pair("DENA", "dena"),
@@ -10252,23 +10380,41 @@ fun DebtsScreen(
 
                             filters.forEach { (type, labelKey) ->
                                 val isSelected = filter == type
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else if (isDark) Color(0xFF1E293B) else Color.White
-                                        )
-                                        .clickable { onFilterChange(type) }
-                                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                                    contentAlignment = Alignment.Center
+                                val count = debtCounts[type] ?: 0
+                                androidx.compose.material3.BadgedBox(
+                                    badge = {
+                                        androidx.compose.material3.Badge(
+                                            containerColor = if (isSelected) Color(0xFFEF4444) else (if (isDark) Color(0xFF3575E2) else Color(0xFF2563EB)),
+                                            contentColor = Color.White,
+                                            modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
+                                        ) {
+                                            Text(
+                                                text = formatNumberByLanguage(count, language),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.padding(top = 4.dp, end = 6.dp)
                                 ) {
-                                    Text(
-                                        text = Translation.get(labelKey, language),
-                                        color = if (isSelected) Color.White else Color.Gray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.primary
+                                                else if (isDark) Color(0xFF1E293B) else Color.White
+                                            )
+                                            .clickable { onFilterChange(type) }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = Translation.get(labelKey, language),
+                                            color = if (isSelected) Color.White else (if (isDark) Color.White.copy(alpha = 0.9f) else Color(0xFF1E293B)),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
