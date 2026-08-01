@@ -9282,103 +9282,22 @@ fun TransactionsScreen(
         }
     }
 
-    val searchQueryLower = searchQuery.lowercase().trim()
     val searchedTransactions = remember(filteredTransactions, searchQuery, persons) {
-        if (searchQueryLower.isEmpty()) {
+        if (searchQuery.isBlank()) {
             filteredTransactions
         } else {
             filteredTransactions.filter { tx ->
-                val personName = persons.find { it.id == tx.personId }?.name?.lowercase() ?: ""
-                val banglaCat = when (tx.category) {
-                    "Salary" -> "বেতন"
-                    "Business" -> "ব্যবসা"
-                    "Agriculture" -> "কৃষি"
-                    "Gift" -> "উপহার"
-                    "Sales" -> "বিক্রয়"
-                    "Honorarium" -> "সম্মানী"
-                    "Freelance" -> "ফ্রিল্যান্সিং"
-                    "Rental" -> "ভাড়া"
-                    "Investment" -> "বিনিয়োগ"
-                    "Food" -> "খাবার"
-                    "Housing" -> "বাসস্থান"
-                    "Bills" -> "বিল"
-                    "Transport" -> "যাতায়াত"
-                    "Shopping" -> "কেনাকাটা"
-                    "Medical" -> "চিকিৎসা"
-                    "Education" -> "শিক্ষা"
-                    "Clothing" -> "পোশাক"
-                    "Entertainment" -> "বিনোদন"
-                    "Others" -> "অন্যান্য"
-                    else -> tx.category
-                }.lowercase()
-                val subTypeStr = (tx.subType ?: "").lowercase()
-                val typeStrBn = when (tx.type) {
-                    "INCOME" -> "আয় income"
-                    "EXPENSE" -> "ব্যয় expense"
-                    "LEND" -> "পাওনা লেন্ড lend"
-                    "BORROW" -> "দেনা ধার borrow"
-                    "REPAY_PAID" -> "দেনা পরিশোধ repay paid"
-                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay received"
-                    else -> ""
-                }
-
-                tx.note.lowercase().contains(searchQueryLower) || 
-                tx.category.lowercase().contains(searchQueryLower) ||
-                banglaCat.contains(searchQueryLower) ||
-                tx.amount.toString().contains(searchQueryLower) ||
-                personName.contains(searchQueryLower) ||
-                subTypeStr.contains(searchQueryLower) ||
-                typeStrBn.contains(searchQueryLower)
+                matchTransactionSearch(tx, searchQuery, persons)
             }
         }
     }
 
     val searchedPrevMonthTransactions = remember(filteredPrevMonthTransactions, searchQuery, persons) {
-        if (searchQueryLower.isEmpty()) {
+        if (searchQuery.isBlank()) {
             filteredPrevMonthTransactions
         } else {
             filteredPrevMonthTransactions.filter { tx ->
-                val personName = persons.find { it.id == tx.personId }?.name?.lowercase() ?: ""
-                val banglaCat = when (tx.category) {
-                    "Salary" -> "বেতন"
-                    "Business" -> "ব্যবসা"
-                    "Agriculture" -> "কৃষি"
-                    "Gift" -> "উপহার"
-                    "Sales" -> "বিক্রয়"
-                    "Honorarium" -> "সম্মানী"
-                    "Freelance" -> "ফ্রিল্যান্সিং"
-                    "Rental" -> "ভাড়া"
-                    "Investment" -> "বিনিয়োগ"
-                    "Food" -> "খাবার"
-                    "Housing" -> "বাসস্থান"
-                    "Bills" -> "বিল"
-                    "Transport" -> "যাতায়াত"
-                    "Shopping" -> "কেনাকাটা"
-                    "Medical" -> "চিকিৎসা"
-                    "Education" -> "শিক্ষা"
-                    "Clothing" -> "পোশাক"
-                    "Entertainment" -> "বিনোদন"
-                    "Others" -> "অন্যান্য"
-                    else -> tx.category
-                }.lowercase()
-                val subTypeStr = (tx.subType ?: "").lowercase()
-                val typeStrBn = when (tx.type) {
-                    "INCOME" -> "আয় income"
-                    "EXPENSE" -> "ব্যয় expense"
-                    "LEND" -> "পাওনা লেন্ড lend"
-                    "BORROW" -> "দেনা ধার borrow"
-                    "REPAY_PAID" -> "দেনা পরিশোধ repay paid"
-                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay received"
-                    else -> ""
-                }
-
-                tx.note.lowercase().contains(searchQueryLower) || 
-                tx.category.lowercase().contains(searchQueryLower) ||
-                banglaCat.contains(searchQueryLower) ||
-                tx.amount.toString().contains(searchQueryLower) ||
-                personName.contains(searchQueryLower) ||
-                subTypeStr.contains(searchQueryLower) ||
-                typeStrBn.contains(searchQueryLower)
+                matchTransactionSearch(tx, searchQuery, persons)
             }
         }
     }
@@ -10091,58 +10010,12 @@ fun DebtsScreen(
         }
     }
 
-    val searchQueryLower = searchQuery.lowercase().trim()
     val searchedDebts = remember(filteredDebts, searchQuery, transactions) {
-        if (searchQueryLower.isEmpty()) {
+        if (searchQuery.isBlank()) {
             filteredDebts
         } else {
-            val matchingPersonIds = transactions.filter { tx ->
-                val banglaCat = when (tx.category) {
-                    "Salary" -> "বেতন"
-                    "Business" -> "ব্যবসা"
-                    "Agriculture" -> "কৃষি"
-                    "Gift" -> "উপহার"
-                    "Sales" -> "বিক্রয়"
-                    "Honorarium" -> "সম্মানী"
-                    "Freelance" -> "ফ্রিল্যান্সিং"
-                    "Rental" -> "ভাড়া"
-                    "Investment" -> "বিনিয়োগ"
-                    "Food" -> "খাবার"
-                    "Housing" -> "বাসস্থান"
-                    "Bills" -> "বিল"
-                    "Transport" -> "যাতায়াত"
-                    "Shopping" -> "কেনাকাটা"
-                    "Medical" -> "চিকিৎসা"
-                    "Education" -> "শিক্ষা"
-                    "Clothing" -> "পোশাক"
-                    "Entertainment" -> "বিনোদন"
-                    "Others" -> "অন্যান্য"
-                    else -> tx.category
-                }.lowercase()
-                val subTypeStr = (tx.subType ?: "").lowercase()
-                val typeStrBn = when (tx.type) {
-                    "INCOME" -> "আয় income"
-                    "EXPENSE" -> "ব্যয় expense"
-                    "LEND" -> "পাওনা লেন্ড lend"
-                    "BORROW" -> "দেনা ধার borrow"
-                    "REPAY_PAID" -> "দেনা পরিশোধ repay paid"
-                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay received"
-                    else -> ""
-                }
-                
-                tx.category.lowercase().contains(searchQueryLower) ||
-                banglaCat.contains(searchQueryLower) ||
-                subTypeStr.contains(searchQueryLower) ||
-                typeStrBn.contains(searchQueryLower) ||
-                (tx.note ?: "").lowercase().contains(searchQueryLower)
-            }.map { it.personId }.toSet()
-
             filteredDebts.filter { item ->
-                item.person.name.lowercase().contains(searchQueryLower) ||
-                item.person.phone.lowercase().contains(searchQueryLower) ||
-                (item.person.address ?: "").lowercase().contains(searchQueryLower) ||
-                item.netBalance.toString().contains(searchQueryLower) ||
-                matchingPersonIds.contains(item.person.id)
+                matchPersonSearch(item.person, searchQuery, item.netBalance, transactions)
             }
         }
     }
@@ -22198,15 +22071,20 @@ fun PreviousMonthSectionHeader(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(
-                    if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                    if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.5f) else Color(0xFFEFF6FF)
                 )
-                .padding(horizontal = 8.dp, vertical = 2.dp)
+                .border(
+                    width = 1.dp,
+                    color = if (isDark) Color(0xFF3B82F6).copy(alpha = 0.4f) else Color(0xFFBFDBFE),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .padding(horizontal = 9.dp, vertical = 2.dp)
         ) {
             Text(
-                text = "$count",
+                text = if (language == AppLanguage.BN) "${formatNumberByLanguage(count, language)}টি" else "$count",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
+                color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8)
             )
         }
     }

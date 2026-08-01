@@ -9,11 +9,18 @@ import com.example.data.Person
 import com.example.data.SavingsGoal
 import com.example.data.SavingsTransaction
 import com.example.data.Transaction
+import com.example.ui.AppLanguage
 
-private fun normalizeBn(str: String): String {
+fun normalizeBn(str: String): String {
     return str.lowercase()
-        .replace("য়", "য়")
+        .replace("\u09AF\u09BC", "\u09DF") // convert য় (Ja + Nukta) to য় (Ya)
         .replace("বাকী", "বাকি")
+}
+
+fun formatNumberByLanguage(num: Int, language: AppLanguage): String {
+    if (language != AppLanguage.BN) return num.toString()
+    val bnDigits = charArrayOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
+    return num.toString().map { if (it in '0'..'9') bnDigits[it - '0'] else it }.joinToString("")
 }
 
 fun highlightMatch(text: String, query: String, highlightColor: Color): AnnotatedString {
@@ -82,86 +89,93 @@ fun matchTransactionSearch(tx: Transaction, searchQuery: String, persons: List<P
     if (queryTokens.isEmpty()) return true
 
     val person = persons.find { it.id == tx.personId }
-    val personName = normalizeBn(person?.name ?: "")
-    val personPhone = normalizeBn(person?.phone ?: "")
-    val personAddress = normalizeBn(person?.address ?: "")
+    val personName = person?.name ?: ""
+    val personPhone = person?.phone ?: ""
+    val personAddress = person?.address ?: ""
 
     val catEn = tx.category.lowercase()
-    val catBn = normalizeBn(when (tx.category) {
-        "Salary" -> "বেতন আয় আয়উৎস বেতনভাতা salary"
-        "Business" -> "ব্যবসা বাণিজ্য বিজনেস ব্যবসায়ী business"
-        "Agriculture" -> "কৃষি চাষাবাদ কৃষিআয় কৃষিচাষ agriculture"
-        "Gift" -> "উপহার হাদিয়া গিফট gift"
-        "Sales" -> "বিক্রয় বিক্রি সেলস বিক্রয়লব্ধ পন্যবিক্রি sale sales"
-        "Honorarium" -> "সম্মানী সম্মানীভাতা honorarium"
-        "Freelance" -> "ফ্রিল্যান্সিং আউটসোর্সিং freelance"
-        "Rental" -> "ভাড়া বাসাভাড়া ভাড়াআদায় rental rent"
-        "Investment" -> "বিনিয়োগ ইনভেস্টমেন্ট সঞ্চয় investment"
-        "Food" -> "খাবার খাদ্য রেস্তোরাঁ নাস্তা বাজার খাদ্যদ্রব্য রেস্তোরা খাবারখরচ food"
-        "Housing" -> "বাসস্থান বাসাভাড়া ঘরভাড়া housing house"
-        "Bills" -> "বিল ইউটিলিটি বিদ্যুৎ পানি গ্যাস বিল bills bill"
-        "Transport" -> "যাতায়াত পরিবহন গাড়িভাড়া ভাড়া travel transport"
-        "Shopping" -> "কেনাকাটা বাজার ক্রয় কেনা কেনাবেচা শপিং শপিংখরচ পোশাক কেনাকাটা shopping buy purchase"
-        "Medical" -> "চিকিৎসা ওষুধ ডাক্তার হাসপাতাল চিকিৎসাখরচ medical doctor"
-        "Education" -> "শিক্ষা পড়াশোনা স্কুল কলেজ টিউশন শিক্ষাখরচ education tuition"
-        "Clothing" -> "পোশাক জামাকাপড় কাপড় পোশাকপরিচ্ছদ clothing clothes"
-        "Entertainment" -> "বিনোদন বিনোদনখরচ সিনেমা ভ্রমণ entertainment"
-        "Others" -> "অন্যান্য অন্যান্যখরচ others"
+    val catBn = when (tx.category) {
+        "Salary" -> "বেতন আয় আয়উৎস salary"
+        "Business" -> "ব্যবসা বাণিজ্য বিজনেস business"
+        "Agriculture" -> "কৃষি চাষাবাদ agriculture"
+        "Gift" -> "উপহার হাদিয়া gift"
+        "Sales" -> "বিক্রয় বিক্রি সেলস sale sales"
+        "Honorarium" -> "সম্মানী honorarium"
+        "Freelance" -> "ফ্রিল্যান্সিং freelance"
+        "Rental" -> "ভাড়া বাসাভাড়া rental rent"
+        "Investment" -> "বিনিয়োগ সঞ্চয় investment"
+        "Food" -> "খাবার খাদ্য নাস্তা বাজার food"
+        "Housing" -> "বাসস্থান বাসাভাড়া housing"
+        "Bills" -> "বিল ইউটিলিটি bills bill"
+        "Transport" -> "যাতায়াত পরিবহন travel transport"
+        "Shopping" -> "কেনাকাটা বাজার ক্রয় কেনা শপিং shopping buy purchase"
+        "Medical" -> "চিকিৎসা ওষুধ ডাক্তার medical"
+        "Education" -> "শিক্ষা পড়াশোনা education"
+        "Clothing" -> "পোশাক কাপড় clothing"
+        "Entertainment" -> "বিনোদন entertainment"
+        "Others" -> "অন্যান্য others"
         else -> tx.category
-    })
-
-    val subTypeRaw = (tx.subType ?: "").lowercase()
-    val subTypeTranslation = normalizeBn(when (tx.subType?.uppercase()) {
-        "CREDIT" -> "ক্রেডিট বাকি ধার বাকীতে বাকীতেক্রয় বাকীতেবিক্রয় বাকীকিনে বাকীধার বাকিআদায় credit buy purchase sale"
-        "CASH" -> "ক্যাশ নগদ ক্যাশটাকা cash"
-        "BANK" -> "ব্যাংক ব্যাংকিং ব্যাংকট্রান্সফার bank transfer"
-        "MOBILE_BANK" -> "মোবাইলব্যাংকিং বিকাশ নগদ রকেট উপায় mobile bank bkash nagad"
-        else -> subTypeRaw
-    })
-
-    val typeRaw = tx.type.lowercase()
-    val typeTranslation = normalizeBn(when (tx.type.uppercase()) {
-        "INCOME" -> "আয় জমা ইনকাম পারিশ্রমিক আয়উৎস income deposit"
-        "EXPENSE" -> "ব্যয় খরচ আউটগোয়িং কেনারখরচ কেনাকাটা খরচেরখাত expense expenditure buy purchase"
-        "LEND" -> "পাওনা লেন্ড ধারদেওয়া ধারদিয়া পাওনাটাকা lend lent"
-        "BORROW" -> "দেনা ধার ধারনেওয়া ধারনিওয়া ঋণ দেনাটাকা borrow borrowed debt"
-        "REPAY_PAID" -> "দেনা পরিশোধ ঋণপরিশোধ ধারশোধ শোধ repay paid"
-        "REPAY_RECEIVED" -> "পাওনা পরিশোধ পাওনাআদায় পাওনাফেরত পাওনাশোধ repay received"
-        else -> typeRaw
-    })
+    }
 
     val subTypeUpper = tx.subType?.uppercase() ?: ""
     val typeUpper = tx.type.uppercase()
 
-    val isCreditPurchase = (subTypeUpper == "CREDIT" && (typeUpper in listOf("BORROW", "EXPENSE") || tx.category == "Shopping")) ||
-            (typeUpper == "BORROW")
-    val isCreditSale = (subTypeUpper == "CREDIT" && (typeUpper in listOf("LEND", "INCOME") || tx.category == "Sales")) ||
-            (typeUpper == "LEND")
-
-    val semanticPhrase = normalizeBn(buildString {
-        if (isCreditPurchase) {
-            append(" বাকি ক্রয় বাকি ক্রয় বাকি কেনাকাটা বাকি ক্রয়কৃত বাকীতে ক্রয় বাকীতে ক্রয় বাকীকেনাকাটা বাকীকিনে বাকীতেকেনাকাটা credit purchase credit buy credit shopping baki kroy baki kroy ")
-        }
-        if (isCreditSale) {
-            append(" বাকি বিক্রয় বাকি বিক্রয় বাকীতে বিক্রয় বাকীতে বিক্রয় বাকীবিক্রি credit sale credit sales baki bikroy baki bikroy ")
-        }
+    val badgeAndSemanticText = buildString {
+        // Credit terms
         if (subTypeUpper == "CREDIT") {
-            append(" বাকি ধার বাকীতে credit baki ")
+            append(" বাকি বাকী বাকীতে ধার credit baki ")
+            if (typeUpper == "LEND" || tx.category.equals("Sales", ignoreCase = true)) {
+                append(" বাকি বিক্রয় বাকী বিক্রয় বাকি বিক্রি বাকীতে বিক্রয় credit sale credit sales ")
+            }
+            if (typeUpper == "BORROW" || tx.category.equals("Shopping", ignoreCase = true) || typeUpper == "EXPENSE") {
+                append(" বাকি ক্রয় বাকী ক্রয় বাকি কেনাকাটা বাকীতে ক্রয় credit purchase credit buy ")
+            }
+        } else if (subTypeUpper == "CASH") {
+            append(" ক্যাশ নগদ cash ")
+        } else if (subTypeUpper == "BANK") {
+            append(" ব্যাংক bank ")
+        } else if (subTypeUpper == "MOBILE_BANK") {
+            append(" মোবাইল ব্যাংকিং বিকাশ নগদ রকেট mobile bank bkash nagad ")
         }
-        if (typeUpper == "EXPENSE" || tx.category == "Shopping") {
-            append(" ক্রয় কেনাকাটা কেনা purchase buy kroy ")
-        }
-        if (typeUpper == "INCOME" || tx.category == "Sales") {
-            append(" বিক্রয় বিক্রি sale sales bikroy ")
-        }
-    })
 
-    val noteStr = normalizeBn(tx.note)
+        // Type terms
+        when {
+            typeUpper == "BORROW" -> {
+                append(" দেনা ধার ঋণ borrow debt payable ")
+                if (subTypeUpper == "CREDIT") {
+                    append(" বাকি ক্রয় বাকী ক্রয় ")
+                }
+            }
+            typeUpper == "LEND" -> {
+                append(" পাওনা lend receivable ")
+                if (subTypeUpper == "CREDIT") {
+                    append(" বাকি বিক্রয় বাকী বিক্রয় ")
+                }
+            }
+            typeUpper == "REPAY_PAID" || tx.category.contains("দেনা পরিশোধ") || tx.category.equals("Repay Paid", ignoreCase = true) -> {
+                append(" দেনা পরিশোধ দেনা ফেরত ঋণ পরিশোধ ধার শোধ repay paid debt repaid ")
+            }
+            typeUpper == "REPAY_RECEIVED" || tx.category.contains("পাওনা পরিশোধ") || tx.category.equals("Repay Received", ignoreCase = true) -> {
+                append(" পাওনা পরিশোধ পাওনা ফেরত পাওনা আদায় loan repaid repay received ")
+            }
+            typeUpper == "EXPENSE" -> {
+                append(" ব্যয় খরচ expense ")
+            }
+            typeUpper == "INCOME" -> {
+                append(" আয় ইনকাম income ")
+            }
+        }
+    }
+
+    val noteStr = tx.note ?: ""
     val amountStr = tx.amount.toString()
 
-    val combinedText = "$personName $personPhone $personAddress $catEn $catBn $subTypeRaw $subTypeTranslation $typeRaw $typeTranslation $semanticPhrase $noteStr $amountStr"
+    val rawCombined = "$personName $personPhone $personAddress $catEn $catBn $badgeAndSemanticText $noteStr $amountStr"
+    val normalizedCombined = normalizeBn(rawCombined)
 
-    return queryTokens.all { token -> combinedText.contains(token) }
+    return queryTokens.all { token ->
+        normalizedCombined.contains(token) || rawCombined.lowercase().contains(token)
+    }
 }
 
 fun matchPersonSearch(person: Person, searchQuery: String, netBalance: Double, transactions: List<Transaction>): Boolean {
@@ -170,18 +184,18 @@ fun matchPersonSearch(person: Person, searchQuery: String, netBalance: Double, t
     val queryTokens = normalizedQuery.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     if (queryTokens.isEmpty()) return true
 
-    val name = normalizeBn(person.name)
-    val phone = normalizeBn(person.phone)
-    val address = normalizeBn(person.address ?: "")
+    val name = person.name
+    val phone = person.phone
+    val address = person.address ?: ""
     val balanceStr = netBalance.toString()
 
-    val balanceTerms = normalizeBn(buildString {
+    val balanceTerms = buildString {
         if (netBalance > 0) append(" পাওনা পাওনাটাকা পাওনাআদায় receivable ")
         else if (netBalance < 0) append(" দেনা দেনাটাকা ঋণ ধার payable debt ")
         else append(" হিসাবসমান settled ")
-    })
+    }
 
-    val personCombinedText = "$name $phone $address $balanceStr $balanceTerms"
+    val personCombinedText = normalizeBn("$name $phone $address $balanceStr $balanceTerms")
     if (queryTokens.all { token -> personCombinedText.contains(token) }) {
         return true
     }
@@ -197,12 +211,12 @@ fun matchSavingsGoalSearch(goal: SavingsGoal, searchQuery: String): Boolean {
     val queryTokens = normalizedQuery.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     if (queryTokens.isEmpty()) return true
 
-    val title = normalizeBn(goal.title)
+    val title = goal.title
     val target = goal.targetAmount.toString()
     val saved = goal.savedAmount.toString()
-    val extraTerms = normalizeBn("সঞ্চয় সেভিংস ডিপিএস সঞ্চয় গোল কার্ড savings goal card deposit dps")
+    val extraTerms = "সঞ্চয় সেভিংস ডিপিএস সঞ্চয় গোল কার্ড savings goal card deposit dps"
 
-    val combined = "$title $target $saved $extraTerms"
+    val combined = normalizeBn("$title $target $saved $extraTerms")
     return queryTokens.all { token -> combined.contains(token) }
 }
 
@@ -212,12 +226,12 @@ fun matchSavingsTransactionSearch(st: SavingsTransaction, goalTitle: String, sea
     val queryTokens = normalizedQuery.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     if (queryTokens.isEmpty()) return true
 
-    val note = normalizeBn(st.note)
+    val note = st.note ?: ""
     val amount = st.amount.toString()
-    val goal = normalizeBn(goalTitle)
-    val typeTerm = normalizeBn(if (st.isDeposit) "জমা জমাকৃত সঞ্চয় সেভিংস deposit" else "উত্তোলন তোলা উইথড্র withdraw withdrawal")
-    val extraTerms = normalizeBn("সঞ্চয় সেভিংস ডিপিএস savings")
+    val goal = goalTitle
+    val typeTerm = if (st.isDeposit) "জমা জমাকৃত সঞ্চয় সেভিংস deposit" else "উত্তোলন তোলা উইথড্র withdraw withdrawal"
+    val extraTerms = "সঞ্চয় সেভিংস ডিপিএস savings"
 
-    val combined = "$note $amount $goal $typeTerm $extraTerms"
+    val combined = normalizeBn("$note $amount $goal $typeTerm $extraTerms")
     return queryTokens.all { token -> combined.contains(token) }
 }
