@@ -6692,7 +6692,31 @@ fun DashboardScreen(
     var showBudgetDetailsType by remember { mutableStateOf<String?>(null) }
     var activeAlertPopup by remember { mutableStateOf<BudgetAlertData?>(null) }
     val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-    val dashboardPrevMonthTransactions = remember(transactions, timeFilter) { getPreviousMonthTransactions(transactions, timeFilter) }
+    val timeFilteredTxs = remember(transactions, timeFilter) {
+        filterTransactionsByTime(transactions, timeFilter)
+    }
+    val currentMonthTxs = remember(transactions) {
+        filterTransactionsByTime(transactions, "MONTH")
+    }
+    val prevMonthTxsRaw = remember(transactions, timeFilter) {
+        getPreviousMonthTransactions(transactions, timeFilter)
+    }
+    val dashRecentTxs = remember(transactions, timeFilteredTxs, currentMonthTxs, prevMonthTxsRaw, timeFilter) {
+        if (timeFilter == "ALL") {
+            if (currentMonthTxs.isNotEmpty()) {
+                currentMonthTxs.sortedByDescending { it.timestamp }.take(10)
+            } else {
+                val prevIds = prevMonthTxsRaw.map { it.id }.toSet()
+                transactions.filter { it.id !in prevIds }.sortedByDescending { it.timestamp }.take(10)
+            }
+        } else {
+            timeFilteredTxs.sortedByDescending { it.timestamp }.take(10)
+        }
+    }
+    val dashboardPrevMonthTransactions = remember(prevMonthTxsRaw, dashRecentTxs) {
+        val recentIds = dashRecentTxs.map { it.id }.toSet()
+        prevMonthTxsRaw.filter { it.id !in recentIds }
+    }
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
 
@@ -7882,8 +7906,8 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(0.dp))
         }
 
-        if (recentTransactions.isEmpty() && dashboardPrevMonthTransactions.isEmpty()) {
-            item {
+        if (dashRecentTxs.isEmpty() && dashboardPrevMonthTransactions.isEmpty()) {
+            item(key = "dash_empty_card") {
                 val bgColor by androidx.compose.animation.animateColorAsState(if (isDark) Color(0xFF1E293B) else Color.White)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -7915,10 +7939,12 @@ fun DashboardScreen(
                 }
             }
         } else {
-            if (recentTransactions.isNotEmpty()) {
-                val grouped = recentTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
-                grouped.forEach { (date, txs) ->
-                    item {
+            if (dashRecentTxs.isNotEmpty()) {
+                val grouped = dashRecentTxs.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
+                grouped.entries.forEachIndexed { groupIdx, entry ->
+                    val date = entry.key
+                    val txs = entry.value
+                    item(key = "dash_hdr_${date}_$groupIdx") {
                         Text(
                             text = formatDateHeader(date, language),
                             color = Color.Gray,
@@ -7927,7 +7953,7 @@ fun DashboardScreen(
                             modifier = Modifier.padding(top = 0.dp, bottom = 4.dp)
                         )
                     }
-                    items(txs, key = { it.id }) { tx ->
+                    itemsIndexed(txs, key = { txIdx, tx -> "dash_rec_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
                         val isSelected = selectedTxIds.contains(tx.id)
                         TransactionRowItem(
                             tx = tx,
@@ -7950,7 +7976,7 @@ fun DashboardScreen(
             }
 
             if (dashboardPrevMonthTransactions.isNotEmpty()) {
-                item {
+                item(key = "dash_prev_month_hdr") {
                     Spacer(modifier = Modifier.height(12.dp))
                     PreviousMonthSectionHeader(
                         language = language,
@@ -7960,8 +7986,10 @@ fun DashboardScreen(
                 }
 
                 val prevGrouped = dashboardPrevMonthTransactions.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
-                prevGrouped.forEach { (date, txs) ->
-                    item {
+                prevGrouped.entries.forEachIndexed { groupIdx, entry ->
+                    val date = entry.key
+                    val txs = entry.value
+                    item(key = "dash_prev_hdr_${date}_$groupIdx") {
                         Text(
                             text = formatDateHeader(date, language),
                             color = Color.Gray,
@@ -7970,7 +7998,7 @@ fun DashboardScreen(
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                         )
                     }
-                    items(txs, key = { it.id }) { tx ->
+                    itemsIndexed(txs, key = { txIdx, tx -> "dash_prev_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
                         val isSelected = selectedTxIds.contains(tx.id)
                         TransactionRowItem(
                             tx = tx,
@@ -9843,8 +9871,10 @@ fun TransactionsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
-                        grouped.forEach { (date, txs) ->
-                            item {
+                        grouped.entries.forEachIndexed { groupIdx, entry ->
+                            val date = entry.key
+                            val txs = entry.value
+                            item(key = "tx_hdr_${date}_$groupIdx") {
                                 Text(
                                     text = formatDateHeader(date, language),
                                     color = Color.Gray,
@@ -9853,7 +9883,7 @@ fun TransactionsScreen(
                                     modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
                                 )
                             }
-                            items(txs, key = { it.id }) { tx ->
+                            itemsIndexed(txs, key = { txIdx, tx -> "tx_curr_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
                                 Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
                                     TransactionRowItem(
@@ -9878,7 +9908,7 @@ fun TransactionsScreen(
                         }
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
-                            item {
+                            item(key = "tx_prev_month_hdr") {
                                 PreviousMonthSectionHeader(
                                     language = language,
                                     isDark = isDark,
@@ -9887,8 +9917,10 @@ fun TransactionsScreen(
                             }
 
                             val prevGrouped = sortedPrevMonthTransactions.groupBy { formatDateToDay(it.timestamp) }
-                            prevGrouped.forEach { (date, txs) ->
-                                item {
+                            prevGrouped.entries.forEachIndexed { groupIdx, entry ->
+                                val date = entry.key
+                                val txs = entry.value
+                                item(key = "tx_prev_hdr_${date}_$groupIdx") {
                                     Text(
                                         text = formatDateHeader(date, language),
                                         color = Color.Gray,
@@ -9897,7 +9929,7 @@ fun TransactionsScreen(
                                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
                                     )
                                 }
-                                items(txs, key = { it.id }) { tx ->
+                                itemsIndexed(txs, key = { txIdx, tx -> "tx_prev_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
                                     val isSelected = selectedTxIds.contains(tx.id)
                                     Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
                                         TransactionRowItem(
@@ -9922,7 +9954,7 @@ fun TransactionsScreen(
                             }
                         }
 
-                        item {
+                        item(key = "tx_bottom_spacer") {
                             Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
                         }
                     }
@@ -9933,7 +9965,7 @@ fun TransactionsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
-                        items(sortedTransactions, key = { it.id }) { tx ->
+                        itemsIndexed(sortedTransactions, key = { txIdx, tx -> "tx_curr_${tx.id}_$txIdx" }) { index, tx ->
                             val isSelected = selectedTxIds.contains(tx.id)
                             Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
                                 TransactionRowItem(
@@ -9957,7 +9989,7 @@ fun TransactionsScreen(
                         }
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
-                            item {
+                            item(key = "tx_prev_month_hdr_nondate") {
                                 PreviousMonthSectionHeader(
                                     language = language,
                                     isDark = isDark,
@@ -9965,7 +9997,7 @@ fun TransactionsScreen(
                                 )
                             }
 
-                            items(sortedPrevMonthTransactions, key = { it.id }) { tx ->
+                            itemsIndexed(sortedPrevMonthTransactions, key = { txIdx, tx -> "tx_prev_${tx.id}_$txIdx" }) { index, tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
                                 Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
                                     TransactionRowItem(
@@ -10815,11 +10847,10 @@ fun filterTransactionsByTime(transactions: List<Transaction>, timeFilter: String
 }
 
 fun getPreviousMonthTransactions(transactions: List<Transaction>, timeFilter: String): List<Transaction> {
-    if (timeFilter != "MONTH" && !timeFilter.startsWith("CUSTOM_MONTH:")) return emptyList()
     val now = System.currentTimeMillis()
     val calendar = java.util.Calendar.getInstance()
     return when {
-        timeFilter == "MONTH" -> {
+        timeFilter == "MONTH" || timeFilter == "ALL" -> {
             calendar.timeInMillis = now
             calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
             calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
