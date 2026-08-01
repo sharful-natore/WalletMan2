@@ -4,6 +4,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -14,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.sp
 
 import android.content.Context
@@ -146,11 +149,7 @@ object BiometricHelper {
         private val ridgePaints = arrayOf(
             android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
-                color = android.graphics.Color.parseColor("#38BDF8") // Light Blue
-            },
-            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                style = android.graphics.Paint.Style.FILL
-                color = android.graphics.Color.parseColor("#84CC16") // Lime
+                color = android.graphics.Color.parseColor("#A855F7") // Purple
             },
             android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
@@ -158,11 +157,15 @@ object BiometricHelper {
             },
             android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
-                color = android.graphics.Color.parseColor("#06B6D4") // Cyan
+                color = android.graphics.Color.parseColor("#A855F7") // Purple
             },
             android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
-                color = android.graphics.Color.parseColor("#EA580C") // Dark Orange
+                color = android.graphics.Color.parseColor("#A855F7") // Purple
+            },
+            android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = android.graphics.Color.parseColor("#A855F7") // Purple
             }
         )
 
@@ -215,7 +218,7 @@ object BiometricHelper {
 
         fun loadCustomColors() {
             val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-            val defaultColors = arrayOf("#38BDF8", "#84CC16", "#A855F7", "#06B6D4", "#EA580C")
+            val defaultColors = arrayOf("#A855F7", "#A855F7", "#A855F7", "#A855F7", "#A855F7")
             for (i in 0 until 5) {
                 val hex = prefs.getString("fingerprint_color_$i", defaultColors[i]) ?: defaultColors[i]
                 try {
@@ -818,7 +821,7 @@ fun FingerprintColorPickerDialog(
     onSave: () -> Unit
 ) {
     val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-    val defaultColors = arrayOf("#38BDF8", "#84CC16", "#A855F7", "#06B6D4", "#EA580C")
+    val defaultColors = arrayOf("#A855F7", "#A855F7", "#A855F7", "#A855F7", "#A855F7")
     
     val customColors = androidx.compose.runtime.remember {
         val list = mutableListOf<androidx.compose.ui.graphics.Color>()
@@ -839,6 +842,16 @@ fun FingerprintColorPickerDialog(
     val languageIsBn = androidx.compose.runtime.remember {
         val lPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
         lPrefs.getString("app_language", "BN") == "BN"
+    }
+
+    val gradientPresets = androidx.compose.runtime.remember {
+        listOf(
+            Pair(if (languageIsBn) "বেগুনি গ্ল্যামার" else "Purple Dream", listOf("#4F46E5", "#6366F1", "#8B5CF6", "#A855F7", "#EC4899")),
+            Pair(if (languageIsBn) "সাইবারপাঙ্ক" else "Cyberpunk", listOf("#EC4899", "#D946EF", "#A855F7", "#8B5CF6", "#6366F1")),
+            Pair(if (languageIsBn) "উষ্ণ সূর্যাস্ত" else "Sunset Glow", listOf("#EF4444", "#F97316", "#F59E0B", "#FBBF24", "#FDE047")),
+            Pair(if (languageIsBn) "মহাসমুদ্র" else "Oceanic Blue", listOf("#0369A1", "#0284C7", "#0EA5E9", "#38BDF8", "#7DD3FC")),
+            Pair(if (languageIsBn) "সবুজ অরণ্য" else "Forest Mint", listOf("#047857", "#059669", "#10B981", "#34D399", "#6EE7B7"))
+        )
     }
 
     var selectedIdx by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0) }
@@ -928,6 +941,54 @@ fun FingerprintColorPickerDialog(
                                     color = if (color.red * 0.299 + color.green * 0.587 + color.blue * 0.114 > 0.5) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
                                 )
                             }
+                        }
+                    }
+                }
+
+                androidx.compose.material3.HorizontalDivider(color = if (isDarkTheme) androidx.compose.ui.graphics.Color(0xFF2E354F) else androidx.compose.ui.graphics.Color(0xFFE2E8F0))
+
+                androidx.compose.material3.Text(
+                    text = if (languageIsBn) "গ্রাডিয়েন্ট কালার প্রিসেট যোগ করুন:" else "Apply Gradient Color Presets:",
+                    fontSize = 12.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.DarkGray
+                )
+
+                androidx.compose.foundation.layout.Row(
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                ) {
+                    gradientPresets.forEach { item ->
+                        val name = item.first
+                        val hexList = item.second
+                        val brushColors = hexList.map { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(it)) }
+                        
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(brushColors))
+                                .clickable {
+                                    for (i in 0 until 5) {
+                                        customColors[i] = brushColors[i]
+                                    }
+                                    if (selectedIdx in 0..4) {
+                                        val currentActive = customColors[selectedIdx]
+                                        redVal = currentActive.red * 255f
+                                        greenVal = currentActive.green * 255f
+                                        blueVal = currentActive.blue * 255f
+                                    }
+                                }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = name,
+                                fontSize = 11.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                color = androidx.compose.ui.graphics.Color.White
+                            )
                         }
                     }
                 }

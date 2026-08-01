@@ -2629,6 +2629,7 @@ fun FinanceNoteApp(
     var longPressedIndex by remember { mutableStateOf(-1) }
     var showRealtimeSyncDialog by remember { mutableStateOf(false) }
     var showProfileSetup by remember { mutableStateOf(false) }
+    var profileSetupInitiallyEdit by remember { mutableStateOf(false) }
     var showEnhancedProfileMenu by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
     var showAutoEntryScreen by remember { mutableStateOf(false) }
@@ -2934,13 +2935,14 @@ fun FinanceNoteApp(
     }
 
     if (showProfileSetup) {
-        ProfileSetupScreen(
-            viewModel = viewModel,
-            language = language,
-            isDark = isDarkTheme,
-            onDismiss = { showProfileSetup = false }
-        )
-    }
+         ProfileSetupScreen(
+             viewModel = viewModel,
+             language = language,
+             isDark = isDarkTheme,
+             initialEditMode = profileSetupInitiallyEdit,
+             onDismiss = { showProfileSetup = false }
+         )
+     }
 
     if (showDraftsDialog) {
         DraftsScratchpadDialog(
@@ -2967,6 +2969,7 @@ fun FinanceNoteApp(
             },
             onProfileSettings = {
                 showEnhancedProfileMenu = false
+                profileSetupInitiallyEdit = false
                 showProfileSetup = true
             },
             onBackupRestore = {
@@ -3020,6 +3023,7 @@ fun FinanceNoteApp(
             val hasPrompted = gPrefs.getBoolean("has_prompted_profile_setup", false)
             
             if (isProfileSetupComplete == false && !hasPrompted) {
+                profileSetupInitiallyEdit = true
                 showProfileSetup = true
                 gPrefs.edit().putBoolean("has_prompted_profile_setup", true).apply()
             } else if (isProfileSetupComplete == true) {
@@ -10895,23 +10899,27 @@ fun getPreviousMonthTransactions(transactions: List<Transaction>, timeFilter: St
             transactions.filter { it.timestamp in startOfPreviousMonth until startOfSelectedMonth }
         }
         timeFilter.startsWith("CUSTOM_MONTH:") -> {
-            val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
-            if (parts.size == 2) {
-                val year = parts[0].toIntOrNull() ?: 2026
-                val month = parts[1].toIntOrNull() ?: 1
-                calendar.clear()
-                calendar.set(java.util.Calendar.YEAR, year)
-                calendar.set(java.util.Calendar.MONTH, month - 1)
-                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
-                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
-                calendar.set(java.util.Calendar.MINUTE, 0)
-                calendar.set(java.util.Calendar.SECOND, 0)
-                calendar.set(java.util.Calendar.MILLISECOND, 0)
-                val startOfSelectedMonth = calendar.timeInMillis
-                calendar.add(java.util.Calendar.MONTH, -1)
-                val startOfPreviousMonth = calendar.timeInMillis
-                transactions.filter { it.timestamp in startOfPreviousMonth until startOfSelectedMonth }
-            } else emptyList()
+            if (isCurrentMonth(timeFilter)) {
+                val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+                if (parts.size == 2) {
+                    val year = parts[0].toIntOrNull() ?: 2026
+                    val month = parts[1].toIntOrNull() ?: 1
+                    calendar.clear()
+                    calendar.set(java.util.Calendar.YEAR, year)
+                    calendar.set(java.util.Calendar.MONTH, month - 1)
+                    calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                    calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    calendar.set(java.util.Calendar.MINUTE, 0)
+                    calendar.set(java.util.Calendar.SECOND, 0)
+                    calendar.set(java.util.Calendar.MILLISECOND, 0)
+                    val startOfSelectedMonth = calendar.timeInMillis
+                    calendar.add(java.util.Calendar.MONTH, -1)
+                    val startOfPreviousMonth = calendar.timeInMillis
+                    transactions.filter { it.timestamp in startOfPreviousMonth until startOfSelectedMonth }
+                } else emptyList()
+            } else {
+                emptyList()
+            }
         }
         else -> emptyList()
     }
@@ -21467,6 +21475,7 @@ fun ProfileSetupScreen(
     viewModel: FinanceViewModel,
     language: AppLanguage,
     isDark: Boolean,
+    initialEditMode: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
@@ -21474,22 +21483,28 @@ fun ProfileSetupScreen(
     val userPhone by viewModel.userPhone.collectAsStateWithLifecycle()
     val userDOB by viewModel.userDOB.collectAsStateWithLifecycle()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsStateWithLifecycle()
+    val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
+    
+    val context = LocalContext.current
+    val googlePrefs = remember { context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE) }
+    val savedSetupEmail = remember(googleEmail) { googlePrefs.getString("user_setup_email", googleEmail ?: "") ?: (googleEmail ?: "") }
     
     var name by remember { mutableStateOf(googleName ?: "") }
     var address by remember { mutableStateOf(userAddress ?: "") }
     var phone by remember { mutableStateOf(userPhone ?: "") }
     var dob by remember { mutableStateOf(userDOB ?: "") }
     var photoUri by remember { mutableStateOf(googlePhotoUrl ?: "") }
+    var emailInput by remember { mutableStateOf(savedSetupEmail) }
     
-    LaunchedEffect(googleName, userAddress, userPhone, userDOB, googlePhotoUrl) {
+    LaunchedEffect(googleName, userAddress, userPhone, userDOB, googlePhotoUrl, googleEmail) {
         if (name.isBlank() && !googleName.isNullOrBlank()) name = googleName!!
         if (address.isBlank() && !userAddress.isNullOrBlank()) address = userAddress!!
         if (phone.isBlank() && !userPhone.isNullOrBlank()) phone = userPhone!!
         if (dob.isBlank() && !userDOB.isNullOrBlank()) dob = userDOB!!
         if (photoUri.isBlank() && !googlePhotoUrl.isNullOrBlank()) photoUri = googlePhotoUrl!!
+        if (emailInput.isBlank() && !googleEmail.isNullOrBlank()) emailInput = googleEmail!!
     }
     
-    val context = LocalContext.current
     val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->
         if (uri != null) {
             photoUri = uri.toString()
@@ -21505,7 +21520,7 @@ fun ProfileSetupScreen(
     var isLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
-    var isEditMode by remember { mutableStateOf(false) }
+    var isEditMode by remember { mutableStateOf(initialEditMode) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -21542,35 +21557,97 @@ fun ProfileSetupScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Beautiful Cover photo with Profile Photo overlapping
                     Box(
                         modifier = Modifier
-                            .size(130.dp)
-                            .clip(CircleShape)
-                            .border(3.dp, FintechBlue, CircleShape)
-                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .height(210.dp)
                     ) {
-                        if (photoUri.isNotEmpty()) {
-                            SubcomposeAsyncImage(
-                                model = photoUri,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                loading = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(36.dp).padding(6.dp),
-                                        strokeWidth = 3.dp,
-                                        color = FintechBlue
+                        // Cover photo gradient background
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            FintechBlue,
+                                            Color(0xFF6366F1), // Indigo
+                                            Color(0xFF8B5CF6)  // Violet/Purple
+                                        )
                                     )
-                                }
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Person,
-                                contentDescription = null,
-                                tint = if (isDark) Color.LightGray else Color.Gray,
-                                modifier = Modifier.size(64.dp)
-                            )
+                                )
+                        ) {
+                            // Abstract design patterns
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    radius = size.minDimension * 0.4f,
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.2f)
+                                )
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.1f),
+                                    radius = size.minDimension * 0.25f,
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.8f)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.app_logo_new),
+                                    contentDescription = null,
+                                    tint = Color.Unspecified,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "FINANCE NOTE",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp
+                                )
+                            }
+                        }
+
+                        // Profile photo overlapping
+                        Box(
+                            modifier = Modifier
+                                .size(110.dp)
+                                .align(Alignment.BottomCenter)
+                                .clip(CircleShape)
+                                .border(4.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape)
+                                .border(1.5.dp, FintechBlue, CircleShape)
+                                .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (photoUri.isNotEmpty()) {
+                                SubcomposeAsyncImage(
+                                    model = photoUri,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                    loading = {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(36.dp).padding(6.dp),
+                                            strokeWidth = 3.dp,
+                                            color = FintechBlue
+                                        )
+                                    }
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color.LightGray else Color.Gray,
+                                    modifier = Modifier.size(54.dp)
+                                )
+                            }
                         }
                     }
 
@@ -21584,7 +21661,7 @@ fun ProfileSetupScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (language == AppLanguage.BN) "ফিন্যান্স ডায়েরি সদস্য" else "Finance Note Member",
+                            text = if (language == AppLanguage.BN) "ফিন্যান্স নোট ব্যবহারকারী" else "Finance Note User",
                             fontSize = 12.sp,
                             color = FintechBlue,
                             fontWeight = FontWeight.SemiBold,
@@ -21628,6 +21705,13 @@ fun ProfileSetupScreen(
                                 value = address.ifBlank { "-" },
                                 isDark = isDark
                             )
+                            HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                            ProfileInfoRow(
+                                icon = Icons.Rounded.Email,
+                                label = if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address",
+                                value = emailInput.ifBlank { "-" },
+                                isDark = isDark
+                            )
                         }
                     }
 
@@ -21642,7 +21726,7 @@ fun ProfileSetupScreen(
                         Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (language == AppLanguage.BN) "প্রোফাইল সংশোধন করুন" else "Edit Profile",
+                            text = if (language == AppLanguage.BN) "প্রোফাইল সম্পাদনা" else "Edit Profile",
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
@@ -21658,55 +21742,135 @@ fun ProfileSetupScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Text(
-                        text = if (language == AppLanguage.BN) "প্রোফাইল সম্পাদন" else "Edit Profile",
+                        text = if (language == AppLanguage.BN) "প্রোফাইল সম্পাদনা" else "Edit Profile",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color.Black
                     )
 
+                    // Beautiful Cover photo with Profile Photo overlapping in Edit Mode
                     Box(
                         modifier = Modifier
-                            .size(120.dp)
-                            .clip(CircleShape)
-                            .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
-                            .clickable { photoLauncher.launch("image/*") },
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .height(210.dp)
                     ) {
-                        if (isPhotoLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(36.dp),
-                                strokeWidth = 3.dp,
-                                color = FintechBlue
-                            )
-                        } else if (photoUri.isNotEmpty()) {
-                            SubcomposeAsyncImage(
-                                model = photoUri,
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                                loading = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(36.dp).padding(6.dp),
-                                        strokeWidth = 3.dp,
-                                        color = FintechBlue
+                        // Cover photo gradient background
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            FintechBlue,
+                                            Color(0xFF6366F1), // Indigo
+                                            Color(0xFF8B5CF6)  // Violet/Purple
+                                        )
                                     )
-                                },
-                                error = {
-                                    Icon(
-                                        imageVector = Icons.Rounded.AddAPhoto,
-                                        contentDescription = null,
-                                        tint = if (isDark) Color.LightGray else Color.Gray,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                }
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.AddAPhoto,
-                                contentDescription = null,
-                                tint = if (isDark) Color.LightGray else Color.Gray,
-                                modifier = Modifier.size(40.dp)
-                            )
+                                )
+                        ) {
+                            // Abstract design patterns
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    radius = size.minDimension * 0.4f,
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.85f, size.height * 0.2f)
+                                )
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.1f),
+                                    radius = size.minDimension * 0.25f,
+                                    center = androidx.compose.ui.geometry.Offset(size.width * 0.15f, size.height * 0.8f)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.app_logo_new),
+                                    contentDescription = null,
+                                    tint = Color.Unspecified,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "FINANCE NOTE",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp
+                                )
+                            }
+                        }
+
+                        // Profile photo with edit badge overlapping
+                        Box(
+                            modifier = Modifier
+                                .size(110.dp)
+                                .align(Alignment.BottomCenter)
+                                .clip(CircleShape)
+                                .border(4.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape)
+                                .border(1.5.dp, FintechBlue, CircleShape)
+                                .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
+                                .clickable { photoLauncher.launch("image/*") },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isPhotoLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(36.dp),
+                                    strokeWidth = 3.dp,
+                                    color = FintechBlue
+                                )
+                            } else if (photoUri.isNotEmpty()) {
+                                SubcomposeAsyncImage(
+                                    model = photoUri,
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                    loading = {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(36.dp).padding(6.dp),
+                                            strokeWidth = 3.dp,
+                                            color = FintechBlue
+                                        )
+                                    },
+                                    error = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.AddAPhoto,
+                                            contentDescription = null,
+                                            tint = if (isDark) Color.LightGray else Color.Gray,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.AddAPhoto,
+                                    contentDescription = null,
+                                    tint = if (isDark) Color.LightGray else Color.Gray,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                            
+                            // Edit badge
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .background(FintechBlue, CircleShape)
+                                    .border(2.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.AddAPhoto,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
 
@@ -21771,6 +21935,21 @@ fun ProfileSetupScreen(
                         )
                     )
 
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { emailInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address") },
+                        leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                            focusedLabelColor = FintechBlue,
+                            unfocusedLabelColor = Color.Gray
+                        )
+                    )
+
                     if (error != null) {
                         Text(text = error!!, color = Color.Red, fontSize = 12.sp)
                     }
@@ -21796,6 +21975,7 @@ fun ProfileSetupScreen(
                         Button(
                             onClick = {
                                 isLoading = true
+                                googlePrefs.edit().putString("user_setup_email", emailInput).apply()
                                 viewModel.updateUserProfile(name, address, phone, dob, photoUri,
                                     onSuccess = {
                                         isLoading = false
@@ -22214,12 +22394,28 @@ fun UndoFloatingBanner(
     }
 }
 
+fun isCurrentMonth(timeFilter: String): Boolean {
+    if (timeFilter == "MONTH") return true
+    if (timeFilter.startsWith("CUSTOM_MONTH:")) {
+        val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+        if (parts.size == 2) {
+            val year = parts[0].toIntOrNull()
+            val month = parts[1].toIntOrNull()
+            val calendar = java.util.Calendar.getInstance()
+            val currentYear = calendar.get(java.util.Calendar.YEAR)
+            val currentMonth = calendar.get(java.util.Calendar.MONTH) + 1
+            return year == currentYear && month == currentMonth
+        }
+    }
+    return false
+}
+
 fun getTransactionSectionTitle(timeFilter: String, language: AppLanguage, isPreviousMonthSection: Boolean = false): String {
     if (isPreviousMonthSection) {
-        return if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions"
+        return if (language == AppLanguage.BN) "গত মাসের লেনদেন" else "Previous Month's Transactions"
     }
     return when {
-        timeFilter == "MONTH" || timeFilter == "ALL" -> {
+        isCurrentMonth(timeFilter) || timeFilter == "ALL" -> {
             if (language == AppLanguage.BN) "চলতি মাসের লেনদেন" else "Current Month's Transactions"
         }
         timeFilter == "TODAY" -> {
@@ -22343,7 +22539,7 @@ fun PreviousMonthSectionHeader(
     count: Int
 ) {
     TransactionSectionHeader(
-        title = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
+        title = if (language == AppLanguage.BN) "গত মাসের লেনদেন" else "Previous Month's Transactions",
         language = language,
         isDark = isDark,
         count = count,
