@@ -6227,7 +6227,7 @@ fun AppLockOverlay(
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
+                                listOf(Color(0xFF6C71F6), Color(0xFF8B5CF6))
                             )
                         ),
                     contentAlignment = Alignment.Center
@@ -6266,7 +6266,7 @@ fun AppLockOverlay(
                     onClick = { triggerPrompt() },
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6366F1)
+                        containerColor = Color(0xFF6C71F6)
                     ),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)
                 ) {
@@ -6290,7 +6290,7 @@ fun AppLockOverlay(
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) "পিন (PIN) ব্যবহার করুন" else "Use Custom PIN",
-                        color = Color(0xFF6366F1),
+                        color = Color(0xFF6C71F6),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
                     )
@@ -6313,7 +6313,7 @@ fun AppLockOverlay(
                     Icon(
                         imageVector = Icons.Rounded.Lock,
                         contentDescription = null,
-                        tint = Color(0xFF6366F1),
+                        tint = Color(0xFF6C71F6),
                         modifier = Modifier.size(48.dp)
                     )
                     
@@ -6348,12 +6348,12 @@ fun AppLockOverlay(
                                     .size(16.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (isFilled) Color(0xFF6366F1)
+                                        if (isFilled) Color(0xFF6C71F6)
                                         else Color.Transparent
                                     )
                                     .border(
                                         width = 2.dp,
-                                        color = if (isFilled) Color(0xFF6366F1) else (if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)),
+                                        color = if (isFilled) Color(0xFF6C71F6) else (if (isDark) Color(0xFF475569) else Color(0xFFCBD5E1)),
                                         shape = CircleShape
                                     )
                             )
@@ -6695,27 +6695,22 @@ fun DashboardScreen(
     val timeFilteredTxs = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
     }
-    val currentMonthTxs = remember(transactions) {
-        filterTransactionsByTime(transactions, "MONTH")
-    }
     val prevMonthTxsRaw = remember(transactions, timeFilter) {
         getPreviousMonthTransactions(transactions, timeFilter)
     }
-    val dashRecentTxs = remember(transactions, timeFilteredTxs, currentMonthTxs, prevMonthTxsRaw, timeFilter) {
-        if (timeFilter == "ALL") {
-            if (currentMonthTxs.isNotEmpty()) {
-                currentMonthTxs.sortedByDescending { it.timestamp }.take(10)
-            } else {
-                val prevIds = prevMonthTxsRaw.map { it.id }.toSet()
-                transactions.filter { it.id !in prevIds }.sortedByDescending { it.timestamp }.take(10)
-            }
-        } else {
-            timeFilteredTxs.sortedByDescending { it.timestamp }.take(10)
-        }
+    val top10DashboardTxs = remember(timeFilteredTxs, prevMonthTxsRaw) {
+        (timeFilteredTxs + prevMonthTxsRaw)
+            .distinctBy { it.id }
+            .sortedByDescending { it.timestamp }
+            .take(10)
     }
-    val dashboardPrevMonthTransactions = remember(prevMonthTxsRaw, dashRecentTxs) {
-        val recentIds = dashRecentTxs.map { it.id }.toSet()
-        prevMonthTxsRaw.filter { it.id !in recentIds }
+    val dashRecentTxs = remember(top10DashboardTxs, prevMonthTxsRaw) {
+        val prevIds = prevMonthTxsRaw.map { it.id }.toSet()
+        top10DashboardTxs.filter { it.id !in prevIds }
+    }
+    val dashboardPrevMonthTransactions = remember(top10DashboardTxs, prevMonthTxsRaw) {
+        val prevIds = prevMonthTxsRaw.map { it.id }.toSet()
+        top10DashboardTxs.filter { it.id in prevIds }
     }
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
@@ -7940,6 +7935,16 @@ fun DashboardScreen(
             }
         } else {
             if (dashRecentTxs.isNotEmpty()) {
+                item(key = "dash_curr_month_hdr") {
+                    TransactionSectionHeader(
+                        title = getTransactionSectionTitle(timeFilter, language, isPreviousMonthSection = false),
+                        language = language,
+                        isDark = isDark,
+                        count = dashRecentTxs.size,
+                        icon = Icons.Rounded.CalendarToday
+                    )
+                }
+
                 val grouped = dashRecentTxs.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
                 grouped.entries.forEachIndexed { groupIdx, entry ->
                     val date = entry.key
@@ -9738,7 +9743,7 @@ fun TransactionsScreen(
                                 androidx.compose.material3.BadgedBox(
                                     badge = {
                                         androidx.compose.material3.Badge(
-                                            containerColor = if (isSelected) Color(0xFFEF4444) else (if (isDark) Color(0xFF3575E2) else Color(0xFF2563EB)),
+                                            containerColor = if (isSelected) Color(0xFFEF4444) else Color(0xFF6C71F6),
                                             contentColor = Color.White,
                                             modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
                                         ) {
@@ -9871,6 +9876,18 @@ fun TransactionsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
+                        if (sortedTransactions.isNotEmpty()) {
+                            item(key = "tx_curr_month_hdr") {
+                                TransactionSectionHeader(
+                                    title = getTransactionSectionTitle(timeFilter, language, isPreviousMonthSection = false),
+                                    language = language,
+                                    isDark = isDark,
+                                    count = sortedTransactions.size,
+                                    icon = Icons.Rounded.CalendarToday
+                                )
+                            }
+                        }
+
                         grouped.entries.forEachIndexed { groupIdx, entry ->
                             val date = entry.key
                             val txs = entry.value
@@ -9909,10 +9926,12 @@ fun TransactionsScreen(
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
                             item(key = "tx_prev_month_hdr") {
-                                PreviousMonthSectionHeader(
+                                TransactionSectionHeader(
+                                    title = getTransactionSectionTitle(timeFilter, language, isPreviousMonthSection = true),
                                     language = language,
                                     isDark = isDark,
-                                    count = sortedPrevMonthTransactions.size
+                                    count = sortedPrevMonthTransactions.size,
+                                    icon = Icons.Rounded.History
                                 )
                             }
 
@@ -9965,6 +9984,18 @@ fun TransactionsScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
+                        if (sortedTransactions.isNotEmpty()) {
+                            item(key = "tx_curr_month_hdr_nondate") {
+                                TransactionSectionHeader(
+                                    title = getTransactionSectionTitle(timeFilter, language, isPreviousMonthSection = false),
+                                    language = language,
+                                    isDark = isDark,
+                                    count = sortedTransactions.size,
+                                    icon = Icons.Rounded.CalendarToday
+                                )
+                            }
+                        }
+
                         itemsIndexed(sortedTransactions, key = { txIdx, tx -> "tx_curr_${tx.id}_$txIdx" }) { index, tx ->
                             val isSelected = selectedTxIds.contains(tx.id)
                             Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
@@ -9990,10 +10021,12 @@ fun TransactionsScreen(
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
                             item(key = "tx_prev_month_hdr_nondate") {
-                                PreviousMonthSectionHeader(
+                                TransactionSectionHeader(
+                                    title = getTransactionSectionTitle(timeFilter, language, isPreviousMonthSection = true),
                                     language = language,
                                     isDark = isDark,
-                                    count = sortedPrevMonthTransactions.size
+                                    count = sortedPrevMonthTransactions.size,
+                                    icon = Icons.Rounded.History
                                 )
                             }
 
@@ -10416,7 +10449,7 @@ fun DebtsScreen(
                                 androidx.compose.material3.BadgedBox(
                                     badge = {
                                         androidx.compose.material3.Badge(
-                                            containerColor = if (isSelected) Color(0xFFEF4444) else (if (isDark) Color(0xFF3575E2) else Color(0xFF2563EB)),
+                                            containerColor = if (isSelected) Color(0xFFEF4444) else Color(0xFF6C71F6),
                                             contentColor = Color.White,
                                             modifier = Modifier.offset(x = 4.dp, y = (-2).dp)
                                         ) {
@@ -15502,7 +15535,7 @@ fun SettingsScreen(
                                 verifyError = if (language == AppLanguage.BN) "বর্তমান পিনটি সঠিক নয়!" else "Current PIN is incorrect!"
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C71F6))
                     ) {
                         Text(if (language == AppLanguage.BN) "পরবর্তী" else "Next")
                     }
@@ -15578,7 +15611,7 @@ fun SettingsScreen(
                                     questError = if (language == AppLanguage.BN) "উত্তরটি সঠিক নয়!" else "Answer is incorrect!"
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C71F6))
                         ) {
                             Text(if (language == AppLanguage.BN) "যাচাই করুন" else "Verify")
                         }
@@ -17005,11 +17038,11 @@ fun SettingsScreen(
                                     .clip(RoundedCornerShape(12.dp))
                                     .clickable { viewModel.setSmsAutoDirectEntry(context, true) },
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isSmsAutoDirectEntry) Color(0xFF2563EB).copy(alpha = 0.15f) else (if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                                    containerColor = if (isSmsAutoDirectEntry) Color(0xFF6C71F6).copy(alpha = 0.15f) else (if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
                                 ),
                                 border = BorderStroke(
                                     width = if (isSmsAutoDirectEntry) 1.5.dp else 1.dp,
-                                    color = if (isSmsAutoDirectEntry) Color(0xFF2563EB) else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                                    color = if (isSmsAutoDirectEntry) Color(0xFF6C71F6) else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
                                 )
                             ) {
                                 Column(
@@ -17023,7 +17056,7 @@ fun SettingsScreen(
                                         RadioButton(
                                             selected = isSmsAutoDirectEntry,
                                             onClick = { viewModel.setSmsAutoDirectEntry(context, true) },
-                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF2563EB))
+                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF6C71F6))
                                         )
                                         Text(
                                             text = if (language == AppLanguage.BN) "সরাসরি অটো এন্ট্রি" else "Direct Auto Entry",
@@ -18703,7 +18736,7 @@ fun CustomChartFilterChip(
     isDark: Boolean
 ) {
     val containerColor = if (selected) {
-        if (isDark) Color(0xFF3B82F6) else Color(0xFF2563EB)
+        Color(0xFF6C71F6)
     } else {
         if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
     }
@@ -22182,11 +22215,47 @@ fun UndoFloatingBanner(
     }
 }
 
+fun getTransactionSectionTitle(timeFilter: String, language: AppLanguage, isPreviousMonthSection: Boolean = false): String {
+    if (isPreviousMonthSection) {
+        return if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions"
+    }
+    return when {
+        timeFilter == "MONTH" || timeFilter == "ALL" -> {
+            if (language == AppLanguage.BN) "চলতি মাসের লেনদেন" else "Current Month's Transactions"
+        }
+        timeFilter == "TODAY" -> {
+            if (language == AppLanguage.BN) "আজকের লেনদেন" else "Today's Transactions"
+        }
+        timeFilter == "YESTERDAY" -> {
+            if (language == AppLanguage.BN) "গতকালকের লেনদেন" else "Yesterday's Transactions"
+        }
+        timeFilter == "WEEK" -> {
+            if (language == AppLanguage.BN) "এই সপ্তাহের লেনদেন" else "This Week's Transactions"
+        }
+        timeFilter == "YEAR" -> {
+            if (language == AppLanguage.BN) "এই বছরের লেনদেন" else "This Year's Transactions"
+        }
+        timeFilter.startsWith("CUSTOM_MONTH:") -> {
+            val label = getCustomTimeFilterLabel(timeFilter, language)
+            if (language == AppLanguage.BN) "${label}-এর লেনদেন" else "$label Transactions"
+        }
+        timeFilter.startsWith("CUSTOM_DATE:") -> {
+            val label = getCustomTimeFilterLabel(timeFilter, language)
+            if (language == AppLanguage.BN) "${label}-এর লেনদেন" else "$label Transactions"
+        }
+        else -> {
+            if (language == AppLanguage.BN) "চলতি মাসের লেনদেন" else "Current Month's Transactions"
+        }
+    }
+}
+
 @Composable
-fun PreviousMonthSectionHeader(
+fun TransactionSectionHeader(
+    title: String,
     language: AppLanguage,
     isDark: Boolean,
-    count: Int
+    count: Int,
+    icon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.CalendarToday
 ) {
     Row(
         modifier = Modifier
@@ -22202,8 +22271,8 @@ fun PreviousMonthSectionHeader(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF3B82F6),
-                            Color(0xFF6366F1)
+                            Color(0xFF6C71F6),
+                            Color(0xFF8B5CF6)
                         )
                     )
                 )
@@ -22216,19 +22285,19 @@ fun PreviousMonthSectionHeader(
                 .size(28.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(
-                    if (isDark) Color(0xFF1E293B) else Color(0xFFEFF6FF)
+                    if (isDark) Color(0xFF1E293B) else Color(0xFFF5F3FF)
                 )
                 .border(
                     width = 1.dp,
-                    color = if (isDark) Color(0xFF3B82F6).copy(alpha = 0.3f) else Color(0xFFBFDBFE),
+                    color = if (isDark) Color(0xFF6C71F6).copy(alpha = 0.3f) else Color(0xFFC7D2FE),
                     shape = RoundedCornerShape(8.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Rounded.History,
+                imageVector = icon,
                 contentDescription = null,
-                tint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                tint = Color(0xFF6C71F6),
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -22236,10 +22305,11 @@ fun PreviousMonthSectionHeader(
         Spacer(modifier = Modifier.width(10.dp))
 
         Text(
-            text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
+            text = title,
             color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
             fontSize = 14.sp,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f, fill = false)
         )
 
         Spacer(modifier = Modifier.width(8.dp))
@@ -22248,11 +22318,11 @@ fun PreviousMonthSectionHeader(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(
-                    if (isDark) Color(0xFF1E3A8A).copy(alpha = 0.5f) else Color(0xFFEFF6FF)
+                    if (isDark) Color(0xFF6C71F6).copy(alpha = 0.2f) else Color(0xFFF5F3FF)
                 )
                 .border(
                     width = 1.dp,
-                    color = if (isDark) Color(0xFF3B82F6).copy(alpha = 0.4f) else Color(0xFFBFDBFE),
+                    color = if (isDark) Color(0xFF6C71F6).copy(alpha = 0.4f) else Color(0xFFC7D2FE),
                     shape = RoundedCornerShape(12.dp)
                 )
                 .padding(horizontal = 9.dp, vertical = 2.dp)
@@ -22261,9 +22331,24 @@ fun PreviousMonthSectionHeader(
                 text = if (language == AppLanguage.BN) "${formatNumberByLanguage(count, language)}টি" else "$count",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isDark) Color(0xFF93C5FD) else Color(0xFF1D4ED8)
+                color = Color(0xFF6C71F6)
             )
         }
     }
+}
+
+@Composable
+fun PreviousMonthSectionHeader(
+    language: AppLanguage,
+    isDark: Boolean,
+    count: Int
+) {
+    TransactionSectionHeader(
+        title = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
+        language = language,
+        isDark = isDark,
+        count = count,
+        icon = Icons.Rounded.History
+    )
 }
 

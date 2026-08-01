@@ -20,7 +20,8 @@ val TextDark = Color(0xFFF0F2F5)
 // Accent Colors
 val FintechGreen = Color(0xFF10B981)
 val FintechRed = Color(0xFFEF4444)
-val FintechBlue = Color(0xFF3F8CFF)
+val FintechPurple = Color(0xFF6C71F6)
+val FintechBlue = Color(0xFF6C71F6) // Logo brand purple used for primary UI elements
 
 // Gradient Schemes (Pairs/Triplets of colors)
 val GradientIrregular = listOf(Color(0xFF00F5D4), Color(0xFF00B4D8), Color(0xFF9B5DE5)) // Irregular (Neon Turquoise, Ocean Blue, Bright Purple)

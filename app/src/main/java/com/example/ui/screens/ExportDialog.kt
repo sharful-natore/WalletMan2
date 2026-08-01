@@ -900,7 +900,7 @@ fun ExportDialog(
     ) {
         val dialogBg = if (isDark) Color(0xFF0F172A) else Color.White
         val cardBg = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
-        val primaryAccent = Color(0xFF2563EB) // Fintech Blue matching main app theme
+        val primaryAccent = Color(0xFF6C71F6) // Logo brand purple matching main app theme
         val textPrimary = if (isDark) Color.White else Color.Black.copy(alpha = 0.95f)
         val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF4B5563)
 
@@ -1538,7 +1538,7 @@ fun ExportDialog(
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isDark) Color(0xFF1E1B4B).copy(alpha = 0.6f) else Color(0xFFF5F3FF)
                             ),
-                            border = BorderStroke(1.dp, if (isDark) Color(0xFF6366F1).copy(alpha = 0.3f) else Color(0xFFC7D2FE))
+                            border = BorderStroke(1.dp, if (isDark) Color(0xFF6C71F6).copy(alpha = 0.3f) else Color(0xFFC7D2FE))
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 // Live Preview Header
@@ -1554,7 +1554,7 @@ fun ExportDialog(
                                         Box(
                                             modifier = Modifier
                                                 .size(28.dp)
-                                                .background(Color(0xFF6366F1), CircleShape),
+                                                .background(Color(0xFF6C71F6), CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text("F", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
@@ -1564,7 +1564,7 @@ fun ExportDialog(
                                                 text = if (isBn) "রিপোর্ট প্রিভিউ (Report Preview)" else "Report Preview",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.ExtraBold,
-                                                color = Color(0xFF6366F1)
+                                                color = Color(0xFF6C71F6)
                                             )
                                             Text(
                                                 text = getCategoryTitle(selectedCategory, language),
@@ -1576,7 +1576,7 @@ fun ExportDialog(
                                     }
 
                                     Surface(
-                                        color = Color(0xFF6366F1).copy(alpha = 0.15f),
+                                        color = Color(0xFF6C71F6).copy(alpha = 0.15f),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text(
@@ -1924,7 +1924,7 @@ fun ExportDialog(
                             .height(48.dp)
                             .testTag("export_download_button"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB), contentColor = Color.White)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C71F6), contentColor = Color.White)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(imageVector = Icons.Rounded.FileDownload, contentDescription = "Download", modifier = Modifier.size(18.dp))
