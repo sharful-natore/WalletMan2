@@ -9845,12 +9845,10 @@ fun TransactionsScreen(
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
                             item {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous month's transactions",
-                                    color = if (isDark) Color.LightGray.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.8f),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+                                PreviousMonthSectionHeader(
+                                    language = language,
+                                    isDark = isDark,
+                                    count = sortedPrevMonthTransactions.size
                                 )
                             }
 
@@ -9926,12 +9924,10 @@ fun TransactionsScreen(
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
                             item {
-                                Text(
-                                    text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous month's transactions",
-                                    color = if (isDark) Color.LightGray.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.8f),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+                                PreviousMonthSectionHeader(
+                                    language = language,
+                                    isDark = isDark,
+                                    count = sortedPrevMonthTransactions.size
                                 )
                             }
 
@@ -22132,6 +22128,86 @@ fun UndoFloatingBanner(
                     trackColor = androidx.compose.ui.graphics.Color.Transparent
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun PreviousMonthSectionHeader(
+    language: AppLanguage,
+    isDark: Boolean,
+    count: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 20.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(20.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF3B82F6),
+                            Color(0xFF6366F1)
+                        )
+                    )
+                )
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (isDark) Color(0xFF1E293B) else Color(0xFFEFF6FF)
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isDark) Color(0xFF3B82F6).copy(alpha = 0.3f) else Color(0xFFBFDBFE),
+                    shape = RoundedCornerShape(8.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.History,
+                contentDescription = null,
+                tint = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Text(
+            text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
+            color = if (isDark) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                )
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "$count",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) Color(0xFFCBD5E1) else Color(0xFF475569)
+            )
         }
     }
 }

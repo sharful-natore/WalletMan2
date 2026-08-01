@@ -56,16 +56,6 @@ fun SearchDialog(
     onNavigateToSettings: (String) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    
-    // 1. Persons (ব্যক্তিবর্গ ও দেনা-পাওনা) - at the top
-    val filteredPersons = remember(searchQuery, persons) {
-        if (searchQuery.isBlank()) emptyList()
-        else persons.filter { 
-            it.name.contains(searchQuery, true) || 
-            it.phone.contains(searchQuery, true) ||
-            (it.address ?: "").contains(searchQuery, true)
-        }
-    }
 
     val personNetMap = remember(transactions, persons) {
         val map = mutableMapOf<Int, Double>()
@@ -80,68 +70,34 @@ fun SearchDialog(
         map
     }
 
+    // 1. Persons (ব্যক্তিবর্গ ও দেনা-পাওনা)
+    val filteredPersons = remember(searchQuery, persons, personNetMap, transactions) {
+        if (searchQuery.isBlank()) emptyList()
+        else persons.filter { person ->
+            matchPersonSearch(person, searchQuery, personNetMap[person.id] ?: 0.0, transactions)
+        }
+    }
+
     // 2. Transactions (লেনদেনসমূহ)
     val filteredTransactions = remember(searchQuery, transactions, persons) {
         if (searchQuery.isBlank()) emptyList()
         else transactions.filter { tx ->
-            val personName = persons.find { it.id == tx.personId }?.name ?: ""
-            val banglaCat = when (tx.category) {
-                "Salary" -> "বেতন"
-                "Business" -> "ব্যবসা"
-                "Agriculture" -> "কৃষি"
-                "Gift" -> "উপহার"
-                "Sales" -> "বিক্রয়"
-                "Honorarium" -> "সম্মানী"
-                "Freelance" -> "ফ্রিল্যান্সিং"
-                "Rental" -> "ভাড়া"
-                "Investment" -> "বিনিয়োগ"
-                "Food" -> "খাবার"
-                "Housing" -> "বাসস্থান"
-                "Bills" -> "বিল"
-                "Transport" -> "যাতায়াত"
-                "Shopping" -> "কেনাকাটা"
-                "Medical" -> "চিকিৎসা"
-                "Education" -> "শিক্ষা"
-                "Clothing" -> "পোশাক"
-                "Entertainment" -> "বিনোদন"
-                "Others" -> "অন্যান্য"
-                else -> tx.category
-            }
-            val subTypeStr = tx.subType ?: ""
-            val typeStrBn = when (tx.type) {
-                "INCOME" -> "আয় Income"
-                "EXPENSE" -> "ব্যয় Expense"
-                "LEND" -> "পাওনা Lend"
-                "BORROW" -> "দেনা ধার Borrow"
-                "REPAY_PAID" -> "দেনা পরিশোধ Repay"
-                "REPAY_RECEIVED" -> "পাওনা পরিশোধ Repay"
-                else -> ""
-            }
-
-            tx.category.contains(searchQuery, true) || 
-            banglaCat.contains(searchQuery, true) ||
-            tx.note.contains(searchQuery, true) ||
-            personName.contains(searchQuery, true) ||
-            tx.amount.toString().contains(searchQuery) ||
-            subTypeStr.contains(searchQuery, true) ||
-            typeStrBn.contains(searchQuery, true)
+            matchTransactionSearch(tx, searchQuery, persons)
         }
     }
 
     // 3. Savings Goals (সঞ্চয় লক্ষ্য / সঞ্চয় কার্ড)
     val filteredGoals = remember(searchQuery, savingsGoals) {
         if (searchQuery.isBlank()) emptyList()
-        else savingsGoals.filter { goal -> goal.title.contains(searchQuery, true) }
+        else savingsGoals.filter { goal -> matchSavingsGoalSearch(goal, searchQuery) }
     }
 
     // 4. Savings Transactions (সঞ্চয় কার্ড এন্ট্রি)
     val filteredSavingsTransactions = remember(searchQuery, savingsTransactions, savingsGoals) {
         if (searchQuery.isBlank()) emptyList()
         else savingsTransactions.filter { st ->
-            val goal = savingsGoals.find { it.id == st.goalId }
-            st.note.contains(searchQuery, true) || 
-            (goal?.title ?: "").contains(searchQuery, true) ||
-            st.amount.toString().contains(searchQuery)
+            val goalTitle = savingsGoals.find { it.id == st.goalId }?.title ?: ""
+            matchSavingsTransactionSearch(st, goalTitle, searchQuery)
         }
     }
 
