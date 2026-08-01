@@ -7203,8 +7203,8 @@ fun DashboardScreen(
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 90.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 90.dp)
             ) {
         if (dueAutoEntriesPrompt.isNotEmpty()) {
             item {
@@ -7855,13 +7855,13 @@ fun DashboardScreen(
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = FintechBlue,
-                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 4.dp)
+                        modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 2.dp)
                     )
                 }
             }
 
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             // Recent Transactions Section
             Row(
@@ -7955,7 +7955,7 @@ fun DashboardScreen(
                             color = Color.Gray,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 0.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                         )
                     }
                     itemsIndexed(txs, key = { txIdx, tx -> "dash_rec_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
@@ -7982,7 +7982,6 @@ fun DashboardScreen(
 
             if (dashboardPrevMonthTransactions.isNotEmpty()) {
                 item(key = "dash_prev_month_hdr") {
-                    Spacer(modifier = Modifier.height(12.dp))
                     PreviousMonthSectionHeader(
                         language = language,
                         isDark = isDark,
@@ -8000,7 +7999,7 @@ fun DashboardScreen(
                             color = Color.Gray,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                         )
                     }
                     itemsIndexed(txs, key = { txIdx, tx -> "dash_prev_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
@@ -9873,7 +9872,7 @@ fun TransactionsScreen(
                     LazyColumn(
                         state = lazyListState,
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
                         if (sortedTransactions.isNotEmpty()) {
@@ -9897,7 +9896,7 @@ fun TransactionsScreen(
                                     color = Color.Gray,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp, start = 8.dp, end = 8.dp)
                                 )
                             }
                             itemsIndexed(txs, key = { txIdx, tx -> "tx_curr_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
@@ -9945,7 +9944,7 @@ fun TransactionsScreen(
                                         color = Color.Gray,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 16.dp, end = 16.dp)
+                                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp, start = 8.dp, end = 8.dp)
                                     )
                                 }
                                 itemsIndexed(txs, key = { txIdx, tx -> "tx_prev_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
@@ -9981,7 +9980,7 @@ fun TransactionsScreen(
                     LazyColumn(
                         state = lazyListState,
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(bottom = 90.dp)
                     ) {
                         if (sortedTransactions.isNotEmpty()) {
@@ -22260,7 +22259,7 @@ fun TransactionSectionHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = 20.dp, bottom = 10.dp),
+            .padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
