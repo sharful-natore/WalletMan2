@@ -240,7 +240,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _isNotificationEnabled = MutableStateFlow(true) // Default to enabled
     val isNotificationEnabled: StateFlow<Boolean> = _isNotificationEnabled.asStateFlow()
 
-    private val _isSmsAutoParseEnabled = MutableStateFlow(true)
+    private val _isSmsAutoParseEnabled = MutableStateFlow(false)
     val isSmsAutoParseEnabled: StateFlow<Boolean> = _isSmsAutoParseEnabled.asStateFlow()
 
     private val _isSmsAutoDirectEntry = MutableStateFlow(false)
@@ -2240,7 +2240,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     fun verifySmsAutoParseState(context: Context) {
         val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
-        _isSmsAutoParseEnabled.value = prefs.getBoolean("is_sms_auto_parse_enabled", true)
+        _isSmsAutoParseEnabled.value = prefs.getBoolean("is_sms_auto_parse_enabled", false)
         _isSmsAutoDirectEntry.value = prefs.getBoolean("is_sms_auto_direct_entry", false)
     }
 

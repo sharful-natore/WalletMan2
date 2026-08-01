@@ -3783,7 +3783,8 @@ fun FinanceNoteApp(
                                                 exportDialogInitialCategory = cat
                                                 exportDialogInitialTimeFilter = timeFilter
                                                 showExportDialog = true
-                                            }
+                                            },
+                                            transactions = transactions
                                         )
                                         3 -> SavingsScreen(
                                             language = language,
@@ -9316,8 +9317,8 @@ fun TransactionsScreen(
                     "EXPENSE" -> "ব্যয় expense"
                     "LEND" -> "পাওনা লেন্ড lend"
                     "BORROW" -> "দেনা ধার borrow"
-                    "REPAY_PAID" -> "দেনা পরিশোধ repay"
-                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay"
+                    "REPAY_PAID" -> "দেনা পরিশোধ repay paid"
+                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay received"
                     else -> ""
                 }
 
@@ -9366,8 +9367,8 @@ fun TransactionsScreen(
                     "EXPENSE" -> "ব্যয় expense"
                     "LEND" -> "পাওনা লেন্ড lend"
                     "BORROW" -> "দেনা ধার borrow"
-                    "REPAY_PAID" -> "দেনা পরিশোধ repay"
-                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay"
+                    "REPAY_PAID" -> "দেনা পরিশোধ repay paid"
+                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay received"
                     else -> ""
                 }
 
@@ -9421,13 +9422,14 @@ fun TransactionsScreen(
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode, sortedTransactions, sortedPrevMonthTransactions) {
         if (isSelectionMode) {
             isHeaderVisible = true
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            if (currentIndex < 5) {
+            val totalTxs = sortedTransactions.size + sortedPrevMonthTransactions.size
+            if (totalTxs < 5 || currentIndex < 5) {
                 isHeaderVisible = true
             } else {
                 if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -9843,41 +9845,13 @@ fun TransactionsScreen(
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
                             item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier
-                                            .background(
-                                                color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .border(
-                                                width = 1.dp,
-                                                color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = androidx.compose.material.icons.Icons.Rounded.History,
-                                            contentDescription = null,
-                                            tint = if (isDark) Color.LightGray else Color.Gray,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
-                                            color = if (isDark) Color.LightGray else Color.Gray,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous month's transactions",
+                                    color = if (isDark) Color.LightGray.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+                                )
                             }
 
                             val prevGrouped = sortedPrevMonthTransactions.groupBy { formatDateToDay(it.timestamp) }
@@ -9952,41 +9926,13 @@ fun TransactionsScreen(
 
                         if (sortedPrevMonthTransactions.isNotEmpty()) {
                             item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier
-                                            .background(
-                                                color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .border(
-                                                width = 1.dp,
-                                                color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f),
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = androidx.compose.material.icons.Icons.Rounded.History,
-                                            contentDescription = null,
-                                            tint = if (isDark) Color.LightGray else Color.Gray,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous Month's Transactions",
-                                            color = if (isDark) Color.LightGray else Color.Gray,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = if (language == AppLanguage.BN) "বিগত মাসের লেনদেন" else "Previous month's transactions",
+                                    color = if (isDark) Color.LightGray.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.8f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 8.dp)
+                                )
                             }
 
                             items(sortedPrevMonthTransactions, key = { it.id }) { tx ->
@@ -10127,7 +10073,8 @@ fun DebtsScreen(
     onTimeFilterChange: (String) -> Unit = {},
     highlightedPersonId: Int? = null,
     activeTab: String = "",
-    onExportRequest: ((String) -> Unit)? = null
+    onExportRequest: ((String) -> Unit)? = null,
+    transactions: List<Transaction> = emptyList()
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("NAME_ASC") }
@@ -10149,15 +10096,57 @@ fun DebtsScreen(
     }
 
     val searchQueryLower = searchQuery.lowercase().trim()
-    val searchedDebts = remember(filteredDebts, searchQuery) {
+    val searchedDebts = remember(filteredDebts, searchQuery, transactions) {
         if (searchQueryLower.isEmpty()) {
             filteredDebts
         } else {
+            val matchingPersonIds = transactions.filter { tx ->
+                val banglaCat = when (tx.category) {
+                    "Salary" -> "বেতন"
+                    "Business" -> "ব্যবসা"
+                    "Agriculture" -> "কৃষি"
+                    "Gift" -> "উপহার"
+                    "Sales" -> "বিক্রয়"
+                    "Honorarium" -> "সম্মানী"
+                    "Freelance" -> "ফ্রিল্যান্সিং"
+                    "Rental" -> "ভাড়া"
+                    "Investment" -> "বিনিয়োগ"
+                    "Food" -> "খাবার"
+                    "Housing" -> "বাসস্থান"
+                    "Bills" -> "বিল"
+                    "Transport" -> "যাতায়াত"
+                    "Shopping" -> "কেনাকাটা"
+                    "Medical" -> "চিকিৎসা"
+                    "Education" -> "শিক্ষা"
+                    "Clothing" -> "পোশাক"
+                    "Entertainment" -> "বিনোদন"
+                    "Others" -> "অন্যান্য"
+                    else -> tx.category
+                }.lowercase()
+                val subTypeStr = (tx.subType ?: "").lowercase()
+                val typeStrBn = when (tx.type) {
+                    "INCOME" -> "আয় income"
+                    "EXPENSE" -> "ব্যয় expense"
+                    "LEND" -> "পাওনা লেন্ড lend"
+                    "BORROW" -> "দেনা ধার borrow"
+                    "REPAY_PAID" -> "দেনা পরিশোধ repay paid"
+                    "REPAY_RECEIVED" -> "পাওনা পরিশোধ repay received"
+                    else -> ""
+                }
+                
+                tx.category.lowercase().contains(searchQueryLower) ||
+                banglaCat.contains(searchQueryLower) ||
+                subTypeStr.contains(searchQueryLower) ||
+                typeStrBn.contains(searchQueryLower) ||
+                (tx.note ?: "").lowercase().contains(searchQueryLower)
+            }.map { it.personId }.toSet()
+
             filteredDebts.filter { item ->
                 item.person.name.lowercase().contains(searchQueryLower) ||
                 item.person.phone.lowercase().contains(searchQueryLower) ||
-                item.person.address.lowercase().contains(searchQueryLower) ||
-                item.netBalance.toString().contains(searchQueryLower)
+                (item.person.address ?: "").lowercase().contains(searchQueryLower) ||
+                item.netBalance.toString().contains(searchQueryLower) ||
+                matchingPersonIds.contains(item.person.id)
             }
         }
     }
@@ -10180,13 +10169,14 @@ fun DebtsScreen(
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode, sortedDebts) {
         if (isSelectionMode) {
             isHeaderVisible = true
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            if (currentIndex < 5) {
+            val totalDebts = sortedDebts.size
+            if (totalDebts < 5 || currentIndex < 5) {
                 isHeaderVisible = true
             } else {
                 if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -13471,10 +13461,11 @@ fun SavingsGoalDetailOverlay(
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, txList) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        if (currentIndex < 5) {
+        val totalSavingsTxs = txList.size
+        if (totalSavingsTxs < 5 || currentIndex < 5) {
             isHeaderVisible = true
         } else {
             if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
@@ -14056,10 +14047,11 @@ fun PersonDetailOverlay(
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, txList) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        if (currentIndex < 5) {
+        val totalPersonTxs = txList.size
+        if (totalPersonTxs < 5 || currentIndex < 5) {
             isHeaderVisible = true
         } else {
             if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {

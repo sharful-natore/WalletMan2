@@ -1,5 +1,21 @@
 package com.example.util
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.unit.sp
+
 import android.content.Context
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -194,6 +210,21 @@ object BiometricHelper {
                     e.printStackTrace()
                 }
             }
+            loadCustomColors()
+        }
+
+        fun loadCustomColors() {
+            val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+            val defaultColors = arrayOf("#38BDF8", "#84CC16", "#A855F7", "#06B6D4", "#EA580C")
+            for (i in 0 until 5) {
+                val hex = prefs.getString("fingerprint_color_$i", defaultColors[i]) ?: defaultColors[i]
+                try {
+                    ridgePaints[i].color = android.graphics.Color.parseColor(hex)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            invalidate()
         }
 
         fun startScanning() {
@@ -468,13 +499,43 @@ object BiometricHelper {
                     bottomMargin = (20 * density).toInt()
                 }
                 setContent {
-                    com.example.ui.components.GlowingPortalBackground(
-                        modifier = Modifier.fillMaxSize()
+                    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+                    var showColorPickerDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    var colorUpdateTrigger by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0) }
+
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = androidx.compose.ui.Alignment.Center
                     ) {
-                        androidx.compose.ui.viewinterop.AndroidView(
-                            factory = { fingerprintView },
-                            modifier = Modifier.size((80 * density).dp)
-                        )
+                        com.example.ui.components.GlowingPortalBackground(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { fingerprintView },
+                                modifier = Modifier
+                                    .size((80 * density).dp)
+                                    .pointerInput(colorUpdateTrigger) {
+                                        detectTapGestures(
+                                            onLongPress = {
+                                                showColorPickerDialog = true
+                                            }
+                                        )
+                                    }
+                            )
+                        }
+
+                        if (showColorPickerDialog) {
+                            FingerprintColorPickerDialog(
+                                context = activity,
+                                isDarkTheme = isDark,
+                                onDismiss = { showColorPickerDialog = false },
+                                onSave = {
+                                    fingerprintView.loadCustomColors()
+                                    colorUpdateTrigger++
+                                    showColorPickerDialog = false
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -747,4 +808,265 @@ object BiometricFeedback {
             }, 180)
         } catch (_: Throwable) {}
     }
+}
+
+@androidx.compose.runtime.Composable
+fun FingerprintColorPickerDialog(
+    context: Context,
+    isDarkTheme: Boolean,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit
+) {
+    val prefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+    val defaultColors = arrayOf("#38BDF8", "#84CC16", "#A855F7", "#06B6D4", "#EA580C")
+    
+    val customColors = androidx.compose.runtime.remember {
+        val list = mutableListOf<androidx.compose.ui.graphics.Color>()
+        for (i in 0 until 5) {
+            val hex = prefs.getString("fingerprint_color_$i", defaultColors[i]) ?: defaultColors[i]
+            val colorVal = try {
+                androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
+            } catch (e: Exception) {
+                androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(defaultColors[i]))
+            }
+            list.add(colorVal)
+        }
+        val stateList = androidx.compose.runtime.mutableStateListOf<androidx.compose.ui.graphics.Color>()
+        stateList.addAll(list)
+        stateList
+    }
+
+    val languageIsBn = androidx.compose.runtime.remember {
+        val lPrefs = context.getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
+        lPrefs.getString("app_language", "BN") == "BN"
+    }
+
+    var selectedIdx by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(0) }
+    
+    val activeColor = customColors.getOrNull(selectedIdx) ?: androidx.compose.ui.graphics.Color.White
+    var redVal by androidx.compose.runtime.remember(selectedIdx) { androidx.compose.runtime.mutableStateOf((activeColor.red * 255f)) }
+    var greenVal by androidx.compose.runtime.remember(selectedIdx) { androidx.compose.runtime.mutableStateOf((activeColor.green * 255f)) }
+    var blueVal by androidx.compose.runtime.remember(selectedIdx) { androidx.compose.runtime.mutableStateOf((activeColor.blue * 255f)) }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = if (isDarkTheme) androidx.compose.ui.graphics.Color(0xFF1E293B) else androidx.compose.ui.graphics.Color.White,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+        tonalElevation = 8.dp,
+        title = {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                androidx.compose.material3.Text(
+                    text = if (languageIsBn) "ফিঙ্গারপ্রিন্ট কালার কাস্টমাইজ" else "Fingerprint Color",
+                    fontSize = 18.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = if (isDarkTheme) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color(0xFF1E293B)
+                )
+                androidx.compose.material3.IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Close",
+                        tint = if (isDarkTheme) androidx.compose.ui.graphics.Color.Gray else androidx.compose.ui.graphics.Color.DarkGray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        text = {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)
+            ) {
+                androidx.compose.material3.Text(
+                    text = if (languageIsBn) "যে কোনো একটি অংশ সিলেক্ট করে কালার কাস্টমাইজ করুন:" else "Select a ridge to customize its color:",
+                    fontSize = 12.sp,
+                    color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.DarkGray
+                )
+
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    customColors.forEachIndexed { idx, color ->
+                        val isSelected = selectedIdx == idx
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) {
+                                        if (isDarkTheme) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color(0xFF0F172A)
+                                    } else {
+                                        androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.5f)
+                                    },
+                                    shape = CircleShape
+                                )
+                                .clickable { selectedIdx = idx },
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                androidx.compose.material3.Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = "Selected",
+                                    tint = if (color.red * 0.299 + color.green * 0.587 + color.blue * 0.114 > 0.5) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            } else {
+                                androidx.compose.material3.Text(
+                                    text = "${idx + 1}",
+                                    fontSize = 11.sp,
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                    color = if (color.red * 0.299 + color.green * 0.587 + color.blue * 0.114 > 0.5) androidx.compose.ui.graphics.Color.Black else androidx.compose.ui.graphics.Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                androidx.compose.material3.HorizontalDivider(color = if (isDarkTheme) androidx.compose.ui.graphics.Color(0xFF2E354F) else androidx.compose.ui.graphics.Color(0xFFE2E8F0))
+
+                androidx.compose.foundation.layout.Column {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = if (languageIsBn) "লাল (Red)" else "Red",
+                            fontSize = 11.sp,
+                            color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray
+                        )
+                        androidx.compose.material3.Text(
+                            text = "${redVal.toInt()}",
+                            fontSize = 11.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray
+                        )
+                    }
+                    androidx.compose.material3.Slider(
+                        value = redVal,
+                        onValueChange = { newValue ->
+                            redVal = newValue
+                            val newCol = androidx.compose.ui.graphics.Color(redVal.toInt(), greenVal.toInt(), blueVal.toInt())
+                            customColors[selectedIdx] = newCol
+                        },
+                        valueRange = 0f..255f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = androidx.compose.ui.graphics.Color.Red,
+                            activeTrackColor = androidx.compose.ui.graphics.Color.Red.copy(alpha = 0.7f),
+                            inactiveTrackColor = androidx.compose.ui.graphics.Color.Red.copy(alpha = 0.2f)
+                        )
+                    )
+                }
+
+                androidx.compose.foundation.layout.Column {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = if (languageIsBn) "সবুজ (Green)" else "Green",
+                            fontSize = 11.sp,
+                            color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray
+                        )
+                        androidx.compose.material3.Text(
+                            text = "${greenVal.toInt()}",
+                            fontSize = 11.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray
+                        )
+                    }
+                    androidx.compose.material3.Slider(
+                        value = greenVal,
+                        onValueChange = { newValue ->
+                            greenVal = newValue
+                            val newCol = androidx.compose.ui.graphics.Color(redVal.toInt(), greenVal.toInt(), blueVal.toInt())
+                            customColors[selectedIdx] = newCol
+                        },
+                        valueRange = 0f..255f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = androidx.compose.ui.graphics.Color(0xFF10B981),
+                            activeTrackColor = androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.7f),
+                            inactiveTrackColor = androidx.compose.ui.graphics.Color(0xFF10B981).copy(alpha = 0.2f)
+                        )
+                    )
+                }
+
+                androidx.compose.foundation.layout.Column {
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = if (languageIsBn) "নীল (Blue)" else "Blue",
+                            fontSize = 11.sp,
+                            color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray
+                        )
+                        androidx.compose.material3.Text(
+                            text = "${blueVal.toInt()}",
+                            fontSize = 11.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray
+                        )
+                    }
+                    androidx.compose.material3.Slider(
+                        value = blueVal,
+                        onValueChange = { newValue ->
+                            blueVal = newValue
+                            val newCol = androidx.compose.ui.graphics.Color(redVal.toInt(), greenVal.toInt(), blueVal.toInt())
+                            customColors[selectedIdx] = newCol
+                        },
+                        valueRange = 0f..255f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = androidx.compose.ui.graphics.Color(0xFF3B82F6),
+                            activeTrackColor = androidx.compose.ui.graphics.Color(0xFF3B82F6).copy(alpha = 0.7f),
+                            inactiveTrackColor = androidx.compose.ui.graphics.Color(0xFF3B82F6).copy(alpha = 0.2f)
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = {
+                    val edit = prefs.edit()
+                    customColors.forEachIndexed { i, col ->
+                        val hex = String.format("#%02X%02X%02X", (col.red * 255f).toInt(), (col.green * 255f).toInt(), (col.blue * 255f).toInt())
+                        edit.putString("fingerprint_color_$i", hex)
+                    }
+                    edit.apply()
+                    onSave()
+                },
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = androidx.compose.ui.graphics.Color(0xFF4F46E5)
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+            ) {
+                androidx.compose.material3.Text(
+                    text = if (languageIsBn) "সংরক্ষণ" else "Save",
+                    color = androidx.compose.ui.graphics.Color.White,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(
+                onClick = onDismiss
+            ) {
+                androidx.compose.material3.Text(
+                    text = if (languageIsBn) "বাতিল" else "Cancel",
+                    color = if (isDarkTheme) androidx.compose.ui.graphics.Color.LightGray else androidx.compose.ui.graphics.Color.Gray,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+            }
+        }
+    )
 }
