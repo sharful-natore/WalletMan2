@@ -6696,27 +6696,550 @@ fun GrowthPillBadge(
         else -> Color(0xFFDC2626)
     }
 
-    val arrow = when {
+    val arrowSymbol = when {
         isZero -> "—"
         changePct > 0 -> "↗"
         else -> "↘"
     }
 
-    val formattedPctVal = formatNumberString(String.format(java.util.Locale.US, "%.1f", kotlin.math.abs(changePct)) + "%", language)
-    val text = if (isZero) "0%" else "${if (changePct > 0) "+" else "-"}$formattedPctVal $arrow"
+    val absVal = kotlin.math.abs(changePct)
+    val pattern = if (absVal >= 100.0 || absVal % 1.0 == 0.0) "%.0f" else "%.1f"
+    val formattedPctVal = formatNumberString(String.format(java.util.Locale.US, pattern, absVal) + "%", language)
+    val pctText = if (isZero) "0%" else "${if (changePct > 0) "+" else "-"}$formattedPctVal"
 
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         color = bgColor,
         border = BorderStroke(0.5.dp, textColor.copy(alpha = 0.3f))
     ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = 9.5.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(1.dp)
+        ) {
+            Text(
+                text = pctText,
+                color = textColor,
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip
+            )
+            Text(
+                text = arrowSymbol,
+                color = textColor,
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip
+            )
+        }
+    }
+}
+
+private fun getMonthName(month: Int, language: AppLanguage): String {
+    val bnMonths = listOf("জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর")
+    val enMonths = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+    val idx = (month - 1).coerceIn(0, 11)
+    return if (language == AppLanguage.BN) bnMonths[idx] else enMonths[idx]
+}
+
+private data class QuadrupleData<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+@Composable
+fun TrendDetailDialog(
+    initialType: String,
+    transactions: List<Transaction>,
+    savingsTransactions: List<SavingsTransaction>,
+    timeFilter: String,
+    comparisonMode: String,
+    language: AppLanguage,
+    isDark: Boolean,
+    onDismiss: () -> Unit
+) {
+    var selectedType by remember { mutableStateOf(initialType) }
+
+    val ym = getYearMonthFromFilter(timeFilter) ?: run {
+        val cal = java.util.Calendar.getInstance()
+        Pair(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+    }
+    val targetYear = ym.first
+    val targetMonth = ym.second
+
+    val calNow = java.util.Calendar.getInstance()
+    val currentYearNow = calNow.get(java.util.Calendar.YEAR)
+    val currentMonthNow = calNow.get(java.util.Calendar.MONTH) + 1
+    val currentDayNow = calNow.get(java.util.Calendar.DAY_OF_MONTH)
+
+    val calTarget = java.util.Calendar.getInstance().apply {
+        clear()
+        set(java.util.Calendar.YEAR, targetYear)
+        set(java.util.Calendar.MONTH, targetMonth - 1)
+        set(java.util.Calendar.DAY_OF_MONTH, 1)
+    }
+    val maxDaysInTargetMonth = calTarget.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+
+    val dayCutoff = if (targetYear == currentYearNow && targetMonth == currentMonthNow) {
+        currentDayNow.coerceIn(1, maxDaysInTargetMonth)
+    } else {
+        maxDaysInTargetMonth
+    }
+
+    val currStartMs = java.util.Calendar.getInstance().apply {
+        clear()
+        set(targetYear, targetMonth - 1, 1, 0, 0, 0)
+    }.timeInMillis
+
+    val currTillDateMs = java.util.Calendar.getInstance().apply {
+        clear()
+        set(targetYear, targetMonth - 1, dayCutoff, 23, 59, 59)
+        set(java.util.Calendar.MILLISECOND, 999)
+    }.timeInMillis
+
+    val currEndMs = java.util.Calendar.getInstance().apply {
+        clear()
+        set(targetYear, targetMonth - 1, maxDaysInTargetMonth, 23, 59, 59)
+        set(java.util.Calendar.MILLISECOND, 999)
+    }.timeInMillis
+
+    val prevStartCal = java.util.Calendar.getInstance().apply {
+        clear()
+        if (comparisonMode == "MONTH") {
+            var pY = targetYear
+            var pM = targetMonth - 1
+            if (pM < 1) { pM = 12; pY -= 1 }
+            set(pY, pM - 1, 1, 0, 0, 0)
+        } else {
+            set(targetYear - 1, targetMonth - 1, 1, 0, 0, 0)
+        }
+    }
+    val prevStartMs = prevStartCal.timeInMillis
+    val maxDaysInPrevMonth = prevStartCal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    val prevDayCutoff = dayCutoff.coerceAtMost(maxDaysInPrevMonth)
+
+    val prevTillDateMs = java.util.Calendar.getInstance().apply {
+        timeInMillis = prevStartMs
+        set(java.util.Calendar.DAY_OF_MONTH, prevDayCutoff)
+        set(java.util.Calendar.HOUR_OF_DAY, 23)
+        set(java.util.Calendar.MINUTE, 59)
+        set(java.util.Calendar.SECOND, 59)
+        set(java.util.Calendar.MILLISECOND, 999)
+    }.timeInMillis
+
+    val prevEndMs = java.util.Calendar.getInstance().apply {
+        timeInMillis = prevStartMs
+        set(java.util.Calendar.DAY_OF_MONTH, maxDaysInPrevMonth)
+        set(java.util.Calendar.HOUR_OF_DAY, 23)
+        set(java.util.Calendar.MINUTE, 59)
+        set(java.util.Calendar.SECOND, 59)
+        set(java.util.Calendar.MILLISECOND, 999)
+    }.timeInMillis
+
+    val isBn = language == AppLanguage.BN
+    val targetMonthName = getMonthName(targetMonth, language)
+    val prevMonthName = if (comparisonMode == "MONTH") {
+        var pM = targetMonth - 1
+        if (pM < 1) pM = 12
+        getMonthName(pM, language)
+    } else {
+        if (isBn) "গত বছর" else "Last Year"
+    }
+
+    val currTillDateTxs = remember(transactions, currStartMs, currTillDateMs) {
+        transactions.filter { it.timestamp in currStartMs..currTillDateMs }
+    }
+    val currFullMonthTxs = remember(transactions, currStartMs, currEndMs) {
+        transactions.filter { it.timestamp in currStartMs..currEndMs }
+    }
+    val prevTillDateTxs = remember(transactions, prevStartMs, prevTillDateMs) {
+        transactions.filter { it.timestamp in prevStartMs..prevTillDateMs }
+    }
+    val prevFullMonthTxs = remember(transactions, prevStartMs, prevEndMs) {
+        transactions.filter { it.timestamp in prevStartMs..prevEndMs }
+    }
+
+    val quadData = remember(
+        selectedType, currTillDateTxs, currFullMonthTxs, prevTillDateTxs, prevFullMonthTxs,
+        savingsTransactions, currStartMs, currTillDateMs, currEndMs, prevStartMs, prevTillDateMs, prevEndMs
+    ) {
+        when (selectedType) {
+            "INCOME" -> {
+                val cT = currTillDateTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+                val pT = prevTillDateTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+                val cF = currFullMonthTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+                val pF = prevFullMonthTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+                QuadrupleData(cT, pT, cF, pF)
+            }
+            "EXPENSE" -> {
+                val cT = currTillDateTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+                val pT = prevTillDateTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+                val cF = currFullMonthTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+                val pF = prevFullMonthTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+                QuadrupleData(cT, pT, cF, pF)
+            }
+            else -> {
+                val cS_T = savingsTransactions.filter { it.timestamp in currStartMs..currTillDateMs }
+                val cT = cS_T.filter { it.isDeposit }.sumOf { it.amount } - cS_T.filter { !it.isDeposit }.sumOf { it.amount }
+                val pS_T = savingsTransactions.filter { it.timestamp in prevStartMs..prevTillDateMs }
+                val pT = pS_T.filter { it.isDeposit }.sumOf { it.amount } - pS_T.filter { !it.isDeposit }.sumOf { it.amount }
+
+                val cS_F = savingsTransactions.filter { it.timestamp in currStartMs..currEndMs }
+                val cF = cS_F.filter { it.isDeposit }.sumOf { it.amount } - cS_F.filter { !it.isDeposit }.sumOf { it.amount }
+                val pS_F = savingsTransactions.filter { it.timestamp in prevStartMs..prevEndMs }
+                val pF = pS_F.filter { it.isDeposit }.sumOf { it.amount } - pS_F.filter { !it.isDeposit }.sumOf { it.amount }
+                QuadrupleData(cT, pT, cF, pF)
+            }
+        }
+    }
+    val currTillAmount = quadData.first
+    val prevTillAmount = quadData.second
+    val currFullAmount = quadData.third
+    val prevFullAmount = quadData.fourth
+
+    data class CatCompareItem(
+        val category: String,
+        val currAmount: Double,
+        val prevAmount: Double,
+        val diff: Double,
+        val pctChange: Double
+    )
+
+    val categoryBreakdown = remember(selectedType, currFullMonthTxs, prevFullMonthTxs) {
+        if (selectedType == "SAVINGS") {
+            emptyList<CatCompareItem>()
+        } else {
+            val filterType = selectedType
+            val currTxs = currFullMonthTxs.filter { it.type == filterType }
+            val prevTxs = prevFullMonthTxs.filter { it.type == filterType }
+
+            val currCatMap = currTxs.groupBy { it.category.ifBlank { if (isBn) "অন্যান্য" else "Others" } }
+                .mapValues { entry -> entry.value.sumOf { it.amount } }
+            val prevCatMap = prevTxs.groupBy { it.category.ifBlank { if (isBn) "অন্যান্য" else "Others" } }
+                .mapValues { entry -> entry.value.sumOf { it.amount } }
+
+            val allCats = (currCatMap.keys + prevCatMap.keys).toSet()
+            allCats.map { cat ->
+                val cAmt = currCatMap[cat] ?: 0.0
+                val pAmt = prevCatMap[cat] ?: 0.0
+                val diff = cAmt - pAmt
+                val pct = if (pAmt > 0) ((cAmt - pAmt) / pAmt * 100) else (if (cAmt > 0) 100.0 else 0.0)
+                CatCompareItem(cat, cAmt, pAmt, diff, pct)
+            }.sortedByDescending { it.currAmount }
+        }
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.85f)
+                .clip(RoundedCornerShape(24.dp)),
+            color = if (isDark) Color(0xFF0F172A) else Color.White
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (isBn) "তুলনামূলক বিশদ বিশ্লেষণ" else "Detailed Comparative Analysis",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
+                        Text(
+                            text = "$targetMonthName $targetYear vs $prevMonthName",
+                            fontSize = 12.sp,
+                            color = FintechBlue,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Close",
+                            tint = if (isDark) Color.White else Color.Black,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val tabs = listOf(
+                        Triple("INCOME", if (isBn) "আয়" else "Income", Color(0xFF10B981)),
+                        Triple("EXPENSE", if (isBn) "ব্যয়" else "Expense", Color(0xFFEF4444)),
+                        Triple("SAVINGS", if (isBn) "সঞ্চয়" else "Savings", Color(0xFF3B82F6))
+                    )
+                    tabs.forEach { (type, label, color) ->
+                        val isSelected = selectedType == type
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (isSelected) color else Color.Transparent)
+                                .clickable { selectedType = type }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.White else (if (isDark) Color.LightGray else Color(0xFF475569))
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)),
+                            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.2f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CalendarToday,
+                                        contentDescription = null,
+                                        tint = FintechBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = if (isBn) "ঠিক এই সময় পর্যন্ত (১-${formatNumber(dayCutoff, language)} তারিখ)" else "Time-to-Date Comparison (Day 1-${dayCutoff})",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "$targetMonthName (১-${formatNumber(dayCutoff, language)}):",
+                                            fontSize = 11.sp,
+                                            color = if (isDark) Color.LightGray else Color.Gray
+                                        )
+                                        Text(
+                                            text = formatCurrency(currTillAmount, language),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White else Color.Black
+                                        )
+                                    }
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "$prevMonthName (১-${formatNumber(prevDayCutoff, language)}):",
+                                            fontSize = 11.sp,
+                                            color = if (isDark) Color.LightGray else Color.Gray
+                                        )
+                                        Text(
+                                            text = formatCurrency(prevTillAmount, language),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDark) Color.White.copy(alpha = 0.8f) else Color(0xFF334155)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val diffTill = currTillAmount - prevTillAmount
+                                val pctTill = if (prevTillAmount > 0) ((currTillAmount - prevTillAmount) / prevTillAmount * 100) else (if (currTillAmount > 0) 100.0 else 0.0)
+                                val isExp = selectedType == "EXPENSE"
+                                val isGood = if (isExp) diffTill <= 0 else diffTill >= 0
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isGood) Color(0xFF10B981).copy(alpha = 0.12f) else Color(0xFFEF4444).copy(alpha = 0.12f))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isBn) "সময়ের তুলনায় পার্থক্য:" else "Till-Date Difference:",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) Color.White.copy(alpha = 0.9f) else Color(0xFF1E293B)
+                                    )
+                                    Text(
+                                        text = "${if (diffTill > 0) "+" else ""}${formatCurrency(diffTill, language)} (${if (pctTill > 0) "+" else ""}${formatNumberString(String.format(java.util.Locale.US, "%.1f", pctTill), language)}%)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isGood) Color(0xFF059669) else Color(0xFFDC2626)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                HorizontalDivider(color = (if (isDark) Color.White else Color.Black).copy(alpha = 0.08f))
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (isBn) "পুরো মাসের মোট পরিমাণ:" else "Full Month Total:",
+                                        fontSize = 11.5.sp,
+                                        color = if (isDark) Color.LightGray else Color.DarkGray
+                                    )
+                                    Text(
+                                        text = "${formatCurrency(currFullAmount, language)} (গত মাসে: ${formatCurrency(prevFullAmount, language)})",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isDark) Color.White else Color.Black
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (selectedType != "SAVINGS") {
+                        item {
+                            Text(
+                                text = if (selectedType == "EXPENSE") (if (isBn) "খাত-ভিত্তিক ব্যয়ের তুলনা" else "Category Expense Breakdown") else (if (isBn) "খাত-ভিত্তিক আয়ের তুলনা" else "Category Income Breakdown"),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) Color.White else Color(0xFF1E293B)
+                            )
+                        }
+
+                        if (categoryBreakdown.isEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(20.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (isBn) "কোনো ক্যাটাগরি তথ্য পাওয়া যায়নি" else "No category data available",
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                        } else {
+                            items(categoryBreakdown) { item ->
+                                val totalFull = if (currFullAmount > 0) currFullAmount else 1.0
+                                val prop = (item.currAmount / totalFull).coerceIn(0.0, 1.0).toFloat()
+                                val isExp = selectedType == "EXPENSE"
+                                val isGoodCat = if (isExp) item.diff <= 0 else item.diff >= 0
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = item.category,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDark) Color.White else Color(0xFF0F172A)
+                                            )
+
+                                            Text(
+                                                text = formatCurrency(item.currAmount, language),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDark) Color.White else Color.Black
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${if (isBn) "গত মাসে:" else "Last month:"} ${formatCurrency(item.prevAmount, language)}",
+                                                fontSize = 11.sp,
+                                                color = if (isDark) Color.LightGray else Color.Gray
+                                            )
+
+                                            val diffText = "${if (item.diff > 0) "+" else ""}${formatCurrency(item.diff, language)}"
+                                            Text(
+                                                text = diffText,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isGoodCat) Color(0xFF059669) else Color(0xFFDC2626)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        LinearProgressIndicator(
+                                            progress = { prop },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(4.dp)
+                                                .clip(RoundedCornerShape(2.dp)),
+                                            color = if (selectedType == "EXPENSE") Color(0xFFEF4444) else Color(0xFF10B981),
+                                            trackColor = (if (isDark) Color.White else Color.Black).copy(alpha = 0.08f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -6731,16 +7254,17 @@ private fun CompactTrendItem(
     accentColor: Color,
     language: AppLanguage,
     isDark: Boolean,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
         border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.25f))
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(8.dp),
             horizontalAlignment = Alignment.Start
         ) {
             Row(
@@ -6749,22 +7273,26 @@ private fun CompactTrendItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier.weight(1f, fill = false),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(6.dp)
+                            .size(5.dp)
                             .clip(CircleShape)
                             .background(accentColor)
                     )
                     Text(
                         text = title,
-                        fontSize = 11.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (isDark) Color.White.copy(alpha = 0.8f) else Color(0xFF475569)
+                        color = if (isDark) Color.White.copy(alpha = 0.8f) else Color(0xFF475569),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+                Spacer(modifier = Modifier.width(2.dp))
                 GrowthPillBadge(changePct = changePct, isExpense = isExpense, language = language)
             }
 
@@ -6802,6 +7330,20 @@ fun FinancialTrendPerformanceCard(
     onExportRequest: ((String) -> Unit)? = null
 ) {
     var comparisonMode by remember { mutableStateOf("MONTH") }
+    var selectedDetailType by remember { mutableStateOf<String?>(null) }
+
+    if (selectedDetailType != null) {
+        TrendDetailDialog(
+            initialType = selectedDetailType!!,
+            transactions = transactions,
+            savingsTransactions = savingsTransactions,
+            timeFilter = timeFilter,
+            comparisonMode = comparisonMode,
+            language = language,
+            isDark = isDark,
+            onDismiss = { selectedDetailType = null }
+        )
+    }
 
     val metrics = remember(transactions, savingsTransactions, comparisonMode, timeFilter, language) {
         val ym = getYearMonthFromFilter(timeFilter) ?: run {
@@ -6918,7 +7460,7 @@ fun FinancialTrendPerformanceCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.clickable { onNavigateToCharts() }
+                    modifier = Modifier.clickable { selectedDetailType = "EXPENSE" }
                 ) {
                     Box(
                         modifier = Modifier
@@ -6951,7 +7493,7 @@ fun FinancialTrendPerformanceCard(
                         )
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                            contentDescription = "View charts",
+                            contentDescription = "View details",
                             tint = FintechBlue,
                             modifier = Modifier.size(14.dp)
                         )
@@ -7016,6 +7558,7 @@ fun FinancialTrendPerformanceCard(
                     accentColor = Color(0xFF10B981),
                     language = language,
                     isDark = isDark,
+                    onClick = { selectedDetailType = "INCOME" },
                     modifier = Modifier.weight(1f)
                 )
 
@@ -7029,6 +7572,7 @@ fun FinancialTrendPerformanceCard(
                     accentColor = Color(0xFFEF4444),
                     language = language,
                     isDark = isDark,
+                    onClick = { selectedDetailType = "EXPENSE" },
                     modifier = Modifier.weight(1f)
                 )
 
@@ -7042,6 +7586,7 @@ fun FinancialTrendPerformanceCard(
                     accentColor = Color(0xFF3B82F6),
                     language = language,
                     isDark = isDark,
+                    onClick = { selectedDetailType = "SAVINGS" },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -8008,8 +8553,9 @@ fun DashboardScreen(
 
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
+                    border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onExportRequest?.invoke("ALL_DATA") }
@@ -9862,21 +10408,33 @@ fun TransactionsScreen(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
+    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode, sortedTransactions, sortedPrevMonthTransactions) {
         if (isSelectionMode) {
             isHeaderVisible = true
+            lastHeaderShownIndex = lazyListState.firstVisibleItemIndex
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            val totalTxs = sortedTransactions.size + sortedPrevMonthTransactions.size
-            if (totalTxs < 5 || currentIndex < 5) {
-                isHeaderVisible = true
-            } else {
-                if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
-                    isHeaderVisible = false
-                } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+            val canScrollDown = lazyListState.canScrollForward
+
+            if (currentIndex < 5 || !canScrollDown) {
+                if (!isHeaderVisible) {
                     isHeaderVisible = true
+                    lastHeaderShownIndex = currentIndex
+                }
+            } else {
+                val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+                val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+                if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+                    isHeaderVisible = false
+                } else if (isScrollingUp) {
+                    if (!isHeaderVisible) {
+                        isHeaderVisible = true
+                        lastHeaderShownIndex = currentIndex
+                    }
                 }
             }
             prevIndex = currentIndex
@@ -10631,21 +11189,33 @@ fun DebtsScreen(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
+    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode, sortedDebts) {
         if (isSelectionMode) {
             isHeaderVisible = true
+            lastHeaderShownIndex = lazyListState.firstVisibleItemIndex
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            val totalDebts = sortedDebts.size
-            if (totalDebts < 5 || currentIndex < 5) {
-                isHeaderVisible = true
-            } else {
-                if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
-                    isHeaderVisible = false
-                } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+            val canScrollDown = lazyListState.canScrollForward
+
+            if (currentIndex < 5 || !canScrollDown) {
+                if (!isHeaderVisible) {
                     isHeaderVisible = true
+                    lastHeaderShownIndex = currentIndex
+                }
+            } else {
+                val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+                val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+                if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+                    isHeaderVisible = false
+                } else if (isScrollingUp) {
+                    if (!isHeaderVisible) {
+                        isHeaderVisible = true
+                        lastHeaderShownIndex = currentIndex
+                    }
                 }
             }
             prevIndex = currentIndex
@@ -13963,18 +14533,29 @@ fun SavingsGoalDetailOverlay(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
+    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, txList) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        val totalSavingsTxs = txList.size
-        if (totalSavingsTxs < 5 || currentIndex < 5) {
-            isHeaderVisible = true
-        } else {
-            if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
-                isHeaderVisible = false
-            } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+        val canScrollDown = lazyListState.canScrollForward
+
+        if (currentIndex < 5 || !canScrollDown) {
+            if (!isHeaderVisible) {
                 isHeaderVisible = true
+                lastHeaderShownIndex = currentIndex
+            }
+        } else {
+            val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+            val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+            if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+                isHeaderVisible = false
+            } else if (isScrollingUp) {
+                if (!isHeaderVisible) {
+                    isHeaderVisible = true
+                    lastHeaderShownIndex = currentIndex
+                }
             }
         }
         prevIndex = currentIndex
@@ -14549,18 +15130,29 @@ fun PersonDetailOverlay(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
+    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, txList) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        val totalPersonTxs = txList.size
-        if (totalPersonTxs < 5 || currentIndex < 5) {
-            isHeaderVisible = true
-        } else {
-            if (currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)) {
-                isHeaderVisible = false
-            } else if (currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)) {
+        val canScrollDown = lazyListState.canScrollForward
+
+        if (currentIndex < 5 || !canScrollDown) {
+            if (!isHeaderVisible) {
                 isHeaderVisible = true
+                lastHeaderShownIndex = currentIndex
+            }
+        } else {
+            val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+            val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+            if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+                isHeaderVisible = false
+            } else if (isScrollingUp) {
+                if (!isHeaderVisible) {
+                    isHeaderVisible = true
+                    lastHeaderShownIndex = currentIndex
+                }
             }
         }
         prevIndex = currentIndex
