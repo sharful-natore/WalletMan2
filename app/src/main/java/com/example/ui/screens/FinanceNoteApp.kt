@@ -6651,6 +6651,404 @@ private fun showLocalSystemNotification(context: Context, title: String, message
     }
 }
 
+data class TrendComparisonData(
+    val currIncome: Double,
+    val prevIncome: Double,
+    val currExpense: Double,
+    val prevExpense: Double,
+    val currSavings: Double,
+    val prevSavings: Double,
+    val periodLabel: String
+) {
+    private fun calcChangePct(curr: Double, prev: Double): Double {
+        return if (prev > 0.0) {
+            ((curr - prev) / prev) * 100.0
+        } else if (curr > 0.0) {
+            100.0
+        } else {
+            0.0
+        }
+    }
+
+    val incomeChangePct: Double get() = calcChangePct(currIncome, prevIncome)
+    val expenseChangePct: Double get() = calcChangePct(currExpense, prevExpense)
+    val savingsChangePct: Double get() = calcChangePct(currSavings, prevSavings)
+}
+
+@Composable
+fun GrowthPillBadge(
+    changePct: Double,
+    isExpense: Boolean = false,
+    language: AppLanguage
+) {
+    val isPositive = if (isExpense) changePct < 0 else changePct > 0
+    val isZero = kotlin.math.abs(changePct) < 0.1
+
+    val bgColor = when {
+        isZero -> Color.Gray.copy(alpha = 0.15f)
+        isPositive -> Color(0xFF10B981).copy(alpha = 0.15f)
+        else -> Color(0xFFEF4444).copy(alpha = 0.15f)
+    }
+
+    val textColor = when {
+        isZero -> Color.Gray
+        isPositive -> Color(0xFF059669)
+        else -> Color(0xFFDC2626)
+    }
+
+    val arrow = when {
+        isZero -> "—"
+        changePct > 0 -> "↗"
+        else -> "↘"
+    }
+
+    val formattedPctVal = formatNumberString(String.format(java.util.Locale.US, "%.1f", kotlin.math.abs(changePct)) + "%", language)
+    val text = if (isZero) "0%" else "${if (changePct > 0) "+" else "-"}$formattedPctVal $arrow"
+
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = bgColor,
+        border = BorderStroke(0.5.dp, textColor.copy(alpha = 0.3f))
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+private fun CompactTrendItem(
+    title: String,
+    currAmount: Double,
+    prevAmount: Double,
+    changePct: Double,
+    periodLabel: String,
+    isExpense: Boolean,
+    accentColor: Color,
+    language: AppLanguage,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
+        border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.25f))
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                    )
+                    Text(
+                        text = title,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.White.copy(alpha = 0.8f) else Color(0xFF475569)
+                    )
+                }
+                GrowthPillBadge(changePct = changePct, isExpense = isExpense, language = language)
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = formatCurrency(currAmount, language),
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) Color.White else Color.Black,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = "${periodLabel}: ${formatCurrency(prevAmount, language)}",
+                fontSize = 9.5.sp,
+                color = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Gray,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun FinancialTrendPerformanceCard(
+    transactions: List<Transaction>,
+    savingsTransactions: List<SavingsTransaction>,
+    timeFilter: String = "MONTH",
+    language: AppLanguage,
+    isDark: Boolean,
+    onNavigateToCharts: () -> Unit,
+    onExportRequest: ((String) -> Unit)? = null
+) {
+    var comparisonMode by remember { mutableStateOf("MONTH") }
+
+    val metrics = remember(transactions, savingsTransactions, comparisonMode, timeFilter, language) {
+        val ym = getYearMonthFromFilter(timeFilter) ?: run {
+            val cal = java.util.Calendar.getInstance()
+            Pair(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+        }
+        val targetYear = ym.first
+        val targetMonth = ym.second
+
+        if (comparisonMode == "MONTH") {
+            val calendar = java.util.Calendar.getInstance()
+            calendar.clear()
+            calendar.set(java.util.Calendar.YEAR, targetYear)
+            calendar.set(java.util.Calendar.MONTH, targetMonth - 1)
+            calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            calendar.set(java.util.Calendar.MINUTE, 0)
+            calendar.set(java.util.Calendar.SECOND, 0)
+            calendar.set(java.util.Calendar.MILLISECOND, 0)
+            val currentStart = calendar.timeInMillis
+
+            calendar.add(java.util.Calendar.MONTH, 1)
+            val currentEnd = calendar.timeInMillis
+
+            calendar.add(java.util.Calendar.MONTH, -2)
+            val prevStart = calendar.timeInMillis
+
+            val currTxs = transactions.filter { it.timestamp in currentStart until currentEnd }
+            val prevTxs = transactions.filter { it.timestamp in prevStart until currentStart }
+
+            val currSavingsTxs = savingsTransactions.filter { it.timestamp in currentStart until currentEnd }
+            val prevSavingsTxs = savingsTransactions.filter { it.timestamp in prevStart until currentStart }
+
+            val currIncome = currTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val prevIncome = prevTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+
+            val currExpense = currTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val prevExpense = prevTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+
+            val currSavings = currSavingsTxs.filter { it.isDeposit }.sumOf { it.amount } - currSavingsTxs.filter { !it.isDeposit }.sumOf { it.amount }
+            val prevSavings = prevSavingsTxs.filter { it.isDeposit }.sumOf { it.amount } - prevSavingsTxs.filter { !it.isDeposit }.sumOf { it.amount }
+
+            TrendComparisonData(
+                currIncome = currIncome,
+                prevIncome = prevIncome,
+                currExpense = currExpense,
+                prevExpense = prevExpense,
+                currSavings = currSavings,
+                prevSavings = prevSavings,
+                periodLabel = if (language == AppLanguage.BN) "গত মাস" else "Last Month"
+            )
+        } else {
+            val calendar = java.util.Calendar.getInstance()
+            calendar.clear()
+            calendar.set(java.util.Calendar.YEAR, targetYear)
+            calendar.set(java.util.Calendar.DAY_OF_YEAR, 1)
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            calendar.set(java.util.Calendar.MINUTE, 0)
+            calendar.set(java.util.Calendar.SECOND, 0)
+            calendar.set(java.util.Calendar.MILLISECOND, 0)
+            val currentStart = calendar.timeInMillis
+
+            calendar.add(java.util.Calendar.YEAR, 1)
+            val currentEnd = calendar.timeInMillis
+
+            calendar.add(java.util.Calendar.YEAR, -2)
+            val prevStart = calendar.timeInMillis
+
+            val currTxs = transactions.filter { it.timestamp in currentStart until currentEnd }
+            val prevTxs = transactions.filter { it.timestamp in prevStart until currentStart }
+
+            val currSavingsTxs = savingsTransactions.filter { it.timestamp in currentStart until currentEnd }
+            val prevSavingsTxs = savingsTransactions.filter { it.timestamp in prevStart until currentStart }
+
+            val currIncome = currTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val prevIncome = prevTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+
+            val currExpense = currTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val prevExpense = prevTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+
+            val currSavings = currSavingsTxs.filter { it.isDeposit }.sumOf { it.amount } - currSavingsTxs.filter { !it.isDeposit }.sumOf { it.amount }
+            val prevSavings = prevSavingsTxs.filter { it.isDeposit }.sumOf { it.amount } - prevSavingsTxs.filter { !it.isDeposit }.sumOf { it.amount }
+
+            TrendComparisonData(
+                currIncome = currIncome,
+                prevIncome = prevIncome,
+                currExpense = currExpense,
+                prevExpense = prevExpense,
+                currSavings = currSavings,
+                prevSavings = prevSavings,
+                periodLabel = if (language == AppLanguage.BN) "গত বছর" else "Last Year"
+            )
+        }
+    }
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
+        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("financial_trend_performance_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.clickable { onNavigateToCharts() }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.linearGradient(
+                                    listOf(FintechBlue, Color(0xFF8B5CF6))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "আর্থিক অগ্রগতি ও ট্রেন্ড" else "Growth & Trend Insights",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color.Black.copy(alpha = 0.78f)
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                            contentDescription = "View charts",
+                            tint = FintechBlue,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isDark) Color(0xFF0F172A) else Color(0xFFF1F5F9),
+                    border = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.2f))
+                ) {
+                    Row(modifier = Modifier.padding(2.dp)) {
+                        val selectedBg = FintechBlue
+                        val unselectedBg = Color.Transparent
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (comparisonMode == "MONTH") selectedBg else unselectedBg)
+                                .clickable { comparisonMode = "MONTH" }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "মাসিক" else "Monthly",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (comparisonMode == "MONTH") Color.White else (if (isDark) Color.LightGray else Color.DarkGray)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (comparisonMode == "YEAR") selectedBg else unselectedBg)
+                                .clickable { comparisonMode = "YEAR" }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "বার্ষিক" else "Yearly",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (comparisonMode == "YEAR") Color.White else (if (isDark) Color.LightGray else Color.DarkGray)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CompactTrendItem(
+                    title = if (language == AppLanguage.BN) "আয়" else "Income",
+                    currAmount = metrics.currIncome,
+                    prevAmount = metrics.prevIncome,
+                    changePct = metrics.incomeChangePct,
+                    periodLabel = metrics.periodLabel,
+                    isExpense = false,
+                    accentColor = Color(0xFF10B981),
+                    language = language,
+                    isDark = isDark,
+                    modifier = Modifier.weight(1f)
+                )
+
+                CompactTrendItem(
+                    title = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
+                    currAmount = metrics.currExpense,
+                    prevAmount = metrics.prevExpense,
+                    changePct = metrics.expenseChangePct,
+                    periodLabel = metrics.periodLabel,
+                    isExpense = true,
+                    accentColor = Color(0xFFEF4444),
+                    language = language,
+                    isDark = isDark,
+                    modifier = Modifier.weight(1f)
+                )
+
+                CompactTrendItem(
+                    title = if (language == AppLanguage.BN) "সঞ্চয়" else "Savings",
+                    currAmount = metrics.currSavings,
+                    prevAmount = metrics.prevSavings,
+                    changePct = metrics.savingsChangePct,
+                    periodLabel = metrics.periodLabel,
+                    isExpense = false,
+                    accentColor = Color(0xFF3B82F6),
+                    language = language,
+                    isDark = isDark,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun DashboardScreen(
@@ -7089,7 +7487,7 @@ fun DashboardScreen(
             onDismissRequest = { activeAlertPopup = null },
             icon = {
                 Icon(
-                    imageVector = if (alert.isWarning) Icons.Rounded.Warning else Icons.Rounded.Savings,
+                    imageVector = if (alert.isWarning) Icons.Rounded.Warning else Icons.Rounded.AccountBalance,
                     contentDescription = null,
                     tint = if (alert.isWarning) Color(0xFFEF4444) else Color(0xFF10B981),
                     modifier = Modifier.size(40.dp)
@@ -7135,9 +7533,10 @@ fun DashboardScreen(
             isDark = isDark,
             transactions = transactions,
             savingsTransactions = savingsTransactions,
-            budgetIncome = budgetIncomeAmount,
-            budgetExpense = budgetExpenseAmount,
-            budgetSavings = budgetSavingsAmount,
+            monthlyBudgets = monthlyBudgets,
+            budgetIncome = currentWorkspace.budgetIncome,
+            budgetExpense = currentWorkspace.budgetExpense,
+            budgetSavings = currentWorkspace.budgetSavings,
             onDismiss = { showBudgetHistoryDialog = false }
         )
     }
@@ -7637,7 +8036,7 @@ fun DashboardScreen(
                                 text = if (language == AppLanguage.BN) "তথ্য/রিপোর্ট এক্সপোর্ট করুন" else "Export Data/Report",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color.White else Color.Black.copy(alpha = 0.95f)
+                                color = if (isDark) Color.White else Color.Black.copy(alpha = 0.78f)
                             )
                         }
 
@@ -7683,6 +8082,19 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                FinancialTrendPerformanceCard(
+                    transactions = transactions,
+                    savingsTransactions = savingsTransactions,
+                    timeFilter = timeFilter,
+                    language = language,
+                    isDark = isDark,
+                    onNavigateToCharts = { onNavigate("charts", "") },
+                    onExportRequest = onExportRequest
+                )
             }
 
             item {
@@ -7863,10 +8275,9 @@ fun DashboardScreen(
                     )
                 }
             }
+        }
 
-
-            Spacer(modifier = Modifier.height(2.dp))
-
+        item {
             // Recent Transactions Section
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -10934,6 +11345,12 @@ fun getYearMonthFromFilter(filter: String): Pair<Int, Int>? {
         filter.startsWith("CUSTOM_MONTH:") -> {
             val parts = filter.substringAfter("CUSTOM_MONTH:").split("-")
             if (parts.size == 2) {
+                Pair(parts[0].toIntOrNull() ?: 2026, parts[1].toIntOrNull() ?: 1)
+            } else null
+        }
+        filter.startsWith("CUSTOM_DATE:") -> {
+            val parts = filter.substringAfter("CUSTOM_DATE:").split("-")
+            if (parts.size >= 2) {
                 Pair(parts[0].toIntOrNull() ?: 2026, parts[1].toIntOrNull() ?: 1)
             } else null
         }
@@ -20785,6 +21202,7 @@ fun BudgetHistoryDialog(
     isDark: Boolean,
     transactions: List<Transaction>,
     savingsTransactions: List<com.example.data.SavingsTransaction>,
+    monthlyBudgets: List<com.example.data.MonthlyBudget> = emptyList(),
     budgetIncome: Double,
     budgetExpense: Double,
     budgetSavings: Double,
@@ -20871,6 +21289,32 @@ fun BudgetHistoryDialog(
                                     .sumOf { if (it.isDeposit) it.amount else -it.amount }
                             }
 
+                            val monthParts = monthKey.split("-")
+                            val keyYear = monthParts.getOrNull(0)?.toIntOrNull() ?: 2026
+                            val keyMonth = monthParts.getOrNull(1)?.toIntOrNull() ?: 1
+
+                            val monthEffectiveBudget = remember(monthlyBudgets, keyYear, keyMonth, budgetIncome, budgetExpense, budgetSavings) {
+                                val exact = monthlyBudgets.find { it.year == keyYear && it.month == keyMonth }
+                                if (exact != null) {
+                                    exact
+                                } else {
+                                    val targetVal = keyYear * 12 + (keyMonth - 1)
+                                    val prev = monthlyBudgets
+                                        .filter { (it.year * 12 + (it.month - 1)) < targetVal }
+                                        .maxByOrNull { it.year * 12 + (it.month - 1) }
+                                    com.example.data.MonthlyBudget(
+                                        year = keyYear,
+                                        month = keyMonth,
+                                        income = prev?.income ?: budgetIncome,
+                                        expense = prev?.expense ?: budgetExpense,
+                                        savings = prev?.savings ?: budgetSavings
+                                    )
+                                }
+                            }
+                            val mIncBudget = monthEffectiveBudget.income ?: 0.0
+                            val mExpBudget = monthEffectiveBudget.expense ?: 0.0
+                            val mSavBudget = monthEffectiveBudget.savings ?: 0.0
+
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(12.dp),
@@ -20897,8 +21341,8 @@ fun BudgetHistoryDialog(
                                     )
 
                                     // 1. Income Progress
-                                    val incProgress = if (budgetIncome > 0) (monthlyIncome / budgetIncome).coerceIn(0.0, 1.0).toFloat() else 0f
-                                    val incPercentText = if (budgetIncome > 0) "${(monthlyIncome / budgetIncome * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
+                                    val incProgress = if (mIncBudget > 0) (monthlyIncome / mIncBudget).coerceIn(0.0, 1.0).toFloat() else 0f
+                                    val incPercentText = if (mIncBudget > 0) "${(monthlyIncome / mIncBudget * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
                                     
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(
@@ -20912,13 +21356,13 @@ fun BudgetHistoryDialog(
                                                 color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
                                             )
                                             Text(
-                                                text = "${formatNumber(monthlyIncome.toInt(), language)} ৳ / ${if (budgetIncome > 0) formatNumber(budgetIncome.toInt(), language) + " ৳" else ""} ($incPercentText)",
+                                                text = "${formatNumber(monthlyIncome.toInt(), language)} ৳ / ${if (mIncBudget > 0) formatNumber(mIncBudget.toInt(), language) + " ৳" else ""} ($incPercentText)",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = if (budgetIncome > 0 && monthlyIncome >= budgetIncome * 0.8) Color(0xFF10B981) else if (isDark) Color.White else Color.Black
+                                                color = if (mIncBudget > 0 && monthlyIncome >= mIncBudget * 0.8) Color(0xFF10B981) else if (isDark) Color.White else Color.Black
                                             )
                                         }
-                                        if (budgetIncome > 0) {
+                                        if (mIncBudget > 0) {
                                             LinearProgressIndicator(
                                                 progress = { incProgress },
                                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
@@ -20929,9 +21373,9 @@ fun BudgetHistoryDialog(
                                     }
 
                                     // 2. Expense Progress
-                                    val expProgress = if (budgetExpense > 0) (monthlyExpense / budgetExpense).coerceIn(0.0, 1.0).toFloat() else 0f
-                                    val expPercentText = if (budgetExpense > 0) "${(monthlyExpense / budgetExpense * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
-                                    val isExpOverLimit = budgetExpense > 0 && monthlyExpense >= budgetExpense * 0.8
+                                    val expProgress = if (mExpBudget > 0) (monthlyExpense / mExpBudget).coerceIn(0.0, 1.0).toFloat() else 0f
+                                    val expPercentText = if (mExpBudget > 0) "${(monthlyExpense / mExpBudget * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
+                                    val isExpOverLimit = mExpBudget > 0 && monthlyExpense >= mExpBudget * 0.8
 
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(
@@ -20945,13 +21389,13 @@ fun BudgetHistoryDialog(
                                                 color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
                                             )
                                             Text(
-                                                text = "${formatNumber(monthlyExpense.toInt(), language)} ৳ / ${if (budgetExpense > 0) formatNumber(budgetExpense.toInt(), language) + " ৳" else ""} ($expPercentText)",
+                                                text = "${formatNumber(monthlyExpense.toInt(), language)} ৳ / ${if (mExpBudget > 0) formatNumber(mExpBudget.toInt(), language) + " ৳" else ""} ($expPercentText)",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = if (isExpOverLimit) Color(0xFFEF4444) else if (isDark) Color.White else Color.Black
                                             )
                                         }
-                                        if (budgetExpense > 0) {
+                                        if (mExpBudget > 0) {
                                             LinearProgressIndicator(
                                                 progress = { expProgress },
                                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
@@ -20962,8 +21406,8 @@ fun BudgetHistoryDialog(
                                     }
 
                                     // 3. Savings Progress
-                                    val savProgress = if (budgetSavings > 0) (monthlySavings / budgetSavings).coerceIn(0.0, 1.0).toFloat() else 0f
-                                    val savPercentText = if (budgetSavings > 0) "${(monthlySavings / budgetSavings * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
+                                    val savProgress = if (mSavBudget > 0) (monthlySavings / mSavBudget).coerceIn(0.0, 1.0).toFloat() else 0f
+                                    val savPercentText = if (mSavBudget > 0) "${(monthlySavings / mSavBudget * 100).toInt()}%" else if (language == AppLanguage.BN) "সেট করুন" else "Set"
 
                                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                         Row(
@@ -20977,13 +21421,13 @@ fun BudgetHistoryDialog(
                                                 color = if (isDark) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
                                             )
                                             Text(
-                                                text = "${formatNumber(monthlySavings.toInt(), language)} ৳ / ${if (budgetSavings > 0) formatNumber(budgetSavings.toInt(), language) + " ৳" else ""} ($savPercentText)",
+                                                text = "${formatNumber(monthlySavings.toInt(), language)} ৳ / ${if (mSavBudget > 0) formatNumber(mSavBudget.toInt(), language) + " ৳" else ""} ($savPercentText)",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = if (budgetSavings > 0 && monthlySavings >= budgetSavings * 0.8) Color(0xFF10B981) else if (isDark) Color.White else Color.Black
+                                                color = if (mSavBudget > 0 && monthlySavings >= mSavBudget * 0.8) Color(0xFF10B981) else if (isDark) Color.White else Color.Black
                                             )
                                         }
-                                        if (budgetSavings > 0) {
+                                        if (mSavBudget > 0) {
                                             LinearProgressIndicator(
                                                 progress = { savProgress },
                                                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),

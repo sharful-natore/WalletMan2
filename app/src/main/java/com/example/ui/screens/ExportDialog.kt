@@ -624,13 +624,14 @@ fun ExportDialog(
 
             val result = mutableListOf<MonthlyBudget>()
             for ((y, m) in requiredMonths) {
-                val existing = list.find { it.year == y && (it.month == m || it.month == m + 1) }
+                val targetMonth = m + 1
+                val existing = list.find { it.year == y && it.month == targetMonth }
                 if (existing != null) {
                     result.add(
                         MonthlyBudget(
                             id = existing.id,
                             year = y,
-                            month = m,
+                            month = targetMonth,
                             income = existing.income ?: 0.0,
                             expense = existing.expense ?: 0.0,
                             savings = existing.savings ?: 0.0,
@@ -638,13 +639,17 @@ fun ExportDialog(
                         )
                     )
                 } else {
+                    val targetVal = y * 12 + (targetMonth - 1)
+                    val prev = list
+                        .filter { (it.year * 12 + (it.month - 1)) < targetVal }
+                        .maxByOrNull { it.year * 12 + (it.month - 1) }
                     result.add(
                         MonthlyBudget(
                             year = y,
-                            month = m,
-                            income = 0.0,
-                            expense = 0.0,
-                            savings = 0.0
+                            month = targetMonth,
+                            income = prev?.income ?: defaultBudgetIncome,
+                            expense = prev?.expense ?: defaultBudgetExpense,
+                            savings = prev?.savings ?: defaultBudgetSavings
                         )
                     )
                 }

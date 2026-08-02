@@ -362,7 +362,7 @@ fun QuickAddDialogScreen(
                             selected = selectedType == "SAVINGS",
                             onClick = { selectedType = "SAVINGS" },
                             label = { Text(if (isBn) "সঞ্চয়" else "Savings") },
-                            leadingIcon = { Icon(Icons.Rounded.Savings, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            leadingIcon = { Icon(Icons.Rounded.AccountBalance, contentDescription = null, modifier = Modifier.size(16.dp)) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Color(0xFF06B6D4).copy(alpha = 0.15f),
                                 selectedLabelColor = Color(0xFF06B6D4),

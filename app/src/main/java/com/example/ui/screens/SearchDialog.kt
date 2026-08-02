@@ -774,7 +774,7 @@ fun SavingsTransactionSearchItem(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Rounded.Savings, 
+                        Icons.Rounded.AccountBalance, 
                         contentDescription = null, 
                         tint = Color(0xFF3B82F6), 
                         modifier = Modifier.size(18.dp)
