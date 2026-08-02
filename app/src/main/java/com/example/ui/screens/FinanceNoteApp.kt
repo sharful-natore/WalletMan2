@@ -10408,35 +10408,37 @@ fun TransactionsScreen(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
-    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
+    var scrollStartDownIndex by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode, sortedTransactions, sortedPrevMonthTransactions) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, lazyListState.isScrollInProgress, isSelectionMode) {
         if (isSelectionMode) {
             isHeaderVisible = true
-            lastHeaderShownIndex = lazyListState.firstVisibleItemIndex
+            scrollStartDownIndex = lazyListState.firstVisibleItemIndex
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            val canScrollDown = lazyListState.canScrollForward
 
-            if (currentIndex < 5 || !canScrollDown) {
+            val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+            val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+            if (currentIndex < 2) {
+                isHeaderVisible = true
+                scrollStartDownIndex = currentIndex
+            } else if (isScrollingUp) {
                 if (!isHeaderVisible) {
                     isHeaderVisible = true
-                    lastHeaderShownIndex = currentIndex
                 }
-            } else {
-                val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
-                val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
-
-                if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+                scrollStartDownIndex = currentIndex
+            } else if (isScrollingDown) {
+                if (isHeaderVisible && (currentIndex - scrollStartDownIndex >= 5)) {
                     isHeaderVisible = false
-                } else if (isScrollingUp) {
-                    if (!isHeaderVisible) {
-                        isHeaderVisible = true
-                        lastHeaderShownIndex = currentIndex
-                    }
                 }
             }
+
+            if (!lazyListState.isScrollInProgress && isHeaderVisible) {
+                scrollStartDownIndex = currentIndex
+            }
+
             prevIndex = currentIndex
             prevScrollOffset = currentOffset
         }
@@ -11189,35 +11191,37 @@ fun DebtsScreen(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
-    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
+    var scrollStartDownIndex by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, isSelectionMode, sortedDebts) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, lazyListState.isScrollInProgress, isSelectionMode) {
         if (isSelectionMode) {
             isHeaderVisible = true
-            lastHeaderShownIndex = lazyListState.firstVisibleItemIndex
+            scrollStartDownIndex = lazyListState.firstVisibleItemIndex
         } else {
             val currentIndex = lazyListState.firstVisibleItemIndex
             val currentOffset = lazyListState.firstVisibleItemScrollOffset
-            val canScrollDown = lazyListState.canScrollForward
 
-            if (currentIndex < 5 || !canScrollDown) {
+            val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+            val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+            if (currentIndex < 2) {
+                isHeaderVisible = true
+                scrollStartDownIndex = currentIndex
+            } else if (isScrollingUp) {
                 if (!isHeaderVisible) {
                     isHeaderVisible = true
-                    lastHeaderShownIndex = currentIndex
                 }
-            } else {
-                val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
-                val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
-
-                if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+                scrollStartDownIndex = currentIndex
+            } else if (isScrollingDown) {
+                if (isHeaderVisible && (currentIndex - scrollStartDownIndex >= 5)) {
                     isHeaderVisible = false
-                } else if (isScrollingUp) {
-                    if (!isHeaderVisible) {
-                        isHeaderVisible = true
-                        lastHeaderShownIndex = currentIndex
-                    }
                 }
             }
+
+            if (!lazyListState.isScrollInProgress && isHeaderVisible) {
+                scrollStartDownIndex = currentIndex
+            }
+
             prevIndex = currentIndex
             prevScrollOffset = currentOffset
         }
@@ -14533,33 +14537,40 @@ fun SavingsGoalDetailOverlay(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
-    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
+    var scrollStartDownIndex by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, txList) {
-        val currentIndex = lazyListState.firstVisibleItemIndex
-        val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        val canScrollDown = lazyListState.canScrollForward
-
-        if (currentIndex < 5 || !canScrollDown) {
-            if (!isHeaderVisible) {
-                isHeaderVisible = true
-                lastHeaderShownIndex = currentIndex
-            }
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, lazyListState.isScrollInProgress, isSelectionMode) {
+        if (isSelectionMode) {
+            isHeaderVisible = true
+            scrollStartDownIndex = lazyListState.firstVisibleItemIndex
         } else {
+            val currentIndex = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+
             val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
             val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
 
-            if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
-                isHeaderVisible = false
+            if (currentIndex < 2) {
+                isHeaderVisible = true
+                scrollStartDownIndex = currentIndex
             } else if (isScrollingUp) {
                 if (!isHeaderVisible) {
                     isHeaderVisible = true
-                    lastHeaderShownIndex = currentIndex
+                }
+                scrollStartDownIndex = currentIndex
+            } else if (isScrollingDown) {
+                if (isHeaderVisible && (currentIndex - scrollStartDownIndex >= 5)) {
+                    isHeaderVisible = false
                 }
             }
+
+            if (!lazyListState.isScrollInProgress && isHeaderVisible) {
+                scrollStartDownIndex = currentIndex
+            }
+
+            prevIndex = currentIndex
+            prevScrollOffset = currentOffset
         }
-        prevIndex = currentIndex
-        prevScrollOffset = currentOffset
     }
 
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
@@ -15130,31 +15141,33 @@ fun PersonDetailOverlay(
     var isHeaderVisible by remember { mutableStateOf(true) }
     var prevIndex by remember { mutableIntStateOf(0) }
     var prevScrollOffset by remember { mutableIntStateOf(0) }
-    var lastHeaderShownIndex by remember { mutableIntStateOf(0) }
+    var scrollStartDownIndex by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, txList) {
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset, lazyListState.isScrollInProgress) {
         val currentIndex = lazyListState.firstVisibleItemIndex
         val currentOffset = lazyListState.firstVisibleItemScrollOffset
-        val canScrollDown = lazyListState.canScrollForward
 
-        if (currentIndex < 5 || !canScrollDown) {
+        val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
+        val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
+
+        if (currentIndex < 2) {
+            isHeaderVisible = true
+            scrollStartDownIndex = currentIndex
+        } else if (isScrollingUp) {
             if (!isHeaderVisible) {
                 isHeaderVisible = true
-                lastHeaderShownIndex = currentIndex
             }
-        } else {
-            val isScrollingDown = currentIndex > prevIndex || (currentIndex == prevIndex && currentOffset > prevScrollOffset + 15)
-            val isScrollingUp = currentIndex < prevIndex || (currentIndex == prevIndex && currentOffset < prevScrollOffset - 15)
-
-            if (isScrollingDown && currentIndex >= lastHeaderShownIndex + 5) {
+            scrollStartDownIndex = currentIndex
+        } else if (isScrollingDown) {
+            if (isHeaderVisible && (currentIndex - scrollStartDownIndex >= 5)) {
                 isHeaderVisible = false
-            } else if (isScrollingUp) {
-                if (!isHeaderVisible) {
-                    isHeaderVisible = true
-                    lastHeaderShownIndex = currentIndex
-                }
             }
         }
+
+        if (!lazyListState.isScrollInProgress && isHeaderVisible) {
+            scrollStartDownIndex = currentIndex
+        }
+
         prevIndex = currentIndex
         prevScrollOffset = currentOffset
     }
