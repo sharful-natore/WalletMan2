@@ -1,0 +1,17 @@
+name: Cleanup Old Workflow Runs
+
+on:
+  # গিটহাব ওয়েবসাইট থেকে যখন খুশি ম্যানুয়ালি রান করার জন্য
+  workflow_dispatch:
+
+jobs:
+  clean-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          retain_days: 0         # ০ দিলে পুরনো সব রান মুছে দেবে
+          keep_minimum_runs: 1   # শুধু একদম লেটেস্ট ১টি রান সেইফ রাখবে
