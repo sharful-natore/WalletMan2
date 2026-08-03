@@ -3596,17 +3596,42 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     } ?: item.itemJson
                 }
                 "GDRIVE_BACKUP" -> {
-                    deletedBackupAdapter.fromJson(item.itemJson)?.let { deletedBackup ->
-                        backupAdapter.fromJson(deletedBackup.backupJson)?.let { b ->
-                            val pCount = b.persons.size
-                            val txCount = b.transactions.size
-                            val gCount = b.savingsGoals.size
-                            val pText = if (language == com.example.ui.AppLanguage.BN) "ব্যক্তি" else "persons"
-                            val txText = if (language == com.example.ui.AppLanguage.BN) "লেনদেন" else "transactions"
-                            val gText = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য" else "goals"
-                            "$txText: $txCount, $pText: $pCount, $gText: $gCount"
+                    try {
+                        val obj = org.json.JSONObject(item.itemJson)
+                        val fileName = obj.optString("fileName", "")
+                        val fileId = obj.optString("fileId", "")
+                        val backupJson = obj.optString("backupJson", "")
+                        var countsStr = ""
+                        if (backupJson.isNotBlank()) {
+                            try {
+                                backupAdapter.fromJson(backupJson)?.let { b ->
+                                    val pCount = b.persons.size
+                                    val txCount = b.transactions.size
+                                    val gCount = b.savingsGoals.size
+                                    val pText = if (language == com.example.ui.AppLanguage.BN) "ব্যক্তি" else "persons"
+                                    val txText = if (language == com.example.ui.AppLanguage.BN) "লেনদেন" else "transactions"
+                                    val gText = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য" else "goals"
+                                    countsStr = "\n$txText: $txCount | $pText: $pCount | $gText: $gCount"
+                                }
+                            } catch (e: Exception) {}
                         }
-                    } ?: item.itemJson
+                        val fileLabel = if (language == com.example.ui.AppLanguage.BN) "ফাইল: " else "File: "
+                        val idLabel = if (language == com.example.ui.AppLanguage.BN) "আইডি: " else "ID: "
+                        val displayFileName = if (fileName.isNotBlank()) fileName else (if (language == com.example.ui.AppLanguage.BN) "গুগল ড্রাইভ ব্যাকআপ" else "Google Drive Backup")
+                        "$fileLabel$displayFileName${if (fileId.isNotBlank()) "\n$idLabel${fileId.take(24)}..." else ""}$countsStr"
+                    } catch (e: Exception) {
+                        deletedBackupAdapter.fromJson(item.itemJson)?.let { deletedBackup ->
+                            backupAdapter.fromJson(deletedBackup.backupJson)?.let { b ->
+                                val pCount = b.persons.size
+                                val txCount = b.transactions.size
+                                val gCount = b.savingsGoals.size
+                                val pText = if (language == com.example.ui.AppLanguage.BN) "ব্যক্তি" else "persons"
+                                val txText = if (language == com.example.ui.AppLanguage.BN) "লেনদেন" else "transactions"
+                                val gText = if (language == com.example.ui.AppLanguage.BN) "লক্ষ্য" else "goals"
+                                "$txText: $txCount, $pText: $pCount, $gText: $gCount"
+                            }
+                        } ?: (if (language == com.example.ui.AppLanguage.BN) "গুগল ড্রাইভ ব্যাকআপ ফাইল" else "Google Drive Backup File")
+                    }
                 }
                 "WORKSPACE" -> {
                     backupAdapter.fromJson(item.itemJson)?.let { backup ->

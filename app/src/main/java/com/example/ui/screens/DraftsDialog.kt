@@ -56,6 +56,39 @@ fun DraftsScratchpadDialog(
     var noteText by remember { mutableStateOf("") }
     var editDraftMode by remember { mutableStateOf<DraftTransaction?>(null) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var selectedDraftIds by remember { mutableStateOf(setOf<Int>()) }
+
+    val activity = remember(context) {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is androidx.fragment.app.FragmentActivity) return@remember ctx
+            ctx = ctx.baseContext
+        }
+        null
+    }
+
+    fun requestBiometricDelete(
+        count: Int,
+        onApproved: () -> Unit
+    ) {
+        if (activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+            val title = if (language == AppLanguage.BN) "খসড়া ডিলেট ভেরিফিকেশন" else "Draft Delete Verification"
+            val subtitle = if (language == AppLanguage.BN) "$count টি খসড়া মুছে ফেলার জন্য ফিঙ্গারপ্রিন্ট দিন" else "Scan fingerprint to delete $count draft(s)"
+            com.example.util.BiometricHelper.showBiometricPrompt(
+                activity = activity,
+                title = title,
+                subtitle = subtitle,
+                negativeButtonText = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                onSuccess = onApproved,
+                onUsePinFallback = onApproved,
+                onError = {
+                    Toast.makeText(context, if (language == AppLanguage.BN) "বায়োমেট্রিক ভেরিফিকেশন ব্যর্থ হয়েছে" else "Biometric verification failed", Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else {
+            onApproved()
+        }
+    }
 
     val speechLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -357,14 +390,76 @@ fun DraftsScratchpadDialog(
                     }
                 }
 
-                // Recent drafts section title
-                Text(
-                    text = if (language == AppLanguage.BN) "বর্তমান খসড়া তালিকা" else "Draft Entries Queue",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color.White else Color.DarkGray,
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
+                // Recent drafts section header & multi-selection action bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "বর্তমান খসড়া তালিকা (${drafts.size})" else "Draft Entries Queue (${drafts.size})",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color.DarkGray
+                    )
+
+                    if (drafts.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    if (selectedDraftIds.size == drafts.size) {
+                                        selectedDraftIds = emptySet()
+                                    } else {
+                                        selectedDraftIds = drafts.map { it.id }.toSet()
+                                    }
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (selectedDraftIds.size == drafts.size)
+                                        (if (language == AppLanguage.BN) "আনসিলেক্ট" else "Deselect")
+                                    else (if (language == AppLanguage.BN) "সব সিলেক্ট" else "Select All"),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = FintechBlue
+                                )
+                            }
+
+                            if (selectedDraftIds.isNotEmpty()) {
+                                Button(
+                                    onClick = {
+                                        requestBiometricDelete(selectedDraftIds.size) {
+                                            selectedDraftIds.forEach { id -> viewModel.deleteDraftTransaction(id) }
+                                            selectedDraftIds = emptySet()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Fingerprint,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${selectedDraftIds.size} " + (if (language == AppLanguage.BN) "মুছুন" else "Delete"),
+                                        fontSize = 12.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // List of active draft items
                 if (drafts.isEmpty()) {
@@ -418,12 +513,22 @@ fun DraftsScratchpadDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(drafts, key = { it.id }) { draft ->
+                            val isSelected = selectedDraftIds.contains(draft.id)
                             DraftItemCard(
                                 draft = draft,
                                 language = language,
                                 isDark = isDark,
+                                isSelected = isSelected,
+                                onToggleSelect = {
+                                    selectedDraftIds = if (isSelected) selectedDraftIds - draft.id else selectedDraftIds + draft.id
+                                },
                                 onPost = { onPostDraft(draft) },
-                                onDelete = { viewModel.deleteDraftTransaction(draft.id) },
+                                onDelete = {
+                                    requestBiometricDelete(1) {
+                                        viewModel.deleteDraftTransaction(draft.id)
+                                        selectedDraftIds = selectedDraftIds - draft.id
+                                    }
+                                },
                                 onEdit = { editDraftMode = draft }
                             )
                         }
@@ -492,41 +597,18 @@ fun DraftItemCard(
     draft: DraftTransaction,
     language: AppLanguage,
     isDark: Boolean,
+    isSelected: Boolean = false,
+    onToggleSelect: () -> Unit = {},
     onPost: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text(if (language == AppLanguage.BN) "ড্রাফট মুছুন" else "Delete Draft") },
-            text = { Text(if (language == AppLanguage.BN) "আপনি কি নিশ্চিত যে এই ড্রাফটটি মুছে ফেলতে চান?" else "Are you sure you want to delete this draft?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        onDelete()
-                        showDeleteConfirm = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
-                ) {
-                    Text(if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
-                }
-            }
-        )
-    }
-
     val itemGradient = com.example.ui.screens.activeThemeGradient
 
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = if (isSelected) BorderStroke(2.dp, Color.White) else null,
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onPost() }
@@ -535,7 +617,7 @@ fun DraftItemCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(androidx.compose.ui.graphics.Brush.linearGradient(itemGradient))
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             Column {
                 Row(
@@ -543,54 +625,71 @@ fun DraftItemCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Rounded.StickyNote2,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.7f),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onToggleSelect() },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = Color.White,
+                                checkmarkColor = FintechBlue,
+                                uncheckedColor = Color.White.copy(alpha = 0.7f)
+                            ),
+                            modifier = Modifier.size(24.dp)
+                        )
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Rounded.StickyNote2,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = SimpleDateFormat("hh:mm a, dd MMM", Locale.getDefault()).format(Date(draft.timestamp)),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White.copy(alpha = 0.8f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = SimpleDateFormat("hh:mm a, dd MMM", Locale.getDefault()).format(Date(draft.timestamp)),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White.copy(alpha = 0.8f)
+                                text = draft.note,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = Color.White,
+                                lineHeight = 22.sp
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = draft.note,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = Color.White,
-                            lineHeight = 22.sp
-                        )
                     }
 
                     // Action buttons
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         IconButton(
                             onClick = onEdit,
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.2f))
                         ) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                         IconButton(
-                            onClick = { showDeleteConfirm = true },
+                            onClick = onDelete,
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
                                 .background(Color.White.copy(alpha = 0.2f))
                         ) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(16.dp))
                         }
                     }
                 }

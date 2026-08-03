@@ -718,16 +718,60 @@ fun TrashDialog(
     isDarkTheme: Boolean,
     onDismiss: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val trashItems by viewModel.allTrashItems.collectAsState()
     var captchaRequiredId by remember { mutableStateOf<Int?>(null) }
     var restoreConfirmId by remember { mutableStateOf<Int?>(null) }
     var generatedCaptcha by remember { mutableStateOf("") }
     var captchaInput by remember { mutableStateOf("") }
     var captchaError by remember { mutableStateOf(false) }
+    var selectedTrashIds by remember { mutableStateOf(setOf<Int>()) }
 
     fun generateNewCaptcha() {
         val chars = "1234567890" // Simplified to numbers for easier typing on mobile
         generatedCaptcha = (1..4).map { chars.random() }.joinToString("")
+    }
+
+    val activity = remember(context) {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is androidx.fragment.app.FragmentActivity) return@remember ctx
+            ctx = ctx.baseContext
+        }
+        null
+    }
+
+    fun requestBiometricDeleteTrash(
+        targetIds: List<Int>,
+        onApproved: () -> Unit
+    ) {
+        if (activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+            val title = if (language == AppLanguage.BN) "রিসাইকেল বিন ডিলেট ভেরিফিকেশন" else "Recycle Bin Delete Verification"
+            val subtitle = if (language == AppLanguage.BN) "${targetIds.size} টি আইটেম স্থায়ীভাবে মুছে ফেলতে ফিঙ্গারপ্রিন্ট দিন" else "Scan fingerprint to permanently delete ${targetIds.size} item(s)"
+            com.example.util.BiometricHelper.showBiometricPrompt(
+                activity = activity,
+                title = title,
+                subtitle = subtitle,
+                negativeButtonText = if (language == AppLanguage.BN) "ক্যাপচা ব্যবহার করুন" else "Use Captcha",
+                onSuccess = onApproved,
+                onUsePinFallback = onApproved,
+                onError = {
+                    if (targetIds.size == 1) {
+                        captchaRequiredId = targetIds.first()
+                        captchaInput = ""
+                        generateNewCaptcha()
+                    }
+                }
+            )
+        } else {
+            if (targetIds.size == 1) {
+                captchaRequiredId = targetIds.first()
+                captchaInput = ""
+                generateNewCaptcha()
+            } else {
+                onApproved()
+            }
+        }
     }
 
     Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
@@ -758,6 +802,60 @@ fun TrashDialog(
                         Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(20.dp), tint = if (isDarkTheme) Color.White else Color.Black)
                     }
                 }
+
+                // Batch Selection Toolbar
+                if (trashItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isDarkTheme) Color(0xFF131B2A) else Color(0xFFE2E8F0))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                if (selectedTrashIds.size == trashItems.size) {
+                                    selectedTrashIds = emptySet()
+                                } else {
+                                    selectedTrashIds = trashItems.map { it.id }.toSet()
+                                }
+                            }
+                        ) {
+                            Text(
+                                text = if (selectedTrashIds.size == trashItems.size)
+                                    (if (language == AppLanguage.BN) "আনসিলেক্ট" else "Deselect All")
+                                else (if (language == AppLanguage.BN) "সব সিলেক্ট (${trashItems.size})" else "Select All (${trashItems.size})"),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = com.example.ui.theme.FintechBlue
+                            )
+                        }
+
+                        if (selectedTrashIds.isNotEmpty()) {
+                            Button(
+                                onClick = {
+                                    val listToDelete = selectedTrashIds.toList()
+                                    requestBiometricDeleteTrash(listToDelete) {
+                                        listToDelete.forEach { id -> viewModel.permanentDeleteTrashItem(id) }
+                                        selectedTrashIds = emptySet()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.FintechRed),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${selectedTrashIds.size} " + (if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete Selected"),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
                 
                 if (trashItems.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -775,6 +873,7 @@ fun TrashDialog(
                         items(trashItems.size) { i ->
                             val item = trashItems[i]
                             val daysLeft = maxOf(0L, 30L - ((System.currentTimeMillis() - item.deletedAt) / (24L*60L*60L*1000L)))
+                            val isSelected = selectedTrashIds.contains(item.id)
                             
                             val itemTitle = when(item.itemType) {
                                 "PERSON_WITH_TXS" -> if (language == AppLanguage.BN) "ব্যক্তি ও লেনদেন" else "Person & Transactions"
@@ -790,16 +889,25 @@ fun TrashDialog(
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = if (isDarkTheme) Color(0xFF252A3F) else Color(0xFFF8FAFC)),
-                                border = BorderStroke(1.dp, if (isDarkTheme) Color(0xFF2E334D) else Color(0xFFE2E8F0))
+                                border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) com.example.ui.theme.FintechBlue else if (isDarkTheme) Color(0xFF2E334D) else Color(0xFFE2E8F0))
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(
-                                            text = itemTitle,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isDarkTheme) Color.White else Color.Black,
-                                            fontSize = 14.sp
-                                        )
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Checkbox(
+                                                checked = isSelected,
+                                                onCheckedChange = {
+                                                    selectedTrashIds = if (isSelected) selectedTrashIds - item.id else selectedTrashIds + item.id
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                            Text(
+                                                text = itemTitle,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isDarkTheme) Color.White else Color.Black,
+                                                fontSize = 14.sp
+                                            )
+                                        }
                                         Text(
                                             text = if (language == AppLanguage.BN) "$daysLeft দিন বাকি" else "$daysLeft days left",
                                             color = if (daysLeft <= 3) com.example.ui.theme.FintechRed else com.example.ui.theme.FintechGreen,
@@ -851,6 +959,7 @@ fun TrashDialog(
                                                 onClick = {
                                                     if (captchaInput == generatedCaptcha) {
                                                         viewModel.permanentDeleteTrashItem(item.id)
+                                                        selectedTrashIds = selectedTrashIds - item.id
                                                         captchaRequiredId = null
                                                         captchaInput = ""
                                                     } else {
@@ -902,14 +1011,17 @@ fun TrashDialog(
                                             }
                                             OutlinedButton(
                                                 onClick = { 
-                                                    captchaRequiredId = item.id
-                                                    captchaInput = ""
-                                                    generateNewCaptcha()
+                                                    requestBiometricDeleteTrash(listOf(item.id)) {
+                                                        viewModel.permanentDeleteTrashItem(item.id)
+                                                        selectedTrashIds = selectedTrashIds - item.id
+                                                    }
                                                 },
                                                 modifier = Modifier.weight(1f),
                                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = com.example.ui.theme.FintechRed),
                                                 border = BorderStroke(1.dp, com.example.ui.theme.FintechRed)
                                             ) {
+                                                Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
                                                 Text(if (language == AppLanguage.BN) "ডিলেট" else "Delete")
                                             }
                                         }
