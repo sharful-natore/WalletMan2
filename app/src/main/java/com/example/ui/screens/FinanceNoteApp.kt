@@ -6708,19 +6708,19 @@ fun GrowthPillBadge(
     val pctText = if (isZero) "0%" else "${if (changePct > 0) "+" else "-"}$formattedPctVal"
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         color = bgColor,
         border = BorderStroke(0.5.dp, textColor.copy(alpha = 0.3f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             Text(
                 text = pctText,
                 color = textColor,
-                fontSize = 8.5.sp,
+                fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 softWrap = false,
@@ -6729,7 +6729,7 @@ fun GrowthPillBadge(
             Text(
                 text = arrowSymbol,
                 color = textColor,
-                fontSize = 8.5.sp,
+                fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 softWrap = false,
@@ -7264,7 +7264,7 @@ private fun CompactTrendItem(
         border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.25f))
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 7.dp),
             horizontalAlignment = Alignment.Start
         ) {
             Row(
@@ -7275,44 +7275,49 @@ private fun CompactTrendItem(
                 Row(
                     modifier = Modifier.weight(1f, fill = false),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(5.dp)
+                            .size(4.dp)
                             .clip(CircleShape)
                             .background(accentColor)
                     )
                     Text(
                         text = title,
-                        fontSize = 10.5.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isDark) Color.White.copy(alpha = 0.8f) else Color(0xFF475569),
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(modifier = Modifier.width(2.dp))
+                Spacer(modifier = Modifier.width(1.dp))
                 GrowthPillBadge(changePct = changePct, isExpense = isExpense, language = language)
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             Text(
                 text = formatCurrency(currAmount, language),
-                fontSize = 13.5.sp,
+                fontSize = 12.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (isDark) Color.White else Color.Black,
-                maxLines = 1
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(2.dp))
 
             Text(
                 text = "${periodLabel}: ${formatCurrency(prevAmount, language)}",
-                fontSize = 9.5.sp,
+                fontSize = 8.5.sp,
                 color = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Gray,
-                maxLines = 1
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -7459,12 +7464,14 @@ fun FinancialTrendPerformanceCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.clickable { selectedDetailType = "EXPENSE" }
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .clickable { selectedDetailType = "EXPENSE" }
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(26.dp)
                             .clip(CircleShape)
                             .background(
                                 androidx.compose.ui.graphics.Brush.linearGradient(
@@ -7477,19 +7484,22 @@ fun FinancialTrendPerformanceCard(
                             imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
                         Text(
                             text = if (language == AppLanguage.BN) "আর্থিক অগ্রগতি ও ট্রেন্ড" else "Growth & Trend Insights",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color.White else Color.Black.copy(alpha = 0.78f)
+                            color = if (isDark) Color.White else Color.Black.copy(alpha = 0.78f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
@@ -7499,6 +7509,8 @@ fun FinancialTrendPerformanceCard(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(4.dp))
 
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -7514,13 +7526,15 @@ fun FinancialTrendPerformanceCard(
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (comparisonMode == "MONTH") selectedBg else unselectedBg)
                                 .clickable { comparisonMode = "MONTH" }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = if (language == AppLanguage.BN) "মাসিক" else "Monthly",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (comparisonMode == "MONTH") Color.White else (if (isDark) Color.LightGray else Color.DarkGray)
+                                color = if (comparisonMode == "MONTH") Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
 
@@ -7529,13 +7543,15 @@ fun FinancialTrendPerformanceCard(
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(if (comparisonMode == "YEAR") selectedBg else unselectedBg)
                                 .clickable { comparisonMode = "YEAR" }
-                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = if (language == AppLanguage.BN) "বার্ষিক" else "Yearly",
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (comparisonMode == "YEAR") Color.White else (if (isDark) Color.LightGray else Color.DarkGray)
+                                color = if (comparisonMode == "YEAR") Color.White else (if (isDark) Color.LightGray else Color.DarkGray),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -7638,6 +7654,7 @@ fun DashboardScreen(
     var showBudgetDialogType by remember { mutableStateOf<String?>(null) }
     var showBudgetDetailsType by remember { mutableStateOf<String?>(null) }
     var activeAlertPopup by remember { mutableStateOf<BudgetAlertData?>(null) }
+    var showMonthlyHistoryDialog by remember { mutableStateOf(false) }
     val transactions by viewModel?.transactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     val timeFilteredTxs = remember(transactions, timeFilter) {
         filterTransactionsByTime(transactions, timeFilter)
@@ -8297,16 +8314,40 @@ fun DashboardScreen(
                         color = Color.White.copy(alpha = 0.85f),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(end = 8.dp)
+                        modifier = Modifier.padding(end = 6.dp)
                     )
-                    Text(
-                        text = "(${getFormattedPeriodText(timeFilter, language)})",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Text(
+                            text = "(${getFormattedPeriodText(timeFilter, language)})",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            textAlign = TextAlign.End,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .clickable { showMonthlyHistoryDialog = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Rounded.History,
+                                contentDescription = "Monthly Financial History",
+                                tint = Color.White,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -8676,7 +8717,7 @@ fun DashboardScreen(
                             },
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = FintechBlue,
+                            color = if (isDark) Color.White else Color.Black.copy(alpha = 0.78f),
                             modifier = Modifier.padding(start = 8.dp)
                         )
                         Row(
@@ -9688,6 +9729,301 @@ fun DashboardScreen(
             }
         )
     }
+
+    if (showMonthlyHistoryDialog) {
+        val savingsTransactions by viewModel?.savingsTransactions?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+        MonthlyFinancialHistoryDialog(
+            language = language,
+            isDark = isDark,
+            timeFilter = timeFilter,
+            transactions = transactions,
+            savingsTransactions = savingsTransactions,
+            onSelectMonth = { selectedYear, selectedMonth ->
+                onTimeFilterChange("CUSTOM_MONTH:$selectedYear-$selectedMonth")
+                showMonthlyHistoryDialog = false
+            },
+            onDismiss = { showMonthlyHistoryDialog = false }
+        )
+    }
+}
+
+data class MonthFinancialSummary(
+    val year: Int,
+    val month: Int,
+    val label: String,
+    val income: Double,
+    val expense: Double,
+    val savings: Double,
+    val isCurrentActive: Boolean
+)
+
+@Composable
+fun MonthlyFinancialHistoryDialog(
+    language: AppLanguage,
+    isDark: Boolean,
+    timeFilter: String,
+    transactions: List<Transaction>,
+    savingsTransactions: List<SavingsTransaction>,
+    onSelectMonth: (year: Int, month: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val monthlySummaries = remember(transactions, savingsTransactions, timeFilter, language) {
+        val list = mutableListOf<MonthFinancialSummary>()
+        val cal = java.util.Calendar.getInstance()
+        
+        val activeYear: Int
+        val activeMonth: Int
+        if (timeFilter.startsWith("CUSTOM_MONTH:")) {
+            val parts = timeFilter.substringAfter("CUSTOM_MONTH:").split("-")
+            activeYear = parts.getOrNull(0)?.toIntOrNull() ?: cal.get(java.util.Calendar.YEAR)
+            activeMonth = parts.getOrNull(1)?.toIntOrNull() ?: (cal.get(java.util.Calendar.MONTH) + 1)
+        } else {
+            activeYear = cal.get(java.util.Calendar.YEAR)
+            activeMonth = cal.get(java.util.Calendar.MONTH) + 1
+        }
+
+        for (i in 0 until 12) {
+            val c = java.util.Calendar.getInstance()
+            c.add(java.util.Calendar.MONTH, -i)
+            val y = c.get(java.util.Calendar.YEAR)
+            val m = c.get(java.util.Calendar.MONTH) + 1
+
+            val startCal = java.util.Calendar.getInstance()
+            startCal.set(y, m - 1, 1, 0, 0, 0)
+            startCal.set(java.util.Calendar.MILLISECOND, 0)
+            val startMs = startCal.timeInMillis
+
+            val endCal = java.util.Calendar.getInstance()
+            endCal.set(y, m - 1, startCal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH), 23, 59, 59)
+            endCal.set(java.util.Calendar.MILLISECOND, 999)
+            val endMs = endCal.timeInMillis
+
+            val monthTxs = transactions.filter { it.timestamp in startMs..endMs }
+            val inc = monthTxs.filter { it.type == "INCOME" || (it.type == "LEND" && it.subType == "CREDIT") }.sumOf { it.amount }
+            val exp = monthTxs.filter { it.type == "EXPENSE" || (it.type == "BORROW" && it.subType == "CREDIT") }.sumOf { it.amount }
+
+            val monthSavingsTxs = savingsTransactions.filter { it.timestamp in startMs..endMs }
+            val savDep = monthSavingsTxs.filter { it.isDeposit }.sumOf { it.amount }
+            val savWith = monthSavingsTxs.filter { !it.isDeposit }.sumOf { it.amount }
+            val sav = savDep - savWith
+
+            val monthLabel = getCustomTimeFilterLabel("CUSTOM_MONTH:$y-$m", language)
+            val isSelected = (y == activeYear && m == activeMonth) && (timeFilter.startsWith("CUSTOM_MONTH:") || timeFilter == "MONTH")
+
+            list.add(
+                MonthFinancialSummary(
+                    year = y,
+                    month = m,
+                    label = monthLabel,
+                    income = inc,
+                    expense = exp,
+                    savings = sav,
+                    isCurrentActive = isSelected
+                )
+            )
+        }
+        list
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = if (language == AppLanguage.BN) "বন্ধ করুন" else "Close",
+                    fontWeight = FontWeight.Bold,
+                    color = FintechBlue
+                )
+            }
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(FintechBlue.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "১২ মাসের আর্থিক হিসাব" else "12-Month Financial History",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF1E293B)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "যেকোনো মাসে ক্লিক করে ডাটা ফিল্টার করুন" else "Tap any month to filter data",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+            ) {
+                items(monthlySummaries.size) { index ->
+                    val item = monthlySummaries[index]
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (item.isCurrentActive) {
+                            FintechBlue.copy(alpha = 0.12f)
+                        } else {
+                            if (isDark) Color(0xFF1E293B) else Color(0xFFF8FAFC)
+                        },
+                        border = BorderStroke(
+                            width = if (item.isCurrentActive) 1.5.dp else 0.5.dp,
+                            color = if (item.isCurrentActive) FintechBlue else (if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.08f))
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectMonth(item.year, item.month) }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = item.label,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                                    )
+                                    if (item.isCurrentActive) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = FintechBlue
+                                        ) {
+                                            Text(
+                                                text = if (language == AppLanguage.BN) "সক্রিয়" else "Active",
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Icon(
+                                    imageVector = if (item.isCurrentActive) androidx.compose.material.icons.Icons.Rounded.CheckCircle else androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowForward,
+                                    contentDescription = null,
+                                    tint = if (item.isCurrentActive) FintechBlue else Color.Gray,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Income
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "আয়:" else "Inc:",
+                                            fontSize = 9.5.sp,
+                                            color = if (isDark) Color.LightGray else Color.DarkGray
+                                        )
+                                        Text(
+                                            text = formatCurrency(item.income, language),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF10B981)
+                                        )
+                                    }
+                                }
+
+                                // Expense
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFEF4444).copy(alpha = 0.1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "ব্যয়:" else "Exp:",
+                                            fontSize = 9.5.sp,
+                                            color = if (isDark) Color.LightGray else Color.DarkGray
+                                        )
+                                        Text(
+                                            text = formatCurrency(item.expense, language),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFEF4444)
+                                        )
+                                    }
+                                }
+
+                                // Savings
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = FintechBlue.copy(alpha = 0.1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "সঞ্চয়:" else "Sav:",
+                                            fontSize = 9.5.sp,
+                                            color = if (isDark) Color.LightGray else Color.DarkGray
+                                        )
+                                        Text(
+                                            text = formatCurrency(item.savings, language),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = FintechBlue
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        containerColor = if (isDark) Color(0xFF0F172A) else Color.White,
+        shape = RoundedCornerShape(20.dp)
+    )
 }
 
 @Composable
@@ -15200,11 +15536,11 @@ fun PersonDetailOverlay(
                     ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(46.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                             .border(2.dp, FintechBlue, CircleShape),
@@ -15222,29 +15558,40 @@ fun PersonDetailOverlay(
                                 text = personDebt.person.name.take(1).uppercase(),
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 22.sp
+                                fontSize = 20.sp
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = personDebt.person.name,
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = if (isDark) Color.White else Color(0xFF1E222F)
-                        )
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = personDebt.person.name,
+                                modifier = Modifier.weight(1f),
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (isDark) Color.White else Color(0xFF1E222F)
+                            )
+                            IconButton(onClick = { onEditPerson(personDebt.person) }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                            }
+                            IconButton(onClick = { onDeletePerson() }, modifier = Modifier.size(30.dp)) {
+                                Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed, modifier = Modifier.size(16.dp))
+                            }
+                        }
                         if (personDebt.person.phone.isNotEmpty()) {
                             val context = androidx.compose.ui.platform.LocalContext.current
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .padding(top = 2.dp)
+                                    .padding(top = 1.dp)
                                     .clip(RoundedCornerShape(4.dp))
                                     .clickable {
                                         try {
@@ -15254,7 +15601,7 @@ fun PersonDetailOverlay(
                                             e.printStackTrace()
                                         }
                                     }
-                                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                                    .padding(horizontal = 2.dp, vertical = 1.dp)
                             ) {
                                 Icon(Icons.Rounded.Phone, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -15270,7 +15617,7 @@ fun PersonDetailOverlay(
                             }
                         }
                         if (personDebt.person.address.isNotEmpty()) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 1.dp)) {
                                 Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(13.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
@@ -15281,15 +15628,6 @@ fun PersonDetailOverlay(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                        }
-                    }
-                    
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { onEditPerson(personDebt.person) }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = Color.Gray, modifier = Modifier.size(18.dp))
-                        }
-                        IconButton(onClick = { onDeletePerson() }, modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -22584,9 +22922,9 @@ fun ProfileSetupScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -22595,7 +22933,7 @@ fun ProfileSetupScreen(
                     ) {
                         Text(
                             text = if (language == AppLanguage.BN) "প্রোফাইল তথ্য" else "Profile Info",
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isDark) Color.White else Color.Black
                         )
@@ -22604,19 +22942,17 @@ fun ProfileSetupScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Beautiful Cover photo with Profile Photo overlapping
+                    // Cover photo with Profile Photo overlapping
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(210.dp)
+                            .height(160.dp)
                     ) {
                         // Cover photo gradient background
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(150.dp)
+                                .height(110.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
                                     Brush.linearGradient(
@@ -22644,14 +22980,14 @@ fun ProfileSetupScreen(
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
-                                    .padding(16.dp),
+                                    .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.app_logo_new),
                                     contentDescription = null,
                                     tint = Color.Unspecified,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
@@ -22667,10 +23003,10 @@ fun ProfileSetupScreen(
                         // Profile photo overlapping
                         Box(
                             modifier = Modifier
-                                .size(110.dp)
+                                .size(86.dp)
                                 .align(Alignment.BottomCenter)
                                 .clip(CircleShape)
-                                .border(4.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape)
+                                .border(3.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape)
                                 .border(1.5.dp, FintechBlue, CircleShape)
                                 .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                             contentAlignment = Alignment.Center
@@ -22683,8 +23019,8 @@ fun ProfileSetupScreen(
                                     contentScale = ContentScale.Crop,
                                     loading = {
                                         CircularProgressIndicator(
-                                            modifier = Modifier.size(36.dp).padding(6.dp),
-                                            strokeWidth = 3.dp,
+                                            modifier = Modifier.size(28.dp).padding(4.dp),
+                                            strokeWidth = 2.5.dp,
                                             color = FintechBlue
                                         )
                                     }
@@ -22694,7 +23030,7 @@ fun ProfileSetupScreen(
                                     imageVector = Icons.Rounded.Person,
                                     contentDescription = null,
                                     tint = if (isDark) Color.LightGray else Color.Gray,
-                                    modifier = Modifier.size(54.dp)
+                                    modifier = Modifier.size(42.dp)
                                 )
                             }
                         }
@@ -22703,27 +23039,25 @@ fun ProfileSetupScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = name.ifBlank { if (language == AppLanguage.BN) "নাম দেওয়া হয়নি" else "No Name Set" },
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (isDark) Color.White else Color.Black,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "ফিন্যান্স নোট ব্যবহারকারী" else "Finance Note User",
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = FintechBlue,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
-                                .background(FintechBlue.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                .background(FintechBlue.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
                     Card(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (isDark) Color(0xFF2E3A4E) else Color.White
                         ),
@@ -22731,9 +23065,16 @@ fun ProfileSetupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            ProfileInfoRow(
+                                icon = Icons.Rounded.Email,
+                                label = if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address",
+                                value = emailInput.ifBlank { "-" },
+                                isDark = isDark
+                            )
+                            HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
                             ProfileInfoRow(
                                 icon = Icons.Rounded.Phone,
                                 label = if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number",
@@ -22754,26 +23095,19 @@ fun ProfileSetupScreen(
                                 value = address.ifBlank { "-" },
                                 isDark = isDark
                             )
-                            HorizontalDivider(color = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
-                            ProfileInfoRow(
-                                icon = Icons.Rounded.Email,
-                                label = if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address",
-                                value = emailInput.ifBlank { "-" },
-                                isDark = isDark
-                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Button(
                         onClick = { isEditMode = true },
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
                     ) {
-                        Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White)
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Rounded.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "প্রোফাইল সম্পাদনা" else "Edit Profile",
                             fontWeight = FontWeight.Bold,
@@ -22786,28 +23120,28 @@ fun ProfileSetupScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) "প্রোফাইল সম্পাদনা" else "Edit Profile",
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) Color.White else Color.Black
                     )
 
-                    // Beautiful Cover photo with Profile Photo overlapping in Edit Mode
+                    // Cover photo with Profile Photo overlapping in Edit Mode
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(210.dp)
+                            .height(160.dp)
                     ) {
                         // Cover photo gradient background
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(150.dp)
+                                .height(110.dp)
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(
                                     Brush.linearGradient(
@@ -22835,14 +23169,14 @@ fun ProfileSetupScreen(
                             Row(
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
-                                    .padding(16.dp),
+                                    .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.app_logo_new),
                                     contentDescription = null,
                                     tint = Color.Unspecified,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
@@ -22858,10 +23192,10 @@ fun ProfileSetupScreen(
                         // Profile photo with edit badge overlapping
                         Box(
                             modifier = Modifier
-                                .size(110.dp)
+                                .size(86.dp)
                                 .align(Alignment.BottomCenter)
                                 .clip(CircleShape)
-                                .border(4.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape)
+                                .border(3.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape)
                                 .border(1.5.dp, FintechBlue, CircleShape)
                                 .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f))
                                 .clickable { photoLauncher.launch("image/*") },
@@ -22869,8 +23203,8 @@ fun ProfileSetupScreen(
                         ) {
                             if (isPhotoLoading) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp),
-                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(28.dp),
+                                    strokeWidth = 2.5.dp,
                                     color = FintechBlue
                                 )
                             } else if (photoUri.isNotEmpty()) {
@@ -22881,8 +23215,8 @@ fun ProfileSetupScreen(
                                     contentScale = ContentScale.Crop,
                                     loading = {
                                         CircularProgressIndicator(
-                                            modifier = Modifier.size(36.dp).padding(6.dp),
-                                            strokeWidth = 3.dp,
+                                            modifier = Modifier.size(28.dp).padding(4.dp),
+                                            strokeWidth = 2.5.dp,
                                             color = FintechBlue
                                         )
                                     },
@@ -22891,7 +23225,7 @@ fun ProfileSetupScreen(
                                             imageVector = Icons.Rounded.AddAPhoto,
                                             contentDescription = null,
                                             tint = if (isDark) Color.LightGray else Color.Gray,
-                                            modifier = Modifier.size(36.dp)
+                                            modifier = Modifier.size(30.dp)
                                         )
                                     }
                                 )
@@ -22900,24 +23234,24 @@ fun ProfileSetupScreen(
                                     imageVector = Icons.Rounded.AddAPhoto,
                                     contentDescription = null,
                                     tint = if (isDark) Color.LightGray else Color.Gray,
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(30.dp)
                                 )
                             }
                             
                             // Edit badge
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(24.dp)
                                     .align(Alignment.BottomEnd)
                                     .background(FintechBlue, CircleShape)
-                                    .border(2.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape),
+                                    .border(1.5.dp, if (isDark) Color(0xFF1E293B) else Color.White, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.AddAPhoto,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(12.dp)
                                 )
                             }
                         }
@@ -22928,7 +23262,22 @@ fun ProfileSetupScreen(
                         onValueChange = { name = it },
                         label = { Text(if (language == AppLanguage.BN) "আপনার নাম" else "Your Name") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) Color.White else Color.Black,
+                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
+                            focusedLabelColor = FintechBlue,
+                            unfocusedLabelColor = Color.Gray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { emailInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address") },
+                        leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null, tint = FintechBlue) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = if (isDark) Color.White else Color.Black,
                             unfocusedTextColor = if (isDark) Color.White else Color.Black,
@@ -22943,7 +23292,7 @@ fun ProfileSetupScreen(
                         label = { Text(if (language == AppLanguage.BN) "ফোন নম্বর" else "Phone Number") },
                         leadingIcon = { Icon(Icons.Rounded.Phone, contentDescription = null, tint = FintechBlue) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = if (isDark) Color.White else Color.Black,
@@ -22959,7 +23308,7 @@ fun ProfileSetupScreen(
                         label = { Text(if (language == AppLanguage.BN) "জন্ম তারিখ" else "Date of Birth") },
                         leadingIcon = { Icon(Icons.Rounded.CalendarToday, contentDescription = null, tint = FintechBlue) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         placeholder = { Text("DD/MM/YYYY", color = Color.Gray.copy(alpha = 0.5f)) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = if (isDark) Color.White else Color.Black,
@@ -22975,22 +23324,7 @@ fun ProfileSetupScreen(
                         label = { Text(if (language == AppLanguage.BN) "ঠিকানা" else "Address") },
                         leadingIcon = { Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = FintechBlue) },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = if (isDark) Color.White else Color.Black,
-                            unfocusedTextColor = if (isDark) Color.White else Color.Black,
-                            focusedLabelColor = FintechBlue,
-                            unfocusedLabelColor = Color.Gray
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = emailInput,
-                        onValueChange = { emailInput = it },
-                        label = { Text(if (language == AppLanguage.BN) "ইমেইল এড্রেস" else "Email Address") },
-                        leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null, tint = FintechBlue) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = if (isDark) Color.White else Color.Black,
                             unfocusedTextColor = if (isDark) Color.White else Color.Black,
@@ -23003,7 +23337,7 @@ fun ProfileSetupScreen(
                         Text(text = error!!, color = Color.Red, fontSize = 12.sp)
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -23011,8 +23345,8 @@ fun ProfileSetupScreen(
                     ) {
                         OutlinedButton(
                             onClick = { isEditMode = false },
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1f).height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors()
                         ) {
                             Text(
@@ -23036,8 +23370,8 @@ fun ProfileSetupScreen(
                                     }
                                 )
                             },
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.weight(1f).height(46.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
                         ) {
                             if (isLoading) {
