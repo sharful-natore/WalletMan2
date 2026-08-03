@@ -383,6 +383,72 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             triggerCustomNotification(if (_language.value == com.example.ui.AppLanguage.BN) "আইটেম সফলভাবে রিস্টোর করা হয়েছে" else "Item restored successfully", isSuccess = true, type = "SUCCESS")
         }
     }
+
+    fun batchRestoreTrashItems(items: List<com.example.data.TrashItem>) {
+        viewModelScope.launch {
+            var restoredCount = 0
+            var skippedBackupCount = 0
+            for (item in items) {
+                val upperType = item.itemType.uppercase()
+                if (upperType == "GDRIVE_BACKUP" || upperType.contains("BACKUP") || upperType == "WORKSPACE") {
+                    skippedBackupCount++
+                    continue
+                }
+                when (item.itemType) {
+                    "PERSON" -> {
+                        personAdapter.fromJson(item.itemJson)?.let { repository.insertPerson(it) }
+                    }
+                    "PERSON_WITH_TXS" -> {
+                        personWithTxAdapter.fromJson(item.itemJson)?.let { pWithTx ->
+                            repository.insertPerson(pWithTx.person)
+                            pWithTx.transactions.forEach { tx ->
+                                repository.insertTransaction(tx)
+                            }
+                        }
+                    }
+                    "TRANSACTION" -> {
+                        transactionAdapter.fromJson(item.itemJson)?.let { repository.insertTransaction(it) }
+                    }
+                    "SAVINGS_GOAL" -> {
+                        savingsGoalAdapter.fromJson(item.itemJson)?.let { repository.insertSavingsGoal(it) }
+                    }
+                    "SAVINGS_GOAL_WITH_TXS" -> {
+                        goalWithTxAdapter.fromJson(item.itemJson)?.let { gWithTx ->
+                            repository.insertSavingsGoal(gWithTx.goal)
+                            gWithTx.transactions.forEach { tx ->
+                                repository.insertSavingsTransaction(tx)
+                            }
+                        }
+                    }
+                    "SAVINGS_TRANSACTION" -> {
+                        savingsTransactionAdapter.fromJson(item.itemJson)?.let { repository.insertSavingsTransaction(it) }
+                    }
+                    "DRAFT_TRANSACTION" -> {
+                        draftAdapter.fromJson(item.itemJson)?.let { repository.insertDraftTransaction(it) }
+                    }
+                    else -> {
+                        try {
+                            transactionAdapter.fromJson(item.itemJson)?.let { repository.insertTransaction(it) }
+                        } catch (_: Exception) {}
+                    }
+                }
+                repository.deleteTrashItemById(item.id)
+                restoredCount++
+            }
+            if (restoredCount > 0) {
+                com.example.widget.updateAllWidgets(getApplication())
+                onLocalDatabaseChanged()
+            }
+            val msg = if (_language.value == com.example.ui.AppLanguage.BN) {
+                if (skippedBackupCount > 0) "$restoredCount টি আইটেম রিস্টোর করা হয়েছে ($skippedBackupCount টি ব্যাকআপ বাদ দেওয়া হয়েছে)"
+                else "$restoredCount টি আইটেম রিস্টোর করা হয়েছে"
+            } else {
+                if (skippedBackupCount > 0) "$restoredCount item(s) restored ($skippedBackupCount backup file(s) skipped)"
+                else "$restoredCount item(s) restored"
+            }
+            triggerCustomNotification(msg, isSuccess = true, type = "SUCCESS")
+        }
+    }
     
     fun permanentDeleteTrashItem(id: Int) {
         viewModelScope.launch {
@@ -1359,6 +1425,39 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onLocalDatabaseChanged()
             triggerCustomNotification(
                 if (_language.value == com.example.ui.AppLanguage.BN) "খসড়া লেনদেনটি সফলভাবে পোস্ট করা হয়েছে" else "Draft transaction posted successfully",
+                isSuccess = true,
+                type = "SUCCESS"
+            )
+        }
+    }
+
+    fun batchPostDrafts(draftsToPost: List<DraftTransaction>) {
+        viewModelScope.launch {
+            for (d in draftsToPost) {
+                val parsed = parseDraftDetails(d.note)
+                val amt = d.amount ?: parsed.amount ?: 0.0
+                val type = d.type ?: parsed.type ?: "EXPENSE"
+                val category = d.category ?: parsed.category ?: "General"
+                val note = if (d.note.isNotBlank()) d.note else parsed.cleanedNote
+                repository.insertTransaction(
+                    Transaction(
+                        amount = amt,
+                        type = type,
+                        category = category,
+                        note = note,
+                        personId = null,
+                        workspaceId = _currentWorkspaceId.value,
+                        subType = "CASH"
+                    )
+                )
+                repository.deleteDraftTransaction(d.id)
+            }
+            if (draftsToPost.isNotEmpty()) {
+                com.example.widget.updateAllWidgets(getApplication())
+                onLocalDatabaseChanged()
+            }
+            triggerCustomNotification(
+                if (_language.value == com.example.ui.AppLanguage.BN) "${draftsToPost.size} টি খসড়া সফলভাবে পোস্ট করা হয়েছে" else "${draftsToPost.size} draft(s) posted successfully",
                 isSuccess = true,
                 type = "SUCCESS"
             )

@@ -840,25 +840,60 @@ fun TrashDialog(
                         }
 
                         if (selectedTrashIds.isNotEmpty()) {
-                            Button(
-                                onClick = {
-                                    val listToDelete = selectedTrashIds.toList()
-                                    requestBiometricDeleteTrash(listToDelete) {
-                                        listToDelete.forEach { id -> viewModel.permanentDeleteTrashItem(id) }
-                                        selectedTrashIds = emptySet()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.FintechRed),
-                                shape = RoundedCornerShape(10.dp)
+                            val selectedItems = trashItems.filter { selectedTrashIds.contains(it.id) }
+                            val restorableItems = selectedItems.filter {
+                                val upper = it.itemType.uppercase()
+                                !upper.contains("BACKUP") && upper != "WORKSPACE"
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "${selectedTrashIds.size} " + (if (language == AppLanguage.BN) "মুছে ফেলুন" else "Delete Selected"),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                Button(
+                                    onClick = {
+                                        viewModel.batchRestoreTrashItems(selectedItems)
+                                        selectedTrashIds = emptySet()
+                                    },
+                                    enabled = restorableItems.isNotEmpty(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF10B981),
+                                        disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Restore, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${restorableItems.size} " + (if (language == AppLanguage.BN) "রিস্টোর" else "Restore"),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val listToDelete = selectedTrashIds.toList()
+                                        requestBiometricDeleteTrash(listToDelete) {
+                                            listToDelete.forEach { id -> viewModel.permanentDeleteTrashItem(id) }
+                                            selectedTrashIds = emptySet()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.FintechRed),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${selectedTrashIds.size} " + (if (language == AppLanguage.BN) "মুছুন" else "Delete"),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
                     }

@@ -3346,6 +3346,10 @@ fun FinanceNoteApp(
                 }
                 val density = LocalDensity.current
                 val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val hasVirtualNav = navBarPadding > 4.dp
+                val effectiveNavHeight = if (hasVirtualNav) 58.dp else 70.dp
+                val effectiveNotchRadius = if (hasVirtualNav) 38.dp else 45.dp
+                val effectiveFabCenterPadding = if (hasVirtualNav) (12.dp + navBarPadding) else 15.dp
                 
                 Box(
                     modifier = Modifier
@@ -3430,19 +3434,19 @@ fun FinanceNoteApp(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 0.dp) // Removed 16dp space to avoid "fixed card" look
-                            .height(58.dp + navBarPadding)
-                            .clip(NotchedBottomBarShape(notchRadiusDp = 38.dp, cornerRadiusDp = 12.dp))
+                            .height(effectiveNavHeight + navBarPadding)
+                            .clip(NotchedBottomBarShape(notchRadiusDp = effectiveNotchRadius, cornerRadiusDp = 12.dp))
                             .background(bottomBarGradient)
                             .border(
                                 width = 1.dp,
                                 color = glassBorderColor,
-                                shape = NotchedBottomBarShape(notchRadiusDp = 38.dp, cornerRadiusDp = 12.dp)
+                                shape = NotchedBottomBarShape(notchRadiusDp = effectiveNotchRadius, cornerRadiusDp = 12.dp)
                             )
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(58.dp)
+                                .height(effectiveNavHeight)
                                 .align(Alignment.TopCenter),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -3496,7 +3500,7 @@ fun FinanceNoteApp(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .padding(bottom = 12.dp + navBarPadding) // Lowered to nestle perfectly in the notch
+                            .padding(bottom = effectiveFabCenterPadding) // Lowered to nestle perfectly in the notch
                             .size(68.dp) // Fix size so the glowing background doesn't shift the button up
                     ) {
                         val fabPrimary = activeThemeGradient.first()
@@ -7642,7 +7646,8 @@ fun DashboardScreen(
     onPersonClick: ((Person) -> Unit)? = null,
     activeTab: String = "",
     onEditGradient: ((String) -> Unit)? = null,
-    onExportRequest: ((String) -> Unit)? = null
+    onExportRequest: ((String) -> Unit)? = null,
+    fabBottomPadding: Dp = 113.dp
 ) {
     val context = LocalContext.current
     val dueAutoEntriesPrompt by viewModel?.dueAutoEntriesPrompt?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyList()) }
@@ -8405,30 +8410,32 @@ fun DashboardScreen(
                                     onExportRequest?.invoke("ONLY_INCOME")
                                 }
                             )
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.TrendingUp,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "আয়" else "Income",
                             color = Color.White.copy(alpha = 0.75f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f)
+                            maxLines = 1,
+                            softWrap = false
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = formatCurrency(income, language),
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            modifier = Modifier.basicMarquee()
+                            modifier = Modifier.weight(1f, fill = false).basicMarquee()
                         )
                     }
 
@@ -8445,30 +8452,32 @@ fun DashboardScreen(
                                     onExportRequest?.invoke("ONLY_EXPENSE")
                                 }
                             )
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.TrendingDown,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = if (language == AppLanguage.BN) "ব্যয়" else "Expense",
                             color = Color.White.copy(alpha = 0.75f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.weight(1f)
+                            maxLines = 1,
+                            softWrap = false
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = formatCurrency(expense, language),
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            modifier = Modifier.basicMarquee()
+                            modifier = Modifier.weight(1f, fill = false).basicMarquee()
                         )
                     }
                 }
@@ -9029,7 +9038,7 @@ fun DashboardScreen(
 
         // Buffer space at bottom to stay above navbar
         item {
-            Spacer(modifier = Modifier.height(110.dp))
+            Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp))
         }
     }
             } // Close Column
@@ -9041,7 +9050,7 @@ fun DashboardScreen(
                 exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 113.dp)
+                    .padding(bottom = fabBottomPadding)
             ) {
                 Row(
                     modifier = Modifier
@@ -10642,7 +10651,8 @@ fun TransactionsScreen(
     onNavigateToTab: ((String, String) -> Unit)? = null,
     onPersonClick: ((Person) -> Unit)? = null,
     activeTab: String = "",
-    onExportRequest: ((String) -> Unit)? = null
+    onExportRequest: ((String) -> Unit)? = null,
+    fabBottomPadding: Dp = 113.dp
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("DATE_DESC") }
@@ -11284,7 +11294,7 @@ fun TransactionsScreen(
                         }
 
                         item(key = "tx_bottom_spacer") {
-                            Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                            Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp)) // Floating button padding
                         }
                     }
                 } else {
@@ -11365,7 +11375,7 @@ fun TransactionsScreen(
                         }
 
                         item {
-                            Spacer(modifier = Modifier.height(110.dp)) // Floating button padding
+                            Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp)) // Floating button padding
                         }
                     }
                 }
@@ -11376,7 +11386,7 @@ fun TransactionsScreen(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 110.dp)
+                    .padding(bottom = fabBottomPadding - 3.dp)
                     .background(if (isDark) Color(0xFF1E293B) else Color.White, RoundedCornerShape(28.dp))
                     .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(28.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -11420,7 +11430,7 @@ fun TransactionsScreen(
             exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 113.dp, end = 16.dp)
+                .padding(bottom = fabBottomPadding, end = 16.dp)
         ) {
             ExtendedFloatingActionButton(
                 onClick = {
@@ -11479,7 +11489,8 @@ fun DebtsScreen(
     highlightedPersonId: Int? = null,
     activeTab: String = "",
     onExportRequest: ((String) -> Unit)? = null,
-    transactions: List<Transaction> = emptyList()
+    transactions: List<Transaction> = emptyList(),
+    fabBottomPadding: Dp = 113.dp
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("NAME_ASC") }
@@ -11933,7 +11944,7 @@ fun DebtsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(110.dp))
+                        Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp))
                     }
                 }
             }
@@ -11946,7 +11957,7 @@ fun DebtsScreen(
             exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 110.dp)
+                .padding(bottom = fabBottomPadding - 3.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -12013,7 +12024,7 @@ fun DebtsScreen(
             exit = androidx.compose.animation.scaleOut() + androidx.compose.animation.fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 113.dp, end = 16.dp)
+                .padding(bottom = fabBottomPadding, end = 16.dp)
         ) {
             ExtendedFloatingActionButton(
                 onClick = { onAddPersonClick() },
@@ -12554,7 +12565,8 @@ fun SavingsScreen(
     onDeleteGoals: (List<Int>) -> Unit = {},
     onMoveGoals: (List<Int>) -> Unit = {},
     highlightedGoalId: Int? = null,
-    activeTab: String = ""
+    activeTab: String = "",
+    fabBottomPadding: Dp = 113.dp
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var currentSortBy by remember { mutableStateOf("TITLE_ASC") }
@@ -12864,7 +12876,7 @@ fun SavingsScreen(
                         }
                     }
                     item {
-                        Spacer(modifier = Modifier.height(70.dp))
+                        Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp))
                     }
                 }
             }
@@ -12874,7 +12886,7 @@ fun SavingsScreen(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 110.dp)
+                    .padding(bottom = fabBottomPadding - 3.dp)
                     .background(if (isDark) Color(0xFF1E293B) else Color.White, RoundedCornerShape(28.dp))
                     .border(1.dp, if (isDark) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(28.dp))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -12957,7 +12969,7 @@ fun SavingsScreen(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = 113.dp, end = 16.dp)
+                    .padding(bottom = fabBottomPadding, end = 16.dp)
                     .testTag("fab_add_savings_goal")
             )
         }

@@ -446,30 +446,60 @@ fun DraftsScratchpadDialog(
                             }
 
                             if (selectedDraftIds.isNotEmpty()) {
-                                Button(
-                                    onClick = {
-                                        requestBiometricDelete(selectedDraftIds.size) {
-                                            selectedDraftIds.forEach { id -> viewModel.deleteDraftTransaction(id) }
-                                            selectedDraftIds = emptySet()
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                    shape = RoundedCornerShape(10.dp)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Fingerprint,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${selectedDraftIds.size} " + (if (language == AppLanguage.BN) "মুছুন" else "Delete"),
-                                        fontSize = 12.sp,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Button(
+                                        onClick = {
+                                            val targetDrafts = drafts.filter { selectedDraftIds.contains(it.id) }
+                                            viewModel.batchPostDrafts(targetDrafts)
+                                            selectedDraftIds = emptySet()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.CheckCircle,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${selectedDraftIds.size} " + (if (language == AppLanguage.BN) "পোস্ট করুন" else "Post"),
+                                            fontSize = 12.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            requestBiometricDelete(selectedDraftIds.size) {
+                                                selectedDraftIds.forEach { id -> viewModel.deleteDraftTransaction(id) }
+                                                selectedDraftIds = emptySet()
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Fingerprint,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${selectedDraftIds.size} " + (if (language == AppLanguage.BN) "মুছুন" else "Delete"),
+                                            fontSize = 12.sp,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
