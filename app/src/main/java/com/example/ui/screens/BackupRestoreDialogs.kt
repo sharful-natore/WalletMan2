@@ -726,6 +726,8 @@ fun TrashDialog(
     var captchaInput by remember { mutableStateOf("") }
     var captchaError by remember { mutableStateOf(false) }
     var selectedTrashIds by remember { mutableStateOf(setOf<Int>()) }
+    var showTrashBatchCaptcha by remember { mutableStateOf(false) }
+    var pendingTrashBatchAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     fun generateNewCaptcha() {
         val chars = "1234567890" // Simplified to numbers for easier typing on mobile
@@ -741,36 +743,41 @@ fun TrashDialog(
         null
     }
 
+    fun triggerTrashCaptcha(targetIds: List<Int>, onApproved: () -> Unit) {
+        if (targetIds.size == 1) {
+            captchaRequiredId = targetIds.first()
+            captchaInput = ""
+            generateNewCaptcha()
+        } else {
+            pendingTrashBatchAction = onApproved
+            captchaInput = ""
+            generateNewCaptcha()
+            showTrashBatchCaptcha = true
+        }
+    }
+
     fun requestBiometricDeleteTrash(
         targetIds: List<Int>,
         onApproved: () -> Unit
     ) {
-        if (activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
+        val prefs = context.getSharedPreferences("financenote_prefs", android.content.Context.MODE_PRIVATE)
+        val bioEnabled = prefs.getBoolean("biometric_lock_enabled", false)
+        val actionEnabled = prefs.getBoolean("biometric_action_confirmation_enabled", true)
+
+        if (bioEnabled && actionEnabled && activity != null && com.example.util.BiometricHelper.isBiometricAvailable(context)) {
             val title = if (language == AppLanguage.BN) "রিসাইকেল বিন ডিলেট ভেরিফিকেশন" else "Recycle Bin Delete Verification"
             val subtitle = if (language == AppLanguage.BN) "${targetIds.size} টি আইটেম স্থায়ীভাবে মুছে ফেলতে ফিঙ্গারপ্রিন্ট দিন" else "Scan fingerprint to permanently delete ${targetIds.size} item(s)"
             com.example.util.BiometricHelper.showBiometricPrompt(
                 activity = activity,
                 title = title,
                 subtitle = subtitle,
-                negativeButtonText = if (language == AppLanguage.BN) "ক্যাপচা ব্যবহার করুন" else "Use Captcha",
+                negativeButtonText = if (language == AppLanguage.BN) "ক্যাপচা ব্যবহার করুন" else "Use CAPTCHA",
                 onSuccess = onApproved,
-                onUsePinFallback = onApproved,
-                onError = {
-                    if (targetIds.size == 1) {
-                        captchaRequiredId = targetIds.first()
-                        captchaInput = ""
-                        generateNewCaptcha()
-                    }
-                }
+                onUsePinFallback = { triggerTrashCaptcha(targetIds, onApproved) },
+                onError = { triggerTrashCaptcha(targetIds, onApproved) }
             )
         } else {
-            if (targetIds.size == 1) {
-                captchaRequiredId = targetIds.first()
-                captchaInput = ""
-                generateNewCaptcha()
-            } else {
-                onApproved()
-            }
+            triggerTrashCaptcha(targetIds, onApproved)
         }
     }
 
@@ -1028,6 +1035,135 @@ fun TrashDialog(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTrashBatchCaptcha && pendingTrashBatchAction != null) {
+        val isMatched = captchaInput.trim() == generatedCaptcha
+        Dialog(onDismissRequest = { showTrashBatchCaptcha = false; pendingTrashBatchAction = null }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDarkTheme) Color(0xFF1E293B) else Color.White
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Delete,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "ট্র্যাশ ডিলেট নিশ্চিত করুন" else "Confirm Trash Delete",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                        )
+                    }
+
+                    HorizontalDivider(color = if (isDarkTheme) Color(0xFF2E334D) else Color(0xFFE2E8F0))
+
+                    Text(
+                        text = if (language == AppLanguage.BN)
+                            "সিলেক্ট করা আইটেমগুলো স্থায়ীভাবে মুছে ফেলতে নিচে দেখানো সিকিউরিটি ক্যাপচা কোডটি টাইপ করুন:"
+                        else "Type the security captcha code below to permanently delete selected item(s):",
+                        fontSize = 14.sp,
+                        color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isDarkTheme) Color(0xFF282E47) else Color(0xFFF1F5F9),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "নিরাপত্তা ক্যাপচা কোড" else "Security Captcha Code",
+                            fontSize = 12.sp,
+                            color = if (isDarkTheme) Color.Gray else Color(0xFF64748B),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = generatedCaptcha,
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 6.sp,
+                            color = Color(0xFFEF4444),
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = captchaInput,
+                        onValueChange = { captchaInput = it },
+                        label = { Text(if (language == AppLanguage.BN) "ক্যাপচা কোডটি টাইপ করুন" else "Type Captcha Code") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = if (isMatched) Color(0xFF10B981) else Color(0xFF3B82F6),
+                            unfocusedBorderColor = if (isDarkTheme) Color(0xFF2E334D) else Color(0xFFCBD5E1),
+                            focusedTextColor = if (isDarkTheme) Color.White else Color(0xFF1E293B),
+                            unfocusedTextColor = if (isDarkTheme) Color.White else Color(0xFF1E293B)
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = { showTrashBatchCaptcha = false; pendingTrashBatchAction = null },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "বাতিল" else "Cancel",
+                                color = if (isDarkTheme) Color.LightGray else Color(0xFF475569)
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (isMatched) {
+                                    pendingTrashBatchAction?.invoke()
+                                    showTrashBatchCaptcha = false; pendingTrashBatchAction = null
+                                }
+                            },
+                            enabled = isMatched,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFEF4444),
+                                disabledContainerColor = if (isDarkTheme) Color(0xFF2E334D) else Color(0xFFE2E8F0)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = if (language == AppLanguage.BN) "স্থায়ীভাবে ডিলিট করুন" else "Permanently Delete",
+                                color = if (isMatched) Color.White else (if (isDarkTheme) Color.Gray else Color(0xFF94A3B8)),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
