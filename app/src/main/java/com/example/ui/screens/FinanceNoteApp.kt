@@ -13210,46 +13210,6 @@ fun DrawScope.drawCardPattern(patternIdx: Int) {
         )
     )
 
-    // 2. Fine Brushed Metal Texture (Horizontal Micro Hairlines)
-    val lineStep = 2.5.dp.toPx()
-    var lineY = 0f
-    var lineSeed = 9876543L
-    while (lineY < h) {
-        lineSeed = (lineSeed * 1664525L + 1013904223L)
-        val alpha = ((lineSeed and 0xFFL) / 255f) * 0.05f + 0.015f
-        val isBright = (lineSeed and 0x1L) == 1L
-        drawLine(
-            color = if (isBright) Color.White.copy(alpha = alpha) else Color.Black.copy(alpha = alpha * 0.6f),
-            start = Offset(0f, lineY),
-            end = Offset(w, lineY),
-            strokeWidth = 1.dp.toPx()
-        )
-        lineY += lineStep
-    }
-
-    // 3. Noisy Metallic Grain Texture (Noise Dot Matrix)
-    val dotStep = 5.dp.toPx()
-    var nx = 0f
-    var noiseSeed = 1234567L
-    while (nx < w) {
-        var ny = 0f
-        while (ny < h) {
-            noiseSeed = (noiseSeed * 1103515245L + 12345L)
-            val nVal = (noiseSeed and 0xFFL) / 255f
-            if (nVal > 0.65f) {
-                val dotAlpha = (nVal - 0.65f) * 0.14f
-                val isSpecular = nVal > 0.88f
-                drawCircle(
-                    color = if (isSpecular) Color.White.copy(alpha = dotAlpha * 1.2f) else Color.Black.copy(alpha = dotAlpha * 0.7f),
-                    radius = 0.7.dp.toPx(),
-                    center = Offset(nx, ny)
-                )
-            }
-            ny += dotStep
-        }
-        nx += dotStep
-    }
-
     when (patternIdx % 6) {
         0 -> { // Security Waves
             val strokeW = 1.2.dp.toPx()
@@ -13397,13 +13357,14 @@ fun SavingsGoalCardItem(
     isSelectionMode: Boolean = false,
     onLongClick: () -> Unit = {}
 ) {
-    val gradientIdx = (goal.colorIndex % 100).let { if (allGradientsList.isNotEmpty() && it in allGradientsList.indices) it else 0 }
+    val savingsGradients = com.example.ui.theme.SavingsGradientsList
+    val gradientIdx = (goal.colorIndex % 100).let { if (savingsGradients.isNotEmpty() && it in savingsGradients.indices) it else 0 }
     val patternIdx = ((goal.colorIndex / 100) % 6).coerceAtLeast(0)
 
-    val rawGradient = if (allGradientsList.isNotEmpty() && gradientIdx in allGradientsList.indices) {
-        allGradientsList[gradientIdx].colors
+    val rawGradient = if (savingsGradients.isNotEmpty() && gradientIdx in savingsGradients.indices) {
+        savingsGradients[gradientIdx]
     } else {
-        com.example.ui.theme.GradientsList[0]
+        com.example.ui.theme.SavingsGradientsList[0]
     }
     val gradient = rawGradient
 
@@ -13445,56 +13406,100 @@ fun SavingsGoalCardItem(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // --- TOP ROW: Chip, Wifi & Category Badge ---
+                // --- TOP ROW: Beautiful Starburst Logo (Left) & Contactless + Mastercard Logos (Right) ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Chip & Contactless Wifi
+                    // Starburst Icon (Left) - Premium financial symbol
+                    Canvas(modifier = Modifier.size(28.dp)) {
+                        val cw = size.width
+                        val ch = size.height
+                        val center = Offset(cw / 2f, ch / 2f)
+                        val rayCount = 16
+                        val maxRadius = cw / 2f
+                        for (i in 0 until rayCount) {
+                            val angleRad = (i * 360f / rayCount) * (Math.PI / 180f)
+                            val startX = center.x + Math.cos(angleRad).toFloat() * (maxRadius * 0.15f)
+                            val startY = center.y + Math.sin(angleRad).toFloat() * (maxRadius * 0.15f)
+                            val endX = center.x + Math.cos(angleRad).toFloat() * maxRadius
+                            val endY = center.y + Math.sin(angleRad).toFloat() * maxRadius
+                            drawLine(
+                                color = Color.White.copy(alpha = 0.95f),
+                                start = Offset(startX, startY),
+                                end = Offset(endX, endY),
+                                strokeWidth = 1.2.dp.toPx()
+                            )
+                        }
+                    }
+
+                    // Contactless and Mastercard Logo (Right)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Metallic Gold EMV Chip Box
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp, 28.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFFFDE68A),
-                                            Color(0xFFD97706),
-                                            Color(0xFFF59E0B),
-                                            Color(0xFFFEF3C7)
-                                        )
-                                    )
-                                )
-                                .border(1.dp, Color(0xFFB45309).copy(alpha = 0.7f), RoundedCornerShape(6.dp))
-                                .padding(2.dp)
-                        ) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val cw = size.width
-                                val ch = size.height
-                                val linePaint = Color(0xFF78350F).copy(alpha = 0.75f)
-                                val lineThick = 1.dp.toPx()
+                        if (isSelectionMode) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f))
+                                    .border(2.dp, Color.White, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        } else {
+                            // Contactless Wifi
+                            Icon(
+                                imageVector = Icons.Rounded.Wifi,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.75f),
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .rotate(90f)
+                            )
 
-                                drawLine(linePaint, Offset(cw * 0.35f, 0f), Offset(cw * 0.35f, ch), strokeWidth = lineThick)
-                                drawLine(linePaint, Offset(cw * 0.65f, 0f), Offset(cw * 0.65f, ch), strokeWidth = lineThick)
-                                drawLine(linePaint, Offset(0f, ch * 0.5f), Offset(cw, ch * 0.5f), strokeWidth = lineThick)
+                            // Mastercard Overlapping Circles (Premium blended gradients)
+                            Box(contentAlignment = Alignment.Center) {
+                                Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    colors = listOf(
+                                                        Color(0xFFFF5F00).copy(alpha = 0.9f),
+                                                        Color(0xFFEB001B).copy(alpha = 0.95f)
+                                                    )
+                                                )
+                                            )
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    colors = listOf(
+                                                        Color(0xFFFFB03A).copy(alpha = 0.9f),
+                                                        Color(0xFFF79E1B).copy(alpha = 0.95f)
+                                                    )
+                                                )
+                                            )
+                                    )
+                                }
                             }
                         }
-
-                        Icon(
-                            imageVector = Icons.Rounded.Wifi,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(18.dp).rotate(90f)
-                        )
                     }
+                }
 
-                    // Category Pill & Checkbox / Progress Pill
+                // --- MIDDLE ROW: Title & Balances + Category Badge + Progress % ---
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     val formattedCategory = if (language == AppLanguage.BN) {
                         when (goal.category.lowercase()) {
                             "emergency", "জরুরি ফান্ড" -> "জরুরি ফান্ড"
@@ -13508,38 +13513,26 @@ fun SavingsGoalCardItem(
                         goal.category.uppercase()
                     }
 
-                    if (isSelectionMode) {
-                        Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f))
-                                .border(2.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSelected) {
-                                Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            if (goal.targetAmount > 0) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.Black.copy(alpha = 0.25f)
-                                ) {
-                                    Text(
-                                        text = "${percentageInt}%",
-                                        color = if (percentageInt >= 100) Color(0xFF34D399) else Color(0xFFFBBF24),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
+                            HighlightedText(
+                                text = goal.title.uppercase(),
+                                query = searchQuery,
+                                color = Color(0xFFFBBF24),
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.sp
+                                )
+                            )
 
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
@@ -13551,29 +13544,23 @@ fun SavingsGoalCardItem(
                                     color = Color(0xFFFBBF24),
                                     style = TextStyle(
                                         color = Color.White,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     ),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                                 )
                             }
                         }
-                    }
-                }
 
-                // --- MIDDLE ROW: Title & Balances ---
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    HighlightedText(
-                        text = goal.title.uppercase(),
-                        query = searchQuery,
-                        color = Color(0xFFFBBF24),
-                        style = TextStyle(
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp
-                        )
-                    )
+                        if (goal.targetAmount > 0 && !isSelectionMode) {
+                            Text(
+                                text = "${percentageInt}%",
+                                color = if (percentageInt >= 100) Color(0xFF34D399) else Color(0xFFFBBF24),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
                     Row(
                         verticalAlignment = Alignment.Bottom,
@@ -13596,7 +13583,7 @@ fun SavingsGoalCardItem(
                     }
                 }
 
-                // --- BOTTOM SECTION: Progress Bar & Cardholder Name / Logo ---
+                // --- BOTTOM SECTION: Progress Bar & Cardholder Name / EMV Chip ---
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (goal.targetAmount > 0) {
                         Box(
@@ -13633,21 +13620,58 @@ fun SavingsGoalCardItem(
                             letterSpacing = 1.sp
                         )
 
-                        // Mastercard Circles Emblem
-                        Box(contentAlignment = Alignment.Center) {
-                            Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFEB001B).copy(alpha = 0.85f))
+                        // Highly realistic EMV Chip Icon in bottom-right (matching premium card!)
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp, 26.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFFE2E8F0), // Platinum / Silver metallic shimmer
+                                            Color(0xFFCBD5E1),
+                                            Color(0xFF94A3B8),
+                                            Color(0xFFF1F5F9)
+                                        )
+                                    )
                                 )
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFF79E1B).copy(alpha = 0.85f))
+                                .border(1.dp, Color(0xFF64748B).copy(alpha = 0.5f), RoundedCornerShape(5.dp))
+                                .padding(1.dp)
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val cw = size.width
+                                val ch = size.height
+                                val linePaint = Color(0xFF334155).copy(alpha = 0.65f)
+                                val lineThick = 1.dp.toPx()
+
+                                // Center rectangle pad
+                                val rectW = cw * 0.38f
+                                val rectH = ch * 0.42f
+                                val rectX = (cw - rectW) / 2f
+                                val rectY = (ch - rectH) / 2f
+
+                                drawRoundRect(
+                                    color = linePaint,
+                                    topLeft = Offset(rectX, rectY),
+                                    size = androidx.compose.ui.geometry.Size(rectW, rectH),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()),
+                                    style = Stroke(width = lineThick)
                                 )
+
+                                // Center horizontal split lines
+                                drawLine(linePaint, Offset(0f, ch * 0.5f), Offset(rectX, ch * 0.5f), strokeWidth = lineThick)
+                                drawLine(linePaint, Offset(rectX + rectW, ch * 0.5f), Offset(cw, ch * 0.5f), strokeWidth = lineThick)
+
+                                // Vertical lines to outer edge
+                                drawLine(linePaint, Offset(rectX + rectW * 0.25f, 0f), Offset(rectX + rectW * 0.25f, rectY), strokeWidth = lineThick)
+                                drawLine(linePaint, Offset(rectX + rectW * 0.75f, 0f), Offset(rectX + rectW * 0.75f, rectY), strokeWidth = lineThick)
+
+                                drawLine(linePaint, Offset(rectX + rectW * 0.25f, rectY + rectH), Offset(rectX + rectW * 0.25f, ch), strokeWidth = lineThick)
+                                drawLine(linePaint, Offset(rectX + rectW * 0.75f, rectY + rectH), Offset(rectX + rectW * 0.75f, ch), strokeWidth = lineThick)
+
+                                // Left/right curved branch segments
+                                drawLine(linePaint, Offset(cw * 0.2f, ch * 0.2f), Offset(cw * 0.2f, ch * 0.8f), strokeWidth = lineThick)
+                                drawLine(linePaint, Offset(cw * 0.8f, ch * 0.2f), Offset(cw * 0.8f, ch * 0.8f), strokeWidth = lineThick)
                             }
                         }
                     }
@@ -14834,6 +14858,11 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var selectedGradientIdx by remember { mutableStateOf((colorIndex % 100).coerceAtLeast(0)) }
     var selectedPatternIdx by remember { mutableStateOf(((colorIndex / 100) % 6).coerceAtLeast(0)) }
 
+    val customGradientsConfig by viewModel.customGradientsConfig.collectAsState()
+    val savingsGradientsList = remember(customGradientsConfig) {
+        com.example.ui.theme.SavingsGradientsList.map { com.example.ui.theme.ThemeGradient(it) } + customGradientsConfig
+    }
+
     val sectors = listOf("Emergency", "Laptop", "Travel", "Marriage", "Investment", "Other")
     var sectorDropdownExpanded by remember { mutableStateOf(false) }
     var customSectorName by remember { mutableStateOf("") }
@@ -14866,7 +14895,6 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
                 // LIVE PREVIEW CARD
                 item {
-                    val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
                     val previewGoal = SavingsGoal(
                         id = initialGoal?.id ?: 0,
                         title = title.ifBlank { if (language == AppLanguage.BN) "কার্ডের নাম" else "CARD NAME" },
@@ -14890,7 +14918,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             language = language,
                             isDark = isDark,
                             profileName = "PREVIEW",
-                            allGradientsList = allGradientsList,
+                            allGradientsList = savingsGradientsList,
                             onGoalClick = {},
                             onContributeClick = { _, _ -> },
                             onEditGoal = {},
@@ -15064,7 +15092,6 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
                 // Color Picker Grid
                 item {
-                    val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
                     Text(if (language == AppLanguage.BN) "কার্ডের রঙ" else "Card Color", color = labelColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Row(
                         modifier = Modifier
@@ -15074,7 +15101,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        allGradientsList.forEachIndexed { idx, grad ->
+                        savingsGradientsList.forEachIndexed { idx, grad ->
                             val isSelected = selectedGradientIdx == idx
                             Box(
                                 modifier = Modifier
@@ -15104,11 +15131,10 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
 
                 // Pattern Picker Grid
                 item {
-                    val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
-                    val activeGradColors = if (allGradientsList.isNotEmpty() && selectedGradientIdx in allGradientsList.indices) {
-                        allGradientsList[selectedGradientIdx].colors
+                    val activeGradColors = if (savingsGradientsList.isNotEmpty() && selectedGradientIdx in savingsGradientsList.indices) {
+                        savingsGradientsList[selectedGradientIdx].colors
                     } else {
-                        com.example.ui.theme.GradientsList[0]
+                        com.example.ui.theme.SavingsGradientsList[0]
                     }
 
                     val patternNames = if (language == AppLanguage.BN) {
