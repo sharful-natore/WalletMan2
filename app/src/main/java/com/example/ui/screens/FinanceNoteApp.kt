@@ -10631,6 +10631,17 @@ fun TransactionDetailsDialog(
     )
 }
 
+enum class SuggestionType {
+    CATEGORY, PERSON, NOTE
+}
+
+data class TransactionSearchSuggestion(
+    val queryText: String,
+    val displayText: String,
+    val subText: String? = null,
+    val type: SuggestionType
+)
+
 // ---------------- TRANSACTIONS TAB ----------------
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -10660,6 +10671,123 @@ fun TransactionsScreen(
 
     var selectedTxIds by remember { mutableStateOf(setOf<Int>()) }
     val isSelectionMode = selectedTxIds.isNotEmpty()
+
+    val searchSuggestions = remember(transactions, persons, searchQuery, language) {
+        val trimmed = searchQuery.trim()
+        val normalizedQ = normalizeBn(trimmed)
+
+        val suggestions = mutableListOf<TransactionSearchSuggestion>()
+        val addedTexts = mutableSetOf<String>()
+
+        if (normalizedQ.isNotEmpty()) {
+            val allCategories = (transactions.map { it.category } + listOf(
+                "Food", "Shopping", "Bills", "Transport", "Salary", "Business", "Medical", "Education", "Housing", "Entertainment"
+            )).distinct()
+
+            for (cat in allCategories) {
+                val catBn = when (cat) {
+                    "Salary" -> "বেতন"
+                    "Business" -> "ব্যবসা"
+                    "Agriculture" -> "কৃষি"
+                    "Gift" -> "উপহার"
+                    "Sales" -> "বিক্রয়"
+                    "Honorarium" -> "সম্মানী"
+                    "Freelance" -> "ফ্রিল্যান্সিং"
+                    "Rental" -> "ভাড়া"
+                    "Investment" -> "বিনিয়োগ"
+                    "Food" -> "খাবার"
+                    "Housing" -> "বাসস্থান"
+                    "Bills" -> "বিল"
+                    "Transport" -> "যাতায়াত"
+                    "Shopping" -> "কেনাকাটা"
+                    "Medical" -> "চিকিৎসা"
+                    "Education" -> "শিক্ষা"
+                    "Clothing" -> "পোশাক"
+                    "Entertainment" -> "বিনোদন"
+                    else -> cat
+                }
+                val matchEn = normalizeBn(cat).contains(normalizedQ)
+                val matchBn = normalizeBn(catBn).contains(normalizedQ)
+                if (matchEn || matchBn) {
+                    val selectText = if (language == AppLanguage.BN && catBn.isNotBlank()) catBn else cat
+                    if (addedTexts.add(selectText.lowercase())) {
+                        suggestions.add(
+                            TransactionSearchSuggestion(
+                                queryText = selectText,
+                                displayText = if (language == AppLanguage.BN) "$catBn ($cat)" else cat,
+                                subText = if (language == AppLanguage.BN) "ক্যাটাগরি" else "Category",
+                                type = SuggestionType.CATEGORY
+                            )
+                        )
+                    }
+                }
+            }
+
+            for (p in persons) {
+                val pName = p.name
+                if (normalizeBn(pName).contains(normalizedQ)) {
+                    if (addedTexts.add(pName.lowercase())) {
+                        suggestions.add(
+                            TransactionSearchSuggestion(
+                                queryText = pName,
+                                displayText = pName,
+                                subText = if (language == AppLanguage.BN) "ব্যক্তি" else "Person",
+                                type = SuggestionType.PERSON
+                            )
+                        )
+                    }
+                }
+            }
+
+            val uniqueNotes = transactions.map { it.note.trim() }
+                .filter { it.isNotBlank() && it.length > 1 }
+                .distinct()
+            for (note in uniqueNotes) {
+                if (normalizeBn(note).contains(normalizedQ)) {
+                    if (addedTexts.add(note.lowercase())) {
+                        suggestions.add(
+                            TransactionSearchSuggestion(
+                                queryText = note,
+                                displayText = note,
+                                subText = if (language == AppLanguage.BN) "নোট" else "Note",
+                                type = SuggestionType.NOTE
+                            )
+                        )
+                    }
+                }
+            }
+        } else {
+            val frequentCats = transactions.groupBy { it.category }
+                .mapValues { it.value.size }
+                .entries.sortedByDescending { it.value }
+                .map { it.key }
+                .take(6)
+
+            for (cat in frequentCats) {
+                val catBn = when (cat) {
+                    "Food" -> "খাবার"
+                    "Shopping" -> "কেনাকাটা"
+                    "Bills" -> "বিল"
+                    "Transport" -> "যাতায়াত"
+                    "Salary" -> "বেতন"
+                    "Medical" -> "চিকিৎসা"
+                    else -> cat
+                }
+                val selectText = if (language == AppLanguage.BN && catBn.isNotBlank()) catBn else cat
+                if (addedTexts.add(selectText.lowercase())) {
+                    suggestions.add(
+                        TransactionSearchSuggestion(
+                            queryText = selectText,
+                            displayText = if (language == AppLanguage.BN) catBn else cat,
+                            subText = if (language == AppLanguage.BN) "জনপ্রিয়" else "Popular",
+                            type = SuggestionType.CATEGORY
+                        )
+                    )
+                }
+            }
+        }
+        suggestions.take(8)
+    }
 
     androidx.activity.compose.BackHandler(enabled = isSelectionMode) {
         selectedTxIds = emptySet()
@@ -10944,6 +11072,89 @@ fun TransactionsScreen(
                             unfocusedContainerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
                         )
                     )
+
+                    // Real-time Search Suggestions Chips
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = searchSuggestions.isNotEmpty(),
+                        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 6.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (searchQuery.isBlank()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(end = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Lightbulb,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "পরামর্শ:" else "Suggestions:",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Gray
+                                    )
+                                }
+                            }
+
+                            searchSuggestions.forEach { suggestion ->
+                                val icon = when (suggestion.type) {
+                                    SuggestionType.CATEGORY -> Icons.Rounded.Category
+                                    SuggestionType.PERSON -> Icons.Rounded.Person
+                                    SuggestionType.NOTE -> Icons.Rounded.Description
+                                }
+
+                                val isExactMatch = searchQuery.trim().equals(suggestion.queryText, ignoreCase = true)
+
+                                Surface(
+                                    onClick = {
+                                        searchQuery = if (isExactMatch) "" else suggestion.queryText
+                                    },
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = if (isExactMatch) MaterialTheme.colorScheme.primary else (if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)),
+                                    contentColor = if (isExactMatch) Color.White else (if (isDark) Color.White else Color(0xFF1E293B)),
+                                    modifier = Modifier.animateContentSize()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = if (isExactMatch) Color.White else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = suggestion.displayText,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        if (suggestion.subText != null && searchQuery.isNotBlank()) {
+                                            Text(
+                                                text = "• ${suggestion.subText}",
+                                                fontSize = 10.sp,
+                                                color = if (isExactMatch) Color.White.copy(alpha = 0.8f) else Color.Gray
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     // Summary Cards (arranged horizontally in a Row)
                     Row(
