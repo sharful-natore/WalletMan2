@@ -3815,6 +3815,7 @@ fun FinanceNoteApp(
                                             onMoveGoal = { goalActionChoice = it },
                                             onDeleteGoals = { pendingDeleteGoals = it },
                                             onMoveGoals = { goalsToMoveIds = it },
+                                            onReorderGoals = { viewModel.updateSavingsGoalsOrder(it) },
                                             highlightedGoalId = highlightedGoalId,
                                             activeTab = activeTab
                                         )
@@ -12777,12 +12778,13 @@ fun SavingsScreen(
     onMoveGoal: (SavingsGoal) -> Unit = {},
     onDeleteGoals: (List<Int>) -> Unit = {},
     onMoveGoals: (List<Int>) -> Unit = {},
+    onReorderGoals: (List<SavingsGoal>) -> Unit = {},
     highlightedGoalId: Int? = null,
     activeTab: String = "",
     fabBottomPadding: Dp = 113.dp
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var currentSortBy by remember { mutableStateOf("TITLE_ASC") }
+    var currentSortBy by remember { mutableStateOf("CUSTOM") }
     var showSortMenu by remember { mutableStateOf(false) }
 
     var selectedGoalIds by remember { mutableStateOf(setOf<Int>()) }
@@ -12808,14 +12810,26 @@ fun SavingsScreen(
     val sortedGoals = remember(searchedGoals, currentSortBy) {
         val list = searchedGoals.toMutableList()
         when (currentSortBy) {
+            "CUSTOM" -> list.sortBy { it.displayOrder }
             "TITLE_ASC" -> list.sortBy { it.title.lowercase() }
             "TITLE_DESC" -> list.sortByDescending { it.title.lowercase() }
             "TARGET_DESC" -> list.sortByDescending { it.targetAmount }
             "TARGET_ASC" -> list.sortBy { it.targetAmount }
             "SAVED_DESC" -> list.sortByDescending { it.savedAmount }
             "SAVED_ASC" -> list.sortBy { it.savedAmount }
+            else -> list.sortBy { it.displayOrder }
         }
         list
+    }
+
+    var dragActiveGoalId by remember { mutableStateOf<Int?>(null) }
+    var localGoalsList by remember { mutableStateOf<List<SavingsGoal>>(emptyList()) }
+    var dragAccumulatedOffset by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(sortedGoals, dragActiveGoalId) {
+        if (dragActiveGoalId == null) {
+            localGoalsList = sortedGoals
+        }
     }
 
     val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -12992,6 +13006,7 @@ fun SavingsScreen(
                         modifier = Modifier.background(if (isDark) Color(0xFF1E293B) else Color.White)
                     ) {
                         val sortOptions = listOf(
+                            Triple("CUSTOM", if (language == AppLanguage.BN) "নিজের সাজানো (কাস্টম)" else "Custom Order", Icons.Rounded.SwapVert),
                             Triple("TITLE_ASC", if (language == AppLanguage.BN) "নাম অনুযায়ী (ক-অ)" else "Title (A-Z)", Icons.Rounded.SortByAlpha),
                             Triple("TITLE_DESC", if (language == AppLanguage.BN) "নাম অনুযায়ী (অ-ক)" else "Title (Z-A)", Icons.Rounded.SortByAlpha),
                             Triple("TARGET_DESC", if (language == AppLanguage.BN) "বেশি লক্ষ্য আগে" else "Highest Target First", Icons.Rounded.TrendingUp),
@@ -13059,9 +13074,73 @@ fun SavingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(sortedGoals, key = { it.id }) { goal ->
+                    items(localGoalsList, key = { it.id }) { goal ->
                         val isSelected = selectedGoalIds.contains(goal.id)
-                        Box(modifier = Modifier.animateItem()) {
+                        val itemHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 196.dp.toPx() }
+
+                        Box(
+                            modifier = Modifier
+                                .animateItem()
+                                .then(
+                                    if (isSelectionMode) {
+                                        Modifier.pointerInput(goal.id, isSelectionMode) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = { offset ->
+                                                    dragActiveGoalId = goal.id
+                                                    dragAccumulatedOffset = 0f
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    dragAccumulatedOffset += dragAmount.y
+                                                    
+                                                    val currentIndex = localGoalsList.indexOfFirst { it.id == goal.id }
+                                                    if (currentIndex != -1) {
+                                                        if (dragAccumulatedOffset > itemHeightPx && currentIndex < localGoalsList.size - 1) {
+                                                            // Swap with below
+                                                            val newList = localGoalsList.toMutableList()
+                                                            val temp = newList[currentIndex]
+                                                            newList[currentIndex] = newList[currentIndex + 1]
+                                                            newList[currentIndex + 1] = temp
+                                                            localGoalsList = newList
+                                                            dragAccumulatedOffset -= itemHeightPx
+                                                        } else if (dragAccumulatedOffset < -itemHeightPx && currentIndex > 0) {
+                                                            // Swap with above
+                                                            val newList = localGoalsList.toMutableList()
+                                                            val temp = newList[currentIndex]
+                                                            newList[currentIndex] = newList[currentIndex - 1]
+                                                            newList[currentIndex - 1] = temp
+                                                            localGoalsList = newList
+                                                            dragAccumulatedOffset += itemHeightPx
+                                                        }
+                                                    }
+                                                },
+                                                onDragEnd = {
+                                                    dragActiveGoalId = null
+                                                    currentSortBy = "CUSTOM"
+                                                    onReorderGoals(localGoalsList)
+                                                },
+                                                onDragCancel = {
+                                                    dragActiveGoalId = null
+                                                }
+                                            )
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .then(
+                                    if (dragActiveGoalId == goal.id) {
+                                        Modifier.graphicsLayer {
+                                            scaleX = 1.04f
+                                            scaleY = 1.04f
+                                            alpha = 0.9f
+                                            shadowElevation = 8.dp.toPx()
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                        ) {
                             SavingsGoalCardItem(
                                 goal = goal,
                                 language = language,
@@ -13210,7 +13289,7 @@ fun DrawScope.drawCardPattern(patternIdx: Int) {
         )
     )
 
-    when (patternIdx % 6) {
+    when (patternIdx % 10) {
         0 -> { // Security Waves
             val strokeW = 1.2.dp.toPx()
             val wave1 = androidx.compose.ui.graphics.Path().apply {
@@ -13335,6 +13414,67 @@ fun DrawScope.drawCardPattern(patternIdx: Int) {
                 center = Offset(w * 0.85f, h * 0.2f)
             )
         }
+        6 -> { // Cyber Topography
+            val strokeW = 1.0.dp.toPx()
+            for (offset in -30..40 step 12) {
+                val offsetPx = offset.dp.toPx()
+                val topoPath = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(0f, h * 0.2f + offsetPx)
+                    quadraticTo(w * 0.25f, h * 0.5f + offsetPx * 0.7f, w * 0.5f, h * 0.3f + offsetPx)
+                    quadraticTo(w * 0.75f, -h * 0.1f + offsetPx * 1.3f, w, h * 0.4f + offsetPx)
+                }
+                drawPath(topoPath, Color.White.copy(alpha = 0.08f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeW))
+            }
+        }
+        7 -> { // Isometric Grid
+            val lineThick = 0.6.dp.toPx()
+            val isoStep = 32.dp.toPx()
+            var iOffset = -h * 2f
+            while (iOffset < w + h * 2f) {
+                drawLine(Color.White.copy(alpha = 0.06f), Offset(iOffset, 0f), Offset(iOffset + h * 1.732f, h), strokeWidth = lineThick)
+                drawLine(Color.White.copy(alpha = 0.06f), Offset(iOffset, h), Offset(iOffset + h * 1.732f, 0f), strokeWidth = lineThick)
+                iOffset += isoStep
+            }
+        }
+        8 -> { // Digital Hex Connectivity
+            val hexSize = 16.dp.toPx()
+            val dy = hexSize * 1.5f
+            val dx = hexSize * 1.732f
+            var row = 0
+            var y = 0f
+            while (y < h + hexSize) {
+                val xOffset = if (row % 2 == 0) 0f else dx / 2f
+                var x = xOffset - hexSize
+                while (x < w + hexSize) {
+                    val hexPath = androidx.compose.ui.graphics.Path().apply {
+                        for (i in 0..5) {
+                            val angle = i * Math.PI / 3f
+                            val px = x + Math.cos(angle).toFloat() * hexSize
+                            val py = y + Math.sin(angle).toFloat() * hexSize
+                            if (i == 0) moveTo(px, py) else lineTo(px, py)
+                        }
+                        close()
+                    }
+                    drawPath(hexPath, Color.White.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.8.dp.toPx()))
+                    if ((row + (x / dx).toInt()) % 4 == 0) {
+                        drawCircle(Color.White.copy(alpha = 0.14f), radius = 1.5.dp.toPx(), center = Offset(x, y))
+                    }
+                    x += dx
+                }
+                y += dy
+                row++
+            }
+        }
+        9 -> { // Sleek Linear Ribbons
+            for (offset in -40..40 step 10) {
+                val offsetPx = offset.dp.toPx()
+                val ribbonPath = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(0f, h * 0.75f + offsetPx)
+                    cubicTo(w * 0.35f, h * 0.9f + offsetPx, w * 0.65f, h * 0.15f + offsetPx, w, h * 0.3f + offsetPx)
+                }
+                drawPath(ribbonPath, Color.White.copy(alpha = 0.06f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2.dp.toPx()))
+            }
+        }
     }
 }
 
@@ -13359,7 +13499,7 @@ fun SavingsGoalCardItem(
 ) {
     val savingsGradients = com.example.ui.theme.SavingsGradientsList
     val gradientIdx = (goal.colorIndex % 100).let { if (savingsGradients.isNotEmpty() && it in savingsGradients.indices) it else 0 }
-    val patternIdx = ((goal.colorIndex / 100) % 6).coerceAtLeast(0)
+    val patternIdx = ((goal.colorIndex / 100) % 10).coerceAtLeast(0)
 
     val rawGradient = if (savingsGradients.isNotEmpty() && gradientIdx in savingsGradients.indices) {
         savingsGradients[gradientIdx]
@@ -13406,33 +13546,17 @@ fun SavingsGoalCardItem(
                     .padding(14.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // --- TOP ROW: Beautiful Starburst Logo (Left) & Contactless + Mastercard Logos (Right) ---
+                // --- TOP ROW: Real App Logo (Left) & Contactless + Mastercard Logos (Right) ---
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Starburst Icon (Left) - Premium financial symbol
-                    Canvas(modifier = Modifier.size(28.dp)) {
-                        val cw = size.width
-                        val ch = size.height
-                        val center = Offset(cw / 2f, ch / 2f)
-                        val rayCount = 16
-                        val maxRadius = cw / 2f
-                        for (i in 0 until rayCount) {
-                            val angleRad = (i * 360f / rayCount) * (Math.PI / 180f)
-                            val startX = center.x + Math.cos(angleRad).toFloat() * (maxRadius * 0.15f)
-                            val startY = center.y + Math.sin(angleRad).toFloat() * (maxRadius * 0.15f)
-                            val endX = center.x + Math.cos(angleRad).toFloat() * maxRadius
-                            val endY = center.y + Math.sin(angleRad).toFloat() * maxRadius
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.95f),
-                                start = Offset(startX, startY),
-                                end = Offset(endX, endY),
-                                strokeWidth = 1.2.dp.toPx()
-                            )
-                        }
-                    }
+                    // App's Real Logo instead of Starburst Icon
+                    AnimatedAppLogo(
+                        modifier = Modifier.size(28.dp),
+                        isInfinite = false
+                    )
 
                     // Contactless and Mastercard Logo (Right)
                     Row(
@@ -13453,46 +13577,52 @@ fun SavingsGoalCardItem(
                                 }
                             }
                         } else {
-                            // Contactless Wifi
-                            Icon(
-                                imageVector = Icons.Rounded.Wifi,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.75f),
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .rotate(90f)
-                            )
+                            // High-fidelity Contactless Waves ())) pointing right
+                            Canvas(modifier = Modifier.size(18.dp, 16.dp)) {
+                                val cw = size.width
+                                val ch = size.height
+                                val strokeW = 1.6.dp.toPx()
+                                val color = Color.White.copy(alpha = 0.55f)
 
-                            // Mastercard Overlapping Circles (Premium blended gradients)
-                            Box(contentAlignment = Alignment.Center) {
-                                Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(22.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                Brush.radialGradient(
-                                                    colors = listOf(
-                                                        Color(0xFFFF5F00).copy(alpha = 0.9f),
-                                                        Color(0xFFEB001B).copy(alpha = 0.95f)
-                                                    )
-                                                )
-                                            )
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(22.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                Brush.radialGradient(
-                                                    colors = listOf(
-                                                        Color(0xFFFFB03A).copy(alpha = 0.9f),
-                                                        Color(0xFFF79E1B).copy(alpha = 0.95f)
-                                                    )
-                                                )
-                                            )
+                                val cx = -cw * 0.4f
+                                val cy = ch * 0.5f
+
+                                val radii = listOf(cw * 0.8f, cw * 1.2f, cw * 1.6f)
+                                radii.forEach { r ->
+                                    drawArc(
+                                        color = color,
+                                        startAngle = -35f,
+                                        sweepAngle = 70f,
+                                        useCenter = false,
+                                        topLeft = Offset(cx - r, cy - r),
+                                        size = androidx.compose.ui.geometry.Size(r * 2f, r * 2f),
+                                        style = Stroke(width = strokeW, cap = StrokeCap.Round)
                                     )
                                 }
+                            }
+
+                            Spacer(modifier = Modifier.width(2.dp))
+
+                            // High-fidelity Mastercard Overlapping Circles (Semi-transparent white)
+                            Canvas(modifier = Modifier.size(34.dp, 22.dp)) {
+                                val cw = size.width
+                                val ch = size.height
+                                val r = ch * 0.5f
+
+                                val x1 = cw * 0.38f
+                                val x2 = cw * 0.62f
+                                val cy = ch * 0.5f
+
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.35f),
+                                    radius = r,
+                                    center = Offset(x1, cy)
+                                )
+                                drawCircle(
+                                    color = Color.White.copy(alpha = 0.35f),
+                                    radius = r,
+                                    center = Offset(x2, cy)
+                                )
                             }
                         }
                     }
@@ -13620,58 +13750,93 @@ fun SavingsGoalCardItem(
                             letterSpacing = 1.sp
                         )
 
-                        // Highly realistic EMV Chip Icon in bottom-right (matching premium card!)
+                        // Highly realistic EMV Chip Icon matching screenshot 100% (translucent debossed glassmorphic look)
                         Box(
                             modifier = Modifier
-                                .size(36.dp, 26.dp)
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFFE2E8F0), // Platinum / Silver metallic shimmer
-                                            Color(0xFFCBD5E1),
-                                            Color(0xFF94A3B8),
-                                            Color(0xFFF1F5F9)
-                                        )
-                                    )
+                                .size(36.dp, 28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.15f))
+                                .border(
+                                    width = 1.dp,
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp)
                                 )
-                                .border(1.dp, Color(0xFF64748B).copy(alpha = 0.5f), RoundedCornerShape(5.dp))
                                 .padding(1.dp)
                         ) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val cw = size.width
                                 val ch = size.height
-                                val linePaint = Color(0xFF334155).copy(alpha = 0.65f)
-                                val lineThick = 1.dp.toPx()
+                                val lineThick = 0.8.dp.toPx()
+
+                                // Helper function to draw 3D debossed lines
+                                fun drawDebossedLine(x1: Float, y1: Float, x2: Float, y2: Float) {
+                                    // Shadow line
+                                    drawLine(
+                                        color = Color.Black.copy(alpha = 0.35f),
+                                        start = Offset(x1, y1) + Offset(0.5f, 0.5f),
+                                        end = Offset(x2, y2) + Offset(0.5f, 0.5f),
+                                        strokeWidth = lineThick
+                                    )
+                                    // Highlight line
+                                    drawLine(
+                                        color = Color.White.copy(alpha = 0.22f),
+                                        start = Offset(x1, y1),
+                                        end = Offset(x2, y2),
+                                        strokeWidth = lineThick
+                                    )
+                                }
+
+                                // Helper function for rounded rectangles (center pad)
+                                fun drawDebossedRoundRect(topLeft: Offset, rSize: androidx.compose.ui.geometry.Size, cr: Float) {
+                                    drawRoundRect(
+                                        color = Color.Black.copy(alpha = 0.35f),
+                                        topLeft = topLeft + Offset(0.5f, 0.5f),
+                                        size = rSize,
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(cr, cr),
+                                        style = Stroke(width = lineThick)
+                                    )
+                                    drawRoundRect(
+                                        color = Color.White.copy(alpha = 0.22f),
+                                        topLeft = topLeft,
+                                        size = rSize,
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(cr, cr),
+                                        style = Stroke(width = lineThick)
+                                    )
+                                }
 
                                 // Center rectangle pad
-                                val rectW = cw * 0.38f
-                                val rectH = ch * 0.42f
+                                val rectW = cw * 0.40f
+                                val rectH = ch * 0.45f
                                 val rectX = (cw - rectW) / 2f
                                 val rectY = (ch - rectH) / 2f
 
-                                drawRoundRect(
-                                    color = linePaint,
+                                drawDebossedRoundRect(
                                     topLeft = Offset(rectX, rectY),
-                                    size = androidx.compose.ui.geometry.Size(rectW, rectH),
-                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()),
-                                    style = Stroke(width = lineThick)
+                                    rSize = androidx.compose.ui.geometry.Size(rectW, rectH),
+                                    cr = 2.dp.toPx()
                                 )
 
-                                // Center horizontal split lines
-                                drawLine(linePaint, Offset(0f, ch * 0.5f), Offset(rectX, ch * 0.5f), strokeWidth = lineThick)
-                                drawLine(linePaint, Offset(rectX + rectW, ch * 0.5f), Offset(cw, ch * 0.5f), strokeWidth = lineThick)
+                                // Center horizontal split lines going outward
+                                drawDebossedLine(0f, ch * 0.5f, rectX, ch * 0.5f)
+                                drawDebossedLine(rectX + rectW, ch * 0.5f, cw, ch * 0.5f)
 
-                                // Vertical lines to outer edge
-                                drawLine(linePaint, Offset(rectX + rectW * 0.25f, 0f), Offset(rectX + rectW * 0.25f, rectY), strokeWidth = lineThick)
-                                drawLine(linePaint, Offset(rectX + rectW * 0.75f, 0f), Offset(rectX + rectW * 0.75f, rectY), strokeWidth = lineThick)
+                                // Top vertical branch lines
+                                drawDebossedLine(rectX + rectW * 0.25f, 0f, rectX + rectW * 0.25f, rectY)
+                                drawDebossedLine(rectX + rectW * 0.75f, 0f, rectX + rectW * 0.75f, rectY)
 
-                                drawLine(linePaint, Offset(rectX + rectW * 0.25f, rectY + rectH), Offset(rectX + rectW * 0.25f, ch), strokeWidth = lineThick)
-                                drawLine(linePaint, Offset(rectX + rectW * 0.75f, rectY + rectH), Offset(rectX + rectW * 0.75f, ch), strokeWidth = lineThick)
+                                // Bottom vertical branch lines
+                                drawDebossedLine(rectX + rectW * 0.25f, rectY + rectH, rectX + rectW * 0.25f, ch)
+                                drawDebossedLine(rectX + rectW * 0.75f, rectY + rectH, rectX + rectW * 0.75f, ch)
 
-                                // Left/right curved branch segments
-                                drawLine(linePaint, Offset(cw * 0.2f, ch * 0.2f), Offset(cw * 0.2f, ch * 0.8f), strokeWidth = lineThick)
-                                drawLine(linePaint, Offset(cw * 0.8f, ch * 0.2f), Offset(cw * 0.8f, ch * 0.8f), strokeWidth = lineThick)
+                                // Left vertical loop/bracket
+                                drawDebossedLine(cw * 0.18f, ch * 0.18f, cw * 0.18f, ch * 0.82f)
+                                drawDebossedLine(cw * 0.18f, ch * 0.18f, rectX, ch * 0.18f)
+                                drawDebossedLine(cw * 0.18f, ch * 0.82f, rectX, ch * 0.82f)
+
+                                // Right vertical loop/bracket with split
+                                drawDebossedLine(cw * 0.82f, ch * 0.18f, cw * 0.82f, ch * 0.82f)
+                                drawDebossedLine(rectX + rectW, ch * 0.18f, cw * 0.82f, ch * 0.18f)
+                                drawDebossedLine(rectX + rectW, ch * 0.82f, cw * 0.82f, ch * 0.82f)
                             }
                         }
                     }
@@ -14856,7 +15021,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var sector by remember { mutableStateOf(initialGoal?.category ?: "Emergency") }
     var colorIndex by remember { mutableStateOf(initialGoal?.colorIndex ?: 0) }
     var selectedGradientIdx by remember { mutableStateOf((colorIndex % 100).coerceAtLeast(0)) }
-    var selectedPatternIdx by remember { mutableStateOf(((colorIndex / 100) % 6).coerceAtLeast(0)) }
+    var selectedPatternIdx by remember { mutableStateOf(((colorIndex / 100) % 10).coerceAtLeast(0)) }
 
     val customGradientsConfig by viewModel.customGradientsConfig.collectAsState()
     val savingsGradientsList = remember(customGradientsConfig) {
@@ -15138,9 +15303,9 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                     }
 
                     val patternNames = if (language == AppLanguage.BN) {
-                        listOf("সিকিউরিটি ওয়েভ", "সার্কিট গ্রিড", "ওয়াটারমার্ক রিং", "ডায়মন্ড ক্রিস্টাল", "কার্বন ফাইবার", "স্মুথ ক্লিন")
+                        listOf("সিকিউরিটি ওয়েভ", "সার্কিট গ্রিড", "ওয়াটারমার্ক রিং", "ডায়মন্ড ক্রিস্টাল", "কার্বন ফাইবার", "স্মুথ ক্লিন", "সাইবার টোপোগ্রাফি", "আইসোমেট্রিক গ্রিড", "ডিজিটাল হেক্সাগন", "লেজার রিবন")
                     } else {
-                        listOf("Security Waves", "Tech Circuit", "Watermark Rings", "Diamond Crystal", "Carbon Mesh", "Smooth Minimal")
+                        listOf("Security Waves", "Tech Circuit", "Watermark Rings", "Diamond Crystal", "Carbon Mesh", "Smooth Minimal", "Cyber Topo", "Isometric Grid", "Digital Hex", "Sleek Ribbons")
                     }
 
                     Text(

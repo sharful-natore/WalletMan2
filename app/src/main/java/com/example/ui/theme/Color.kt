@@ -30,11 +30,15 @@ val GradientTricolorCustom = listOf(Color(0xFF00C6FF), Color(0xFF0072FF), Color(
 
 // Multi-color realistic credit card aurora gradients (matching your premium reference card!)
 val GradientSleekAurora = listOf(Color(0xFF8B5CF6), Color(0xFFD946EF), Color(0xFFF97316), Color(0xFFFF8A5C)) // Aurora Sunset (Violet, fuchsia, deep orange, peach glow)
-val GradientNeonSunrise = listOf(Color(0xFF4F46E5), Color(0xFFEC4899), Color(0xFFF97316), Color(0xFFFFB03A)) // Vivid sunset/sunrise blending
-val GradientVelvetTwilight = listOf(Color(0xFF3B0764), Color(0xFF9333EA), Color(0xFFEC4899), Color(0xFFFDBA74)) // Dark luxury violet-magenta-gold
-val GradientCyberpunkVibe = listOf(Color(0xFF1E3A8A), Color(0xFF7C3AED), Color(0xFFEC4899), Color(0xFFFF8A5C)) // Deep Blue, Royal Violet, Pink, Sunset Amber
-val GradientNorthernLights = listOf(Color(0xFF0D9488), Color(0xFF06B6D4), Color(0xFF8B5CF6), Color(0xFFEC4899)) // Teal, Cyan, Violet, Pink
-val GradientHolographicMint = listOf(Color(0xFF06B6D4), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEC4899)) // Cyan to Mint to Rose
+val GradientAuroraForest = listOf(Color(0xFF0F766E), Color(0xFF10B981), Color(0xFF84CC16), Color(0xFF134E4A)) // Deep Emerald Forest (Teal, mint, lime, dark teal)
+val GradientAuroraMidnight = listOf(Color(0xFF1E1B4B), Color(0xFF2563EB), Color(0xFF38BDF8), Color(0xFF06B6D4)) // Cyber Midnight Ocean (Indigo, royal blue, sky blue, cyan)
+val GradientAuroraOrchid = listOf(Color(0xFF4C1D95), Color(0xFF8B5CF6), Color(0xFFC084FC), Color(0xFFFBCFE8)) // Velvet Royal Orchid (Plum, violet, lavender, soft rose pink)
+val GradientAuroraFire = listOf(Color(0xFF7F1D1D), Color(0xFFDC2626), Color(0xFFF97316), Color(0xFFFBBF24)) // Volcanic Fire (Deep red, crimson, vibrant orange, gold)
+val GradientAuroraCyberpunk = listOf(Color(0xFF3B0764), Color(0xFFF43F5E), Color(0xFF00F5D4), Color(0xFF0D9488)) // Neon Cyberpunk (Dark violet, hot pink, neon turquoise, teal)
+val GradientAuroraGoldenHour = listOf(Color(0xFF78350F), Color(0xFFD97706), Color(0xFFFBBF24), Color(0xFFFEF08A)) // Golden Hour (Bronze, rich amber, warm gold, light yellow)
+val GradientAuroraUnicorn = listOf(Color(0xFFDDD6FE), Color(0xFFBAE6FD), Color(0xFFFBCFE8), Color(0xFFA7F3D0)) // Pastel Unicorn (Lavender, soft blue, cotton candy pink, mint)
+val GradientAuroraVolcanic = listOf(Color(0xFF1E293B), Color(0xFFBE123C), Color(0xFFF59E0B), Color(0xFF475569)) // Volcanic Ash (Charcoal slate, rose red, amber, dark gray)
+val GradientAuroraCandyApp = listOf(Color(0xFF9D174D), Color(0xFFF43F5E), Color(0xFFFBBF24), Color(0xFF10B981)) // Fruit Candy (Cherry, neon rose, canary yellow, mint green)
 
 val GradientSleekIndigo = listOf(Color(0xFF6F7BF7), Color(0xFF918EF4), Color(0xFF38BDF8)) // Premium Sky Blue & Indigo-Cyan gradient from screenshot
 val GradientPurpleBlue = listOf(Color(0xFF6366F1), Color(0xFF4F46E5))
@@ -83,24 +87,15 @@ val GradientsList = listOf(
 )
 
 val SavingsGradientsList = listOf(
-    GradientSleekAurora,       // 0 - Matching screenshot!
-    GradientNeonSunrise,       // 1 - Vivid sunset/sunrise
-    GradientVelvetTwilight,    // 2 - Luxury magenta-gold
-    GradientCyberpunkVibe,     // 3 - Blue, Violet, Rose, Sunset Amber
-    GradientNorthernLights,    // 4 - Teal, Cyan, Violet, Pink
-    GradientHolographicMint,   // 5 - Cyan to Mint to Rose
-    GradientSleekIndigo,       // 6
-    GradientCosmicNebula,      // 7
-    GradientRoyalPurple,       // 8
-    GradientPurpleBlue,        // 9
-    GradientDeepLavender,      // 10
-    GradientCalmBlue,          // 11
-    GradientMidnightViolet,    // 12
-    GradientSlateObsidian,     // 13
-    GradientMidnightIndigo,    // 14
-    GradientOceanDeepBlue,     // 15
-    GradientDeepViolet,        // 16
-    GradientMidnightPurple,    // 17
-    GradientIndigoDusk         // 18
+    GradientSleekAurora,       // 0 - Purple/Magenta/Orange/Peach
+    GradientAuroraForest,      // 1 - Green/Teal/Lime
+    GradientAuroraMidnight,    // 2 - Midnight Blue/Cyan
+    GradientAuroraOrchid,      // 3 - Violet/Plum/Rose Pink
+    GradientAuroraFire,        // 4 - Crimson/Orange/Gold
+    GradientAuroraCyberpunk,   // 5 - Purple/Hot Pink/Neon Turquoise
+    GradientAuroraGoldenHour,  // 6 - Bronze/Amber/Gold/Yellow
+    GradientAuroraUnicorn,     // 7 - Lavender/Sky Blue/Cotton Candy Pink
+    GradientAuroraVolcanic,    // 8 - Charcoal/Rose Red/Gold
+    GradientAuroraCandyApp     // 9 - Cherry Red/Rose/Canary/Mint
 )
 

@@ -59,7 +59,8 @@ data class SavingsGoal(
     val colorIndex: Int = 0, // Index for choosing distinct fintech gradient card themes
     val cardholderName: String = "",
     val createdAt: Long = System.currentTimeMillis(),
-    val workspaceId: String = "default"
+    val workspaceId: String = "default",
+    val displayOrder: Int = 0
 )
 
 @Entity(tableName = "savings_transactions")

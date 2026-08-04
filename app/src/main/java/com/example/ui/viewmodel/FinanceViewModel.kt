@@ -1670,6 +1670,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun updateSavingsGoalsOrder(goals: List<SavingsGoal>) {
+        viewModelScope.launch {
+            goals.forEachIndexed { index, goal ->
+                val updated = goal.copy(displayOrder = index)
+                repository.insertSavingsGoal(updated)
+            }
+            onLocalDatabaseChanged()
+        }
+    }
+
     fun moveSavingsGoal(goalId: Int, targetWorkspaceId: String) {
         viewModelScope.launch {
             val goal = repository.getSavingsGoalById(goalId)

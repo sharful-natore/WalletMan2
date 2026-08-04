@@ -48,7 +48,7 @@ interface FinanceDao {
     suspend fun updateTransaction(transaction: Transaction)
 
     // Savings Goals
-    @Query("SELECT * FROM savings_goals ORDER BY createdAt DESC")
+    @Query("SELECT * FROM savings_goals ORDER BY displayOrder ASC, createdAt DESC")
     fun getAllSavingsGoals(): Flow<List<SavingsGoal>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
