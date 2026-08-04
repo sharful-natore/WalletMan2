@@ -13194,19 +13194,61 @@ fun DrawScope.drawCardPattern(patternIdx: Int) {
     val h = size.height
     if (w <= 0 || h <= 0) return
 
-    // Holographic Sheen Overlay
+    // 1. Metallic Specular & Holographic Sheen Overlay
     drawRect(
         brush = Brush.linearGradient(
             colors = listOf(
-                Color.White.copy(alpha = 0.22f),
-                Color.White.copy(alpha = 0.04f),
+                Color.White.copy(alpha = 0.28f),
+                Color.White.copy(alpha = 0.08f),
                 Color.Transparent,
-                Color.White.copy(alpha = 0.10f)
+                Color.White.copy(alpha = 0.22f),
+                Color.Transparent,
+                Color.White.copy(alpha = 0.12f)
             ),
             start = Offset(0f, 0f),
-            end = Offset(w, h)
+            end = Offset(w * 1.2f, h * 1.2f)
         )
     )
+
+    // 2. Fine Brushed Metal Texture (Horizontal Micro Hairlines)
+    val lineStep = 2.5.dp.toPx()
+    var lineY = 0f
+    var lineSeed = 9876543L
+    while (lineY < h) {
+        lineSeed = (lineSeed * 1664525L + 1013904223L)
+        val alpha = ((lineSeed and 0xFFL) / 255f) * 0.05f + 0.015f
+        val isBright = (lineSeed and 0x1L) == 1L
+        drawLine(
+            color = if (isBright) Color.White.copy(alpha = alpha) else Color.Black.copy(alpha = alpha * 0.6f),
+            start = Offset(0f, lineY),
+            end = Offset(w, lineY),
+            strokeWidth = 1.dp.toPx()
+        )
+        lineY += lineStep
+    }
+
+    // 3. Noisy Metallic Grain Texture (Noise Dot Matrix)
+    val dotStep = 5.dp.toPx()
+    var nx = 0f
+    var noiseSeed = 1234567L
+    while (nx < w) {
+        var ny = 0f
+        while (ny < h) {
+            noiseSeed = (noiseSeed * 1103515245L + 12345L)
+            val nVal = (noiseSeed and 0xFFL) / 255f
+            if (nVal > 0.65f) {
+                val dotAlpha = (nVal - 0.65f) * 0.14f
+                val isSpecular = nVal > 0.88f
+                drawCircle(
+                    color = if (isSpecular) Color.White.copy(alpha = dotAlpha * 1.2f) else Color.Black.copy(alpha = dotAlpha * 0.7f),
+                    radius = 0.7.dp.toPx(),
+                    center = Offset(nx, ny)
+                )
+            }
+            ny += dotStep
+        }
+        nx += dotStep
+    }
 
     when (patternIdx % 6) {
         0 -> { // Security Waves
@@ -14822,6 +14864,41 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                     )
                 }
 
+                // LIVE PREVIEW CARD
+                item {
+                    val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
+                    val previewGoal = SavingsGoal(
+                        id = initialGoal?.id ?: 0,
+                        title = title.ifBlank { if (language == AppLanguage.BN) "কার্ডের নাম" else "CARD NAME" },
+                        targetAmount = parseAmountOrExpression(targetStr) ?: 0.0,
+                        savedAmount = initialGoal?.savedAmount ?: 0.0,
+                        category = if (sector == "Other" && customSectorName.isNotBlank()) customSectorName else sector,
+                        colorIndex = (selectedGradientIdx % 100) + (selectedPatternIdx * 100),
+                        cardholderName = cardholderName.ifBlank { "CARDHOLDER NAME" }
+                    )
+
+                    Text(
+                        text = if (language == AppLanguage.BN) "কার্ডের পূর্বরূপ (Live Preview)" else "Card Preview",
+                        color = labelColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Box(modifier = Modifier.padding(top = 4.dp)) {
+                        SavingsGoalCardItem(
+                            goal = previewGoal,
+                            language = language,
+                            isDark = isDark,
+                            profileName = "PREVIEW",
+                            allGradientsList = allGradientsList,
+                            onGoalClick = {},
+                            onContributeClick = { _, _ -> },
+                            onEditGoal = {},
+                            maskBalance = false
+                        )
+                    }
+                }
+
                 item {
                     OutlinedTextField(
                         value = title,
@@ -14998,7 +15075,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         allGradientsList.forEachIndexed { idx, grad ->
-                            val isSelected = colorIndex == idx
+                            val isSelected = selectedGradientIdx == idx
                             Box(
                                 modifier = Modifier
                                     .size(36.dp)
@@ -15009,7 +15086,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                                         color = if (isSelected) textColor else Color.Transparent,
                                         shape = CircleShape
                                     )
-                                    .clickable { colorIndex = idx }
+                                    .clickable { selectedGradientIdx = idx }
                             )
                         }
                         Box(
@@ -15021,6 +15098,96 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(androidx.compose.material.icons.Icons.Rounded.Add, contentDescription = "Add Custom Gradient", tint = textColor)
+                        }
+                    }
+                }
+
+                // Pattern Picker Grid
+                item {
+                    val allGradientsList by viewModel.allGradientsConfig.collectAsState(initial = emptyList())
+                    val activeGradColors = if (allGradientsList.isNotEmpty() && selectedGradientIdx in allGradientsList.indices) {
+                        allGradientsList[selectedGradientIdx].colors
+                    } else {
+                        com.example.ui.theme.GradientsList[0]
+                    }
+
+                    val patternNames = if (language == AppLanguage.BN) {
+                        listOf("সিকিউরিটি ওয়েভ", "সার্কিট গ্রিড", "ওয়াটারমার্ক রিং", "ডায়মন্ড ক্রিস্টাল", "কার্বন ফাইবার", "স্মুথ ক্লিন")
+                    } else {
+                        listOf("Security Waves", "Tech Circuit", "Watermark Rings", "Diamond Crystal", "Carbon Mesh", "Smooth Minimal")
+                    }
+
+                    Text(
+                        text = if (language == AppLanguage.BN) "কার্ডের ব্যাকগ্রাউন্ড প্যাটার্ন" else "Background Pattern",
+                        color = labelColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        patternNames.forEachIndexed { pIdx, pName ->
+                            val isSelected = selectedPatternIdx == pIdx
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color.Transparent,
+                                modifier = Modifier
+                                    .width(115.dp)
+                                    .height(65.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(
+                                        width = if (isSelected) 2.5.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else labelColor.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(14.dp)
+                                    )
+                                    .clickable { selectedPatternIdx = pIdx }
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Canvas(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Brush.linearGradient(activeGradColors))
+                                    ) {
+                                        drawCardPattern(pIdx)
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.25f))
+                                            .padding(6.dp),
+                                        contentAlignment = Alignment.BottomStart
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = pName,
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
+                                            )
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.CheckCircle,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -15040,8 +15207,9 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             onClick = {
                                 val target = parseAmountOrExpression(targetStr) ?: 0.0
                                 val finalSector = if (sector == "Other" && customSectorName.isNotBlank()) customSectorName else sector
+                                val finalColorIndex = (selectedGradientIdx % 100) + (selectedPatternIdx * 100)
                                 if (title.trim().isNotEmpty()) {
-                                    onConfirm(title.trim().uppercase(), target, finalSector, colorIndex, cardholderName.trim().uppercase())
+                                    onConfirm(title.trim().uppercase(), target, finalSector, finalColorIndex, cardholderName.trim().uppercase())
                                 } else {
                                     viewModel.triggerCustomNotification(Translation.get("error_empty_title", language), isSuccess = false, type = "ERROR")
                                 }
@@ -15057,8 +15225,8 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                 }
             }
         }
-            }
-        }
+    }
+}
 
 @Composable
 fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel, 
