@@ -726,6 +726,7 @@ fun TrashDialog(
     var captchaInput by remember { mutableStateOf("") }
     var captchaError by remember { mutableStateOf(false) }
     var selectedTrashIds by remember { mutableStateOf(setOf<Int>()) }
+    var showBatchRestoreConfirm by remember { mutableStateOf(false) }
     var showTrashBatchCaptcha by remember { mutableStateOf(false) }
     var pendingTrashBatchAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -852,8 +853,7 @@ fun TrashDialog(
                             ) {
                                 Button(
                                     onClick = {
-                                        viewModel.batchRestoreTrashItems(selectedItems)
-                                        selectedTrashIds = emptySet()
+                                        showBatchRestoreConfirm = true
                                     },
                                     enabled = restorableItems.isNotEmpty(),
                                     colors = ButtonDefaults.buttonColors(
@@ -885,7 +885,7 @@ fun TrashDialog(
                                     shape = RoundedCornerShape(10.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
-                                    Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "${selectedTrashIds.size} " + (if (language == AppLanguage.BN) "মুছুন" else "Delete"),
@@ -1062,7 +1062,7 @@ fun TrashDialog(
                                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = com.example.ui.theme.FintechRed),
                                                 border = BorderStroke(1.dp, com.example.ui.theme.FintechRed)
                                             ) {
-                                                Icon(Icons.Rounded.Fingerprint, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(if (language == AppLanguage.BN) "ডিলেট" else "Delete")
                                             }
@@ -1075,6 +1075,48 @@ fun TrashDialog(
                 }
             }
         }
+    }
+
+    if (showBatchRestoreConfirm) {
+        val selectedItems = trashItems.filter { selectedTrashIds.contains(it.id) }
+        val restorableItems = selectedItems.filter {
+            val upper = it.itemType.uppercase()
+            !upper.contains("BACKUP") && upper != "WORKSPACE"
+        }
+        AlertDialog(
+            onDismissRequest = { showBatchRestoreConfirm = false },
+            title = {
+                Text(
+                    text = if (language == AppLanguage.BN) "রিস্টোর নিশ্চিতকরণ" else "Confirm Restore",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (language == AppLanguage.BN)
+                        "আপনি কি নিশ্চিত যে ${restorableItems.size} টি আইটেম রিস্টোর করতে চান?"
+                    else
+                        "Are you sure you want to restore ${restorableItems.size} item(s)?"
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.batchRestoreTrashItems(restorableItems)
+                        selectedTrashIds = emptySet()
+                        showBatchRestoreConfirm = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                ) {
+                    Text(if (language == AppLanguage.BN) "হ্যাঁ, রিস্টোর করুন" else "Yes, Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatchRestoreConfirm = false }) {
+                    Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel")
+                }
+            }
+        )
     }
 
     if (showTrashBatchCaptcha && pendingTrashBatchAction != null) {

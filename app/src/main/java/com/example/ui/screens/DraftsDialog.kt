@@ -487,7 +487,7 @@ fun DraftsScratchpadDialog(
                                         shape = RoundedCornerShape(10.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Fingerprint,
+                                            imageVector = Icons.Rounded.Delete,
                                             contentDescription = null,
                                             tint = Color.White,
                                             modifier = Modifier.size(16.dp)

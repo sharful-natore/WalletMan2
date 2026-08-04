@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.focus.onFocusChanged
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -3346,10 +3347,9 @@ fun FinanceNoteApp(
                 }
                 val density = LocalDensity.current
                 val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                val hasVirtualNav = navBarPadding > 4.dp
-                val effectiveNavHeight = if (hasVirtualNav) 58.dp else 70.dp
-                val effectiveNotchRadius = if (hasVirtualNav) 38.dp else 45.dp
-                val effectiveFabCenterPadding = if (hasVirtualNav) (12.dp + navBarPadding) else 15.dp
+                val effectiveNavHeight = 58.dp
+                val effectiveNotchRadius = 38.dp
+                val effectiveFabCenterPadding = 12.dp + navBarPadding
                 
                 Box(
                     modifier = Modifier
@@ -10666,6 +10666,7 @@ fun TransactionsScreen(
     fabBottomPadding: Dp = 113.dp
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var isSearchFocused by remember { mutableStateOf(false) }
     var currentSortBy by remember { mutableStateOf("DATE_DESC") }
     var showSortMenu by remember { mutableStateOf(false) }
 
@@ -11037,7 +11038,8 @@ fun TransactionsScreen(
                         onValueChange = { searchQuery = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .onFocusChanged { isSearchFocused = it.isFocused },
                         placeholder = {
                             Text(
                                 text = if (language == AppLanguage.BN) "এখানে খুঁজুন..." else "Search here...",
@@ -11075,7 +11077,7 @@ fun TransactionsScreen(
 
                     // Real-time Search Suggestions Chips
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = searchSuggestions.isNotEmpty(),
+                        visible = (isSearchFocused || searchQuery.isNotBlank()) && searchSuggestions.isNotEmpty(),
                         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                         exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                     ) {
@@ -13187,6 +13189,153 @@ fun SavingsScreen(
     }
 }
 
+fun DrawScope.drawCardPattern(patternIdx: Int) {
+    val w = size.width
+    val h = size.height
+    if (w <= 0 || h <= 0) return
+
+    // Holographic Sheen Overlay
+    drawRect(
+        brush = Brush.linearGradient(
+            colors = listOf(
+                Color.White.copy(alpha = 0.22f),
+                Color.White.copy(alpha = 0.04f),
+                Color.Transparent,
+                Color.White.copy(alpha = 0.10f)
+            ),
+            start = Offset(0f, 0f),
+            end = Offset(w, h)
+        )
+    )
+
+    when (patternIdx % 6) {
+        0 -> { // Security Waves
+            val strokeW = 1.2.dp.toPx()
+            val wave1 = androidx.compose.ui.graphics.Path().apply {
+                moveTo(0f, h * 0.25f)
+                cubicTo(w * 0.25f, h * 0.05f, w * 0.5f, h * 0.65f, w, h * 0.2f)
+            }
+            val wave2 = androidx.compose.ui.graphics.Path().apply {
+                moveTo(0f, h * 0.45f)
+                cubicTo(w * 0.35f, h * 0.15f, w * 0.65f, h * 0.85f, w, h * 0.40f)
+            }
+            val wave3 = androidx.compose.ui.graphics.Path().apply {
+                moveTo(0f, h * 0.65f)
+                cubicTo(w * 0.3f, h * 0.35f, w * 0.7f, h * 0.95f, w, h * 0.60f)
+            }
+
+            drawPath(wave1, Color.White.copy(alpha = 0.14f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeW))
+            drawPath(wave2, Color.White.copy(alpha = 0.10f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeW))
+            drawPath(wave3, Color.White.copy(alpha = 0.08f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeW))
+
+            val centerRing = Offset(w * 0.85f, h * 0.15f)
+            for (r in listOf(35.dp.toPx(), 70.dp.toPx(), 110.dp.toPx(), 155.dp.toPx())) {
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.06f),
+                    radius = r,
+                    center = centerRing,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                )
+            }
+        }
+        1 -> { // Tech Circuit Grid
+            val step = 20.dp.toPx()
+            var x = step
+            while (x < w) {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.07f),
+                    start = Offset(x, 0f),
+                    end = Offset(x, h),
+                    strokeWidth = 0.8.dp.toPx()
+                )
+                x += step
+            }
+            var y = step
+            while (y < h) {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.07f),
+                    start = Offset(0f, y),
+                    end = Offset(w, y),
+                    strokeWidth = 0.8.dp.toPx()
+                )
+                y += step
+            }
+            listOf(
+                Offset(step * 2, step), Offset(step * 5, step * 2),
+                Offset(step * 8, step * 3), Offset(step * 3, step * 5),
+                Offset(step * 7, step * 6)
+            ).forEach { pt ->
+                if (pt.x < w && pt.y < h) {
+                    drawCircle(Color.White.copy(alpha = 0.35f), radius = 2.5.dp.toPx(), center = pt)
+                    drawCircle(Color.White.copy(alpha = 0.12f), radius = 5.dp.toPx(), center = pt, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+                }
+            }
+        }
+        2 -> { // Watermark Rings
+            val center1 = Offset(w * 0.70f, h * 0.5f)
+            val center2 = Offset(w * 0.85f, h * 0.3f)
+            for (r in 15..150 step 14) {
+                val rPx = r.dp.toPx()
+                drawCircle(Color.White.copy(alpha = 0.06f), radius = rPx, center = center1, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+                drawCircle(Color.White.copy(alpha = 0.04f), radius = rPx, center = center2, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()))
+            }
+        }
+        3 -> { // Diamond Crystal
+            val dSize = 28.dp.toPx()
+            var row = 0
+            var y = 0f
+            while (y < h + dSize) {
+                var x = if (row % 2 == 0) 0f else dSize / 2f
+                while (x < w + dSize) {
+                    val p = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(x, y - dSize / 2f)
+                        lineTo(x + dSize / 2f, y)
+                        lineTo(x, y + dSize / 2f)
+                        lineTo(x - dSize / 2f, y)
+                        close()
+                    }
+                    val alpha = if ((row + (x / dSize).toInt()) % 3 == 0) 0.09f else 0.03f
+                    drawPath(p, Color.White.copy(alpha = alpha))
+                    drawPath(p, Color.White.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 0.8.dp.toPx()))
+                    x += dSize
+                }
+                y += dSize / 2f
+                row++
+            }
+        }
+        4 -> { // Carbon Fiber Mesh
+            val spacing = 10.dp.toPx()
+            var offset = -h
+            while (offset < w + h) {
+                drawLine(
+                    color = Color.White.copy(alpha = 0.08f),
+                    start = Offset(offset, 0f),
+                    end = Offset(offset + h, h),
+                    strokeWidth = 1.dp.toPx()
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.05f),
+                    start = Offset(offset + h, 0f),
+                    end = Offset(offset, h),
+                    strokeWidth = 1.dp.toPx()
+                )
+                offset += spacing
+            }
+        }
+        5 -> { // Smooth Minimal Glow
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.White.copy(alpha = 0.30f), Color.Transparent),
+                    center = Offset(w * 0.85f, h * 0.2f),
+                    radius = w * 0.65f
+                ),
+                radius = w * 0.65f,
+                center = Offset(w * 0.85f, h * 0.2f)
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SavingsGoalCardItem(
@@ -13206,26 +13355,29 @@ fun SavingsGoalCardItem(
     isSelectionMode: Boolean = false,
     onLongClick: () -> Unit = {}
 ) {
-    val rawGradient = if (goal.colorIndex in allGradientsList.indices) {
-        allGradientsList[goal.colorIndex].colors
+    val gradientIdx = (goal.colorIndex % 100).let { if (allGradientsList.isNotEmpty() && it in allGradientsList.indices) it else 0 }
+    val patternIdx = ((goal.colorIndex / 100) % 6).coerceAtLeast(0)
+
+    val rawGradient = if (allGradientsList.isNotEmpty() && gradientIdx in allGradientsList.indices) {
+        allGradientsList[gradientIdx].colors
     } else {
         com.example.ui.theme.GradientsList[0]
     }
-    val gradient = if (isDark) {
-        listOf(Color(0xFF1E293B), Color(0xFF1E293B))
-    } else {
-        rawGradient
-    }
+    val gradient = rawGradient
+
+    val progress = if (goal.targetAmount > 0) (goal.savedAmount / goal.targetAmount).coerceIn(0.0, 1.0).toFloat() else 0f
+    val percentageInt = (progress * 100).toInt()
 
     FintechGradientCard(
         gradientColors = gradient,
+        cornerRadius = 24.dp,
+        padding = PaddingValues(0.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(170.dp)
+            .height(180.dp)
             .then(
                 if (isHighlighted) Modifier.border(4.dp, Color(0xFFFBBF24), RoundedCornerShape(24.dp))
                 else if (isSelected) Modifier.border(3.dp, Color.White, RoundedCornerShape(24.dp))
-                else if (isDark) Modifier.border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
                 else Modifier
             )
             .combinedClickable(
@@ -13241,155 +13393,227 @@ fun SavingsGoalCardItem(
             .testTag("savings_item_${goal.id}")
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Mastercard Chip and Contactless Icon
-            Column(modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp)) {
-                // Chip Icon Simulation
-                Box(
-                    modifier = Modifier
-                        .size(38.dp, 28.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.White.copy(alpha = 0.2f))
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCardPattern(patternIdx)
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // --- TOP ROW: Chip, Wifi & Category Badge ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceEvenly
+                    // Chip & Contactless Wifi
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        repeat(3) {
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 0.5.dp)
+                        // Metallic Gold EMV Chip Box
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp, 28.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFFFDE68A),
+                                            Color(0xFFD97706),
+                                            Color(0xFFF59E0B),
+                                            Color(0xFFFEF3C7)
+                                        )
+                                    )
+                                )
+                                .border(1.dp, Color(0xFFB45309).copy(alpha = 0.7f), RoundedCornerShape(6.dp))
+                                .padding(2.dp)
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val cw = size.width
+                                val ch = size.height
+                                val linePaint = Color(0xFF78350F).copy(alpha = 0.75f)
+                                val lineThick = 1.dp.toPx()
+
+                                drawLine(linePaint, Offset(cw * 0.35f, 0f), Offset(cw * 0.35f, ch), strokeWidth = lineThick)
+                                drawLine(linePaint, Offset(cw * 0.65f, 0f), Offset(cw * 0.65f, ch), strokeWidth = lineThick)
+                                drawLine(linePaint, Offset(0f, ch * 0.5f), Offset(cw, ch * 0.5f), strokeWidth = lineThick)
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.Rounded.Wifi,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(18.dp).rotate(90f)
+                        )
+                    }
+
+                    // Category Pill & Checkbox / Progress Pill
+                    val formattedCategory = if (language == AppLanguage.BN) {
+                        when (goal.category.lowercase()) {
+                            "emergency", "জরুরি ফান্ড" -> "জরুরি ফান্ড"
+                            "laptop", "ল্যাপটপ" -> "ল্যাপটপ"
+                            "travel", "ভ্রমণ" -> "ভ্রমণ"
+                            "marriage", "বিয়ে" -> "বিয়ে"
+                            "investment", "বিনিয়োগ" -> "বিনিয়োগ"
+                            else -> goal.category.uppercase()
+                        }
+                    } else {
+                        goal.category.uppercase()
+                    }
+
+                    if (isSelectionMode) {
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f))
+                                .border(2.dp, Color.White, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    } else {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (goal.targetAmount > 0) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.Black.copy(alpha = 0.25f)
+                                ) {
+                                    Text(
+                                        text = "${percentageInt}%",
+                                        color = if (percentageInt >= 100) Color(0xFF34D399) else Color(0xFFFBBF24),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White.copy(alpha = 0.2f)
+                            ) {
+                                HighlightedText(
+                                    text = formattedCategory,
+                                    query = searchQuery,
+                                    color = Color(0xFFFBBF24),
+                                    style = TextStyle(
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Icon(
-                    imageVector = Icons.Rounded.Wifi,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.4f),
-                    modifier = Modifier.size(18.dp).rotate(90f)
-                )
-            }
 
-
-            val formattedCategory = if (language == AppLanguage.BN) {
-                when (goal.category.lowercase()) {
-                    "emergency", "জরুরি ফান্ড" -> "জরুরি ফান্ড"
-                    "laptop", "ল্যাপটপ" -> "ল্যাপটপ"
-                    "travel", "ভ্রমণ" -> "ভ্রমণ"
-                    "marriage", "বিয়ে" -> "বিয়ে"
-                    "investment", "বিনিয়োগ" -> "বিনিয়োগ"
-                    else -> goal.category.uppercase()
-                }
-            } else {
-                goal.category.uppercase()
-            }
-
-            if (isSelectionMode) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 12.dp, end = 12.dp)
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f))
-                        .border(2.dp, Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSelected) {
-                        Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
-                    }
-                }
-            } else {
-                HighlightedText(
-                    text = formattedCategory,
-                    query = searchQuery,
-                    color = Color(0xFFFBBF24),
-                    style = TextStyle(
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp)
-                )
-            }
-
-            // Goal Title and Balance in the bottom-left
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, bottom = 0.dp),
-                verticalArrangement = Arrangement.spacedBy(0.dp)
-            ) {
-                HighlightedText(
-                    text = goal.title.uppercase(),
-                    query = searchQuery,
-                    color = Color(0xFFFBBF24),
-                    style = TextStyle(
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 1.sp
+                // --- MIDDLE ROW: Title & Balances ---
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    HighlightedText(
+                        text = goal.title.uppercase(),
+                        query = searchQuery,
+                        color = Color(0xFFFBBF24),
+                        style = TextStyle(
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.sp
+                        )
                     )
-                )
-                
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = if (maskBalance) "৳ ●●●●" else formatCurrency(goal.savedAmount, language),
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (goal.targetAmount > 0) {
+
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
-                            text = " / " + formatCurrency(goal.targetAmount, language),
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(bottom = 2.dp, start = 2.dp)
+                            text = if (maskBalance) "৳ ●●●●" else formatCurrency(goal.savedAmount, language),
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
                         )
+                        if (goal.targetAmount > 0) {
+                            Text(
+                                text = "/ " + formatCurrency(goal.targetAmount, language),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                        }
                     }
                 }
-                
-                Text(
-                    text = goal.cardholderName.ifBlank { profileName }.uppercase(),
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp
-                )
-            }
 
-            // Bottom row: Mastercard-like logo
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(end = 8.dp, bottom = 8.dp)
-                    .align(Alignment.BottomEnd),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.Bottom
-            ) {
-
-                // Mastercard Circles Logo Simulation
-                Box(contentAlignment = Alignment.Center) {
-                    Row(horizontalArrangement = Arrangement.spacedBy((-12).dp)) {
+                // --- BOTTOM SECTION: Progress Bar & Cardholder Name / Logo ---
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (goal.targetAmount > 0) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .fillMaxWidth()
+                                .height(5.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFEB001B).copy(alpha = 0.8f))
+                                .background(Color.White.copy(alpha = 0.25f))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progress)
+                                    .fillMaxHeight()
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF34D399), Color(0xFF10B981), Color(0xFFFBBF24))
+                                        )
+                                    )
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = goal.cardholderName.ifBlank { profileName }.uppercase(),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp
                         )
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFF79E1B).copy(alpha = 0.8f))
-                        )
+
+                        // Mastercard Circles Emblem
+                        Box(contentAlignment = Alignment.Center) {
+                            Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEB001B).copy(alpha = 0.85f))
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFF79E1B).copy(alpha = 0.85f))
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
-            }
-        }
+    }
+}
 
 // ---------------- DIALOGS ----------------
 
@@ -14246,7 +14470,6 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             .testTag("input_tx_note")
                     )
                 }
-
                 // Manual Date/Time Selection
                 item {
                     Text(
@@ -14547,8 +14770,8 @@ fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                 }
             }
         }
-            }
-        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -14566,6 +14789,8 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
     var showTargetCalculator by remember { mutableStateOf(false) }
     var sector by remember { mutableStateOf(initialGoal?.category ?: "Emergency") }
     var colorIndex by remember { mutableStateOf(initialGoal?.colorIndex ?: 0) }
+    var selectedGradientIdx by remember { mutableStateOf((colorIndex % 100).coerceAtLeast(0)) }
+    var selectedPatternIdx by remember { mutableStateOf(((colorIndex / 100) % 6).coerceAtLeast(0)) }
 
     val sectors = listOf("Emergency", "Laptop", "Travel", "Marriage", "Investment", "Other")
     var sectorDropdownExpanded by remember { mutableStateOf(false) }
