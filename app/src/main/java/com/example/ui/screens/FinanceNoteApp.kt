@@ -7265,7 +7265,7 @@ private fun CompactTrendItem(
     Surface(
         modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
-        color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
+        color = if (isDark) Color(0xFF0F172A) else Color.White,
         border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.25f))
     ) {
         Column(
@@ -13074,9 +13074,11 @@ fun SavingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
-                    items(localGoalsList, key = { it.id }) { goal ->
+                    itemsIndexed(localGoalsList, key = { _, goal -> goal.id }) { index, goal ->
                         val isSelected = selectedGoalIds.contains(goal.id)
                         val itemHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) { 196.dp.toPx() }
+                        val canMoveUp = index > 0
+                        val canMoveDown = index < localGoalsList.size - 1
 
                         Box(
                             modifier = Modifier
@@ -13163,7 +13165,29 @@ fun SavingsScreen(
                                 isSelectionMode = isSelectionMode,
                                 onLongClick = {
                                     selectedGoalIds = if (isSelected) selectedGoalIds - goal.id else selectedGoalIds + goal.id
-                                }
+                                },
+                                onMoveUp = if (canMoveUp) {
+                                    {
+                                        val newList = localGoalsList.toMutableList()
+                                        val temp = newList[index]
+                                        newList[index] = newList[index - 1]
+                                        newList[index - 1] = temp
+                                        localGoalsList = newList
+                                        currentSortBy = "CUSTOM"
+                                        onReorderGoals(newList)
+                                    }
+                                } else null,
+                                onMoveDown = if (canMoveDown) {
+                                    {
+                                        val newList = localGoalsList.toMutableList()
+                                        val temp = newList[index]
+                                        newList[index] = newList[index + 1]
+                                        newList[index + 1] = temp
+                                        localGoalsList = newList
+                                        currentSortBy = "CUSTOM"
+                                        onReorderGoals(newList)
+                                    }
+                                } else null
                             )
                         }
                     }
@@ -13495,7 +13519,9 @@ fun SavingsGoalCardItem(
     searchQuery: String = "",
     isSelected: Boolean = false,
     isSelectionMode: Boolean = false,
-    onLongClick: () -> Unit = {}
+    onLongClick: () -> Unit = {},
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null
 ) {
     val savingsGradients = com.example.ui.theme.SavingsGradientsList
     val gradientIdx = (goal.colorIndex % 100).let { if (savingsGradients.isNotEmpty() && it in savingsGradients.indices) it else 0 }
@@ -13558,53 +13584,77 @@ fun SavingsGoalCardItem(
                         isInfinite = false
                     )
 
-                    // Contactless and Mastercard Logo (Right)
+                    // Contactless and Mastercard Logo (Right) / Order Arrows during selection mode
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (isSelectionMode) {
+                            if (onMoveUp != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.28f))
+                                        .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                        .clickable { onMoveUp() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ArrowUpward,
+                                        contentDescription = "Move Up",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            if (onMoveDown != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.28f))
+                                        .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                        .clickable { onMoveDown() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ArrowDownward,
+                                        contentDescription = "Move Down",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
                             Box(
                                 modifier = Modifier
-                                    .size(26.dp)
+                                    .size(28.dp)
                                     .clip(CircleShape)
                                     .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.2f))
                                     .border(2.dp, Color.White, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isSelected) {
-                                    Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Rounded.Check, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(18.dp))
                                 }
                             }
                         } else {
-                            // High-fidelity Contactless Waves ())) pointing right
-                            Canvas(modifier = Modifier.size(18.dp, 16.dp)) {
-                                val cw = size.width
-                                val ch = size.height
-                                val strokeW = 1.6.dp.toPx()
-                                val color = Color.White.copy(alpha = 0.55f)
-
-                                val cx = -cw * 0.4f
-                                val cy = ch * 0.5f
-
-                                val radii = listOf(cw * 0.8f, cw * 1.2f, cw * 1.6f)
-                                radii.forEach { r ->
-                                    drawArc(
-                                        color = color,
-                                        startAngle = -35f,
-                                        sweepAngle = 70f,
-                                        useCenter = false,
-                                        topLeft = Offset(cx - r, cy - r),
-                                        size = androidx.compose.ui.geometry.Size(r * 2f, r * 2f),
-                                        style = Stroke(width = strokeW, cap = StrokeCap.Round)
-                                    )
-                                }
-                            }
+                            // Contactless Wifi Icon (Smaller size like before)
+                            Icon(
+                                imageVector = Icons.Rounded.Wifi,
+                                contentDescription = "Contactless",
+                                tint = Color.White.copy(alpha = 0.75f),
+                                modifier = Modifier
+                                    .size(13.dp)
+                                    .rotate(90f)
+                            )
 
                             Spacer(modifier = Modifier.width(2.dp))
 
-                            // High-fidelity Mastercard Overlapping Circles (Semi-transparent white)
-                            Canvas(modifier = Modifier.size(34.dp, 22.dp)) {
+                            // Mastercard Overlapping Circles
+                            Canvas(modifier = Modifier.size(32.dp, 20.dp)) {
                                 val cw = size.width
                                 val ch = size.height
                                 val r = ch * 0.5f
@@ -13685,7 +13735,7 @@ fun SavingsGoalCardItem(
                         if (goal.targetAmount > 0 && !isSelectionMode) {
                             Text(
                                 text = "${percentageInt}%",
-                                color = if (percentageInt >= 100) Color(0xFF34D399) else Color(0xFFFBBF24),
+                                color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -13750,16 +13800,25 @@ fun SavingsGoalCardItem(
                             letterSpacing = 1.sp
                         )
 
-                        // Highly realistic EMV Chip Icon matching screenshot 100% (translucent debossed glassmorphic look)
+                        // Silver-White Metallic EMV Chip Icon
                         Box(
                             modifier = Modifier
-                                .size(36.dp, 28.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Black.copy(alpha = 0.15f))
+                                .size(34.dp, 25.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFFFFFFFF),
+                                            Color(0xFFF1F5F9),
+                                            Color(0xFFE2E8F0),
+                                            Color(0xFFFFFFFF)
+                                        )
+                                    )
+                                )
                                 .border(
                                     width = 1.dp,
-                                    color = Color.White.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(6.dp)
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    shape = RoundedCornerShape(5.dp)
                                 )
                                 .padding(1.dp)
                         ) {
