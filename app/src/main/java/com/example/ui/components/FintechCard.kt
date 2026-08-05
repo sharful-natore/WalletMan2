@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -19,13 +20,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -39,14 +43,16 @@ fun FintechGradientCard(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     brush: Brush? = null,
-    shadowElevation: Dp = 6.dp,
+    shadowElevation: Dp = 0.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    var isRawPressed by remember { mutableStateOf(false) }
+
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
+        targetValue = if (isPressed || isRawPressed) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -61,6 +67,29 @@ fun FintechGradientCard(
             onClick = { onClick?.invoke() },
             onLongClick = { onLongClick?.invoke() }
         )
+    } else {
+        Modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    isRawPressed = true
+                    try {
+                        awaitRelease()
+                    } finally {
+                        isRawPressed = false
+                    }
+                }
+            )
+        }
+    }
+
+    val shadowModifier = if (shadowElevation > 0.dp) {
+        Modifier.shadow(
+            elevation = shadowElevation,
+            shape = shape,
+            clip = false,
+            ambientColor = Color.Black.copy(alpha = 0.22f),
+            spotColor = Color.Black.copy(alpha = 0.35f)
+        )
     } else Modifier
 
     Box(
@@ -70,13 +99,7 @@ fun FintechGradientCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .shadow(
-                elevation = shadowElevation,
-                shape = shape,
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.22f),
-                spotColor = Color.Black.copy(alpha = 0.35f)
-            )
+            .then(shadowModifier)
             .clip(shape)
             .background(
                 brush = brush ?: Brush.linearGradient(
@@ -108,15 +131,17 @@ fun FrostedGlassCard(
     isDark: Boolean = true,
     cornerRadius: Dp = 24.dp,
     padding: PaddingValues = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-    shadowElevation: Dp = 4.dp,
+    shadowElevation: Dp = 0.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    var isRawPressed by remember { mutableStateOf(false) }
+
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
+        targetValue = if (isPressed || isRawPressed) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
@@ -130,8 +155,31 @@ fun FrostedGlassCard(
             indication = null,
             onClick = onClick
         )
-    } else Modifier
+    } else {
+        Modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    isRawPressed = true
+                    try {
+                        awaitRelease()
+                    } finally {
+                        isRawPressed = false
+                    }
+                }
+            )
+        }
+    }
     
+    val shadowModifier = if (shadowElevation > 0.dp) {
+        Modifier.shadow(
+            elevation = shadowElevation,
+            shape = shape,
+            clip = false,
+            ambientColor = if (isDark) Color.Black.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.12f),
+            spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.18f)
+        )
+    } else Modifier
+
     // Frosted glass background opacity depends on dark/light mode
     val backgroundColor = if (isDark) {
         Color(0xFF1C1E2D).copy(alpha = 0.85f)
@@ -162,13 +210,7 @@ fun FrostedGlassCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .shadow(
-                elevation = shadowElevation,
-                shape = shape,
-                clip = false,
-                ambientColor = if (isDark) Color.Black.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.12f),
-                spotColor = if (isDark) Color.Black.copy(alpha = 0.4f) else Color.Black.copy(alpha = 0.18f)
-            )
+            .then(shadowModifier)
             .clip(shape)
             .background(backgroundColor)
             .border(

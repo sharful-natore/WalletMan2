@@ -7289,7 +7289,7 @@ private fun CompactTrendItem(
                 )
             },
         shape = RoundedCornerShape(14.dp),
-        color = if (isDark) Color(0xFF0F172A).copy(alpha = 0.9f) else Color.White,
+        color = if (isDark) Color(0xFF1C1E2D).copy(alpha = 0.85f) else Color.White,
         border = BorderStroke(
             width = 1.dp,
             brush = Brush.linearGradient(
@@ -7300,7 +7300,7 @@ private fun CompactTrendItem(
                 )
             )
         ),
-        shadowElevation = if (isDark) 2.dp else 3.dp
+        shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 7.dp),

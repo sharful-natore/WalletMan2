@@ -2577,6 +2577,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             .edit()
             .putBoolean("debt_alert_enabled", enabled)
             .apply()
+        if (!enabled) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancelAll()
+        }
     }
 
     fun setDebtReminderIntervalDays(context: Context, days: Int) {
@@ -4490,7 +4494,9 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun checkDebtReminders() {
+        if (!_isDebtAlertEnabled.value) return
         viewModelScope.launch {
+            if (!_isDebtAlertEnabled.value) return@launch
             val now = System.currentTimeMillis()
             val lastGlobalCheck = prefs.getLong("last_global_debt_check_time", 0L)
             val oneHourMs = 60 * 60 * 1000L
@@ -4559,6 +4565,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     private fun sendDebtSystemNotification(message: String) {
+        if (!_isDebtAlertEnabled.value) return
         val context = getApplication<Application>()
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
