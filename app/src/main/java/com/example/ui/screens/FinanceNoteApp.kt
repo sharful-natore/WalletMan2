@@ -243,27 +243,28 @@ fun CategorySegmentedDonutChart(
     isDark: Boolean,
     language: AppLanguage,
     modifier: Modifier = Modifier,
-    strokeWidthDp: Dp = 10.dp,
-    centerTextSize: TextUnit = 14.sp,
+    strokeWidthDp: Dp = 18.dp,
+    centerTextSize: TextUnit = 22.sp,
     categoryType: String? = null,
     unfilledColorOverride: Color? = null,
     centerColorOverride: Color? = null,
     customPalette: List<Color>? = null,
+    selectedIndex: Int? = null,
+    onSelectedIndexChange: ((Int?) -> Unit)? = null,
     onCenterClick: () -> Unit = {},
     onLongPress: () -> Unit = {}
 ) {
     var animationPlayed by remember { mutableStateOf(false) }
-    var hoveredSegment by remember { mutableStateOf<Pair<String, Double>?>(null) }
+    var internalSelectedIndex by remember { mutableStateOf<Int?>(null) }
+
+    val activeSelectedIndex = selectedIndex ?: internalSelectedIndex
+    val setActiveSelectedIndex: (Int?) -> Unit = { newIndex ->
+        internalSelectedIndex = newIndex
+        onSelectedIndexChange?.invoke(newIndex)
+    }
 
     LaunchedEffect(Unit) {
         animationPlayed = true
-    }
-
-    LaunchedEffect(hoveredSegment) {
-        if (hoveredSegment != null) {
-            delay(3000) // Auto-hide tooltip after 3 seconds
-            hoveredSegment = null
-        }
     }
 
     val animatedProgressMultiplier by animateFloatAsState(
@@ -272,30 +273,31 @@ fun CategorySegmentedDonutChart(
         label = "donut_chart_animation"
     )
 
-    val progress = if (targetAmount > 0.0) {
-        (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
-    } else {
-        0.0
-    }
+    val colors = if (!customPalette.isNullOrEmpty()) customPalette else getBudgetCategoryColors(categoryType)
+    val validSegments = segments.filter { it.second > 0.0 }
+    val activeSegmentsSum = validSegments.sumOf { it.second }
 
-    val actualProgressMultiplier = if (targetAmount > 0.0) {
-        totalFilledAmount / targetAmount
-    } else {
-        0.0
-    }
-
-    val percentageText = if (targetAmount > 0.0) {
-        "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
+    val percentageText = if (activeSelectedIndex != null && activeSelectedIndex in validSegments.indices) {
+        val selSeg = validSegments[activeSelectedIndex]
+        val pct = if (totalFilledAmount > 0.0) ((selSeg.second / totalFilledAmount) * 100).toInt() else 0
+        "${pct}%"
+    } else if (targetAmount > 0.0) {
+        "${((totalFilledAmount / targetAmount) * animatedProgressMultiplier * 100).toInt()}%"
     } else {
         if (language == AppLanguage.BN) "সেট নেই" else "Not Set"
     }
 
-    // Dynamic color logic: green for INCOME, dark orange for EXPENSE, and theme blue for SAVINGS
-    val percentageColor = if (targetAmount > 0.0) {
+    val selectedSegName = if (activeSelectedIndex != null && activeSelectedIndex in validSegments.indices) {
+        validSegments[activeSelectedIndex].first
+    } else null
+
+    val percentageColor = if (activeSelectedIndex != null && activeSelectedIndex in validSegments.indices) {
+        colors[activeSelectedIndex % colors.size]
+    } else if (targetAmount > 0.0) {
         when (categoryType) {
-            "INCOME" -> Color(0xFF10B981) // Green
-            "EXPENSE" -> Color(0xFFE65100) // Dark Orange
-            "SAVINGS" -> FintechBlue // Theme Blue
+            "INCOME" -> Color(0xFF10B981)
+            "EXPENSE" -> Color(0xFFE65100)
+            "SAVINGS" -> FintechBlue
             else -> FintechBlue
         }
     } else {
@@ -303,285 +305,166 @@ fun CategorySegmentedDonutChart(
     }
 
     val centerBgColor = centerColorOverride ?: (if (isDark) Color(0xFF333333).copy(alpha = 0.5f) else Color.LightGray.copy(alpha = 0.3f))
-    // Unfilled base color
-    val unfilledColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0)
-
-    val colors = if (!customPalette.isNullOrEmpty()) customPalette else getBudgetCategoryColors(categoryType)
+    val unfilledColor = unfilledColorOverride ?: (if (isDark) Color.White.copy(alpha = 0.12f) else Color(0xFFE2E8F0))
 
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(segments, targetAmount) {
-                detectTapGestures(
-                    onLongPress = { onLongPress() },
-                    onTap = { offset ->
-                    val strokePx = strokeWidthDp.toPx()
-                    val chartRadius = (minOf(size.width, size.height) - strokePx) / 2f
-                    val innerRadius = chartRadius - strokePx / 2f
-                    val outerRadius = chartRadius + strokePx / 2f
-                    
-                    val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-                    val dx = offset.x - center.x
-                    val dy = offset.y - center.y
-                    val distance = kotlin.math.sqrt(dx * dx + dy * dy)
-                    
-                    // Limit inward touch padding so the center hole remains easily clickable
-                    val maxInwardPadding = minOf(12.dp.toPx(), innerRadius * 0.4f)
-                    val outwardPadding = 16.dp.toPx()
-                    
-                    if (distance in (innerRadius - maxInwardPadding)..(outerRadius + outwardPadding)) {
-                        var angle = (kotlin.math.atan2(dy, dx) * 180f / kotlin.math.PI).toFloat()
-                        if (angle < 0) angle += 360f // 0 is 3 o'clock, clockwise
-                        
-                        // Map angle so that 0 is top (12 o'clock)
-                        var angleFromTop = angle + 90f
-                        if (angleFromTop >= 360f) angleFromTop -= 360f
-                        
-                        var currentAngle = 0f
-                        var found: Pair<String, Double>? = null
-                        val validSegments = segments.filter { it.second > 0.0 }
-                        val activeSegmentsSum = validSegments.sumOf { it.second }
-                        val progress = if (targetAmount > 0.0) {
-                            (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
-                        } else {
-                            0.0
-                        }
-                        for (segment in validSegments) {
-                            val proportionOfActive = if (activeSegmentsSum > 0.0) segment.second / activeSegmentsSum else 0.0
-                            val sweep = (proportionOfActive * progress * 360f).toFloat()
-                            if (angleFromTop >= currentAngle && angleFromTop <= (currentAngle + sweep)) {
-                                found = segment
-                                break
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(validSegments, targetAmount) {
+                    detectTapGestures(
+                        onLongPress = { onLongPress() },
+                        onTap = { offset ->
+                            val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                            val dx = offset.x - center.x
+                            val dy = offset.y - center.y
+                            val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+
+                            val strokeWidthPx = strokeWidthDp.toPx()
+                            val outerRadius = (minOf(size.width, size.height) / 2f) - 12.dp.toPx()
+                            val innerRadius = outerRadius - strokeWidthPx
+
+                            if (dist in (innerRadius - 12.dp.toPx())..(outerRadius + 16.dp.toPx())) {
+                                var angle = (kotlin.math.atan2(dy, dx) * 180f / kotlin.math.PI).toFloat()
+                                if (angle < 0) angle += 360f
+
+                                var angleFromTop = angle + 90f
+                                if (angleFromTop >= 360f) angleFromTop -= 360f
+
+                                val progress = if (targetAmount > 0.0) (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0) else 0.0
+                                val totalActiveSweep = (progress * 360f).toFloat()
+
+                                var currentAngle = 0f
+                                var tappedIdx: Int? = null
+
+                                for (i in validSegments.indices) {
+                                    val prop = if (activeSegmentsSum > 0.0) validSegments[i].second / activeSegmentsSum else 0.0
+                                    val sweep = (prop * totalActiveSweep).toFloat()
+                                    if (angleFromTop >= currentAngle && angleFromTop <= (currentAngle + sweep)) {
+                                        tappedIdx = i
+                                        break
+                                    }
+                                    currentAngle += sweep
+                                }
+
+                                if (tappedIdx != null) {
+                                    val newIdx = if (activeSelectedIndex == tappedIdx) null else tappedIdx
+                                    setActiveSelectedIndex(newIdx)
+                                } else {
+                                    setActiveSelectedIndex(null)
+                                    onCenterClick()
+                                }
+                            } else {
+                                setActiveSelectedIndex(null)
+                                onCenterClick()
                             }
-                            currentAngle += sweep
                         }
-                        
-                        if (found != null) {
-                            hoveredSegment = found
-                        } else {
-                            hoveredSegment = null
-                            onCenterClick()
-                        }
-                    } else {
-                        hoveredSegment = null
-                        onCenterClick()
-                    }
+                    )
                 }
-            )
-        }
-    ) {
+        ) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
-            // Subtract 16.dp to leave 8.dp of space on the outside for the glowing shadow to fade out nicely
-            val radius = (sizeMin - strokeWidthPx - 16.dp.toPx()) / 2f
+            val radius = (sizeMin / 2f) - 12.dp.toPx()
 
-            // Draw central hollow background
-            val innerRadius = radius - strokeWidthPx / 2f
-            if (innerRadius > 0f) {
+            // Draw unfilled background track
+            drawCircle(
+                color = unfilledColor,
+                radius = radius - (strokeWidthPx / 2f),
+                style = Stroke(width = strokeWidthPx)
+            )
+
+            if (targetAmount > 0.0 && activeSegmentsSum > 0.0) {
+                val progress = (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
+                val totalActiveSweep = (progress * 360f).toFloat()
+
+                var currentStartAngle = -90f
+
+                validSegments.forEachIndexed { index, segment ->
+                    val prop = segment.second / activeSegmentsSum
+                    val rawSweep = (prop * totalActiveSweep).toFloat()
+                    val sweepAngle = (rawSweep * animatedProgressMultiplier).coerceAtMost(359.99f)
+
+                    if (sweepAngle > 0f) {
+                        val isSelected = (activeSelectedIndex == index)
+                        val popOffset = if (isSelected) 8.dp.toPx() else 0f
+
+                        val midAngle = currentStartAngle + (sweepAngle / 2f)
+                        val midRad = Math.toRadians(midAngle.toDouble())
+
+                        val offsetX = (popOffset * kotlin.math.cos(midRad)).toFloat()
+                        val offsetY = (popOffset * kotlin.math.sin(midRad)).toFloat()
+
+                        val sliceCenter = androidx.compose.ui.geometry.Offset(center.x + offsetX, center.y + offsetY)
+                        val sliceColor = colors[index % colors.size]
+
+                        val arcTopLeft = androidx.compose.ui.geometry.Offset(sliceCenter.x - radius, sliceCenter.y - radius)
+                        val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+
+                        // 1. Draw shadow for selected segment
+                        if (isSelected) {
+                            drawArc(
+                                color = sliceColor.copy(alpha = 0.35f),
+                                startAngle = currentStartAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                topLeft = androidx.compose.ui.geometry.Offset(arcTopLeft.x - 3.dp.toPx(), arcTopLeft.y - 3.dp.toPx()),
+                                size = androidx.compose.ui.geometry.Size(arcSize.width + 6.dp.toPx(), arcSize.height + 6.dp.toPx()),
+                                style = Stroke(width = strokeWidthPx + 6.dp.toPx())
+                            )
+                        }
+
+                        // 2. Draw donut segment arc
+                        drawArc(
+                            color = sliceColor,
+                            startAngle = currentStartAngle,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                        )
+
+                        currentStartAngle += sweepAngle
+                    }
+                }
+            }
+
+            // Central hollow hole
+            val holeRadius = radius - strokeWidthPx
+            if (holeRadius > 0f) {
                 drawCircle(
                     color = centerBgColor,
-                    radius = innerRadius,
+                    radius = holeRadius,
                     center = center
                 )
             }
-
-            val activeSegments = segments.filter { it.second > 0.0 }
-            val activeSegmentsSum = activeSegments.sumOf { it.second }
-
-            val drawSegments = mutableListOf<Pair<Float, Color>>()
-
-            val resolvedUnfilledColor = unfilledColorOverride ?: unfilledColor
-
-            if (targetAmount > 0.0 && activeSegmentsSum > 0.0) {
-                // Determine progress of active segments capped at 1.0
-                val progress = (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
-                
-                // Add active segments
-                activeSegments.forEachIndexed { index, segment ->
-                    val segmentAmount = segment.second
-                    val proportionOfActive = if (activeSegmentsSum > 0.0) segmentAmount / activeSegmentsSum else 0.0
-                    val allocatedSweep = ((proportionOfActive * progress * 360f).toFloat() * animatedProgressMultiplier).coerceAtMost(359.99f)
-                    if (allocatedSweep > 0f) {
-                        drawSegments.add(Pair(allocatedSweep, colors[index % colors.size]))
-                    }
-                }
-                
-                // Add remaining gray segment
-                val totalActiveSweep = drawSegments.sumOf { it.first.toDouble() }.toFloat()
-                val remainingSweep = (360f - totalActiveSweep).coerceAtLeast(0f)
-                if (remainingSweep > 0f) {
-                    drawSegments.add(Pair(remainingSweep, resolvedUnfilledColor))
-                }
-            } else {
-                // If there's no budget set or no active spending, show 100% unfilled gray
-                drawSegments.add(Pair(360f, resolvedUnfilledColor))
-            }
-
-            // Compute concentric paths for the double-layer design (outer solid color, inner lighter color layer)
-            val outerStrokeWidth = strokeWidthPx * 0.72f
-            val innerStrokeWidth = strokeWidthPx * 0.28f
-            val outerRadius = radius + (innerStrokeWidth / 2f)
-            val concentricInnerRadius = radius - (outerStrokeWidth / 2f)
-
-            val outerArcTopLeft = androidx.compose.ui.geometry.Offset(center.x - outerRadius, center.y - outerRadius)
-            val outerArcSize = androidx.compose.ui.geometry.Size(outerRadius * 2f, outerRadius * 2f)
-
-            val innerArcTopLeft = androidx.compose.ui.geometry.Offset(center.x - concentricInnerRadius, center.y - concentricInnerRadius)
-            val innerArcSize = androidx.compose.ui.geometry.Size(concentricInnerRadius * 2f, concentricInnerRadius * 2f)
-
-            // Draw the segments
-            if (drawSegments.size == 1) {
-                // Single segment, draw perfect continuous circle with no gaps/caps artifacts
-                val color = drawSegments[0].second
-                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
-                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
-                
-                if (color == resolvedUnfilledColor) {
-                    drawArc(
-                        color = color,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx)
-                    )
-                } else {
-                    // 1. Draw background unfilled track first
-                    drawArc(
-                        color = resolvedUnfilledColor,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx)
-                    )
-
-                    // 2. Draw outer solid segment
-                    drawArc(
-                        color = color,
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = outerArcTopLeft,
-                        size = outerArcSize,
-                        style = Stroke(width = outerStrokeWidth)
-                    )
-
-                    // 3. Draw inner concentric lighter layer
-                    drawArc(
-                        color = color.copy(alpha = 0.38f),
-                        startAngle = -90f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        topLeft = innerArcTopLeft,
-                        size = innerArcSize,
-                        style = Stroke(width = innerStrokeWidth)
-                    )
-                }
-            } else if (drawSegments.size > 1) {
-                var startAngle = -90f
-                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
-                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
-
-                // 1. Draw the continuous unfilled background channel track first
-                drawArc(
-                    color = resolvedUnfilledColor,
-                    startAngle = -90f,
-                    sweepAngle = 360f,
-                    useCenter = false,
-                    topLeft = arcTopLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidthPx)
-                )
-
-                // 2. Draw active segments on top using double-layer concentric arcs
-                drawSegments.forEach { segment ->
-                    val allocatedSweep = segment.first
-                    val color = segment.second
-
-                    if (color != resolvedUnfilledColor) {
-                        // Outer vibrant arc segment
-                        drawArc(
-                            color = color,
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep,
-                            useCenter = false,
-                            topLeft = outerArcTopLeft,
-                            size = outerArcSize,
-                            style = Stroke(width = outerStrokeWidth, cap = StrokeCap.Butt)
-                        )
-
-                        // Inner concentric lighter layer
-                        drawArc(
-                            color = color.copy(alpha = 0.38f),
-                            startAngle = startAngle,
-                            sweepAngle = allocatedSweep,
-                            useCenter = false,
-                            topLeft = innerArcTopLeft,
-                            size = innerArcSize,
-                            style = Stroke(width = innerStrokeWidth, cap = StrokeCap.Butt)
-                        )
-                    }
-
-                    startAngle += allocatedSweep
-                }
-            }
         }
 
-
-    // Center percentage text or hovered segment info
+        // Center Percentage Text
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            modifier = Modifier.padding(horizontal = 4.dp)
         ) {
             Text(
                 text = formatNumberString(percentageText, language),
-                fontSize = if (targetAmount > 0.0) 28.sp else 16.sp,
+                fontSize = if (targetAmount > 0.0) centerTextSize else 14.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (targetAmount > 0.0) percentageColor else (if (isDark) Color.White else Color(0xFF1E293B)),
+                color = percentageColor,
                 textAlign = TextAlign.Center
             )
-        }
-
-        // External Tooltip
-        if (hoveredSegment != null) {
-            val segmentIndex = segments.indexOfFirst { it.first == hoveredSegment!!.first }
-            val segmentColor = if (segmentIndex != -1) colors[segmentIndex % colors.size] else FintechBlue
-            
-            androidx.compose.ui.window.Popup(
-                alignment = Alignment.TopCenter,
-                offset = IntOffset(0, -50),
-                onDismissRequest = { hoveredSegment = null }
-            ) {
-                Card(
-                    shape = RoundedCornerShape(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = segmentColor),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = hoveredSegment!!.first,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = formatCurrency(hoveredSegment!!.second, language),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                    }
-                }
+            if (selectedSegName != null) {
+                Text(
+                    text = selectedSegName,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = percentageColor,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -716,41 +599,6 @@ fun BudgetControlDonutChart(
                         style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                     )
                 }
-
-                // 3. Draw uniform parallel gap dividers at junction 1 (-90°) and junction 2 (-90° + filledSweep)
-                val dividerColor = if (centerColorOverride != Color.Transparent) {
-                    centerColorOverride
-                } else {
-                    if (isDark) Color(0xFF1E293B) else Color.White
-                }
-
-                val gapWidthPx = 5.dp.toPx()
-                val rInner = radius - (strokeWidthPx / 2f) - 1.dp.toPx()
-                val rOuter = radius + (strokeWidthPx / 2f) + 1.dp.toPx()
-
-                // Divider at start angle (-90 degrees / top center)
-                val angle1Rad = Math.toRadians(-90.0)
-                val dir1X = kotlin.math.cos(angle1Rad).toFloat()
-                val dir1Y = kotlin.math.sin(angle1Rad).toFloat()
-                drawLine(
-                    color = dividerColor,
-                    start = centerOffset + Offset(rInner * dir1X, rInner * dir1Y),
-                    end = centerOffset + Offset(rOuter * dir1X, rOuter * dir1Y),
-                    strokeWidth = gapWidthPx,
-                    cap = StrokeCap.Butt
-                )
-
-                // Divider at end angle (-90 + filledSweep)
-                val angle2Rad = Math.toRadians((-90f + filledSweep).toDouble())
-                val dir2X = kotlin.math.cos(angle2Rad).toFloat()
-                val dir2Y = kotlin.math.sin(angle2Rad).toFloat()
-                drawLine(
-                    color = dividerColor,
-                    start = centerOffset + Offset(rInner * dir2X, rInner * dir2Y),
-                    end = centerOffset + Offset(rOuter * dir2X, rOuter * dir2Y),
-                    strokeWidth = gapWidthPx,
-                    cap = StrokeCap.Butt
-                )
             }
         }
 
@@ -9204,6 +9052,7 @@ fun DashboardScreen(
         var isEditingBudget by remember(targetAmount) { mutableStateOf(targetAmount == 0.0) }
         var localBudgetInput by remember(targetAmount) { mutableStateOf(if (targetAmount > 0.0) targetAmount.toInt().toString() else "") }
         var showInplaceBudgetCalculator by remember { mutableStateOf(false) }
+        var selectedCategoryIndex by remember(categoryType) { mutableStateOf<Int?>(null) }
 
         val colors = budgetGradients["BUDGET_DETAILS_$categoryType"] ?: getBudgetCategoryColors(categoryType)
 
@@ -9261,6 +9110,8 @@ fun DashboardScreen(
                                 categoryType = categoryType,
                                 centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA), // Match budget section
                                 customPalette = budgetGradients["BUDGET_DETAILS_$categoryType"],
+                                selectedIndex = selectedCategoryIndex,
+                                onSelectedIndexChange = { selectedCategoryIndex = it },
                                 onCenterClick = {
                                     if (targetAmount == 0.0) {
                                         isEditingBudget = true
@@ -9450,11 +9301,13 @@ fun DashboardScreen(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            segments.filter { it.second > 0.0 }.forEach { segment ->
+                            val activeSegs = segments.filter { it.second > 0.0 }
+                            activeSegs.forEachIndexed { filteredIdx, segment ->
                                 val originalIndex = segments.indexOf(segment)
                                 val name = segment.first
                                 val amount = segment.second
                                 val color = colors[originalIndex % colors.size]
+                                val isSelectedCategory = (selectedCategoryIndex == filteredIdx)
                                 
                                 val percentOfTotal = if (totalFilledAmount > 0.0) {
                                     (amount / totalFilledAmount) * 100
@@ -9471,10 +9324,19 @@ fun DashboardScreen(
                                 Card(
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isDark) Color.White.copy(alpha = 0.04f) else Color(0xFFF8FAFC)
+                                        containerColor = if (isSelectedCategory) color.copy(alpha = 0.15f) else (if (isDark) Color.White.copy(alpha = 0.04f) else Color(0xFFF8FAFC))
                                     ),
-                                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.06f) else Color.LightGray.copy(alpha = 0.3f)),
-                                    modifier = Modifier.fillMaxWidth()
+                                    border = BorderStroke(
+                                        if (isSelectedCategory) 2.dp else 1.dp,
+                                        if (isSelectedCategory) color else (if (isDark) Color.White.copy(alpha = 0.06f) else Color.LightGray.copy(alpha = 0.3f))
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .touchScaleDown(
+                                            onClick = {
+                                                selectedCategoryIndex = if (selectedCategoryIndex == filteredIdx) null else filteredIdx
+                                            }
+                                        )
                                 ) {
                                     Column(
                                         modifier = Modifier
@@ -10237,7 +10099,7 @@ fun TransactionRowItem(
         border = BorderStroke(if (isHighlighted || isSelected) 2.dp else 1.dp, if (isHighlighted) Color(0xFFFBBF24) else if (isSelected) FintechBlue else (if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))),
         modifier = modifier
             .fillMaxWidth()
-            .combinedClickable(
+            .touchScaleDown(
                 onClick = {
                     if (isSelectionMode) {
                         onLongClick()
@@ -12712,7 +12574,7 @@ fun PersonDebtRowItem(
         border = BorderStroke(if (isHighlighted || isSelected) 2.dp else 1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
+            .touchScaleDown(
                 onClick = {
                     if (isSelectionMode) {
                         onLongClick()
@@ -22300,7 +22162,7 @@ fun ChartSection(
         label = "chart_donut_animation"
     )
 
-    var selectedIndex by remember { mutableStateOf<Int?>(0) }
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
     val defaultVibrantPalette = remember {
         listOf(

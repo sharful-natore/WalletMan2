@@ -42,6 +42,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import com.example.ui.components.touchScaleDown
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DraftsScratchpadDialog(
@@ -786,7 +788,7 @@ fun DraftItemCard(
         border = if (isSelected) BorderStroke(2.dp, Color.White) else null,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onPost() }
+            .touchScaleDown(onClick = { onPost() })
     ) {
         Box(
             modifier = Modifier
