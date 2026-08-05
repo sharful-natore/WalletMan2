@@ -243,7 +243,7 @@ fun CategorySegmentedDonutChart(
     isDark: Boolean,
     language: AppLanguage,
     modifier: Modifier = Modifier,
-    strokeWidthDp: Dp = 24.dp,
+    strokeWidthDp: Dp = 28.dp,
     centerTextSize: TextUnit = 22.sp,
     categoryType: String? = null,
     unfilledColorOverride: Color? = null,
@@ -367,13 +367,22 @@ fun CategorySegmentedDonutChart(
         ) {
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
-            val radius = (sizeMin / 2f) - 12.dp.toPx()
+            val extraExpandPx = 6.dp.toPx()
+            val outerPadding = extraExpandPx + 2.dp.toPx()
+            val radius = (sizeMin / 2f) - (strokeWidthPx / 2f) - outerPadding
+
+            val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+            val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
 
             // Draw unfilled background track
-            drawCircle(
+            drawArc(
                 color = unfilledColor,
-                radius = radius - (strokeWidthPx / 2f),
-                style = Stroke(width = strokeWidthPx)
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
             )
 
             if (targetAmount > 0.0 && activeSegmentsSum > 0.0) {
@@ -382,9 +391,6 @@ fun CategorySegmentedDonutChart(
 
                 var currentStartAngle = -90f
 
-                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
-                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
-
                 validSegments.forEachIndexed { index, segment ->
                     val prop = segment.second / activeSegmentsSum
                     val rawSweep = (prop * totalActiveSweep).toFloat()
@@ -392,43 +398,49 @@ fun CategorySegmentedDonutChart(
 
                     if (sweepAngle > 0f) {
                         val isSelected = (activeSelectedIndex == index)
-                        val popOffset = if (isSelected) 8.dp.toPx() else 0f
+                        val baseColor = colors[index % colors.size]
+                        val sliceColor = baseColor
 
-                        val midAngle = currentStartAngle + (sweepAngle / 2f)
-                        val midRad = Math.toRadians(midAngle.toDouble())
-
-                        val offsetX = (popOffset * kotlin.math.cos(midRad)).toFloat()
-                        val offsetY = (popOffset * kotlin.math.sin(midRad)).toFloat()
-
-                        val sliceCenter = androidx.compose.ui.geometry.Offset(center.x + offsetX, center.y + offsetY)
-                        val sliceColor = colors[index % colors.size]
-
-                        val arcTopLeft = androidx.compose.ui.geometry.Offset(sliceCenter.x - radius, sliceCenter.y - radius)
-                        val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
-
-                        // 1. Draw drop shadow for selected popped slice
                         if (isSelected) {
+                            // Expand segment outwards while keeping inner track edge perfectly aligned
+                            val selStrokeWidthPx = strokeWidthPx + extraExpandPx
+                            val selRadius = radius + (extraExpandPx / 2f)
+                            val selTopLeft = androidx.compose.ui.geometry.Offset(center.x - selRadius, center.y - selRadius)
+                            val selSize = androidx.compose.ui.geometry.Size(selRadius * 2f, selRadius * 2f)
+
+                            // Soft glow for selected segment
                             drawArc(
                                 color = sliceColor.copy(alpha = 0.35f),
                                 startAngle = currentStartAngle,
                                 sweepAngle = sweepAngle,
                                 useCenter = false,
-                                topLeft = androidx.compose.ui.geometry.Offset(arcTopLeft.x - 3.dp.toPx(), arcTopLeft.y - 3.dp.toPx()),
-                                size = androidx.compose.ui.geometry.Size(arcSize.width + 6.dp.toPx(), arcSize.height + 6.dp.toPx()),
-                                style = Stroke(width = strokeWidthPx + 6.dp.toPx())
+                                topLeft = androidx.compose.ui.geometry.Offset(selTopLeft.x - 2.dp.toPx(), selTopLeft.y - 2.dp.toPx()),
+                                size = androidx.compose.ui.geometry.Size(selSize.width + 4.dp.toPx(), selSize.height + 4.dp.toPx()),
+                                style = Stroke(width = selStrokeWidthPx + 4.dp.toPx(), cap = StrokeCap.Butt)
+                            )
+
+                            // Draw selected slice expanded outward
+                            drawArc(
+                                color = sliceColor,
+                                startAngle = currentStartAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                topLeft = selTopLeft,
+                                size = selSize,
+                                style = Stroke(width = selStrokeWidthPx, cap = StrokeCap.Butt)
+                            )
+                        } else {
+                            // Standard donut segment on track line
+                            drawArc(
+                                color = sliceColor,
+                                startAngle = currentStartAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = false,
+                                topLeft = arcTopLeft,
+                                size = arcSize,
+                                style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                             )
                         }
-
-                        // 2. Draw donut segment arc
-                        drawArc(
-                            color = sliceColor,
-                            startAngle = currentStartAngle,
-                            sweepAngle = sweepAngle,
-                            useCenter = false,
-                            topLeft = arcTopLeft,
-                            size = arcSize,
-                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                        )
 
                         currentStartAngle += sweepAngle
                     }
@@ -436,7 +448,7 @@ fun CategorySegmentedDonutChart(
             }
 
             // Central hollow hole
-            val holeRadius = radius - strokeWidthPx
+            val holeRadius = radius - (strokeWidthPx / 2f)
             if (holeRadius > 0f) {
                 drawCircle(
                     color = centerBgColor,
@@ -610,7 +622,7 @@ fun BudgetControlDonutChart(
                     if (isDark) Color(0xFF1E293B) else Color.White
                 }
 
-                val gapWidthPx = 5.dp.toPx()
+                val gapWidthPx = 4.dp.toPx()
                 val rInner = radius - (strokeWidthPx / 2f) - 1.dp.toPx()
                 val rOuter = radius + (strokeWidthPx / 2f) + 1.dp.toPx()
 
@@ -952,12 +964,12 @@ fun MonthYearPickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedYear, selectedMonth) }) {
+            TextButton(onClick = { onConfirm(selectedYear, selectedMonth) }, modifier = Modifier.pressScale(0.92f)) {
                 Text(Translation.get("confirm", language))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, modifier = Modifier.pressScale(0.92f)) {
                 Text(Translation.get("cancel", language))
             }
         }
@@ -1139,12 +1151,12 @@ fun SpecificDatePickerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay, selectedHour, selectedMinute) }) {
+            TextButton(onClick = { onConfirm(selectedYear, selectedMonth, selectedDay, selectedHour, selectedMinute) }, modifier = Modifier.pressScale(0.92f)) {
                 Text(Translation.get("confirm", language))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, modifier = Modifier.pressScale(0.92f)) {
                 Text(Translation.get("cancel", language))
             }
         }
@@ -1800,7 +1812,7 @@ fun DeleteVerificationDialog(
                 enabled = isMatched,
                 colors = ButtonDefaults.buttonColors(containerColor = FintechRed),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("delete_verification_confirm_btn")
+                modifier = Modifier.pressScale(0.95f).testTag("delete_verification_confirm_btn")
             ) {
                 Text(Translation.get("delete", language), color = Color.White)
             }
@@ -1808,7 +1820,8 @@ fun DeleteVerificationDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.pressScale(0.95f)
             ) {
                 Text(Translation.get("cancel", language))
             }
@@ -7414,6 +7427,9 @@ fun FinancialTrendPerformanceCard(
         border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
         modifier = Modifier
             .fillMaxWidth()
+            .bounceClick(scaleDownRatio = 0.97f) {
+                onNavigateToCharts()
+            }
             .testTag("financial_trend_performance_card")
     ) {
         Column(
@@ -8042,7 +8058,8 @@ fun DashboardScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (alert.isWarning) Color(0xFFEF4444) else Color(0xFF10B981)
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.pressScale(0.95f)
                 ) {
                     Text(
                         text = if (language == AppLanguage.BN) "ঠিক আছে" else "OK",
@@ -8569,7 +8586,9 @@ fun DashboardScreen(
                     border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onExportRequest?.invoke("ALL_DATA") }
+                        .bounceClick(scaleDownRatio = 0.96f) {
+                            onExportRequest?.invoke("ALL_DATA")
+                        }
                         .testTag("dashboard_export_menu_button")
                 ) {
                     Row(
@@ -8662,12 +8681,9 @@ fun DashboardScreen(
                 border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = {
-                            onExportRequest?.invoke("ONLY_BUDGET")
-                        }
-                    )
+                    .bounceClick(scaleDownRatio = 0.97f) {
+                        showBudgetHistoryDialog = true
+                    }
                     .testTag("budget_control_card")
             ) {
                 Column(
@@ -8695,7 +8711,7 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { showBudgetHistoryDialog = true }
+                                .bounceClick(scaleDownRatio = 0.92f) { showBudgetHistoryDialog = true }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(
@@ -8725,10 +8741,7 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .combinedClickable(
-                                    onClick = { showBudgetDetailsType = "INCOME" },
-                                    onLongClick = { onEditGradient?.invoke("INCOME") }
-                                )
+                                .bounceClick(scaleDownRatio = 0.95f) { showBudgetDetailsType = "INCOME" }
                                 .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -8760,10 +8773,7 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .combinedClickable(
-                                    onClick = { showBudgetDetailsType = "EXPENSE" },
-                                    onLongClick = { onEditGradient?.invoke("EXPENSE") }
-                                )
+                                .bounceClick(scaleDownRatio = 0.95f) { showBudgetDetailsType = "EXPENSE" }
                                 .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -8795,10 +8805,7 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .combinedClickable(
-                                    onClick = { showBudgetDetailsType = "SAVINGS" },
-                                    onLongClick = { onEditGradient?.invoke("SAVINGS") }
-                                )
+                                .bounceClick(scaleDownRatio = 0.95f) { showBudgetDetailsType = "SAVINGS" }
                                 .padding(top = 0.dp, bottom = 4.dp, start = 2.dp, end = 2.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
@@ -9142,8 +9149,8 @@ fun DashboardScreen(
                                 segments = segments,
                                 isDark = isDark,
                                 language = language,
-                                modifier = Modifier.size(160.dp),
-                                strokeWidthDp = 22.dp, // Match budget section with increased thickness
+                                modifier = Modifier.size(176.dp),
+                                strokeWidthDp = 32.dp, // Thicker segment ring with ample central room for percentage text
                                 centerTextSize = 22.sp,
                                 categoryType = categoryType,
                                 centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA), // Match budget section
@@ -10426,22 +10433,31 @@ fun TransactionDetailsDialog(
             title = { Text(if (language == AppLanguage.BN) "কিভাবে শেয়ার করবেন?" else "How to share?") },
             text = {
                 Column {
-                    TextButton(onClick = { 
-                        showShareOptions = false
-                        onShareText()
-                    }) {
+                    TextButton(
+                        onClick = { 
+                            showShareOptions = false
+                            onShareText()
+                        },
+                        modifier = Modifier.pressScale(0.92f)
+                    ) {
                         Text(if (language == AppLanguage.BN) "টেক্সট হিসেবে" else "As Text", color = FintechBlue)
                     }
-                    TextButton(onClick = {
-                        showShareOptions = false
-                        screenshotState.createBitmap()?.let { onShareImage(it) }
-                    }) {
+                    TextButton(
+                        onClick = {
+                            showShareOptions = false
+                            screenshotState.createBitmap()?.let { onShareImage(it) }
+                        },
+                        modifier = Modifier.pressScale(0.92f)
+                    ) {
                         Text(if (language == AppLanguage.BN) "ছবি হিসেবে (স্ক্রিনশট)" else "As Image (Screenshot)", color = FintechBlue)
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showShareOptions = false }) {
+                TextButton(
+                    onClick = { showShareOptions = false },
+                    modifier = Modifier.pressScale(0.92f)
+                ) {
                     Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
                 }
             }
@@ -10591,18 +10607,18 @@ fun TransactionDetailsDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = onEdit) {
+                    IconButton(onClick = onEdit, modifier = Modifier.pressScale(0.92f)) {
                         Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = FintechBlue)
                     }
-                    IconButton(onClick = onDelete) {
+                    IconButton(onClick = onDelete, modifier = Modifier.pressScale(0.92f)) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
                     }
-                    IconButton(onClick = { showShareOptions = true }) {
+                    IconButton(onClick = { showShareOptions = true }, modifier = Modifier.pressScale(0.92f)) {
                         Icon(Icons.Rounded.Share, contentDescription = "Share", tint = FintechBlue)
                     }
                 }
                 
-                TextButton(onClick = onDismiss) {
+                TextButton(onClick = onDismiss, modifier = Modifier.pressScale(0.95f)) {
                     Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close", color = FintechBlue)
                 }
             }
@@ -11485,6 +11501,12 @@ fun TransactionsScreen(
                             }
                         }
 
+                        if (sortedTransactions.isNotEmpty() || sortedPrevMonthTransactions.isNotEmpty()) {
+                            item(key = "tx_end_of_list_card") {
+                                TransactionEndOfListAnimation(language = language, isDark = isDark)
+                            }
+                        }
+
                         item(key = "tx_bottom_spacer") {
                             Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp)) // Floating button padding
                         }
@@ -11510,7 +11532,7 @@ fun TransactionsScreen(
 
                         itemsIndexed(sortedTransactions, key = { txIdx, tx -> "tx_curr_${tx.id}_$txIdx" }) { index, tx ->
                             val isSelected = selectedTxIds.contains(tx.id)
-                            Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
+                            Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem().scrollEntranceEffect(tx.id)) {
                                 TransactionRowItem(
                                     tx = tx,
                                     language = language,
@@ -11544,7 +11566,7 @@ fun TransactionsScreen(
 
                             itemsIndexed(sortedPrevMonthTransactions, key = { txIdx, tx -> "tx_prev_${tx.id}_$txIdx" }) { index, tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
-                                Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
+                                Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem().scrollEntranceEffect(tx.id)) {
                                     TransactionRowItem(
                                         tx = tx,
                                         language = language,
@@ -11566,7 +11588,13 @@ fun TransactionsScreen(
                             }
                         }
 
-                        item {
+                        if (sortedTransactions.isNotEmpty() || sortedPrevMonthTransactions.isNotEmpty()) {
+                            item(key = "tx_end_of_list_card_nondate") {
+                                TransactionEndOfListAnimation(language = language, isDark = isDark)
+                            }
+                        }
+
+                        item(key = "tx_bottom_spacer_nondate") {
                             Spacer(modifier = Modifier.height(fabBottomPadding - 3.dp)) // Floating button padding
                         }
                     }
@@ -13518,6 +13546,170 @@ fun Modifier.scrollEntranceEffect(key: Any? = Unit): Modifier {
     }
 }
 
+@Composable
+fun Modifier.pressScale(
+    scaleDownRatio: Float = 0.95f,
+    interactionSource: MutableInteractionSource? = null
+): Modifier {
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val isPressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) scaleDownRatio else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "pressScale"
+    )
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+@Composable
+fun Modifier.bounceClick(
+    scaleDownRatio: Float = 0.95f,
+    onClick: (() -> Unit)? = null
+): Modifier {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) scaleDownRatio else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "bounceClickScale"
+    )
+
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .then(
+            if (onClick != null) {
+                Modifier.pointerInput(onClick) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true
+                            tryAwaitRelease()
+                            isPressed = false
+                        },
+                        onTap = {
+                            onClick()
+                        }
+                    )
+                }
+            } else {
+                Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true
+                            tryAwaitRelease()
+                            isPressed = false
+                        }
+                    )
+                }
+            }
+        )
+}
+
+@Composable
+fun TransactionEndOfListAnimation(
+    language: AppLanguage,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "end_of_list_anim")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    val pulseGlow by infiniteTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.65f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseGlow"
+    )
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDark) Color(0xFF1E293B) else Color.White
+        ),
+        border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.25f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .scrollEntranceEffect("tx_end_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 18.dp, horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(52.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                    }
+                    .background(
+                        color = FintechBlue.copy(alpha = 0.12f),
+                        shape = CircleShape
+                    )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            color = FintechBlue.copy(alpha = pulseGlow * 0.35f),
+                            shape = CircleShape
+                        )
+                )
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = if (language == AppLanguage.BN) "সব লেনদেন দেখা শেষ" else "All Transactions Loaded",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isDark) Color.White else Color(0xFF1E293B)
+            )
+
+            Spacer(modifier = Modifier.height(3.dp))
+
+            Text(
+                text = if (language == AppLanguage.BN) "আপনার লেনদেনের তালিকার শেষ পর্যন্ত পৌঁছে গেছেন" else "You've reached the bottom of your transaction history",
+                fontSize = 12.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SavingsGoalCardItem(
@@ -14857,7 +15049,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                     ) {
                         TextButton(
                             onClick = onDismiss,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).pressScale(0.95f)
                         ) {
                             Text(Translation.get("cancel", language), color = labelColor)
                         }
@@ -14876,6 +15068,7 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier
                                 .weight(1.5f)
+                                .pressScale(0.95f)
                                 .testTag("btn_confirm_tx")
                         ) {
                             Text(Translation.get("confirm", language), color = Color.White, fontWeight = FontWeight.Bold)
@@ -15051,7 +15244,7 @@ fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).pressScale(0.95f)) {
                         Text(Translation.get("cancel", language), color = labelColor)
                     }
 
@@ -15069,6 +15262,7 @@ fun AddPersonDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1.5f)
+                            .pressScale(0.95f)
                             .testTag("btn_confirm_person")
                     ) {
                         Text(Translation.get("confirm", language), color = Color.White, fontWeight = FontWeight.Bold)
@@ -15466,7 +15660,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             .padding(top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).pressScale(0.95f)) {
                             Text(Translation.get("cancel", language), color = labelColor)
                         }
 
@@ -15484,6 +15678,7 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             modifier = Modifier
                                 .weight(1.5f)
+                                .pressScale(0.95f)
                                 .testTag("btn_confirm_saving")
                         ) {
                             Text(Translation.get("confirm", language), color = Color.White, fontWeight = FontWeight.Bold)
@@ -15695,7 +15890,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                         .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f).pressScale(0.95f)) {
                         Text(Translation.get("cancel", language), color = labelColor)
                     }
 
@@ -15715,6 +15910,7 @@ fun SavingsContributionDialog(viewModel: com.example.ui.viewmodel.FinanceViewMod
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier
                             .weight(1.5f)
+                            .pressScale(0.95f)
                             .testTag("btn_confirm_contribution")
                     ) {
                         Text(Translation.get("confirm", language), color = Color.White, fontWeight = FontWeight.Bold)
@@ -16232,22 +16428,31 @@ fun SavingsTransactionDetailsDialog(
             title = { Text(if (language == AppLanguage.BN) "কিভাবে শেয়ার করবেন?" else "How to share?") },
             text = {
                 Column {
-                    TextButton(onClick = { 
-                        showShareOptions = false
-                        onShareText()
-                    }) {
+                    TextButton(
+                        onClick = { 
+                            showShareOptions = false
+                            onShareText()
+                        },
+                        modifier = Modifier.pressScale(0.92f)
+                    ) {
                         Text(if (language == AppLanguage.BN) "টেক্সট হিসেবে" else "As Text", color = FintechBlue)
                     }
-                    TextButton(onClick = {
-                        showShareOptions = false
-                        screenshotState.createBitmap()?.let { onShareImage(it) }
-                    }) {
+                    TextButton(
+                        onClick = {
+                            showShareOptions = false
+                            screenshotState.createBitmap()?.let { onShareImage(it) }
+                        },
+                        modifier = Modifier.pressScale(0.92f)
+                    ) {
                         Text(if (language == AppLanguage.BN) "ছবি হিসেবে (স্ক্রিনশট)" else "As Image (Screenshot)", color = FintechBlue)
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showShareOptions = false }) {
+                TextButton(
+                    onClick = { showShareOptions = false },
+                    modifier = Modifier.pressScale(0.92f)
+                ) {
                     Text(if (language == AppLanguage.BN) "বাতিল" else "Cancel", color = FintechRed)
                 }
             }
@@ -16311,18 +16516,18 @@ fun SavingsTransactionDetailsDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = onEdit) {
+                    IconButton(onClick = onEdit, modifier = Modifier.pressScale(0.92f)) {
                         Icon(Icons.Rounded.Edit, contentDescription = "Edit", tint = FintechBlue)
                     }
-                    IconButton(onClick = onDelete) {
+                    IconButton(onClick = onDelete, modifier = Modifier.pressScale(0.92f)) {
                         Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = FintechRed)
                     }
-                    IconButton(onClick = { showShareOptions = true }) {
+                    IconButton(onClick = { showShareOptions = true }, modifier = Modifier.pressScale(0.92f)) {
                         Icon(Icons.Rounded.Share, contentDescription = "Share", tint = FintechBlue)
                     }
                 }
                 
-                TextButton(onClick = onDismiss) {
+                TextButton(onClick = onDismiss, modifier = Modifier.pressScale(0.95f)) {
                     Text(if (language == AppLanguage.BN) "বন্ধ করুন" else "Close", color = FintechBlue)
                 }
             }
@@ -23162,7 +23367,7 @@ fun BudgetHistoryDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, modifier = Modifier.pressScale(0.95f)) {
                 Text(
                     text = if (language == AppLanguage.BN) "বন্ধ করুন" else "Close",
                     color = FintechBlue,
@@ -23548,7 +23753,7 @@ fun LoginScreen(
                     onClick = {
                         onGoogleSignIn()
                     },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    modifier = Modifier.fillMaxWidth().height(54.dp).pressScale(0.96f),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
                     border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.2f) else Color.LightGray),
@@ -23727,7 +23932,7 @@ fun LoginScreen(
                                 )
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier.fillMaxWidth().height(50.dp).pressScale(0.95f),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
                     ) {
