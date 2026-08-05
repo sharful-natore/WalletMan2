@@ -403,7 +403,7 @@ fun CategorySegmentedDonutChart(
                 activeSegments.forEachIndexed { index, segment ->
                     val segmentAmount = segment.second
                     val proportionOfActive = if (activeSegmentsSum > 0.0) segmentAmount / activeSegmentsSum else 0.0
-                    val allocatedSweep = (proportionOfActive * progress * 360f).toFloat() * animatedProgressMultiplier
+                    val allocatedSweep = ((proportionOfActive * progress * 360f).toFloat() * animatedProgressMultiplier).coerceAtMost(359.99f)
                     if (allocatedSweep > 0f) {
                         drawSegments.add(Pair(allocatedSweep, colors[index % colors.size]))
                     }
@@ -667,7 +667,6 @@ fun BudgetControlDonutChart(
 
             val currentProgress = (progress * animatedProgressMultiplier).toFloat()
             val startAngle = -90f
-            val gapAngle = if (currentProgress > 0.02f && currentProgress < 0.98f) 2.5f else 0f
 
             if (currentProgress >= 0.999f) {
                 // 100% Filled slice
@@ -692,14 +691,24 @@ fun BudgetControlDonutChart(
                     style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                 )
             } else {
-                val filledSweep = (currentProgress * 360f) - (gapAngle / 2f)
-                val unfilledSweep = (360f - (currentProgress * 360f)) - (gapAngle / 2f)
+                val filledSweep = currentProgress * 360f
 
-                // 1. Filled slice (Primary Arc)
+                // 1. Draw unfilled track first
+                drawArc(
+                    color = unfilledColor,
+                    startAngle = startAngle,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                )
+
+                // 2. Draw filled slice on top
                 if (filledSweep > 0f) {
                     drawArc(
                         color = filledColor,
-                        startAngle = startAngle + (gapAngle / 2f),
+                        startAngle = startAngle,
                         sweepAngle = filledSweep,
                         useCenter = false,
                         topLeft = arcTopLeft,
@@ -708,18 +717,40 @@ fun BudgetControlDonutChart(
                     )
                 }
 
-                // 2. Unfilled slice (Gray Arc - exact match to reference image!)
-                if (unfilledSweep > 0f) {
-                    drawArc(
-                        color = unfilledColor,
-                        startAngle = startAngle + (gapAngle / 2f) + filledSweep + gapAngle,
-                        sweepAngle = unfilledSweep,
-                        useCenter = false,
-                        topLeft = arcTopLeft,
-                        size = arcSize,
-                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                    )
+                // 3. Draw uniform parallel gap dividers at junction 1 (-90°) and junction 2 (-90° + filledSweep)
+                val dividerColor = if (centerColorOverride != Color.Transparent) {
+                    centerColorOverride
+                } else {
+                    if (isDark) Color(0xFF1E293B) else Color.White
                 }
+
+                val gapWidthPx = 5.dp.toPx()
+                val rInner = radius - (strokeWidthPx / 2f) - 1.dp.toPx()
+                val rOuter = radius + (strokeWidthPx / 2f) + 1.dp.toPx()
+
+                // Divider at start angle (-90 degrees / top center)
+                val angle1Rad = Math.toRadians(-90.0)
+                val dir1X = kotlin.math.cos(angle1Rad).toFloat()
+                val dir1Y = kotlin.math.sin(angle1Rad).toFloat()
+                drawLine(
+                    color = dividerColor,
+                    start = centerOffset + Offset(rInner * dir1X, rInner * dir1Y),
+                    end = centerOffset + Offset(rOuter * dir1X, rOuter * dir1Y),
+                    strokeWidth = gapWidthPx,
+                    cap = StrokeCap.Butt
+                )
+
+                // Divider at end angle (-90 + filledSweep)
+                val angle2Rad = Math.toRadians((-90f + filledSweep).toDouble())
+                val dir2X = kotlin.math.cos(angle2Rad).toFloat()
+                val dir2Y = kotlin.math.sin(angle2Rad).toFloat()
+                drawLine(
+                    color = dividerColor,
+                    start = centerOffset + Offset(rInner * dir2X, rInner * dir2Y),
+                    end = centerOffset + Offset(rOuter * dir2X, rOuter * dir2Y),
+                    strokeWidth = gapWidthPx,
+                    cap = StrokeCap.Butt
+                )
             }
         }
 
@@ -22391,7 +22422,7 @@ fun ChartSection(
 
                             values.forEachIndexed { index, value ->
                                 val rawSweep = ((value / totalValid) * 360f).toFloat()
-                                val sweepAngle = rawSweep * animatedProgressMultiplier
+                                val sweepAngle = (rawSweep * animatedProgressMultiplier).coerceAtMost(359.99f)
 
                                 if (sweepAngle > 0f) {
                                     val isSelected = (selectedIndex == index)
