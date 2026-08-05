@@ -594,9 +594,10 @@ fun BudgetControlDonutChart(
     categoryType: String, // "INCOME", "EXPENSE", "SAVINGS"
     language: AppLanguage,
     modifier: Modifier = Modifier,
-    strokeWidthDp: Dp = 14.dp,
-    centerTextSize: TextUnit = 14.sp,
-    centerColorOverride: Color = Color(0xFFF8F9FA),
+    isDark: Boolean = false,
+    strokeWidthDp: Dp = 18.dp,
+    centerTextSize: TextUnit = 13.sp,
+    centerColorOverride: Color = Color.Transparent,
     customGradient: List<Color>? = null,
     onCenterClick: () -> Unit = {},
     onLongPress: () -> Unit = {}
@@ -609,50 +610,32 @@ fun BudgetControlDonutChart(
 
     val animatedProgressMultiplier by animateFloatAsState(
         targetValue = if (animationPlayed) 1f else 0f,
-        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
         label = "budget_chart_animation"
     )
 
-    val progress = if (targetAmount > 0.0) {
-        (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
-    } else {
-        0.0
+    val progress = remember(targetAmount, totalFilledAmount) {
+        if (targetAmount > 0.0) {
+            (totalFilledAmount / targetAmount).coerceIn(0.0, 1.0)
+        } else {
+            0.0
+        }
     }
 
-    val actualProgressMultiplier = if (targetAmount > 0.0) {
-        totalFilledAmount / targetAmount
-    } else {
-        0.0
+    val percentageInt = (progress * animatedProgressMultiplier * 100).toInt()
+
+    // Slice colors matching reference image (Vibrant slice + Light gray remaining arc)
+    val filledColor = remember(categoryType, customGradient) {
+        customGradient?.firstOrNull() ?: when (categoryType) {
+            "INCOME" -> Color(0xFF10B981)   // Green
+            "EXPENSE" -> Color(0xFFF97316)  // Orange
+            "SAVINGS" -> Color(0xFF0284C7)  // Blue
+            else -> Color(0xFF0078D4)
+        }
     }
 
-    val percentageText = if (targetAmount > 0.0) {
-        "${(actualProgressMultiplier * animatedProgressMultiplier * 100).toInt()}%"
-    } else {
-        if (language == AppLanguage.BN) "সেট করুন" else "Set"
-    }
-
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-
-    // Colors & Gradients selection
-    val gradientColors = customGradient ?: when (categoryType) {
-        "INCOME" -> listOf(Color(0xFF34D399), Color(0xFF10B981), Color(0xFF059669))
-        "EXPENSE" -> listOf(Color(0xFFFDBA74), Color(0xFFF97316), Color(0xFFEA580C))
-        "SAVINGS" -> listOf(Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFF2563EB))
-        else -> listOf(Color(0xFF38BDF8), Color(0xFF38BDF8))
-    }
-
-    val trackColor = when (categoryType) {
-        "INCOME" -> Color(0xFF10B981).copy(alpha = 0.20f)
-        "EXPENSE" -> Color(0xFFEA580C).copy(alpha = 0.20f)
-        "SAVINGS" -> FintechBlue.copy(alpha = 0.20f)
-        else -> Color.LightGray.copy(alpha = 0.20f)
-    }
-
-    val percentageColor = when (categoryType) {
-        "INCOME" -> if (isDark) Color(0xFF4CAF50) else Color(0xFF2E7D32)
-        "EXPENSE" -> if (isDark) Color(0xFFFF9800) else Color(0xFFE65100)
-        "SAVINGS" -> if (isDark) Color(0xFF38BDF8) else FintechBlue
-        else -> FintechBlue
+    val unfilledColor = remember(isDark) {
+        if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
     }
 
     Box(
@@ -668,9 +651,11 @@ fun BudgetControlDonutChart(
             val sizeMin = size.minDimension
             val strokeWidthPx = strokeWidthDp.toPx()
             val radius = (sizeMin - strokeWidthPx) / 2f
-            val centerOffset = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+            val centerOffset = Offset(size.width / 2f, size.height / 2f)
+            val arcTopLeft = Offset(centerOffset.x - radius, centerOffset.y - radius)
+            val arcSize = Size(radius * 2f, radius * 2f)
 
-            // Draw central hollow background
+            // Central hollow background
             val innerRadius = radius - strokeWidthPx / 2f
             if (innerRadius > 0f) {
                 drawCircle(
@@ -680,53 +665,82 @@ fun BudgetControlDonutChart(
                 )
             }
 
-            // Draw progress track (100% circle background with trackColor)
-            val arcTopLeft = androidx.compose.ui.geometry.Offset(centerOffset.x - radius, centerOffset.y - radius)
-            val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
-            drawArc(
-                color = trackColor,
-                startAngle = -90f,
-                sweepAngle = 360f,
-                useCenter = false,
-                topLeft = arcTopLeft,
-                size = arcSize,
-                style = Stroke(width = strokeWidthPx)
-            )
+            val currentProgress = (progress * animatedProgressMultiplier).toFloat()
+            val startAngle = -90f
+            val gapAngle = if (currentProgress > 0.02f && currentProgress < 0.98f) 2.5f else 0f
 
-            // Draw active segment (progress arc)
-            val sweepAngle = (progress * 360f).toFloat() * animatedProgressMultiplier
-            if (sweepAngle > 0f) {
-                // Gradient brush for the segment
-                val brush = Brush.linearGradient(
-                    colors = gradientColors,
-                    start = Offset(centerOffset.x, centerOffset.y - radius),
-                    end = Offset(centerOffset.x, centerOffset.y + radius)
-                )
-
-                // Main Gradient Arc
+            if (currentProgress >= 0.999f) {
+                // 100% Filled slice
                 drawArc(
-                    brush = brush,
-                    startAngle = -90f,
-                    sweepAngle = sweepAngle,
+                    color = filledColor,
+                    startAngle = startAngle,
+                    sweepAngle = 360f,
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,
-                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Round)
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                 )
+            } else if (currentProgress <= 0.001f) {
+                // 0% Filled slice (100% Gray arc)
+                drawArc(
+                    color = unfilledColor,
+                    startAngle = startAngle,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                )
+            } else {
+                val filledSweep = (currentProgress * 360f) - (gapAngle / 2f)
+                val unfilledSweep = (360f - (currentProgress * 360f)) - (gapAngle / 2f)
+
+                // 1. Filled slice (Primary Arc)
+                if (filledSweep > 0f) {
+                    drawArc(
+                        color = filledColor,
+                        startAngle = startAngle + (gapAngle / 2f),
+                        sweepAngle = filledSweep,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                    )
+                }
+
+                // 2. Unfilled slice (Gray Arc - exact match to reference image!)
+                if (unfilledSweep > 0f) {
+                    drawArc(
+                        color = unfilledColor,
+                        startAngle = startAngle + (gapAngle / 2f) + filledSweep + gapAngle,
+                        sweepAngle = unfilledSweep,
+                        useCenter = false,
+                        topLeft = arcTopLeft,
+                        size = arcSize,
+                        style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
+                    )
+                }
             }
         }
 
-        // Center percentage text
+        // Center percentage / inner text
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            modifier = Modifier.padding(horizontal = 2.dp)
         ) {
+            val textStr = if (targetAmount > 0.0) {
+                "${percentageInt}%"
+            } else {
+                if (language == AppLanguage.BN) "সেট" else "Set"
+            }
             Text(
-                text = formatNumberString(percentageText, language),
+                text = formatNumberString(textStr, language),
                 fontSize = if (targetAmount > 0.0) centerTextSize else 11.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = if (targetAmount > 0.0) percentageColor else Color.Gray,
+                color = if (targetAmount > 0.0) {
+                    filledColor
+                } else Color.Gray,
                 textAlign = TextAlign.Center
             )
         }
@@ -7025,7 +7039,7 @@ fun TrendDetailDialog(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().bouncyOverscroll(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     item {
@@ -7289,16 +7303,10 @@ private fun CompactTrendItem(
                 )
             },
         shape = RoundedCornerShape(14.dp),
-        color = if (isDark) Color(0xFF1C1E2D).copy(alpha = 0.85f) else Color.White,
+        color = if (isDark) Color(0xFF1E293B) else Color.White,
         border = BorderStroke(
             width = 1.dp,
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    accentColor.copy(alpha = 0.45f),
-                    accentColor.copy(alpha = 0.12f),
-                    if (isDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.05f)
-                )
-            )
+            color = accentColor.copy(alpha = if (isDark) 0.5f else 0.4f)
         ),
         shadowElevation = 0.dp
     ) {
@@ -8207,7 +8215,8 @@ fun DashboardScreen(
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .bouncyOverscroll(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(top = 12.dp, bottom = 90.dp)
             ) {
@@ -8636,7 +8645,7 @@ fun DashboardScreen(
 
 
 
-            item {
+            item(key = "export_card") {
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF1E293B) else Color.White),
@@ -8715,7 +8724,7 @@ fun DashboardScreen(
                 }
             }
 
-            item {
+            item(key = "trend_card") {
                 Spacer(modifier = Modifier.height(4.dp))
                 FinancialTrendPerformanceCard(
                     transactions = transactions,
@@ -8728,7 +8737,7 @@ fun DashboardScreen(
                 )
             }
 
-            item {
+            item(key = "budget_card") {
                 // Monthly Budget Control Card (সাদা রং এর)
             Card(
                 shape = RoundedCornerShape(24.dp),
@@ -8818,10 +8827,11 @@ fun DashboardScreen(
                                 totalFilledAmount = effectiveIncome,
                                 categoryType = "INCOME",
                                 language = language,
+                                isDark = isDark,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
-                                strokeWidthDp = 14.dp,
-                                centerTextSize = 14.sp,
-                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA),
+                                strokeWidthDp = 18.dp,
+                                centerTextSize = 13.sp,
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color.White,
                                 customGradient = budgetGradients["INCOME"],
                                 onCenterClick = { showBudgetDetailsType = "INCOME" },
                                 onLongPress = { onEditGradient?.invoke("INCOME") }
@@ -8852,10 +8862,11 @@ fun DashboardScreen(
                                 totalFilledAmount = effectiveExpense,
                                 categoryType = "EXPENSE",
                                 language = language,
+                                isDark = isDark,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
-                                strokeWidthDp = 14.dp,
-                                centerTextSize = 14.sp,
-                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA),
+                                strokeWidthDp = 18.dp,
+                                centerTextSize = 13.sp,
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color.White,
                                 customGradient = budgetGradients["EXPENSE"],
                                 onCenterClick = { showBudgetDetailsType = "EXPENSE" },
                                 onLongPress = { onEditGradient?.invoke("EXPENSE") }
@@ -8886,10 +8897,11 @@ fun DashboardScreen(
                                 totalFilledAmount = effectiveSavings,
                                 categoryType = "SAVINGS",
                                 language = language,
+                                isDark = isDark,
                                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(0.dp),
-                                strokeWidthDp = 14.dp,
-                                centerTextSize = 14.sp,
-                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color(0xFFF8F9FA),
+                                strokeWidthDp = 18.dp,
+                                centerTextSize = 13.sp,
+                                centerColorOverride = if (isDark) Color(0xFF1E293B) else Color.White,
                                 customGradient = budgetGradients["SAVINGS"],
                                 onCenterClick = { showBudgetDetailsType = "SAVINGS" },
                                 onLongPress = { onEditGradient?.invoke("SAVINGS") }
@@ -9922,6 +9934,7 @@ fun MonthlyFinancialHistoryDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 420.dp)
+                    .bouncyOverscroll()
             ) {
                 items(monthlySummaries.size) { index ->
                     val item = monthlySummaries[index]
@@ -12157,7 +12170,7 @@ fun DebtsScreen(
             } else {
                 LazyColumn(
                     state = lazyListState,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).bouncyOverscroll(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
@@ -13104,7 +13117,8 @@ fun SavingsScreen(
                 LazyColumn(
                     state = lazyListState,
                     modifier = Modifier.weight(1f)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
+                        .bouncyOverscroll(),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
@@ -14313,7 +14327,8 @@ fun AddTransactionDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
             LazyColumn(
                 modifier = Modifier
                     .padding(20.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .bouncyOverscroll(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
@@ -15175,7 +15190,8 @@ fun AddSavingsGoalDialog(viewModel: com.example.ui.viewmodel.FinanceViewModel,
             LazyColumn(
                 modifier = Modifier
                     .padding(24.dp)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .bouncyOverscroll(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
@@ -16070,7 +16086,7 @@ fun SavingsGoalDetailOverlay(
             } else {
                 LazyColumn(
                     state = lazyListState,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).bouncyOverscroll(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
@@ -16998,7 +17014,7 @@ fun PersonDetailOverlay(
                 val grouped = txList.sortedByDescending { it.timestamp }.groupBy { formatDateToDay(it.timestamp) }
                 LazyColumn(
                     state = lazyListState,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).bouncyOverscroll(),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
                 ) {
@@ -22214,6 +22230,22 @@ fun ChartsScreen(
     }
 }
 
+fun formatDonutPercentage(pct: Double, language: AppLanguage): String {
+    val formatted = if (pct % 1.0 < 0.05 || pct >= 99.5) {
+        "${pct.toInt()}%"
+    } else {
+        String.format(java.util.Locale.US, "%.1f%%", pct)
+    }
+    return if (language == AppLanguage.BN) {
+        formatted.replace('0', '০').replace('1', '১').replace('2', '২')
+            .replace('3', '৩').replace('4', '৪').replace('5', '৫')
+            .replace('6', '৬').replace('7', '৭').replace('8', '৮')
+            .replace('9', '৯')
+    } else {
+        formatted
+    }
+}
+
 @Composable
 fun ChartSection(
     title: String,
@@ -22224,7 +22256,7 @@ fun ChartSection(
     isDark: Boolean = true,
     onLongPress: () -> Unit = {}
 ) {
-    val bgColor = if (isDark) listOf(Color(0xFF1E293B), Color(0xFF1E293B)) else listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))
+    val bgColor = if (isDark) listOf(Color(0xFF1C1E2D), Color(0xFF1C1E2D)) else listOf(Color.White, Color.White)
     val textColor = if (isDark) Color.White else Color(0xFF1E293B)
     
     var animationPlayed by remember { mutableStateOf(false) }
@@ -22237,150 +22269,242 @@ fun ChartSection(
         label = "chart_donut_animation"
     )
 
-    val centerBgColor = FintechBlue.copy(alpha = 0.1f)
+    var selectedIndex by remember { mutableStateOf<Int?>(0) }
+
+    val defaultVibrantPalette = remember {
+        listOf(
+            Color(0xFF6366F1), // Bright Indigo
+            Color(0xFFD946EF), // Bright Magenta
+            Color(0xFF16A34A), // Vibrant Green
+            Color(0xFFF97316), // Vibrant Orange
+            Color(0xFFDC2626), // Vibrant Red
+            Color(0xFF06B6D4), // Cyan
+            Color(0xFF8B5CF6), // Bright Purple
+            Color(0xFFEAB308)  // Amber
+        )
+    }
 
     FintechGradientCard(
         gradientColors = bgColor,
         cornerRadius = 24.dp,
         padding = PaddingValues(20.dp),
-        modifier = Modifier.fillMaxWidth()
+        shadowElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .pointerInput(Unit) {
                 detectTapGestures(onLongPress = { onLongPress() })
             }
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = title,
-                color = Color(0xFF3B82F6),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            if (total == 0.0) {
-                Box(modifier = Modifier.height(150.dp), contentAlignment = Alignment.Center) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = formatCurrency(total, language),
+                    color = FintechBlue,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (total <= 0.0 || data.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
                         text = if (language == AppLanguage.BN) "কোন তথ্য নেই" else "No Data Available",
-                        color = textColor.copy(alpha = 0.6f)
+                        color = textColor.copy(alpha = 0.5f)
                     )
                 }
             } else {
-                val values = data.values.map { it.toFloat() }
-                val labels = data.keys.toList()
-                val totalFloat = total.toFloat()
+                val validData = data.filter { it.value > 0.0 }
+                val labels = validData.keys.toList()
+                val values = validData.values.toList()
+                val totalValid = values.sum()
+
+                val activeColors = if (palette.size >= validData.size) palette else defaultVibrantPalette
 
                 Row(
-                     modifier = Modifier.fillMaxWidth(),
-                     verticalAlignment = Alignment.CenterVertically,
-                     horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    // Donut Chart Canvas
+                    Box(
+                        modifier = Modifier
+                            .size(170.dp)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(modifier = Modifier.size(140.dp), contentAlignment = Alignment.Center) {
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val sizeMin = size.minDimension
-                                val strokeWidthPx = 16.dp.toPx()
-                                // Subtract 16.dp to leave 8.dp space for glowing shadow
-                                val radius = (sizeMin - strokeWidthPx - 16.dp.toPx()) / 2f
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(validData) {
+                                    detectTapGestures { offset ->
+                                        val center = Offset(size.width / 2f, size.height / 2f)
+                                        val dx = offset.x - center.x
+                                        val dy = offset.y - center.y
+                                        val dist = kotlin.math.sqrt(dx * dx + dy * dy)
 
-                                // Draw central hollow background
-                                val innerRadius = radius - strokeWidthPx / 2f
-                                if (innerRadius > 0f) {
-                                    drawCircle(
-                                        color = centerBgColor,
-                                        radius = innerRadius,
-                                        center = center
-                                    )
-                                }
+                                        val outerR = minOf(size.width, size.height) / 2f - 12.dp.toPx()
+                                        val innerR = outerR * 0.28f
 
-                                // Draw active segments with flat caps and gap-less design
-                                if (totalFloat > 0f) {
-                                    var startAngle = -90f
-                                    val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
-                                    val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+                                        if (dist in innerR..(outerR + 20.dp.toPx())) {
+                                            var touchAngle = (kotlin.math.atan2(dy, dx) * 180f / kotlin.math.PI).toFloat()
+                                            if (touchAngle < 0f) touchAngle += 360f
 
-                                    val validValues = values.filter { it > 0f }
-                                    validValues.forEachIndexed { index, value ->
-                                        val sweepAngle = ((value / totalFloat) * 360f) * animatedProgressMultiplier
-                                        val color = palette[index % palette.size]
+                                            var angleFromTop = touchAngle + 90f
+                                            if (angleFromTop >= 360f) angleFromTop -= 360f
 
-                                        // Soft glowing shadow extending ONLY outwards (blurred)
-                                        // Android 8.1 compatible natural outward glow with smooth gradient fade
-                                        val glowLayers = 100
-                                        val glowSize = 6.dp.toPx()
-                                        for (i in glowLayers downTo 1) {
-                                            val fraction = i.toFloat() / glowLayers
-                                            val currentGlowWidth = glowSize * fraction
-                                            val glowRadius = radius + (strokeWidthPx / 2f) + (currentGlowWidth / 2f)
-                                            // Linear fade for smoother outer transition and blurrier falloff
-                                            val alpha = 0.019f * (1.0f - fraction)
-                                            drawArc(
-                                                color = color.copy(alpha = alpha.coerceAtLeast(0.001f)),
-                                                startAngle = startAngle,
-                                                sweepAngle = sweepAngle + 0.8f,
-                                                useCenter = false,
-                                                topLeft = androidx.compose.ui.geometry.Offset(center.x - glowRadius, center.y - glowRadius),
-                                                size = androidx.compose.ui.geometry.Size(glowRadius * 2f, glowRadius * 2f),
-                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = currentGlowWidth, cap = androidx.compose.ui.graphics.StrokeCap.Butt)
-                                            )
+                                            var currentAngle = 0f
+                                            for (i in values.indices) {
+                                                val sweep = ((values[i] / totalValid) * 360f).toFloat()
+                                                if (angleFromTop >= currentAngle && angleFromTop <= (currentAngle + sweep)) {
+                                                    selectedIndex = if (selectedIndex == i) null else i
+                                                    break
+                                                }
+                                                currentAngle += sweep
+                                            }
                                         }
-
-                                        drawArc(
-                                            color = color,
-                                            startAngle = startAngle,
-                                            sweepAngle = sweepAngle + 0.8f,
-                                            useCenter = false,
-                                            topLeft = arcTopLeft,
-                                            size = arcSize,
-                                            style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
-                                        )
-                                        
-                                        startAngle += sweepAngle
                                     }
                                 }
+                        ) {
+                            val sizeMin = size.minDimension
+                            val outerRadius = (sizeMin / 2f) - 12.dp.toPx()
+                            val innerRadius = outerRadius * 0.28f
+
+                            var currentStartAngle = -90f
+
+                            values.forEachIndexed { index, value ->
+                                val rawSweep = ((value / totalValid) * 360f).toFloat()
+                                val sweepAngle = rawSweep * animatedProgressMultiplier
+
+                                if (sweepAngle > 0f) {
+                                    val isSelected = (selectedIndex == index)
+                                    val popOffset = if (isSelected) 8.dp.toPx() else 0f
+
+                                    val midAngle = currentStartAngle + (sweepAngle / 2f)
+                                    val midRad = Math.toRadians(midAngle.toDouble())
+
+                                    val offsetX = (popOffset * kotlin.math.cos(midRad)).toFloat()
+                                    val offsetY = (popOffset * kotlin.math.sin(midRad)).toFloat()
+
+                                    val sliceCenter = Offset(center.x + offsetX, center.y + offsetY)
+                                    val sliceColor = activeColors[index % activeColors.size]
+
+                                    // 1. Draw drop shadow for popped/selected slice
+                                    if (isSelected) {
+                                        val shadowPath = Path().apply {
+                                            arcTo(
+                                                rect = Rect(
+                                                    sliceCenter.x - outerRadius - 6.dp.toPx(),
+                                                    sliceCenter.y - outerRadius - 6.dp.toPx(),
+                                                    sliceCenter.x + outerRadius + 6.dp.toPx(),
+                                                    sliceCenter.y + outerRadius + 6.dp.toPx()
+                                                ),
+                                                startAngleDegrees = currentStartAngle,
+                                                sweepAngleDegrees = sweepAngle,
+                                                forceMoveTo = true
+                                            )
+                                            lineTo(sliceCenter.x, sliceCenter.y)
+                                            close()
+                                        }
+                                        drawPath(
+                                            path = shadowPath,
+                                            color = sliceColor.copy(alpha = 0.35f),
+                                            style = Fill
+                                        )
+                                    }
+
+                                    // 2. Draw filled pie wedge
+                                    val wedgePath = Path().apply {
+                                        arcTo(
+                                            rect = Rect(
+                                                sliceCenter.x - outerRadius,
+                                                sliceCenter.y - outerRadius,
+                                                sliceCenter.x + outerRadius,
+                                                sliceCenter.y + outerRadius
+                                            ),
+                                            startAngleDegrees = currentStartAngle,
+                                            sweepAngleDegrees = sweepAngle,
+                                            forceMoveTo = true
+                                        )
+                                        lineTo(sliceCenter.x, sliceCenter.y)
+                                        close()
+                                    }
+                                    drawPath(path = wedgePath, color = sliceColor)
+
+                                    currentStartAngle += sweepAngle
+                                }
                             }
-                            
-                            // Center Amount Text
-                            Text(
-                                text = formatCurrency(total, language),
-                                color = if (isDark) Color.White else Color(0xFF1E293B),
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 4.dp)
+
+                            // 4. Draw central donut hole (white/dark bg circle)
+                            val centerHoleColor = if (isDark) Color(0xFF1C1E2D) else Color.White
+                            drawCircle(
+                                color = centerHoleColor,
+                                radius = innerRadius,
+                                center = center
                             )
                         }
                     }
 
+                    // Legend Section on the right
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         labels.forEachIndexed { index, label ->
                             val value = data[label] ?: 0.0
-                            val percent = ((value / total) * 100).toInt()
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            val pct = ((value / totalValid) * 100)
+                            val isSelected = (selectedIndex == index)
+                            val itemColor = activeColors[index % activeColors.size]
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        selectedIndex = if (selectedIndex == index) null else index
+                                    }
+                                    .background(
+                                        if (isSelected) itemColor.copy(alpha = 0.15f) else Color.Transparent
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(10.dp)
+                                        .size(12.dp)
                                         .clip(CircleShape)
-                                        .background(palette[index % palette.size])
+                                        .background(itemColor)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = label,
                                         color = textColor,
-                                        fontSize = 12.sp,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "${formatCurrency(value, language)} ($percent%)",
-                                        color = textColor.copy(alpha = 0.7f),
+                                        text = "${formatCurrency(value, language)} (${formatDonutPercentage(pct, language)})",
+                                        color = textColor.copy(alpha = 0.65f),
                                         fontSize = 10.sp
                                     )
                                 }
@@ -22389,7 +22513,7 @@ fun ChartSection(
                     }
                 }
             }
-        }    
+        }
     }
 }
 

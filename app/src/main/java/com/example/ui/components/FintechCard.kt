@@ -24,13 +24,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -226,3 +231,103 @@ fun FrostedGlassCard(
         }
     }
 }
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun Modifier.touchScaleDown(
+    scaleDownFactor: Float = 0.96f,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null
+): Modifier = composed {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    var isRawPressed by remember { mutableStateOf(false) }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed || isRawPressed) scaleDownFactor else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "touchScaleDown"
+    )
+
+    val clickMod = if (onClick != null || onLongClick != null) {
+        Modifier.combinedClickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = { onClick?.invoke() },
+            onLongClick = { onLongClick?.invoke() }
+        )
+    } else {
+        Modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    isRawPressed = true
+                    try {
+                        awaitRelease()
+                    } finally {
+                        isRawPressed = false
+                    }
+                }
+            )
+        }
+    }
+
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .then(clickMod)
+}
+
+fun Modifier.bouncyOverscroll(): Modifier = composed {
+    var overscrollAmount by remember { mutableStateOf(0f) }
+
+    val animatedOverscroll by animateFloatAsState(
+        targetValue = overscrollAmount,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "bouncyOverscroll"
+    )
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                if (source == NestedScrollSource.UserInput) {
+                    val newOverscroll = overscrollAmount + available.y * 0.35f
+                    overscrollAmount = newOverscroll.coerceIn(-100f, 100f)
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                overscrollAmount = 0f
+                return Velocity.Zero
+            }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(overscrollAmount) {
+        if (overscrollAmount != 0f) {
+            kotlinx.coroutines.delay(80)
+            overscrollAmount = 0f
+        }
+    }
+
+    this
+        .nestedScroll(nestedScrollConnection)
+        .graphicsLayer {
+            translationY = animatedOverscroll
+            val scaleFactor = 1f + (kotlin.math.abs(animatedOverscroll) / 1200f)
+            scaleY = scaleFactor
+        }
+}
+
+
