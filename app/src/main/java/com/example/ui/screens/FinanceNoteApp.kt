@@ -243,7 +243,7 @@ fun CategorySegmentedDonutChart(
     isDark: Boolean,
     language: AppLanguage,
     modifier: Modifier = Modifier,
-    strokeWidthDp: Dp = 18.dp,
+    strokeWidthDp: Dp = 24.dp,
     centerTextSize: TextUnit = 22.sp,
     categoryType: String? = null,
     unfilledColorOverride: Color? = null,
@@ -382,6 +382,9 @@ fun CategorySegmentedDonutChart(
 
                 var currentStartAngle = -90f
 
+                val arcTopLeft = androidx.compose.ui.geometry.Offset(center.x - radius, center.y - radius)
+                val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+
                 validSegments.forEachIndexed { index, segment ->
                     val prop = segment.second / activeSegmentsSum
                     val rawSweep = (prop * totalActiveSweep).toFloat()
@@ -403,7 +406,7 @@ fun CategorySegmentedDonutChart(
                         val arcTopLeft = androidx.compose.ui.geometry.Offset(sliceCenter.x - radius, sliceCenter.y - radius)
                         val arcSize = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
 
-                        // 1. Draw shadow for selected segment
+                        // 1. Draw drop shadow for selected popped slice
                         if (isSelected) {
                             drawArc(
                                 color = sliceColor.copy(alpha = 0.35f),
@@ -599,6 +602,41 @@ fun BudgetControlDonutChart(
                         style = Stroke(width = strokeWidthPx, cap = StrokeCap.Butt)
                     )
                 }
+
+                // 3. Draw uniform parallel gap dividers at junction 1 (-90°) and junction 2 (-90° + filledSweep)
+                val dividerColor = if (centerColorOverride != Color.Transparent && centerColorOverride != null) {
+                    centerColorOverride
+                } else {
+                    if (isDark) Color(0xFF1E293B) else Color.White
+                }
+
+                val gapWidthPx = 5.dp.toPx()
+                val rInner = radius - (strokeWidthPx / 2f) - 1.dp.toPx()
+                val rOuter = radius + (strokeWidthPx / 2f) + 1.dp.toPx()
+
+                // Divider at start angle (-90 degrees / top center)
+                val angle1Rad = Math.toRadians(-90.0)
+                val dir1X = kotlin.math.cos(angle1Rad).toFloat()
+                val dir1Y = kotlin.math.sin(angle1Rad).toFloat()
+                drawLine(
+                    color = dividerColor,
+                    start = centerOffset + Offset(rInner * dir1X, rInner * dir1Y),
+                    end = centerOffset + Offset(rOuter * dir1X, rOuter * dir1Y),
+                    strokeWidth = gapWidthPx,
+                    cap = StrokeCap.Butt
+                )
+
+                // Divider at end angle (-90 + filledSweep)
+                val angle2Rad = Math.toRadians((-90f + filledSweep).toDouble())
+                val dir2X = kotlin.math.cos(angle2Rad).toFloat()
+                val dir2Y = kotlin.math.sin(angle2Rad).toFloat()
+                drawLine(
+                    color = dividerColor,
+                    start = centerOffset + Offset(rInner * dir2X, rInner * dir2Y),
+                    end = centerOffset + Offset(rOuter * dir2X, rOuter * dir2Y),
+                    strokeWidth = gapWidthPx,
+                    cap = StrokeCap.Butt
+                )
             }
         }
 
