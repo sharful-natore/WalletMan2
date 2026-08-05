@@ -7262,11 +7262,45 @@ private fun CompactTrendItem(
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "trendItemScale"
+    )
+
     Surface(
-        modifier = modifier.clickable { onClick() },
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                    },
+                    onTap = { onClick() }
+                )
+            },
         shape = RoundedCornerShape(14.dp),
-        color = if (isDark) Color(0xFF0F172A) else Color.White,
-        border = BorderStroke(0.5.dp, accentColor.copy(alpha = 0.25f))
+        color = if (isDark) Color(0xFF0F172A).copy(alpha = 0.9f) else Color.White,
+        border = BorderStroke(
+            width = 1.dp,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    accentColor.copy(alpha = 0.45f),
+                    accentColor.copy(alpha = 0.12f),
+                    if (isDark) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.05f)
+                )
+            )
+        ),
+        shadowElevation = if (isDark) 2.dp else 3.dp
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 7.dp),
@@ -13083,6 +13117,7 @@ fun SavingsScreen(
                         Box(
                             modifier = Modifier
                                 .animateItem()
+                                .scrollEntranceEffect(goal.id)
                                 .then(
                                     if (isSelectionMode) {
                                         Modifier.pointerInput(goal.id, isSelectionMode) {
@@ -13502,6 +13537,42 @@ fun DrawScope.drawCardPattern(patternIdx: Int) {
     }
 }
 
+@Composable
+fun Modifier.scrollEntranceEffect(key: Any? = Unit): Modifier {
+    var visible by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(key) {
+        visible = true
+    }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.25f,
+        animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing),
+        label = "scrollEntranceAlpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.96f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "scrollEntranceScale"
+    )
+    val offsetY by animateFloatAsState(
+        targetValue = if (visible) 0f else 24f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "scrollEntranceOffsetY"
+    )
+
+    return this.graphicsLayer {
+        this.alpha = alpha
+        this.scaleX = scale
+        this.scaleY = scale
+        this.translationY = offsetY
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SavingsGoalCardItem(
@@ -13541,6 +13612,15 @@ fun SavingsGoalCardItem(
         gradientColors = gradient,
         cornerRadius = 24.dp,
         padding = PaddingValues(0.dp),
+        shadowElevation = 8.dp,
+        onClick = {
+            if (isSelectionMode) {
+                onLongClick()
+            } else {
+                onGoalClick(goal)
+            }
+        },
+        onLongClick = onLongClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
@@ -13548,16 +13628,6 @@ fun SavingsGoalCardItem(
                 if (isHighlighted) Modifier.border(4.dp, Color(0xFFFBBF24), RoundedCornerShape(24.dp))
                 else if (isSelected) Modifier.border(3.dp, Color.White, RoundedCornerShape(24.dp))
                 else Modifier
-            )
-            .combinedClickable(
-                onClick = {
-                    if (isSelectionMode) {
-                        onLongClick()
-                    } else {
-                        onGoalClick(goal)
-                    }
-                },
-                onLongClick = onLongClick
             )
             .testTag("savings_item_${goal.id}")
     ) {
