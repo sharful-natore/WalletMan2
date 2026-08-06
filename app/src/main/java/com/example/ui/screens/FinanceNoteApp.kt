@@ -10,6 +10,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.window.Popup
 import kotlinx.coroutines.delay
 import com.example.BuildConfig
@@ -2578,6 +2581,7 @@ fun FinanceNoteApp(
     var showEnhancedProfileMenu by remember { mutableStateOf(false) }
     var showDraftsDialog by remember { mutableStateOf(false) }
     var showAutoEntryScreen by remember { mutableStateOf(false) }
+    var showGuidelineScreen by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showNoInternetDialog by remember { mutableStateOf(false) }
     var onNoInternetRetryAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -2852,6 +2856,10 @@ fun FinanceNoteApp(
     }
 
     var showWorkspaceDialog by remember { mutableStateOf(false) }
+    var hasSeenOnboarding by remember {
+        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+        mutableStateOf(prefs.getBoolean("has_seen_onboarding", false))
+    }
 
     if (showWorkspaceDialog) {
         WorkspaceManagementDialog(
@@ -2941,6 +2949,10 @@ fun FinanceNoteApp(
             onAutoEntry = {
                 showEnhancedProfileMenu = false
                 showAutoEntryScreen = true
+            },
+            onGuidelines = {
+                showEnhancedProfileMenu = false
+                showGuidelineScreen = true
             }
         )
     }
@@ -2951,6 +2963,14 @@ fun FinanceNoteApp(
             language = language,
             isDark = isDarkTheme,
             onDismiss = { showAutoEntryScreen = false }
+        )
+    }
+
+    if (showGuidelineScreen) {
+        com.example.ui.screens.UserGuidelineScreen(
+            language = language,
+            isDark = isDarkTheme,
+            onDismiss = { showGuidelineScreen = false }
         )
     }
 
@@ -2981,13 +3001,31 @@ fun FinanceNoteApp(
         colorScheme = MaterialTheme.colorScheme
     ) {
         if (!isAuthenticated && !showSplash && !forceDismissLogin) {
-            LoginScreen(
-                viewModel = viewModel,
-                language = language,
-                isDark = isDarkTheme,
-                onDismiss = { /* mandatory login, no dismiss unless logged in */ },
-                onGoogleSignIn = { triggerGoogleSignIn() }
-            )
+            if (!hasSeenOnboarding) {
+                OnboardingScreen(
+                    language = language,
+                    isDark = isDarkTheme,
+                    onToggleLanguage = {
+                        viewModel.toggleLanguage(context)
+                    },
+                    onFinish = {
+                        hasSeenOnboarding = true
+                        val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                        prefs.edit().putBoolean("has_seen_onboarding", true).apply()
+                    }
+                )
+            } else {
+                LoginScreen(
+                    viewModel = viewModel,
+                    language = language,
+                    isDark = isDarkTheme,
+                    onDismiss = { /* mandatory login, no dismiss unless logged in */ },
+                    onGoogleSignIn = { triggerGoogleSignIn() },
+                    onOpenOnboarding = {
+                        hasSeenOnboarding = false
+                    }
+                )
+            }
         } else {
             Scaffold(
                 containerColor = Color.Transparent,
@@ -11430,7 +11468,7 @@ fun TransactionsScreen(
                             }
                             itemsIndexed(txs, key = { txIdx, tx -> "tx_curr_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
                                 val isSelected = selectedTxIds.contains(tx.id)
-                                Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
+                                Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem().scrollEntranceEffect(tx.id)) {
                                     TransactionRowItem(
                                         tx = tx,
                                         language = language,
@@ -11478,7 +11516,7 @@ fun TransactionsScreen(
                                 }
                                 itemsIndexed(txs, key = { txIdx, tx -> "tx_prev_${tx.id}_${groupIdx}_$txIdx" }) { index, tx ->
                                     val isSelected = selectedTxIds.contains(tx.id)
-                                    Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem()) {
+                                    Box(modifier = Modifier.padding(horizontal = 4.dp).animateItem().scrollEntranceEffect(tx.id)) {
                                         TransactionRowItem(
                                             tx = tx,
                                             language = language,
@@ -11498,12 +11536,6 @@ fun TransactionsScreen(
                                         )
                                     }
                                 }
-                            }
-                        }
-
-                        if (sortedTransactions.isNotEmpty() || sortedPrevMonthTransactions.isNotEmpty()) {
-                            item(key = "tx_end_of_list_card") {
-                                TransactionEndOfListAnimation(language = language, isDark = isDark)
                             }
                         }
 
@@ -11585,12 +11617,6 @@ fun TransactionsScreen(
                                         }
                                     )
                                 }
-                            }
-                        }
-
-                        if (sortedTransactions.isNotEmpty() || sortedPrevMonthTransactions.isNotEmpty()) {
-                            item(key = "tx_end_of_list_card_nondate") {
-                                TransactionEndOfListAnimation(language = language, isDark = isDark)
                             }
                         }
 
@@ -23656,6 +23682,1936 @@ fun GoogleLogoIcon(modifier: Modifier = Modifier.size(22.dp)) {
     )
 }
 
+// ==================== ONBOARDING FEATURE FOR FIRST-TIME USERS ====================
+
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+fun OnboardingScreen(
+    language: AppLanguage,
+    isDark: Boolean,
+    onToggleLanguage: () -> Unit = {},
+    onFinish: () -> Unit
+) {
+    val context = LocalContext.current
+    val activity = context as? android.app.Activity
+
+    androidx.compose.runtime.DisposableEffect(activity, isDark) {
+        if (activity != null) {
+            val window = activity.window
+            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            insetsController.isAppearanceLightStatusBars = !isDark
+            insetsController.isAppearanceLightNavigationBars = !isDark
+        }
+        onDispose {}
+    }
+
+    var currentPage by rememberSaveable { mutableStateOf(0) }
+    val totalPages = 9
+    var offsetX by remember { mutableStateOf(0f) }
+
+    val bgColor = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC)
+    val cardBgColor = if (isDark) Color(0xFF1E293B) else Color.White
+    val textColor = if (isDark) Color.White else Color(0xFF0F172A)
+    val subtitleColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onFinish,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(bgColor),
+            color = bgColor
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+            ) {
+                // Top Header Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = com.example.R.drawable.ic_app_logo),
+                            contentDescription = "Finance Note Logo",
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "ফাইন্যান্স নোট" else "Finance Note",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = textColor
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Language Switcher Chip
+                        Surface(
+                            onClick = onToggleLanguage,
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0),
+                            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.4f)),
+                            modifier = Modifier.pressScale(0.92f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Language,
+                                    contentDescription = "Language Toggle",
+                                    tint = FintechBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (language == AppLanguage.BN) "English" else "বাংলা",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.White else Color(0xFF0F172A)
+                                )
+                            }
+                        }
+
+                        if (currentPage < totalPages - 1) {
+                            TextButton(
+                                onClick = onFinish,
+                                modifier = Modifier.pressScale(0.92f)
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "স্কিপ করুন" else "Skip",
+                                    color = FintechBlue,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                    }
+                }
+
+                // Interactive Content Page with Horizontal Drag Gesture
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .draggable(
+                            orientation = androidx.compose.foundation.gestures.Orientation.Horizontal,
+                            state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                                offsetX += delta
+                            },
+                            onDragStopped = {
+                                if (offsetX < -50f && currentPage < totalPages - 1) {
+                                    currentPage++
+                                } else if (offsetX > 50f && currentPage > 0) {
+                                    currentPage--
+                                }
+                                offsetX = 0f
+                            }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AnimatedContent(
+                        targetState = currentPage,
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                                    slideOutHorizontally { width -> -width } + fadeOut()
+                                )
+                            } else {
+                                (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                                    slideOutHorizontally { width -> width } + fadeOut()
+                                )
+                            }
+                        },
+                        label = "onboarding_page_anim"
+                    ) { page ->
+                        OnboardingPageContent(
+                            pageIndex = page,
+                            language = language,
+                            isDark = isDark,
+                            textColor = textColor,
+                            subtitleColor = subtitleColor,
+                            cardBgColor = cardBgColor
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Bottom Controls & Indicators
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Indicator Dots
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 20.dp)
+                    ) {
+                        for (i in 0 until totalPages) {
+                            val isActive = (i == currentPage)
+                            val dotWidth by animateDpAsState(
+                                targetValue = if (isActive) 28.dp else 8.dp,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
+                                ),
+                                label = "dotWidth"
+                            )
+                            val dotColor by animateColorAsState(
+                                targetValue = if (isActive) FintechBlue else (if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                                label = "dotColor"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .height(8.dp)
+                                    .width(dotWidth)
+                                    .clip(CircleShape)
+                                    .background(dotColor)
+                                    .clickable { currentPage = i }
+                            )
+                        }
+                    }
+
+                    // Bottom Buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (currentPage > 0) {
+                            OutlinedButton(
+                                onClick = { currentPage-- },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = textColor
+                                ),
+                                modifier = Modifier
+                                    .height(50.dp)
+                                    .pressScale(0.95f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (language == AppLanguage.BN) "আগের" else "Back",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(90.dp))
+                        }
+
+                        if (currentPage < totalPages - 1) {
+                            Button(
+                                onClick = { currentPage++ },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                modifier = Modifier
+                                    .height(50.dp)
+                                    .pressScale(0.95f)
+                            ) {
+                                Text(
+                                    text = if (language == AppLanguage.BN) "পরবর্তী" else "Next",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = onFinish,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Unspecified),
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier
+                                    .height(52.dp)
+                                    .pressScale(0.95f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(FintechBlue, Color(0xFF2563EB))
+                                            ),
+                                            shape = RoundedCornerShape(14.dp)
+                                        )
+                                        .padding(horizontal = 24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = if (language == AppLanguage.BN) "শুরু করুন" else "Get Started",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = Icons.Rounded.CheckCircle,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OnboardingPageContent(
+    pageIndex: Int,
+    language: AppLanguage,
+    isDark: Boolean,
+    textColor: Color,
+    subtitleColor: Color,
+    cardBgColor: Color
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        val badgeText = when (pageIndex) {
+            0 -> if (language == AppLanguage.BN) "আয়-ব্যয় ও দেনা-পাওনা ট্র্যাকিং" else "Income, Expense & Debt Logs"
+            1 -> if (language == AppLanguage.BN) "সঞ্চয় ও বাজেট কন্ট্রোল" else "Savings & Budget Control"
+            2 -> if (language == AppLanguage.BN) "আর্থিক অগ্রগতি ও ট্রেন্ড" else "Financial Progress & Trends"
+            3 -> if (language == AppLanguage.BN) "কুইক এন্ট্রি ও ইনস্ট্যান্ট ট্র্যাকিং" else "Quick Entry & Instant Track"
+            4 -> if (language == AppLanguage.BN) "ড্রাফট ও খসড়া লেনদেন" else "Draft & Pending Transactions"
+            5 -> if (language == AppLanguage.BN) "পিডিএফ এক্সপোর্ট ও রিপোর্ট" else "PDF Export & Statements"
+            6 -> if (language == AppLanguage.BN) "কাস্টমাইজেবল থিম ও অ্যাপিয়ারেন্স" else "Custom Themes & Dark Mode"
+            7 -> if (language == AppLanguage.BN) "মাল্টি ওয়ার্কস্পেস ম্যানেজমেন্ট" else "Multi-Workspace Support"
+            else -> if (language == AppLanguage.BN) "নিরাপদ ক্লাউড ব্যাকআপ ও সিকিউরিটি" else "Secure Cloud Sync & Security"
+        }
+
+        val badgeIcon = when (pageIndex) {
+            0 -> Icons.Rounded.ReceiptLong
+            1 -> Icons.Rounded.AccountBalance // Bank Icon used instead of pig icon!
+            2 -> Icons.Rounded.TrendingUp
+            3 -> Icons.Rounded.Bolt
+            4 -> Icons.Rounded.Drafts
+            5 -> Icons.Rounded.PictureAsPdf
+            6 -> Icons.Rounded.Palette
+            7 -> Icons.Rounded.Workspaces
+            else -> Icons.Rounded.Security
+        }
+
+        Surface(
+            color = FintechBlue.copy(alpha = if (isDark) 0.2f else 0.1f),
+            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = badgeIcon,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = badgeText,
+                    color = FintechBlue,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Illustration Area
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(cardBgColor)
+                .border(
+                    width = 1.dp,
+                    color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
+                    shape = RoundedCornerShape(24.dp)
+                )
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            when (pageIndex) {
+                0 -> IncomeExpenseDebtIllustration(language, isDark)
+                1 -> SavingsBudgetIllustration(language, isDark)
+                2 -> FinancialTrendIllustration(language, isDark)
+                3 -> QuickEntryIllustration(language, isDark)
+                4 -> DraftTransactionsIllustration(language, isDark)
+                5 -> PdfExportIllustration(language, isDark)
+                6 -> CustomThemeIllustration(language, isDark)
+                7 -> MultiWorkspaceIllustration(language, isDark)
+                else -> SecuritySyncIllustration(language, isDark)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        val titleText = when (pageIndex) {
+            0 -> if (language == AppLanguage.BN) "আয়, ব্যয় ও দেনা-পাওনার সঠিক হিসাব" else "Track Income, Expenses & Debt"
+            1 -> if (language == AppLanguage.BN) "স্মার্ট বাজেট ও সঞ্চয় লক্ষ্যপূরণ" else "Smart Budgeting & Savings Goals"
+            2 -> if (language == AppLanguage.BN) "ভিজ্যুয়াল রিপোর্ট ও গ্রোথ এনালাইসিস" else "Visual Trends & Progress Analytics"
+            3 -> if (language == AppLanguage.BN) "২ সেকেন্ডে কুইক লেনদেন এন্ট্রি" else "Instant 2-Second Quick Entry"
+            4 -> if (language == AppLanguage.BN) "ব্যস্ত সময়ে ড্রাফট লেনদেন সেভ করুন" else "Save Drafts On The Go"
+            5 -> if (language == AppLanguage.BN) "প্রফেশনাল পিডিএফ স্টেটমেন্ট ও রিপোর্ট" else "Professional PDF Statements"
+            6 -> if (language == AppLanguage.BN) "পছন্দসই প্রিমিয়াম থিম ও কালার টোন" else "Personalized Custom Themes"
+            7 -> if (language == AppLanguage.BN) "ব্যক্তিগত ও বিজনেস ভিন্ন ভিন্ন ওয়ার্কস্পেস" else "Separate Personal & Business Workspaces"
+            else -> if (language == AppLanguage.BN) "গুগল ড্রাইভ ব্যাকআপ ও বায়োমেট্রিক" else "Google Drive Sync & Biometrics"
+        }
+
+        Text(
+            text = titleText,
+            fontSize = 21.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            textAlign = TextAlign.Center,
+            lineHeight = 28.sp,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        val descText = when (pageIndex) {
+            0 -> if (language == AppLanguage.BN) "দৈনন্দিন ক্যাশ, ওয়ালেট ও ব্যাংকের আয়-ব্যয়ের পাশাপাশি কার কাছে কত পাবেন বা কত দেনা আছেন তা নিখুঁতভাবে ট্র্যাকিং করুন।" else "Keep precise logs of daily earnings, spending, debts, and receivables in one single workspace."
+            1 -> if (language == AppLanguage.BN) "মাসিক বাজেটের সীমা নির্ধারণ করে বাড়তি খরচ ঠেকান এবং সেভিংস ভল্টের মাধ্যমে সঞ্চয় নিশ্চিত করুন।" else "Set monthly budget caps by category and build dedicated savings vaults with progress tracking."
+            2 -> if (language == AppLanguage.BN) "আকর্ষণীয় চার্ট, গ্রাফ ও ক্যাশফ্লো রিপোর্ট দেখে আপনার আয়-ব্যয় এবং সঞ্চয়ের অভ্যাসে ইতিবাচক পরিবর্তন আনুন।" else "Uncover spending patterns and track net-worth growth with dynamic interactive charts."
+            3 -> if (language == AppLanguage.BN) "পিনড ক্যাটাগরি ও ১-ট্যাপ টেমপ্লেট ব্যবহার করে যাতায়াত বা কেনাকাটার খরচ নিমেষেই ইনপুট দিন।" else "Record expenses in seconds using 1-tap templates and pinned favorite categories."
+            4 -> if (language == AppLanguage.BN) "সম্পূর্ণ তথ্য ইনপুট দেওয়ার সময় না থাকলে ড্রাফট হিসেবে দ্রুত সেভ করে রাখুন এবং পরে নিখুঁত এডিট করুন।" else "Save quick drafts when busy and finalize amount or categories whenever convenient."
+            5 -> if (language == AppLanguage.BN) "আপনার সমস্ত আয়-ব্যয়ের ক্যাটাগরি চার্ট ও মাসিক স্টেটমেন্ট এইচডি পিডিএফ (PDF) ফরম্যাটে এক্সপোর্ট করুন।" else "Generate sleek PDF reports and view detailed category pie charts with one tap."
+            6 -> if (language == AppLanguage.BN) "ফিনটেক ব্লু, এমারেল্ড গ্রীন, ও রয়্যাল পার্পলসহ চমৎকার কালার থিম এবং নাইট ডার্ক মোড উপভোগ করুন।" else "Personalize your app with Fintech Blue, Emerald, Purple themes and eye-safe Dark Mode."
+            7 -> if (language == AppLanguage.BN) "ব্যক্তিগত ওয়ালেট, অফিসিয়াল বা পারিবারিক বাজেট আলাদা ওয়ার্কস্পেসে নিখুঁতভাবে পরিচালনা করুন।" else "Switch between Personal, Office, and Family workspaces with separate balances & budgets."
+            else -> if (language == AppLanguage.BN) "গুগল ড্রাইভে ১-ক্লিক সিকিউর ব্যাকআপ এবং বায়োমেট্রিক ফিঙ্গারপ্রিন্ট লকিং দিয়ে গোপনীয়তা নিশ্চিত করুন।" else "Protect financial records with 1-click Google Drive backups and biometric fingerprint lock."
+        }
+
+        Text(
+            text = descText,
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Normal,
+            color = subtitleColor,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+fun IncomeExpenseDebtIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                color = if (isDark) Color(0xFF0F172A) else Color(0xFFECFDF5),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowDownward,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "আয় (মাসিক)" else "Income",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = "৳৪৫,০০০",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981)
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                color = if (isDark) Color(0xFF0F172A) else Color(0xFFFEF2F2),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "ব্যয় (মাসিক)" else "Expense",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = "৳১৮,২০০",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFEF4444)
+                        )
+                    }
+                }
+            }
+        }
+
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFEFF6FF),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(FintechBlue.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Handshake,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "দেনা-পাওনা হিসাব (পাওনা)" else "Net Debt / Receivable",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "২ জন ব্যক্তির কাছে পাওনা" else "Receivable from 2 persons",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Text(
+                    text = "৳৩,৫০০",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechBlue
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SavingsBudgetIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PieChart,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "মাসিক খরচ সীমা (বাজেট)" else "Monthly Budget Cap",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                    }
+                    Text(
+                        text = "৭২%",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FintechBlue
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = { 0.72f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    color = FintechBlue,
+                    trackColor = FintechBlue.copy(alpha = 0.2f)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "খরচ: ৳১৮,০০০" else "Spent: $18,000",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "সীমা: ৳২৫,০০০" else "Limit: $25,000",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.LightGray else Color.DarkGray
+                    )
+                }
+            }
+        }
+
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFECFDF5),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF10B981).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Bank icon used for Savings instead of pig icon!
+                        Icon(
+                            imageVector = Icons.Rounded.AccountBalance,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "জরুরি সঞ্চয় তহবিল" else "Emergency Savings Vault",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "লক্ষ্য: ৳৫০,০০০" else "Target: $50,000",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Text(
+                    text = "৳৩৫,০০০",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF10B981)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FinancialTrendIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFF0FDF4),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.TrendingUp,
+                        contentDescription = null,
+                        tint = Color(0xFF10B981),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "মাসিক নেট-ওয়ার্থ প্রবৃদ্ধি" else "Monthly Growth Trend",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                }
+                Text(
+                    text = "+১৫.৪%",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF10B981)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(90.dp)
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            val bars = listOf(
+                Pair(if (language == AppLanguage.BN) "জানু" else "Jan", 0.45f),
+                Pair(if (language == AppLanguage.BN) "ফেব্রু" else "Feb", 0.60f),
+                Pair(if (language == AppLanguage.BN) "মার্চ" else "Mar", 0.75f),
+                Pair(if (language == AppLanguage.BN) "এপ্রিল" else "Apr", 0.95f)
+            )
+            bars.forEachIndexed { idx, (month, ratio) ->
+                val barColor = if (idx == 3) FintechBlue else (if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .width(28.dp)
+                            .height((70 * ratio).dp)
+                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                            .background(barColor)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = month,
+                        fontSize = 10.sp,
+                        fontWeight = if (idx == 3) FontWeight.Bold else FontWeight.Normal,
+                        color = if (idx == 3) FintechBlue else Color.Gray
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickEntryIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFEFF6FF),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(FintechBlue),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FlashOn,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "১-ট্যাপ কুইক টেমপ্লেট" else "1-Tap Quick Template",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "দ্রুততম উপায়ে ক্যাশ এন্ট্রি" else "Instant Fast Entry",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Surface(
+                    color = FintechBlue.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ইনস্ট্যান্ট" else "Instant",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FintechBlue,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // Preset Chips Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val chips = listOf(
+                if (language == AppLanguage.BN) "☕ চা ৫০৳" else "☕ Tea $50",
+                if (language == AppLanguage.BN) "📱 রিচার্জ ২০০৳" else "📱 Mobile $200",
+                if (language == AppLanguage.BN) "🚗 রিকশা ১০০৳" else "🚗 Ride $100"
+            )
+            chips.forEach { label ->
+                Surface(
+                    color = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isDark) Color.LightGray else Color(0xFF334155),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // Pinned Category Icons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val categories = listOf(
+                Pair(Icons.Rounded.Restaurant, if (language == AppLanguage.BN) "খাবার" else "Food"),
+                Pair(Icons.Rounded.ShoppingCart, if (language == AppLanguage.BN) "বাজার" else "Grocery"),
+                Pair(Icons.Rounded.DirectionsCar, if (language == AppLanguage.BN) "যাতায়াত" else "Transport"),
+                Pair(Icons.Rounded.Receipt, if (language == AppLanguage.BN) "ইউটিলিটি" else "Bills")
+            )
+            categories.forEach { (icon, name) ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(FintechBlue.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = name,
+                        fontSize = 10.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DraftTransactionsIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Active Draft Item Card
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFFFFBEB),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF59E0B).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Drafts,
+                            contentDescription = null,
+                            tint = Color(0xFFF59E0B),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "মধ্যাহ্নভোজ (খসড়া)" else "Lunch Expense (Draft)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "পরবর্তীতে তথ্য নিশ্চিত করুন" else "Pending final details",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Surface(
+                    color = Color(0xFFF59E0B).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ড্রাফট" else "Draft",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFF59E0B),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        // Action Buttons Row Simulation
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = {},
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1)),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = null,
+                    tint = if (isDark) Color.LightGray else Color.DarkGray,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (language == AppLanguage.BN) "এডিট করুন" else "Edit Draft",
+                    fontSize = 12.sp,
+                    color = if (isDark) Color.LightGray else Color.DarkGray
+                )
+            }
+
+            Button(
+                onClick = {},
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (language == AppLanguage.BN) "কনফার্ম করুন" else "Finalize",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Draft Counter Pill
+        Surface(
+            color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.HourglassTop,
+                    contentDescription = null,
+                    tint = Color(0xFFF59E0B),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "মোট খসড়া লেনদেন: ৩ টি পেন্ডিং" else "Pending Draft Items: 3 Items",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFF59E0B)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PdfExportIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Document Card
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFFEF2F2),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFEF4444).copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PictureAsPdf,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "মাসিক_ফাইন্যান্স_রিপোর্ট.pdf" else "Monthly_Finance_Statement.pdf",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "এইচডি কোয়ালিটি এক্সপোর্ট রেডি" else "HD Vector Statement Ready",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
+                Surface(
+                    color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "PDF",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFEF4444),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
+
+        // Share & Download Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Button(
+                onClick = {},
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Download,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (language == AppLanguage.BN) "ডাউনলোড" else "Download",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            OutlinedButton(
+                onClick = {},
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.4f)),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(42.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Share,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (language == AppLanguage.BN) "শেয়ার করুন" else "Share PDF",
+                    fontSize = 12.sp,
+                    color = FintechBlue,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        // Summary Pill
+        Surface(
+            color = Color(0xFFEF4444).copy(alpha = 0.12f),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Summarize,
+                    contentDescription = null,
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "সকল লেনদেনের বিস্তৃত হিসাব এক্সপোর্ট করুন" else "Export complete visual transaction logs",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFEF4444)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CustomThemeIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Color Swatches Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val swatches = listOf(
+                Pair(Color(0xFF2563EB), "Fintech"),
+                Pair(Color(0xFF10B981), "Emerald"),
+                Pair(Color(0xFF8B5CF6), "Purple"),
+                Pair(Color(0xFFEC4899), "Rose"),
+                Pair(Color(0xFFF59E0B), "Amber")
+            )
+
+            swatches.forEachIndexed { idx, (color, name) ->
+                val isSelected = (idx == 0)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .border(
+                                width = if (isSelected) 3.dp else 0.dp,
+                                color = if (isSelected) Color.White else Color.Transparent,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = name,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) FintechBlue else Color.Gray
+                    )
+                }
+            }
+        }
+
+        // Light/Dark Mode Switcher Banner
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isDark) Icons.Rounded.DarkMode else Icons.Rounded.LightMode,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text(
+                        text = if (isDark) (if (language == AppLanguage.BN) "ডার্ক নাইট মোড" else "Dark Night Mode")
+                        else (if (language == AppLanguage.BN) "লাইফস্টাইল লাইট মোড" else "Light Theme Mode"),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                }
+                Surface(
+                    color = FintechBlue.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "সক্রিয়" else "Active",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FintechBlue,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+data class WorkspaceItem(val icon: androidx.compose.ui.graphics.vector.ImageVector, val label: String, val color: Color, val isActive: Boolean)
+
+@Composable
+fun MultiWorkspaceIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Workspace Cards Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val workspaces = listOf(
+                WorkspaceItem(Icons.Rounded.Person, if (language == AppLanguage.BN) "ব্যক্তিগত" else "Personal", FintechBlue, true),
+                WorkspaceItem(Icons.Rounded.Business, if (language == AppLanguage.BN) "বিজনেস" else "Business", Color(0xFF10B981), false),
+                WorkspaceItem(Icons.Rounded.Group, if (language == AppLanguage.BN) "ফ্যামিলি" else "Family", Color(0xFF8B5CF6), false)
+            )
+
+            workspaces.forEach { (icon, label, color, isActive) ->
+                Surface(
+                    color = if (isActive) color.copy(alpha = 0.15f) else (if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC)),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(
+                        width = if (isActive) 1.5.dp else 1.dp,
+                        color = if (isActive) color else (if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0))
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(color.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Text(
+                            text = label,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isActive) color else (if (isDark) Color.LightGray else Color.DarkGray)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Active Workspace Stats Pill
+        Surface(
+            color = FintechBlue.copy(alpha = 0.12f),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Workspaces,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "ব্যক্তিগত ওয়ালেট ব্যালেন্স" else "Personal Wallet Balance",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                }
+                Text(
+                    text = "৳৫৮,৪০০",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechBlue
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ExpenseTrackingIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Income Row Card
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFF0FDF4),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ArrowUpward,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "মাসিক বেতন" else "Monthly Salary",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "ব্যাংক একাউন্ট" else "Bank Account",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Text(
+                    text = "+৳৫০,০০০",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF10B981)
+                )
+            }
+        }
+
+        // Expense Row Card
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFFEF2F2),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.4f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ShoppingCart,
+                            contentDescription = null,
+                            tint = Color(0xFFEF4444),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = if (language == AppLanguage.BN) "সাপ্তাহিক বাজার" else "Weekly Grocery",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) Color.White else Color(0xFF0F172A)
+                        )
+                        Text(
+                            text = if (language == AppLanguage.BN) "বিকাশ ওয়ালেট" else "bKash Wallet",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+                Text(
+                    text = "-৳৩,৫০০",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFEF4444)
+                )
+            }
+        }
+
+        // Balance Summary Pill
+        Surface(
+            color = FintechBlue.copy(alpha = 0.15f),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.AccountBalance,
+                    contentDescription = null,
+                    tint = FintechBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "মোট অবশিষ্ট ব্যালেন্স: ৳৪৬,৫০০" else "Net Available Balance: ৳46,500",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechBlue
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun BudgetingIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Budget Progress Box
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFF8FAFC),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "মাসিক খরচ বাজেট" else "Monthly Expense Budget",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                    Surface(
+                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "৬৪% ব্যবহৃত" else "64% Used",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                LinearProgressIndicator(
+                    progress = { 0.64f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(CircleShape),
+                    color = FintechBlue,
+                    trackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "ব্যয়িত: ৳৩২,০০০" else "Spent: ৳32,000",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "সীমা: ৳৫০,০০০" else "Limit: ৳50,000",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.LightGray else Color.DarkGray
+                    )
+                }
+            }
+        }
+
+        // Savings Goal Box
+        Surface(
+            color = if (isDark) Color(0xFF0F172A) else Color(0xFFEFF6FF),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FintechBlue.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Savings,
+                        contentDescription = null,
+                        tint = FintechBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (language == AppLanguage.BN) "নতুন ল্যাপটপ ফান্ড" else "New Laptop Fund",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { 0.8f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(CircleShape),
+                        color = Color(0xFF10B981),
+                        trackColor = if (isDark) Color(0xFF334155) else Color(0xFFDBEAFE)
+                    )
+                }
+                Text(
+                    text = "৮০%",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF10B981)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AnalyticsIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Bar Chart Graphic Simulation
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(110.dp)
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            val bars = listOf(
+                Pair(if (language == AppLanguage.BN) "জানু" else "Jan", 0.45f),
+                Pair(if (language == AppLanguage.BN) "ফেব্রু" else "Feb", 0.65f),
+                Pair(if (language == AppLanguage.BN) "মার্চ" else "Mar", 0.35f),
+                Pair(if (language == AppLanguage.BN) "এপ্রিল" else "Apr", 0.85f),
+                Pair(if (language == AppLanguage.BN) "মে" else "May", 0.55f)
+            )
+
+            bars.forEachIndexed { index, pair ->
+                val isCurrent = (index == 3)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Bottom,
+                    modifier = Modifier.fillMaxHeight()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(22.dp)
+                            .fillMaxHeight(pair.second)
+                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                            .background(
+                                if (isCurrent) Brush.verticalGradient(listOf(FintechBlue, Color(0xFF3B82F6)))
+                                else SolidColor(if (isDark) Color(0xFF334155) else Color(0xFFCBD5E1))
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = pair.first,
+                        fontSize = 10.sp,
+                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isCurrent) FintechBlue else Color.Gray
+                    )
+                }
+            }
+        }
+
+        // Donut / Category Badges
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            CategoryLegendBadge(if (language == AppLanguage.BN) "খাবার ৩৫%" else "Food 35%", Color(0xFF3B82F6))
+            CategoryLegendBadge(if (language == AppLanguage.BN) "বাজার ২৫%" else "Grocery 25%", Color(0xFF10B981))
+            CategoryLegendBadge(if (language == AppLanguage.BN) "বিল ২০%" else "Bills 20%", Color(0xFFF59E0B))
+            CategoryLegendBadge(if (language == AppLanguage.BN) "অন্যান্য ২০%" else "Other 20%", Color(0xFF8B5CF6))
+        }
+    }
+}
+
+@Composable
+fun CategoryLegendBadge(label: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.Gray
+        )
+    }
+}
+
+@Composable
+fun SecuritySyncIllustration(language: AppLanguage, isDark: Boolean) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Google Drive Sync Card
+            Surface(
+                color = if (isDark) Color(0xFF0F172A) else Color(0xFFEFF6FF),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.3f)),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(FintechBlue.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CloudDone,
+                            contentDescription = null,
+                            tint = FintechBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        text = if (language == AppLanguage.BN) "গুগল ড্রাইভ সিঙ্ক" else "Google Drive Sync",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "১-ক্লিক ব্যাকআপ" else "1-Click Backup",
+                        fontSize = 10.sp,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Biometric Security Card
+            Surface(
+                color = if (isDark) Color(0xFF0F172A) else Color(0xFFF0FDF4),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Fingerprint,
+                            contentDescription = null,
+                            tint = Color(0xFF10B981),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Text(
+                        text = if (language == AppLanguage.BN) "বায়োমেট্রিক লক" else "Biometric Lock",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDark) Color.White else Color(0xFF0F172A),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (language == AppLanguage.BN) "ফিঙ্গারপ্রিন্ট নিরাপদ" else "Fingerprint Secure",
+                        fontSize = 10.sp,
+                        color = FintechBlue,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // Multi-Workspace Tag
+        Surface(
+            color = Color(0xFF8B5CF6).copy(alpha = 0.12f),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.3f))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Workspaces,
+                    contentDescription = null,
+                    tint = Color(0xFF8B5CF6),
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = if (language == AppLanguage.BN) "মাল্টি-ওয়ার্কস্পেস ও ফ্যামিলি প্রোফাইল সাপোর্টেড" else "Multi-Workspace & Family Profile Supported",
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF8B5CF6)
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -23663,7 +25619,8 @@ fun LoginScreen(
     language: AppLanguage,
     isDark: Boolean,
     onDismiss: () -> Unit,
-    onGoogleSignIn: () -> Unit
+    onGoogleSignIn: () -> Unit,
+    onOpenOnboarding: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val activity = context as? android.app.Activity
@@ -23945,6 +25902,37 @@ fun LoginScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
                             )
+                        }
+                    }
+
+                    if (onOpenOnboarding != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { onOpenOnboarding() },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, FintechBlue.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .pressScale(0.95f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Info,
+                                    contentDescription = null,
+                                    tint = FintechBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = if (language == AppLanguage.BN) "অ্যাপের আকর্ষণীয় ফিচারসমূহ দেখুন" else "View App's Exciting Features",
+                                    color = FintechBlue,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -24633,7 +26621,8 @@ fun EnhancedProfileMenu(
     onLogin: () -> Unit,
     onLogout: () -> Unit,
     onDrafts: () -> Unit,
-    onAutoEntry: () -> Unit = {}
+    onAutoEntry: () -> Unit = {},
+    onGuidelines: () -> Unit = {}
 ) {
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
@@ -24762,6 +26751,13 @@ fun EnhancedProfileMenu(
                     label = if (language == AppLanguage.BN) "স্বয়ংক্রিয় এন্ট্রি (অটো এন্ট্রি)" else "Auto Entry System",
                     isDark = isDark,
                     onClick = onAutoEntry
+                )
+
+                ProfileMenuItem(
+                    icon = Icons.Rounded.MenuBook,
+                    label = if (language == AppLanguage.BN) "গাইডলাইন" else "User Guidelines",
+                    isDark = isDark,
+                    onClick = onGuidelines
                 )
 
                 HorizontalDivider(color = if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f))
