@@ -2128,6 +2128,37 @@ fun FinanceNoteApp(
         }
     }
 
+    val authRecoveryIntent by viewModel.authRecoveryIntent.collectAsState()
+    val googleAuthConsentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        viewModel.clearAuthRecoveryIntent()
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.triggerCustomNotification(
+                if (language == AppLanguage.BN) "গুগল ড্রাইভ পারমিশন অনুমোদিত হয়েছে! এখন ব্যাকআপ করতে পারবেন।" else "Google Drive permission granted! You can now backup.",
+                isSuccess = true,
+                type = "SUCCESS"
+            )
+        } else {
+            viewModel.triggerCustomNotification(
+                if (language == AppLanguage.BN) "ড্রাইভ অ্যাক্সেস পারমিশন প্রদান করা হয়নি" else "Drive access permission was not granted",
+                isSuccess = false,
+                type = "INFO"
+            )
+        }
+    }
+
+    LaunchedEffect(authRecoveryIntent) {
+        authRecoveryIntent?.let { intent ->
+            try {
+                googleAuthConsentLauncher.launch(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                viewModel.clearAuthRecoveryIntent()
+            }
+        }
+    }
+
     val triggerGoogleSignIn = {
         val finalClientId = if (BuildConfig.DRIVE_API.isNotEmpty() &&
             BuildConfig.DRIVE_API != "YOUR_DRIVE_API_CLIENT_ID" &&
@@ -2146,6 +2177,7 @@ fun FinanceNoteApp(
         )
             .requestEmail()
             .requestProfile()
+            .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"))
 
         if (finalClientId.isNotBlank()) {
             try {
@@ -3595,17 +3627,30 @@ fun FinanceNoteApp(
                                     onBack = { activeTab = "dashboard" },
                                     onSignInClick = { triggerGoogleSignIn() },
                                     onBackupClick = {
-                                        composeCoroutineScope.launch {
-                                            val backupData = viewModel.getCurrentDatabaseBackup()
-                                            val stats = viewModel.calculateBackupStats(backupData)
-                                            cloudBackupStats = stats
-                                            showBackupConfirm = true
+                                        if (!isGoogleSignedIn) {
+                                            triggerGoogleSignIn()
+                                        } else {
+                                            composeCoroutineScope.launch {
+                                                val backupData = viewModel.getCurrentDatabaseBackup()
+                                                val stats = viewModel.calculateBackupStats(backupData)
+                                                cloudBackupStats = stats
+                                                showBackupConfirm = true
+                                            }
                                         }
                                     },
                                     onRestoreClick = {
-                                        executeWithInternetCheck {
-                                            showRestoreListDialog = true
-                                            viewModel.listGoogleDriveFiles(context)
+                                        if (!isGoogleSignedIn) {
+                                            triggerGoogleSignIn()
+                                        } else {
+                                            executeWithInternetCheck {
+                                                showRestoreListDialog = true
+                                                viewModel.listGoogleDriveFiles(
+                                                    context = context,
+                                                    onError = { err ->
+                                                        viewModel.triggerCustomNotification(err, isSuccess = false, type = "ERROR")
+                                                    }
+                                                )
+                                            }
                                         }
                                     },
                                     showLogoutConfirm = showLogoutConfirm,
@@ -17419,6 +17464,7 @@ fun SettingsScreen(
     val profileAddress by viewModel.profileAddress.collectAsState()
 
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
+    val isAuthenticated by viewModel.isUserSignedInFlow.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsState()
     val googleEmail by viewModel.googleEmail.collectAsState()
     val googlePhotoUrl by viewModel.googlePhotoUrl.collectAsState()
@@ -18939,13 +18985,13 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isGoogleSignedIn) (googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল ইউজার" else "Google User" }) else (if (language == AppLanguage.BN) "লগইন করা নেই" else "Not Signed In"),
+                                text = if (isGoogleSignedIn) (googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্টেড" else "Google Drive Connected" }) else (if (isAuthenticated) (if (language == AppLanguage.BN) "ফায়ারস্টোর সিঙ্ক সক্রিয়" else "Firestore Sync Active") else (if (language == AppLanguage.BN) "লগইন করা নেই" else "Not Signed In")),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 color = if (isDark) Color.White else Color(0xFF1E293B)
                             )
                             Text(
-                                text = if (isGoogleSignedIn) (googleEmail.orEmpty().ifBlank { "drive.user@gmail.com" }) else (if (language == AppLanguage.BN) "ব্যাকআপ রাখতে অনুগ্রহ করে সাইন-ইন করুন" else "Please sign-in to backup your data"),
+                                text = if (isGoogleSignedIn) (googleEmail.orEmpty().ifBlank { "drive.user@gmail.com" }) else (if (isAuthenticated) (if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ নিতে গুগল দিয়ে লগইন করুন" else "Sign in with Google for Drive Backup") else (if (language == AppLanguage.BN) "ব্যাকআপ রাখতে অনুগ্রহ করে সাইন-ইন করুন" else "Please sign-in to backup your data")),
                                 fontSize = 11.sp,
                                 color = if (isDark) Color.Gray else Color(0xFF64748B),
                                 maxLines = 1,
@@ -18974,7 +19020,7 @@ fun SettingsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "লগইন" else "Login"),
+                                    text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "গুগল লগইন" else "Google"),
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -23038,19 +23084,55 @@ fun GoogleDriveRestoreListDialog(
                     }
                 } else if (files.isEmpty()) {
                     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Rounded.CloudOff,
                                 contentDescription = null,
-                                modifier = Modifier.size(64.dp),
+                                modifier = Modifier.size(56.dp),
                                 tint = if (isDark) Color.DarkGray else Color.LightGray
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = if (language == AppLanguage.BN) "কোনো ব্যাকআপ ফাইল পাওয়া যায়নি" else "No backup files found",
+                                text = if (language == AppLanguage.BN) "গুগল ড্রাইভে কোনো ব্যাকআপ ফাইল পাওয়া যায়নি" else "No backup files found on Google Drive",
                                 color = if (isDark) Color.Gray else Color(0xFF64748B),
-                                fontSize = 14.sp
+                                fontSize = 13.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = {
+                                    viewModel.pullFromFirestore(
+                                        onSuccess = {
+                                            viewModel.triggerCustomNotification(
+                                                if (language == AppLanguage.BN) "ক্লাউড থেকে সফলভাবে ডাটা রিস্টোর সম্পন্ন হয়েছে!" else "Data successfully restored from Cloud!",
+                                                isSuccess = true,
+                                                type = "SUCCESS"
+                                            )
+                                            onDismiss()
+                                        },
+                                        onError = { err ->
+                                            viewModel.triggerCustomNotification(
+                                                "${if (language == AppLanguage.BN) "রিস্টোর ব্যর্থ: " else "Restore failed: "}$err",
+                                                isSuccess = false,
+                                                type = "ERROR"
+                                            )
+                                        }
+                                    )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Rounded.CloudSync, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (language == AppLanguage.BN) "ফায়ারস্টোর ক্লাউড সিঙ্ক থেকে রিস্টোর" else "Restore from Firestore Cloud",
+                                    fontSize = 12.sp,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 } else {
@@ -26058,7 +26140,10 @@ fun ProfileSetupScreen(
     
     val context = LocalContext.current
     val googlePrefs = remember { context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE) }
-    val savedSetupEmail = remember(googleEmail) { googlePrefs.getString("user_setup_email", googleEmail ?: "") ?: (googleEmail ?: "") }
+    val savedSetupEmail = remember(googleEmail) {
+        val raw = googlePrefs.getString("user_setup_email", googleEmail ?: "") ?: (googleEmail ?: "")
+        viewModel.cleanEmailOrUid(raw) ?: raw
+    }
     
     var name by remember { mutableStateOf(googleName ?: "") }
     var address by remember { mutableStateOf(userAddress ?: "") }
@@ -26073,7 +26158,9 @@ fun ProfileSetupScreen(
         if (phone.isBlank() && !userPhone.isNullOrBlank()) phone = userPhone!!
         if (dob.isBlank() && !userDOB.isNullOrBlank()) dob = userDOB!!
         if (photoUri.isBlank() && !googlePhotoUrl.isNullOrBlank()) photoUri = googlePhotoUrl!!
-        if (emailInput.isBlank() && !googleEmail.isNullOrBlank()) emailInput = googleEmail!!
+        if (emailInput.isBlank() && !googleEmail.isNullOrBlank()) {
+            emailInput = viewModel.cleanEmailOrUid(googleEmail!!) ?: googleEmail!!
+        }
     }
     
     val cropLauncher = rememberLauncherForActivityResult(UCropContract()) { uri ->
@@ -26542,7 +26629,8 @@ fun ProfileSetupScreen(
                         Button(
                             onClick = {
                                 isLoading = true
-                                googlePrefs.edit().putString("user_setup_email", emailInput).apply()
+                                val cleanedSetupEmail = viewModel.cleanEmailOrUid(emailInput) ?: emailInput
+                                googlePrefs.edit().putString("user_setup_email", cleanedSetupEmail).apply()
                                 viewModel.updateUserProfile(name, address, phone, dob, photoUri,
                                     onSuccess = {
                                         isLoading = false
@@ -26625,6 +26713,7 @@ fun EnhancedProfileMenu(
     onGuidelines: () -> Unit = {}
 ) {
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsStateWithLifecycle()
+    val isAuthenticated by viewModel.isUserSignedInFlow.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsStateWithLifecycle()
     val profileName by viewModel.profileName.collectAsStateWithLifecycle()
     val googleEmail by viewModel.googleEmail.collectAsStateWithLifecycle()
@@ -26633,8 +26722,8 @@ fun EnhancedProfileMenu(
     val isPhotoLoading by viewModel.isPhotoLoading.collectAsStateWithLifecycle()
     val draftsList by viewModel.draftTransactions.collectAsStateWithLifecycle()
 
-    val displayPhotoUri = rawProfilePhotoUri.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) googlePhotoUrl else null)
-    val displayName = profileName.takeIf { !it.isNullOrBlank() } ?: (if (isGoogleSignedIn) (googleName ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User"))
+    val displayPhotoUri = rawProfilePhotoUri.takeIf { !it.isNullOrBlank() } ?: (if (isAuthenticated) googlePhotoUrl else null)
+    val displayName = profileName.takeIf { !it.isNullOrBlank() } ?: (googleName?.takeIf { it.isNotBlank() } ?: (if (isAuthenticated) (googleEmail?.substringBefore("@") ?: (if (language == AppLanguage.BN) "ব্যবহারকারী" else "User")) else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User")))
 
     Dialog(
         onDismissRequest = onDismiss
@@ -26704,7 +26793,7 @@ fun EnhancedProfileMenu(
                             fontSize = 18.sp,
                             color = if (isDark) Color.White else Color.Black
                         )
-                        if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) {
+                        if (isAuthenticated && !googleEmail.isNullOrBlank()) {
                             Text(
                                 text = googleEmail ?: "",
                                 fontSize = 12.sp,
@@ -26762,7 +26851,7 @@ fun EnhancedProfileMenu(
 
                 HorizontalDivider(color = if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.LightGray.copy(alpha = 0.5f))
 
-                if (isGoogleSignedIn) {
+                if (isAuthenticated) {
                     ProfileMenuItem(
                         icon = Icons.Rounded.Logout,
                         label = if (language == AppLanguage.BN) "লগআউট" else "Logout",

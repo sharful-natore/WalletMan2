@@ -101,6 +101,16 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
     val updateManager = UpdateManager()
 
+    fun cleanEmailOrUid(input: String?): String? {
+        if (input == null) return null
+        val trimmed = input.trim()
+        return if (trimmed.contains("@")) {
+            trimmed.lowercase().replace(" ", "")
+        } else {
+            trimmed
+        }
+    }
+
     private fun getFirebaseAuth(): FirebaseAuth {
         val app = com.example.FinanceApplication.ensureFirebaseInitialized(getApplication())
         return if (app != null) {
@@ -154,9 +164,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
         val initialGPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
         val savedEmail = initialGPrefs.getString("google_email", null)
+        val isGoogleLoginPref = initialGPrefs.getBoolean("is_google_login", false)
         if (!savedEmail.isNullOrBlank()) {
-            _isGoogleSignedIn.value = true
-            _googleEmail.value = savedEmail
+            _isGoogleSignedIn.value = isGoogleLoginPref
+            _googleEmail.value = cleanEmailOrUid(savedEmail)
             _googleName.value = initialGPrefs.getString("google_name", null)
             _googlePhotoUrl.value = initialGPrefs.getString("google_photo_url", null)
             _isProfileSetupComplete.value = initialGPrefs.getBoolean("profile_setup_complete", false)
@@ -167,15 +178,15 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 val user = auth.currentUser
                 _currentUser.value = user
                 
-                // Treat any Firebase sign-in as 'signed in' for sync purposes
+                val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
+                val isGoogleLogin = gPrefs.getBoolean("is_google_login", false) || (user?.providerData?.any { it.providerId == "google.com" } == true)
+                
                 val signedIn = user != null || !_googleEmail.value.isNullOrBlank()
-                _isGoogleSignedIn.value = signedIn
+                _isGoogleSignedIn.value = signedIn && isGoogleLogin
                 
                 if (signedIn && user != null) {
                     // Use Firebase user details as default profile data
-                    val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                    
-                    _googleEmail.value = user.email ?: user.uid
+                    _googleEmail.value = cleanEmailOrUid(user.email ?: user.uid)
                     
                     if (gPrefs.getBoolean("profile_setup_complete", false)) {
                         _googleName.value = gPrefs.getString("google_name", user.displayName)
@@ -192,7 +203,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     // Keep SharedPreferences in sync for Widget
                     val cachedPrefs = getApplication<Application>().getSharedPreferences("financenote_prefs", Context.MODE_PRIVATE)
                     gPrefs.edit().apply {
-                        putString("google_email", _googleEmail.value)
+                        putString("google_email", cleanEmailOrUid(_googleEmail.value))
                         putString("google_name", _googleName.value)
                         putString("google_photo_url", _googlePhotoUrl.value)
                     }.apply()
@@ -1971,9 +1982,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         }
     }
 
+    fun getActiveSyncEmail(): String? {
+        return cleanEmailOrUid(_googleEmail.value ?: _currentUser.value?.email)
+    }
+
     fun syncProfilePhotoToCloud(context: Context, workspaceId: String, photoUriOrPath: String?) {
-        val email = _googleEmail.value
-        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) return
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2049,8 +2064,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun restoreProfilePhotoFromCloud(context: Context, workspaceId: String, onRestored: ((String) -> Unit)? = null) {
-        val email = _googleEmail.value
-        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) return
 
         // 1. Check if local photo file exists and is non-empty on device
         val localFile = File(context.filesDir, "profile_photo_${workspaceId}.jpg")
@@ -2196,8 +2211,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun syncPersonPhotoToCloud(context: Context, personId: Int, photoUriOrPath: String?) {
-        val email = _googleEmail.value
-        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) return
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2234,8 +2249,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val downloadingPersonPhotos = java.util.concurrent.ConcurrentHashMap<Int, Boolean>()
 
     fun downloadAndSavePersonPhotoIfNeeded(person: Person) {
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) return
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) return
         if (downloadingPersonPhotos.putIfAbsent(person.id, true) == true) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -2797,8 +2812,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     val unsyncedItems: StateFlow<List<String>> = _unsyncedItems.asStateFlow()
 
     fun getUnsyncedItems(): List<String> {
-        val email = _googleEmail.value
-        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) return emptyList()
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) return emptyList()
         return _unsyncedItems.value
     }
 
@@ -2927,11 +2942,12 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                         super.onAvailable(network)
                         _isNetworkActive.value = true
                         // Internet is back! If there are unsaved changes, trigger sync
-                        if (_hasUnsavedChanges.value && _isGoogleSignedIn.value) {
+                        val syncEmail = getActiveSyncEmail()
+                        if (_hasUnsavedChanges.value && !syncEmail.isNullOrBlank()) {
                             uploadToFirestore()
                         }
                         // Automatically background sync any offline profile/person photos if signed in
-                        if (_isGoogleSignedIn.value) {
+                        if (!syncEmail.isNullOrBlank()) {
                             viewModelScope.launch(Dispatchers.IO) {
                                 try {
                                     val workspacesList = repository.allWorkspaces.first()
@@ -3020,8 +3036,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun checkUnsavedChanges() {
-        val email = _googleEmail.value
-        if (!_isGoogleSignedIn.value || email.isNullOrBlank()) {
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) {
             _hasUnsavedChanges.value = false
             _unsyncedItems.value = emptyList()
             return
@@ -3077,7 +3093,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     private fun onLocalDatabaseChanged() {
-        if (_isGoogleSignedIn.value && !_googleEmail.value.isNullOrBlank()) {
+        val email = getActiveSyncEmail()
+        if (!email.isNullOrBlank()) {
             checkUnsavedChanges()
             uploadToFirestore()
         } else {
@@ -3090,10 +3107,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private var uploadJob: kotlinx.coroutines.Job? = null
     
     fun uploadToFirestore(onComplete: (() -> Unit)? = null, onError: ((String) -> Unit)? = null) {
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) {
             _firestoreSyncStatus.value = "Sign-in required"
-            onError?.invoke("Not signed in to Google")
+            onError?.invoke("Not signed in")
             return
         }
         uploadJob?.cancel()
@@ -3150,10 +3167,10 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun pullFromFirestore(onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) {
             _firestoreSyncStatus.value = "Sign-in required"
-            onError("Not signed in to Google")
+            onError("Not signed in")
             return
         }
         viewModelScope.launch {
@@ -3213,8 +3230,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         profilePhotosListener?.remove()
         personPhotosListener?.remove()
 
-        val email = _googleEmail.value
-        if (email.isNullOrBlank() || !_isGoogleSignedIn.value) {
+        val email = getActiveSyncEmail()
+        if (email.isNullOrBlank()) {
             _firestoreSyncStatus.value = null
             return
         }
@@ -3581,6 +3598,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     private val _driveStatusMessage = MutableStateFlow<String?>(null)
     val driveStatusMessage: StateFlow<String?> = _driveStatusMessage.asStateFlow()
 
+    private val _authRecoveryIntent = MutableStateFlow<Intent?>(null)
+    val authRecoveryIntent: StateFlow<Intent?> = _authRecoveryIntent.asStateFlow()
+
+    fun clearAuthRecoveryIntent() {
+        _authRecoveryIntent.value = null
+    }
+
     private val _googleDriveFiles = MutableStateFlow<List<GoogleDriveFile>>(emptyList())
     val googleDriveFiles: StateFlow<List<GoogleDriveFile>> = _googleDriveFiles.asStateFlow()
 
@@ -3798,7 +3822,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         _autoBackupIntervalDays.value = prefs.getInt("auto_backup_interval_days", -1)
 
         if (!email.isNullOrEmpty()) {
-            _googleEmail.value = email
+            _googleEmail.value = cleanEmailOrUid(email)
             _googleName.value = name
             _googlePhotoUrl.value = photoUrl
             _isGoogleSignedIn.value = true
@@ -3856,19 +3880,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (email == null) {
                     throw Exception("Google account email not found")
                 }
+                val cleanedEmail = cleanEmailOrUid(email) ?: email
                 
                 // Select "default" workspace on Google Sign-In as requested
                 selectWorkspace("default")
 
                 val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
                 prefs.edit()
-                    .putString("google_email", email)
+                    .putString("google_email", cleanedEmail)
                     .putString("google_name", account.displayName ?: "Google User")
                     .putString("google_photo_url", account.photoUrl?.toString())
-                    .putString("last_google_email", email)
+                    .putString("last_google_email", cleanedEmail)
+                    .putBoolean("is_google_login", true)
                     .apply()
                 
-                _googleEmail.value = email
+                _googleEmail.value = cleanedEmail
                 _googleName.value = account.displayName ?: "Google User"
                 _googlePhotoUrl.value = account.photoUrl?.toString()
                 _isGoogleSignedIn.value = true
@@ -3876,7 +3902,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 // Update profile states as well so they match the Google account immediately
                 saveProfile(getApplication(),
                     name = account.displayName ?: "Google User",
-                    email = email,
+                    email = cleanedEmail,
                     photoUri = account.photoUrl?.toString(),
                     phone = _profilePhone.value,
                     social = _profileSocial.value,
@@ -3924,23 +3950,25 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 if (email.isBlank() || !email.contains("@")) {
                     throw Exception("Please enter a valid Google email address")
                 }
+                val cleanedEmail = cleanEmailOrUid(email) ?: email
                 selectWorkspace("default")
                 val prefs = context.getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                val finalName = if (!name.isNullOrBlank()) name else email.substringBefore("@").replace(".", " ")
+                val finalName = if (!name.isNullOrBlank()) name else cleanedEmail.substringBefore("@").replace(".", " ")
                 prefs.edit()
-                    .putString("google_email", email)
+                    .putString("google_email", cleanedEmail)
                     .putString("google_name", finalName)
-                    .putString("last_google_email", email)
+                    .putString("last_google_email", cleanedEmail)
+                    .putBoolean("is_google_login", true)
                     .apply()
 
-                _googleEmail.value = email
+                _googleEmail.value = cleanedEmail
                 _googleName.value = finalName
                 _isGoogleSignedIn.value = true
 
                 saveProfile(
                     getApplication(),
                     name = finalName,
-                    email = email,
+                    email = cleanedEmail,
                     photoUri = _profilePhotoUri.value,
                     phone = _profilePhone.value,
                     social = _profileSocial.value,
@@ -3968,6 +3996,13 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     val account = android.accounts.Account(email, "com.google")
                     val scope = "oauth2:https://www.googleapis.com/auth/drive.file"
                     com.google.android.gms.auth.GoogleAuthUtil.getToken(context, account, scope)
+                } catch (e: com.google.android.gms.auth.UserRecoverableAuthException) {
+                    e.printStackTrace()
+                    val intent = e.intent
+                    if (intent != null) {
+                        _authRecoveryIntent.value = intent
+                    }
+                    null
                 } catch (e: Exception) {
                     e.printStackTrace()
                     null
@@ -3980,11 +4015,17 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
         viewModelScope.launch {
             _isSyncing.value = true
             try {
+                // Ensure Firestore cloud backup is also triggered in background
+                try { uploadToFirestore() } catch (e: Exception) { e.printStackTrace() }
+
                 _driveStatusMessage.value = "Starting cloud backup..."
                 val accessToken = getValidAccessToken(context)
                 if (accessToken == null) {
-                    _isGoogleSignedIn.value = false
-                    throw Exception("Not signed in to Google or session expired")
+                    if (_authRecoveryIntent.value != null) {
+                        throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ ব্যাকআপের জন্য গুগল পারমিশন ডায়লগে 'Allow' চাপুন" else "Please tap 'Allow' on the Google Drive permission prompt")
+                    } else {
+                        throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ ব্যাকআপের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
+                    }
                 }
 
                 // 1. Get database data JSON string with comment and createdAt metadata
@@ -4065,8 +4106,11 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             try {
                 val accessToken = getValidAccessToken(context)
                 if (accessToken == null) {
-                    _isGoogleSignedIn.value = false
-                    throw Exception("Not signed in to Google or session expired")
+                    if (_authRecoveryIntent.value != null) {
+                        throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ রিস্টোরের জন্য গুগল পারমিশন ডায়লগে 'Allow' চাপুন" else "Please tap 'Allow' on the Google Drive permission prompt")
+                    } else {
+                        throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ রিস্টোরের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
+                    }
                 }
 
                 val request = Request.Builder()
@@ -4104,8 +4148,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             try {
                 val accessToken = getValidAccessToken(context)
                 if (accessToken == null) {
-                    _isGoogleSignedIn.value = false
-                    throw Exception("Not signed in to Google or session expired")
+                    throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ অ্যাক্সেসের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
                 }
 
                 // Fetch metadata for file name
@@ -4182,8 +4225,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _driveStatusMessage.value = "Downloading selected backup file..."
                 val accessToken = getValidAccessToken(context)
                 if (accessToken == null) {
-                    _isGoogleSignedIn.value = false
-                    throw Exception("Not signed in to Google or session expired")
+                    throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ অ্যাক্সেসের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
                 }
 
                 val downloadRequest = Request.Builder()
@@ -4219,8 +4261,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _driveStatusMessage.value = "Downloading selected backup file..."
                 val accessToken = getValidAccessToken(context)
                 if (accessToken == null) {
-                    _isGoogleSignedIn.value = false
-                    throw Exception("Not signed in to Google or session expired")
+                    throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ অ্যাক্সেসের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
                 }
 
                 val downloadRequest = Request.Builder()
@@ -4264,8 +4305,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 _driveStatusMessage.value = "Searching for backup on cloud..."
                 val accessToken = getValidAccessToken(context)
                 if (accessToken == null) {
-                    _isGoogleSignedIn.value = false
-                    throw Exception("Not signed in to Google or session expired")
+                    throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ অ্যাক্সেসের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
                 }
 
                 val searchRequest = Request.Builder()
@@ -4453,6 +4493,7 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             .remove("google_email")
             .remove("google_name")
             .remove("google_photo_url")
+            .remove("is_google_login")
             .remove("profile_setup_complete")
             .remove("user_address")
             .remove("user_phone")
@@ -4647,8 +4688,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             uploadToFirestore()
         }
         
-        val email = _googleEmail.value
-        if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
+        val email = getActiveSyncEmail()
+        if (!email.isNullOrBlank()) {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val db = getFirestore(getApplication())
@@ -4675,8 +4716,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
     }
 
     fun fetchUserProfile() {
-        val email = _googleEmail.value
-        if (_isGoogleSignedIn.value && !email.isNullOrBlank()) {
+        val email = getActiveSyncEmail()
+        if (!email.isNullOrBlank()) {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val db = getFirestore(getApplication())
@@ -4739,17 +4780,21 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("ইমেইল এবং পাসওয়ার্ড ঘর দুটি পূরণ করুন")
             return
         }
+        val cleanedEmailInput = cleanEmailOrUid(trimmedEmail) ?: trimmedEmail
         try {
-            getFirebaseAuth().signInWithEmailAndPassword(trimmedEmail, pass)
+            getFirebaseAuth().signInWithEmailAndPassword(cleanedEmailInput, pass)
                 .addOnCompleteListener { task ->
                     try {
                         if (task.isSuccessful) {
                             val user = task.result?.user
-                            val userEmail = user?.email ?: trimmedEmail
+                            val userEmail = cleanEmailOrUid(user?.email ?: cleanedEmailInput) ?: cleanedEmailInput
                             _googleEmail.value = userEmail
-                            _isGoogleSignedIn.value = true
+                            _isGoogleSignedIn.value = false
                             val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                            gPrefs.edit().putString("google_email", userEmail).apply()
+                            gPrefs.edit()
+                                .putString("google_email", userEmail)
+                                .putBoolean("is_google_login", false)
+                                .apply()
                             try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
                             try { restoreAllWorkspaceProfilePhotosFromCloud() } catch (e: Exception) { e.printStackTrace() }
                             try { startRealtimeSync() } catch (e: Exception) { e.printStackTrace() }
@@ -4788,7 +4833,8 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             onError("ইমেইল এবং পাসওয়ার্ড ঘর দুটি পূরণ করুন")
             return
         }
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+        val cleanedEmailInput = cleanEmailOrUid(trimmedEmail) ?: trimmedEmail
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(cleanedEmailInput).matches()) {
             onError("সঠিক ইমেইল এড্রেস প্রদান করুন")
             return
         }
@@ -4797,17 +4843,20 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
             return
         }
         try {
-            getFirebaseAuth().createUserWithEmailAndPassword(trimmedEmail, pass)
+            getFirebaseAuth().createUserWithEmailAndPassword(cleanedEmailInput, pass)
                 .addOnCompleteListener { task ->
                     try {
                         if (task.isSuccessful) {
                             val user = task.result?.user
-                            val userEmail = user?.email ?: trimmedEmail
+                            val userEmail = cleanEmailOrUid(user?.email ?: cleanedEmailInput) ?: cleanedEmailInput
                             _googleEmail.value = userEmail
-                            _isGoogleSignedIn.value = true
+                            _isGoogleSignedIn.value = false
                             _isProfileSetupComplete.value = false // Explicitly set to false to trigger setup
                             val gPrefs = getApplication<Application>().getSharedPreferences("financenote_google_prefs", Context.MODE_PRIVATE)
-                            gPrefs.edit().putString("google_email", userEmail).apply()
+                            gPrefs.edit()
+                                .putString("google_email", userEmail)
+                                .putBoolean("is_google_login", false)
+                                .apply()
                             try { fetchUserProfile() } catch (e: Exception) { e.printStackTrace() }
                             try { restoreProfilePhotoFromCloud(getApplication(), _currentWorkspaceId.value) } catch (e: Exception) { e.printStackTrace() }
                             try { checkAndRestoreProfilePhoto(getApplication(), _currentWorkspaceId.value) } catch (e: Exception) { e.printStackTrace() }

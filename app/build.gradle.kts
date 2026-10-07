@@ -43,6 +43,7 @@ android {
     }
     buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$oauthClientId\"")
     buildConfigField("String", "PROJECT_ID", "\"$projectId\"")
+    buildConfigField("String", "DRIVE_API", "\"$oauthClientId\"")
   }
 
   signingConfigs {
