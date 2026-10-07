@@ -2135,11 +2135,13 @@ fun FinanceNoteApp(
         viewModel.clearAuthRecoveryIntent()
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             viewModel.triggerCustomNotification(
-                if (language == AppLanguage.BN) "গুগল ড্রাইভ পারমিশন অনুমোদিত হয়েছে! এখন ব্যাকআপ করতে পারবেন।" else "Google Drive permission granted! You can now backup.",
+                if (language == AppLanguage.BN) "গুগল ড্রাইভ পারমিশন অনুমোদিত হয়েছে! ব্যাকআপ/রিস্টোর সম্পন্ন হচ্ছে..." else "Google Drive permission granted! Processing backup/restore...",
                 isSuccess = true,
                 type = "SUCCESS"
             )
+            viewModel.executePendingDriveAction(context)
         } else {
+            viewModel.setPendingDriveAction(null)
             viewModel.triggerCustomNotification(
                 if (language == AppLanguage.BN) "ড্রাইভ অ্যাক্সেস পারমিশন প্রদান করা হয়নি" else "Drive access permission was not granted",
                 isSuccess = false,
@@ -3745,11 +3747,15 @@ fun FinanceNoteApp(
                                             isGoogleSignedIn = isGoogleSignedIn,
                                             onSignInClick = { triggerGoogleSignIn() },
                                             onBackupClick = {
-                                                composeCoroutineScope.launch {
-                                                    val backupData = viewModel.getCurrentDatabaseBackup()
-                                                    val stats = viewModel.calculateBackupStats(backupData)
-                                                    cloudBackupStats = stats
-                                                    showBackupConfirm = true
+                                                if (!isGoogleSignedIn) {
+                                                    triggerGoogleSignIn()
+                                                } else {
+                                                    composeCoroutineScope.launch {
+                                                        val backupData = viewModel.getCurrentDatabaseBackup()
+                                                        val stats = viewModel.calculateBackupStats(backupData)
+                                                        cloudBackupStats = stats
+                                                        showBackupConfirm = true
+                                                    }
                                                 }
                                             },
                                             viewModel = viewModel,
@@ -17463,6 +17469,7 @@ fun SettingsScreen(
     val profileSocial by viewModel.profileSocial.collectAsState()
     val profileAddress by viewModel.profileAddress.collectAsState()
 
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isGoogleSignedIn by viewModel.isGoogleSignedIn.collectAsState()
     val isAuthenticated by viewModel.isUserSignedInFlow.collectAsStateWithLifecycle()
     val googleName by viewModel.googleName.collectAsState()
@@ -17754,6 +17761,190 @@ fun SettingsScreen(
                         tint = FintechBlue,
                         modifier = Modifier.size(16.dp)
                     )
+                }
+            }
+        }
+
+        // --- 1. APP ACCOUNT & USER PROFILE CARD ---
+        SettingCategory(
+            title = if (language == AppLanguage.BN) "অ্যাপ অ্যাকাউন্ট ও প্রোফাইল" else "App Account & Profile",
+            isDark = isDark,
+            icon = Icons.Rounded.AccountCircle,
+            initiallyExpanded = false
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+                    ),
+                    border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isPhotoLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = FintechBlue)
+                                } else if (!photoUriInput.isNullOrEmpty()) {
+                                    SubcomposeAsyncImage(
+                                        model = photoUriInput,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop,
+                                        error = {
+                                            Icon(Icons.Rounded.Person, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(24.dp))
+                                        }
+                                    )
+                                } else {
+                                    Icon(Icons.Rounded.Person, contentDescription = null, tint = FintechBlue, modifier = Modifier.size(24.dp))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                val isEmailUser = currentUser != null
+                                val userEmail = currentUser?.email ?: profileEmail.ifBlank { if (language == AppLanguage.BN) "গেস্ট অ্যাকাউন্ট" else "Guest Account" }
+                                val userName = nameInput.ifBlank { currentUser?.displayName ?: (if (isEmailUser) userEmail.substringBefore("@") else (if (language == AppLanguage.BN) "অতিথি ইউজার" else "Guest User")) }
+
+                                Text(
+                                    text = userName,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = if (isDark) Color.White else Color(0xFF1E293B)
+                                )
+                                Text(
+                                    text = userEmail,
+                                    fontSize = 11.sp,
+                                    color = if (isDark) Color.Gray else Color(0xFF64748B),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(3.dp))
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isEmailUser || isAuthenticated) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = if (isEmailUser || isAuthenticated) (if (language == AppLanguage.BN) "🟢 ক্লাউড সিঙ্ক সক্রিয় (ইমেইল লগইন)" else "🟢 Cloud Sync Active") else (if (language == AppLanguage.BN) "🟠 অফলাইন / গেস্ট মোড" else "🟠 Offline / Guest Mode"),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isEmailUser || isAuthenticated) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { photoLauncher.launch("image/*") },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(Icons.Rounded.CameraAlt, contentDescription = "Change Photo", tint = FintechBlue, modifier = Modifier.size(20.dp))
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = nameInput,
+                            onValueChange = { nameInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "ব্যবহারকারীর নাম" else "User Name", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                        )
+
+                        OutlinedTextField(
+                            value = phoneInput,
+                            onValueChange = { phoneInput = it },
+                            label = { Text(if (language == AppLanguage.BN) "মোবাইল নম্বর" else "Phone Number", fontSize = 12.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    viewModel.saveProfile(
+                                        context = context,
+                                        name = nameInput,
+                                        email = emailInput,
+                                        photoUri = photoUriInput,
+                                        phone = phoneInput,
+                                        social = socialInput,
+                                        address = addressInput
+                                    )
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "প্রোফাইল তথ্য সফলভাবে সেভ হয়েছে!" else "Profile info saved successfully!",
+                                        isSuccess = true,
+                                        type = "SUCCESS"
+                                    )
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = FintechBlue)
+                            ) {
+                                Icon(Icons.Rounded.Save, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (language == AppLanguage.BN) "তথ্য সেভ" else "Save Info", fontSize = 12.sp, color = Color.White)
+                            }
+
+                            if (currentUser != null || isAuthenticated) {
+                                Button(
+                                    onClick = {
+                                        viewModel.signOutAppAccount(context) {
+                                            viewModel.triggerCustomNotification(
+                                                if (language == AppLanguage.BN) "অ্যাপ অ্যাকাউন্ট থেকে লগআউট হয়েছে!" else "Signed out from app account!",
+                                                isSuccess = true,
+                                                type = "SIGN_OUT"
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = FintechRed)
+                                ) {
+                                    Icon(Icons.Rounded.Logout, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (language == AppLanguage.BN) "লগআউট" else "Sign Out", fontSize = 12.sp, color = Color.White)
+                                }
+                            } else {
+                                Button(
+                                    onClick = { onSignInClick() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                                ) {
+                                    Icon(Icons.Rounded.Login, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (language == AppLanguage.BN) "লগইন / সাইন আপ" else "Login / Sign Up", fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -18922,112 +19113,116 @@ fun SettingsScreen(
                 HorizontalDivider(color = if (isDark) Color(0xFF262626) else Color(0xFFE2E8F0))
 
                 // Online Backup (Google Drive) Sub-header
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = if (language == AppLanguage.BN) "অনলাইন ব্যাকআপ (গুগল ড্রাইভ)" else "Online Backup (Google Drive)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = if (isDark) Color.White else Color(0xFF1E293B)
-                    )
-                    // User status row
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9))
-                            .padding(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text(
+                            text = if (language == AppLanguage.BN) "অনলাইন ক্লাউড ব্যাকআপ (গুগল ড্রাইভ)" else "Online Cloud Backup (Google Drive)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = if (isDark) Color.White else Color(0xFF1E293B)
+                        )
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
-                            contentAlignment = Alignment.Center
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF64748B).copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
-                            if (isPhotoLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = FintechBlue
-                                )
-                            } else if (isGoogleSignedIn && !profilePhotoUri.isNullOrEmpty()) {
-                                SubcomposeAsyncImage(
-                                    model = profilePhotoUri,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop,
-                                    loading = {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp).padding(2.dp),
-                                            strokeWidth = 2.dp,
-                                            color = FintechBlue
-                                        )
-                                    },
-                                    error = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.AccountCircle,
-                                            contentDescription = null,
-                                            tint = FintechBlue,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.AccountCircle, 
-                                    contentDescription = null, 
-                                    tint = FintechBlue, 
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isGoogleSignedIn) (googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্টেড" else "Google Drive Connected" }) else (if (isAuthenticated) (if (language == AppLanguage.BN) "ফায়ারস্টোর সিঙ্ক সক্রিয়" else "Firestore Sync Active") else (if (language == AppLanguage.BN) "লগইন করা নেই" else "Not Signed In")),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = if (isDark) Color.White else Color(0xFF1E293B)
-                            )
-                            Text(
-                                text = if (isGoogleSignedIn) (googleEmail.orEmpty().ifBlank { "drive.user@gmail.com" }) else (if (isAuthenticated) (if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপ নিতে গুগল দিয়ে লগইন করুন" else "Sign in with Google for Drive Backup") else (if (language == AppLanguage.BN) "ব্যাকআপ রাখতে অনুগ্রহ করে সাইন-ইন করুন" else "Please sign-in to backup your data")),
+                                text = if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) (if (language == AppLanguage.BN) "সংযুক্ত" else "Connected") else (if (language == AppLanguage.BN) "সংযুক্ত নয়" else "Not Connected"),
                                 fontSize = 11.sp,
-                                color = if (isDark) Color.Gray else Color(0xFF64748B),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                fontWeight = FontWeight.Bold,
+                                color = if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) Color(0xFF10B981) else Color(0xFF64748B)
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (isGoogleSignedIn) {
-                                    onLogoutClick()
-                                } else {
-                                    onSignInClick()
-                                }
-                            },
-                            shape = CircleShape,
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isGoogleSignedIn) FintechRed else FintechBlue),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                    }
+
+                    // Google Drive Status Card Row
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+                        ),
+                        border = BorderStroke(1.dp, if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
                             modifier = Modifier
-                                .width(90.dp)
-                                .height(36.dp)
-                                .align(Alignment.CenterVertically)
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)),
                                 contentAlignment = Alignment.Center
                             ) {
+                                GoogleLogoIcon(modifier = Modifier.size(24.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isGoogleSignedIn) (if (language == AppLanguage.BN) "লগআউট" else "Logout") else (if (language == AppLanguage.BN) "গুগল লগইন" else "Google"),
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) (googleName.orEmpty().ifBlank { if (language == AppLanguage.BN) "গুগল ড্রাইভ কানেক্টেড" else "Google Drive Connected" }) else (if (language == AppLanguage.BN) "গুগল ড্রাইভ একাউন্ট" else "Google Drive Account"),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = if (isDark) Color.White else Color(0xFF1E293B)
                                 )
+                                Text(
+                                    text = if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) googleEmail.orEmpty() else (if (language == AppLanguage.BN) "ড্রাইভ ব্যাকআপের জন্য গুগল সাইন-ইন করুন" else "Sign in to connect Google Drive"),
+                                    fontSize = 11.sp,
+                                    color = if (isDark) Color.Gray else Color(0xFF64748B),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) {
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.disconnectGoogleDrive(context) {
+                                            viewModel.triggerCustomNotification(
+                                                if (language == AppLanguage.BN) "গুগল ড্রাইভ সংযোগ বিচ্ছিন্ন করা হয়েছে" else "Google Drive disconnected",
+                                                isSuccess = true,
+                                                type = "INFO"
+                                            )
+                                        }
+                                    },
+                                    shape = CircleShape,
+                                    border = BorderStroke(1.dp, FintechRed.copy(alpha = 0.7f)),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "ডিসকানেক্ট" else "Disconnect",
+                                        color = FintechRed,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else {
+                                Button(
+                                    onClick = { onSignInClick() },
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.buttonColors(containerColor = FintechBlue),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(34.dp)
+                                ) {
+                                    Text(
+                                        text = if (language == AppLanguage.BN) "যুক্ত করুন" else "Connect",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
+
                     if (!driveStatusMessage.isNullOrEmpty()) {
                         Text(
                             text = driveStatusMessage ?: "",
@@ -19039,14 +19234,14 @@ fun SettingsScreen(
                     }
                     Text(
                         text = if (language == AppLanguage.BN) 
-                            "আপনার সমস্ত লেনদেন, সঞ্চয় এবং হিসাবের তথ্য সম্পূর্ণ নিরাপদ রাখতে সরাসরি গুগল ড্রাইভে ব্যাকআপ রাখুন।" 
-                            else "To keep all your transaction, savings, and account data safe, backup directly to Google Drive.",
+                            "আপনার সমস্ত লেনদেন, সঞ্চয় এবং হিসাবের তথ্য সম্পূর্ণ নিরাপদ রাখতে সরাসরি গুগল ড্রাইভে ব্যাকআপ রাখুন এবং যেকোনো ফোন থেকে রিস্টোর করুন।" 
+                            else "To keep all your transaction, savings, and account data safe, backup directly to Google Drive and restore anytime.",
                         fontSize = 12.sp,
                         color = if (isDark) Color.Gray else Color(0xFF64748B)
                     )
 
                     // Last Backup Time Info Row & Auto Backup Setting
-                    if (isGoogleSignedIn) {
+                    if (isGoogleSignedIn && !googleEmail.isNullOrBlank()) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -19155,7 +19350,12 @@ fun SettingsScreen(
                     ) {
                         Button(
                             onClick = {
-                                if (!isGoogleSignedIn) {
+                                if (!isGoogleSignedIn || googleEmail.isNullOrBlank()) {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভ যুক্ত করুন" else "Please connect Google Drive first",
+                                        isSuccess = false,
+                                        type = "INFO"
+                                    )
                                     onSignInClick()
                                 } else {
                                     onBackupClick()
@@ -19171,7 +19371,12 @@ fun SettingsScreen(
                         }
                         Button(
                             onClick = {
-                                if (!isGoogleSignedIn) {
+                                if (!isGoogleSignedIn || googleEmail.isNullOrBlank()) {
+                                    viewModel.triggerCustomNotification(
+                                        if (language == AppLanguage.BN) "অনুগ্রহ করে প্রথমে গুগল ড্রাইভ যুক্ত করুন" else "Please connect Google Drive first",
+                                        isSuccess = false,
+                                        type = "INFO"
+                                    )
                                     onSignInClick()
                                 } else {
                                     onRestoreClick()
