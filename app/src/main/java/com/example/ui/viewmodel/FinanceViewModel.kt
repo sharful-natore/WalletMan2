@@ -49,6 +49,7 @@ import com.example.ui.theme.CustomGradientDirection
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import com.example.ui.AppLanguage
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -4113,9 +4114,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     }
                 }
 
+                val httpUrl = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
+                    .addQueryParameter("q", "trashed = false and (name contains 'finance_note_backup' or mimeType = 'application/json')")
+                    .addQueryParameter("fields", "files(id, name, mimeType, createdTime, size)")
+                    .addQueryParameter("orderBy", "createdTime desc")
+                    .addQueryParameter("pageSize", "100")
+                    .addQueryParameter("spaces", "drive")
+                    .build()
+
                 val request = Request.Builder()
-                    .url("https://www.googleapis.com/drive/v3/files?q=name%20contains%20'finance_note_backup'%20and%20trashed=false&fields=files(id,name,mimeType,createdTime,size)&orderBy=createdTime%20desc")
+                    .url(httpUrl)
                     .header("Authorization", "Bearer $accessToken")
+                    .get()
                     .build()
 
                 val response = kotlinx.coroutines.Dispatchers.IO.let { d ->
@@ -4126,12 +4136,31 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
 
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
-                    val filesResponse = moshi.adapter(GoogleDriveFilesResponse::class.java).fromJson(body)
-                    _googleDriveFiles.value = filesResponse?.files ?: emptyList()
+                    val list = mutableListOf<GoogleDriveFile>()
+                    try {
+                        val jsonObject = org.json.JSONObject(body)
+                        val jsonArray = jsonObject.optJSONArray("files")
+                        if (jsonArray != null) {
+                            for (i in 0 until jsonArray.length()) {
+                                val item = jsonArray.getJSONObject(i)
+                                val id = item.optString("id", "")
+                                val name = item.optString("name", "")
+                                val mimeType = if (item.has("mimeType")) item.optString("mimeType") else null
+                                val createdTime = if (item.has("createdTime")) item.optString("createdTime") else null
+                                val size = if (item.has("size")) item.optString("size") else null
+                                if (id.isNotEmpty() && name.isNotEmpty()) {
+                                    list.add(GoogleDriveFile(id = id, name = name, mimeType = mimeType, createdTime = createdTime, size = size))
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    _googleDriveFiles.value = list
                     onSuccess()
                 } else {
                     val errBody = response.body?.string() ?: ""
-                    throw Exception("Failed to list files: $errBody")
+                    throw Exception("Failed to list files ($response.code): $errBody")
                 }
             } catch (e: Exception) {
                 onError(e.localizedMessage ?: "Unknown error")
@@ -4308,9 +4337,18 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                     throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "ড্রাইভ অ্যাক্সেসের জন্য প্রথমে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন" else "Please sign in with Google to access Google Drive")
                 }
 
+                val httpUrl = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
+                    .addQueryParameter("q", "trashed = false and (name contains 'finance_note_backup' or mimeType = 'application/json')")
+                    .addQueryParameter("fields", "files(id, name)")
+                    .addQueryParameter("orderBy", "createdTime desc")
+                    .addQueryParameter("pageSize", "10")
+                    .addQueryParameter("spaces", "drive")
+                    .build()
+
                 val searchRequest = Request.Builder()
-                    .url("https://www.googleapis.com/drive/v3/files?q=name%20contains%20'finance_note_backup'%20and%20trashed=false&fields=files(id,name)&orderBy=createdTime%20desc")
+                    .url(httpUrl)
                     .header("Authorization", "Bearer $accessToken")
+                    .get()
                     .build()
 
                 val searchResponse = kotlinx.coroutines.Dispatchers.IO.let { d ->
@@ -4322,18 +4360,19 @@ class FinanceViewModel(private val repository: FinanceRepository, application: A
                 var existingFileId: String? = null
                 if (searchResponse.isSuccessful) {
                     val searchBody = searchResponse.body?.string() ?: ""
-                    val listType = com.squareup.moshi.Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
-                    val mapAdapter = moshi.adapter<Map<String, Any>>(listType)
-                    val parsed = mapAdapter.fromJson(searchBody)
-                    val filesList = parsed?.get("files") as? List<*>
-                    if (!filesList.isNullOrEmpty()) {
-                        val firstFile = filesList[0] as? Map<*, *>
-                        existingFileId = firstFile?.get("id") as? String
+                    try {
+                        val jsonObject = org.json.JSONObject(searchBody)
+                        val jsonArray = jsonObject.optJSONArray("files")
+                        if (jsonArray != null && jsonArray.length() > 0) {
+                            existingFileId = jsonArray.getJSONObject(0).optString("id", null)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
 
-                if (existingFileId == null) {
-                    throw Exception("No backup file found on Google Drive!")
+                if (existingFileId.isNullOrEmpty()) {
+                    throw Exception(if (_language.value == com.example.ui.AppLanguage.BN) "গুগল ড্রাইভে কোনো ব্যাকআপ ফাইল পাওয়া যায়নি!" else "No backup file found on Google Drive!")
                 }
 
                 restoreFromGoogleDriveFile(context, existingFileId, onSuccess, onError)
