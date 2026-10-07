@@ -15,7 +15,7 @@ android {
   compileSdk = 34
 
   defaultConfig {
-    applicationId = "com.fantasix.financenote"
+    applicationId = "com.vibestudio.financenote"
     minSdk = 24
     targetSdk = 34
     versionCode = 4
